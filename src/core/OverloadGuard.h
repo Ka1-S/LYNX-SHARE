@@ -55,6 +55,9 @@ public:
         // 190os: the stop now lets go at once, and the processing time it judges does not include the yield, so the
         // windows above see the same; each probe starved the screen for its 250 ms (perf190os/HANDOFF.md)
         double probeEveryMs = 0.0, probeMs = 250.0;
+        // round 190px: how late the pulse is when render-ahead starts pacing its catch-up ("ralate"; 50 = uiLateMs's
+        // default). Pacing costs the audio nothing while the ring holds blocks, so it may act earlier than the yield.
+        double aheadLateMs = 50.0;
     };
     const Params& params() const noexcept { return p; }
     // "key=value,…" (missing keys keep their value; any thread before the device starts)
@@ -85,6 +88,7 @@ public:
             else if (key == "probe") p.probeMs = v;
             else if (key == "probeevery") p.probeEveryMs = v;
             else if (key == "stopgrace") p.stopGraceMs = v;
+            else if (key == "ralate") p.aheadLateMs = v;
             at = end;
             while (*at != 0 && *at != ',')
                 ++at;
@@ -99,6 +103,24 @@ public:
 
     // Message thread: its 30 Hz pulse (the engine's timer), `nowMs` on the callbacks' clock.
     void uiPulse (double nowMs) noexcept { lastUiMs.store (nowMs, std::memory_order_relaxed); }
+
+    // Round 190px (perf 7): the UI starves right now — "Safe overloads" on and the 30 Hz pulse late by aheadLateMs. Any
+    // thread (the render-ahead thread paces its catch-up with it: after an overload, the callbacks keep their deadline
+    // while render-ahead refills its window with the workers on both CPUs of a small PC, which the callbacks' windows
+    // above never see; 190os measured 90-130 ms frame gaps there).
+    bool uiStarving (double nowMs) const noexcept
+    {
+        const auto ui = lastUiMs.load (std::memory_order_relaxed);
+        return enabled.load (std::memory_order_relaxed) && ui > 0.0 && nowMs - ui > p.aheadLateMs;
+    }
+    // what the render-ahead thread gave up that way (for --uiperf and the tests)
+    void notePaced (double ms) noexcept
+    {
+        pacedUs.fetch_add ((std::uint64_t) (ms * 1000.0), std::memory_order_relaxed);
+        pacedCount.fetch_add (1, std::memory_order_relaxed);
+    }
+    double pacedMs() const noexcept { return (double) pacedUs.load (std::memory_order_relaxed) / 1000.0; }
+    std::uint64_t timesPaced() const noexcept { return pacedCount.load (std::memory_order_relaxed); }
 
     // Audio thread, after every device callback (its output written): `usedMs` its processing time, `budgetMs` its
     // deadline, `playing` whether the transport runs (round 190os). Returns how long to yield now (ms, 0 = none). No
@@ -244,6 +266,7 @@ private:
     std::atomic<double> releaseAt { 0.0 }, releaseLag { 0.0 };
     std::atomic<double> lastUiMs { 0.0 };
     std::atomic<std::uint64_t> engagements { 0 }, yieldedUs { 0 };
+    std::atomic<std::uint64_t> pacedUs { 0 }, pacedCount { 0 }; // (round 190px)
     // audio thread only
     double windowStartMs = 0.0, lastOverloadMs = -1.0e12;
     int windowCalls = 0, windowOver = 0;

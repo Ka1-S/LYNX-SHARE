@@ -52,6 +52,7 @@ namespace lynx
 {
 class WorkerPool;
 class OsSemaphore;
+class OverloadGuard;
 
 // Options › Audio settings › "Render ahead (lower CPU at small buffers)": on by default (O22). App-wide, kept in
 // ui-options.txt ("renderAhead=0/1").
@@ -193,6 +194,15 @@ public:
     // render-ahead thread; `onThreadStart` raises its priority (as the workers'). Once, before playback.
     void setWorkerPool (WorkerPool* pool, std::function<void()> onThreadStart = {});
     void setLiveInput (LiveInput* input) noexcept { liveInput = input; }
+    // Round 190px (perf 7, fluidity): the engine's "Safe overloads" guard and its clock (ms, the callbacks' clock). While
+    // the guard says the UI starves, the render-ahead thread refills its window without the workers (unless the ring is
+    // about to run dry) and gives up a slice of the CPU after each block it renders while two or more wait in the ring.
+    // Only when blocks are rendered changes, never what they hold. Once, before playback; nullptr = never paced.
+    void setUiGuard (OverloadGuard* guard, double (*clockMs)() noexcept) noexcept
+    {
+        uiGuard = guard;
+        uiClock = clockMs;
+    }
     void setTargets (const renderahead::Targets* t) noexcept { targets = t; }
     // the window in samples (default about 23 ms; tests use other values)
     void setWindowSamples (int samples) noexcept { windowSamples = samples; }
@@ -316,6 +326,8 @@ private:
     std::unique_ptr<MeterBank> aheadMeters; // its meters, taken into the ring and replayed when the block is heard
     std::unique_ptr<HostTimeline> aheadTimeline;
     const renderahead::Targets* targets = nullptr;
+    OverloadGuard* uiGuard = nullptr; // (round 190px)
+    double (*uiClock)() noexcept = nullptr;
     renderahead::Stats counters;
 
     // the partition in use and the one being worked out (the renderers hold pointers into `current`)

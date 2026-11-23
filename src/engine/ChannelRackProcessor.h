@@ -80,6 +80,8 @@ public:
     void setProfiling (bool on) noexcept { ahead->setProfiling (on); }
     bool renderAheadOwnsWorkers() const noexcept { return ahead->ownsWorkers(); }
     void haltRenderAhead() noexcept { ahead->halt(); }
+    // round 190px: render-ahead paces its catch-up while the UI starves (core/RenderAhead.h setUiGuard)
+    void setUiGuard (OverloadGuard* guard, double (*clockMs)() noexcept) noexcept { ahead->setUiGuard (guard, clockMs); }
     void resumeRenderAhead() noexcept { ahead->resume(); } // (round 190jb: after an export's hold)
     void setRenderAheadAlways (bool always) noexcept { ahead->setAlwaysEngage (always); }
     const renderahead::Stats& renderAheadStats() const noexcept { return ahead->stats(); }

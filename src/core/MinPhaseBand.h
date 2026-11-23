@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <cmath>
 #include <complex>
 #include <vector>
@@ -303,10 +304,17 @@ public:
             for (int k = 0; k < order; ++k)
                 out[(std::size_t) k0++] = std::polar (radius, pi * (2.0 * k + order + 1.0) / (2.0 * order));
         };
-        if (wh > 0.0)
-            butterworth (wh, poles, np, nh);
-        if (wl > 0.0)
-            butterworth (wl, poles, np, nl);
+        // round 190px (perf 7): the poles, and so their sections, depend on the crossovers and their orders only, not on
+        // g: Prism's dynamic bands design again at every gain step, so they are worked out once per (wl, wh, nl, nh) and
+        // kept (the same doubles: the comparison is exact, and the sections come from the same roots)
+        const bool polesKept = poleKey[0] == wl && poleKey[1] == wh && poleOrders[0] == nl && poleOrders[1] == nh;
+        if (! polesKept)
+        {
+            if (wh > 0.0)
+                butterworth (wh, poles, np, nh);
+            if (wl > 0.0)
+                butterworth (wl, poles, np, nl);
+        }
         if (wl > 0.0 && wh > 0.0 && nl != nh)
             mixedZeros (wl, wh, nl, nh, g, zeros, nz);
         else if (wl <= 0.0)
@@ -337,7 +345,20 @@ public:
         // sections: conjugate pairs, then the real roots two by two, a last real root alone
         std::array<Analog, 4> num {}, den {};
         const int sn = sections (zeros.data(), nz, num);
-        const int sd = sections (poles.data(), np, den);
+        int sd = 0;
+        if (polesKept)
+        {
+            den = keptDen;
+            sd = keptSections;
+        }
+        else
+        {
+            sd = sections (poles.data(), np, den);
+            keptDen = den;
+            keptSections = sd;
+            poleKey = { wl, wh };
+            poleOrders = { nl, nh };
+        }
         const int m = std::max (sn, sd);
         for (int k = 0; k < m; ++k)
             c[(std::size_t) k] = bilinear (k < sn ? num[(std::size_t) k] : Analog {}, k < sd ? den[(std::size_t) k] : Analog {});
@@ -553,5 +574,10 @@ private:
     std::array<std::array<double, 2>, maxSections> state {};
     int count = 0;
     double gain = 1.0;
+    // round 190px: the last design's pole sections and what they were made from (NaN: none yet)
+    std::array<double, 2> poleKey { std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN() };
+    std::array<int, 2> poleOrders { 0, 0 };
+    std::array<Analog, 4> keptDen {};
+    int keptSections = 0;
 };
 } // namespace lynx::minphase

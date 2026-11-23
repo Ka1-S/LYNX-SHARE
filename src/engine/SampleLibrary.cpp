@@ -189,6 +189,9 @@ public:
         return true;
     }
 
+    // round 190px: the decoded channels themselves (SampleLibrary::decode takes them instead of copying them twice)
+    oggvorbis::Decoded& decodedData() noexcept { return decoded; }
+
 private:
     oggvorbis::Decoded decoded;
 };
@@ -309,6 +312,10 @@ namespace
 // a changed algorithm never reuses an old copy. The floats are stored as computed: what plays is bit for bit the same.
 constexpr char stretchMagic[8] = { 'L', 'Y', 'N', 'X', 'S', 'T', 'R', '1' };
 constexpr int stretchHeader = 32;
+// round 190px (perf 7): the header's channel count for a stereo copy whose two channels are the same samples — one
+// channel is stored, both read it (Thief: the stretched copies of its four long stems, 67 MB of the 229 MB locked in
+// RAM). An older LYNX refuses the file (channels other than 1 / 2) and stretches again.
+constexpr std::int32_t stretchStereoSame = -2;
 constexpr juce::int64 stretchCacheLimit = 1024LL * 1024 * 1024; // pruned (oldest first) to 3/4 of it when exceeded
 
 std::uint64_t fnv (const void* data, std::size_t bytes, std::uint64_t h = 1469598103934665603ULL) noexcept
@@ -553,7 +560,8 @@ std::shared_ptr<SampleData> mapStretched (const juce::File& file, double rate, j
     auto copy = std::make_shared<LockedCopy>();
     copy->file = std::make_unique<juce::MemoryMappedFile> (file, juce::MemoryMappedFile::readOnly);
     const auto* d = static_cast<const char*> (copy->file->getData());
-    const auto bytes = (std::size_t) (frames * channels) * sizeof (float);
+    const auto stored = channels == stretchStereoSame ? 1 : channels;
+    const auto bytes = (std::size_t) (frames * stored) * sizeof (float);
     if (d == nullptr || copy->file->getSize() != (std::size_t) stretchHeader + bytes || std::memcmp (d, stretchMagic, 8) != 0)
         return nullptr;
     const auto* samples = d + stretchHeader;
@@ -565,7 +573,8 @@ std::shared_ptr<SampleData> mapStretched (const juce::File& file, double rate, j
     out->sampleRate = rate;
     out->mappedFrames = (std::size_t) frames;
     out->mappedLeft = reinterpret_cast<const float*> (samples);
-    out->mappedRight = channels == 2 ? reinterpret_cast<const float*> (samples) + frames : nullptr;
+    out->mappedRight = channels == 2 ? reinterpret_cast<const float*> (samples) + frames
+                       : channels == stretchStereoSame ? out->mappedLeft : nullptr;
     {
         const std::scoped_lock l (lockedCopiesLock());
         auto& list = lockedCopies();
@@ -591,8 +600,8 @@ std::shared_ptr<SampleData> readStretched (const juce::File& file)
                 std::memcpy (&rate, header + 8, 8);
                 std::memcpy (&frames, header + 16, 8);
                 std::memcpy (&channels, header + 24, 4);
-                if (frames > 0 && (channels == 1 || channels == 2) && rate > 0.0
-                    && file.getSize() == stretchHeader + frames * channels * (juce::int64) sizeof (float))
+                if (frames > 0 && (channels == 1 || channels == 2 || channels == stretchStereoSame) && rate > 0.0
+                    && file.getSize() == stretchHeader + frames * (channels == stretchStereoSame ? 1 : channels) * (juce::int64) sizeof (float))
                     if (auto mapped = mapStretched (file, rate, frames, channels))
                     {
                         file.setLastModificationTime (juce::Time::getCurrentTime()); // (recently used: pruned last)
@@ -613,8 +622,8 @@ std::shared_ptr<SampleData> readStretched (const juce::File& file)
     std::memcpy (&rate, d + 8, 8);
     std::memcpy (&frames, d + 16, 8);
     std::memcpy (&channels, d + 24, 4);
-    if (frames <= 0 || (channels != 1 && channels != 2) || ! (rate > 0.0)
-        || (juce::int64) block.getSize() != stretchHeader + frames * channels * (juce::int64) sizeof (float))
+    if (frames <= 0 || (channels != 1 && channels != 2 && channels != stretchStereoSame) || ! (rate > 0.0)
+        || (juce::int64) block.getSize() != stretchHeader + frames * (channels == stretchStereoSame ? 1 : channels) * (juce::int64) sizeof (float))
         return nullptr;
     auto out = std::make_shared<SampleData>();
     out->sampleRate = rate;
@@ -622,6 +631,8 @@ std::shared_ptr<SampleData> readStretched (const juce::File& file)
     out->left.assign (samples, samples + frames);
     if (channels == 2)
         out->right.assign (samples + frames, samples + 2 * frames);
+    else if (channels == stretchStereoSame) // (not mapped: the two channels in RAM, as a stereo copy read this way was)
+        out->right = out->left;
     file.setLastModificationTime (juce::Time::getCurrentTime()); // (recently used: pruned last)
     return out;
 }
@@ -653,7 +664,9 @@ void writeStretched (const juce::File& file, const SampleData& data)
         if (out.failedToOpen())
             return;
         const auto frames = (juce::int64) data.left.size();
-        const std::int32_t channels = data.right.empty() ? 1 : 2;
+        std::int32_t channels = data.right.empty() ? 1 : 2;
+        if (channels == 2 && std::memcmp (data.left.data(), data.right.data(), data.left.size() * sizeof (float)) == 0)
+            channels = stretchStereoSame;
         char header[stretchHeader] {};
         std::memcpy (header, stretchMagic, 8);
         std::memcpy (header + 8, &data.sampleRate, 8);
@@ -878,23 +891,55 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
                                                     .hashCode64());
     const auto leftFile = cacheFolder().getChildFile (key + ".L.pcm");
     const auto rightFile = cacheFolder().getChildFile (key + ".R.pcm");
+    // round 190px (perf 7): a stereo file whose two channels decode to the same samples keeps one channel on disk and in
+    // memory; this marker says so (Thief's four long stems: 67 MB of the 211 MB its streamed samples map)
+    const auto sameFile = cacheFolder().getChildFile (key + ".R.same");
+    bool rightIsLeft = channels > 1 && sameFile.existsAsFile() && leftFile.existsAsFile();
 
     prunePcmCacheLater();
     if (leftFile.existsAsFile())
     {
         markUsed (leftFile);
-        if (channels > 1)
+        if (channels > 1 && ! rightIsLeft)
             markUsed (rightFile);
     }
     auto mapped = std::make_shared<Mapped>();
     mapped->left = mapChannel (leftFile, reader.sampleRate, frames);
-    mapped->right = channels > 1 ? mapChannel (rightFile, reader.sampleRate, frames) : nullptr;
+    mapped->right = channels > 1 && ! rightIsLeft ? mapChannel (rightFile, reader.sampleRate, frames) : nullptr;
 
-    if (mapped->left == nullptr || (channels > 1 && mapped->right == nullptr))
+    // a cache written before round 190px holds both channels: compared once (a read of what is mapped, cheaper than
+    // decoding again), and the answer kept beside it (.R.same: the right file goes; .R.diff: both stay)
+    const auto diffFile = cacheFolder().getChildFile (key + ".R.diff");
+    if (mapped->left != nullptr && mapped->right != nullptr && ! diffFile.existsAsFile())
+    {
+        const auto* a = static_cast<const char*> (mapped->left->getData()) + cacheHeader;
+        const auto* b = static_cast<const char*> (mapped->right->getData()) + cacheHeader;
+        if (std::memcmp (a, b, (std::size_t) frames * sizeof (float)) == 0)
+        {
+            mapped->right = nullptr; // (unmapped before it is deleted: Windows keeps a mapped file)
+            if (sameFile.create().wasOk() && rightFile.deleteFile())
+                rightIsLeft = true;
+            else
+            {
+                sameFile.deleteFile();
+                mapped->right = mapChannel (rightFile, reader.sampleRate, frames);
+            }
+        }
+        else
+            diffFile.create();
+    }
+
+    if (mapped->left == nullptr || (channels > 1 && ! rightIsLeft && mapped->right == nullptr))
     {
         // decode once, in chunks, straight into the cache files
+        mapped->left = nullptr;
+        mapped->right = nullptr;
         leftFile.deleteFile();
         rightFile.deleteFile();
+        sameFile.deleteFile();
+        diffFile.deleteFile();
+        rightIsLeft = false;
+        bool same = channels > 1;
         {
             juce::FileOutputStream outL (leftFile);
             std::unique_ptr<juce::FileOutputStream> outR;
@@ -916,18 +961,31 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
                 outL.write (buffer.getReadPointer (0), (size_t) n * sizeof (float));
 
                 if (outR != nullptr)
+                {
                     outR->write (buffer.getReadPointer (1), (size_t) n * sizeof (float));
+                    same = same && std::memcmp (buffer.getReadPointer (0), buffer.getReadPointer (1), (size_t) n * sizeof (float)) == 0;
+                }
             }
 
             outL.flush();
             if (outR != nullptr)
                 outR->flush();
         }
+        // (the right file is written as it decodes — whether the channels match is only known at the end — and dropped
+        // then; the marker is made once the left file is complete)
+        if (same && sameFile.create().wasOk() && rightFile.deleteFile())
+            rightIsLeft = true;
+        else
+        {
+            sameFile.deleteFile();
+            if (channels > 1)
+                diffFile.create();
+        }
 
         mapped->left = mapChannel (leftFile, reader.sampleRate, frames);
-        mapped->right = channels > 1 ? mapChannel (rightFile, reader.sampleRate, frames) : nullptr;
+        mapped->right = channels > 1 && ! rightIsLeft ? mapChannel (rightFile, reader.sampleRate, frames) : nullptr;
 
-        if (mapped->left == nullptr || (channels > 1 && mapped->right == nullptr))
+        if (mapped->left == nullptr || (channels > 1 && ! rightIsLeft && mapped->right == nullptr))
             return nullptr;
     }
 
@@ -939,7 +997,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
     data->mappedLeft = reinterpret_cast<const float*> (static_cast<const char*> (mapped->left->getData()) + cacheHeader);
     data->mappedRight = mapped->right != nullptr
                             ? reinterpret_cast<const float*> (static_cast<const char*> (mapped->right->getData()) + cacheHeader)
-                            : nullptr;
+                            : (rightIsLeft ? data->mappedLeft : nullptr); // (stereo, the same samples: isStereo() stays true)
     data->mapping = mapped;
 
     // the first seconds already in memory: the clip start doesn't wait for the disk
@@ -1081,7 +1139,7 @@ std::int64_t heldBytes (const SampleData& d)
 }
 std::int64_t mappedBytesOf (const SampleData& d)
 {
-    return d.isMapped() ? (std::int64_t) d.mappedFrames * (d.mappedRight != nullptr ? 2 : 1) * (std::int64_t) sizeof (float) : 0;
+    return d.isMapped() ? (std::int64_t) d.mappedFrames * (d.mappedRight != nullptr && d.mappedRight != d.mappedLeft ? 2 : 1) * (std::int64_t) sizeof (float) : 0;
 }
 } // namespace
 
@@ -1179,14 +1237,36 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
     const auto frames = (int) juce::jmin<juce::int64> (reader->lengthInSamples, (juce::int64) (reader->sampleRate * 600.0));
     const auto channels = juce::jmin (2, (int) reader->numChannels);
 
-    juce::AudioBuffer<float> buffer (channels, frames);
-    reader->read (&buffer, 0, frames, 0, true, channels > 1);
-
     auto data = std::make_shared<SampleData>();
     data->sampleRate = reader->sampleRate;
     data->bitsPerSample = (int) reader->bitsPerSample;
     data->floatData = reader->usesFloatingPointData;
-    data->left.assign (buffer.getReadPointer (0), buffer.getReadPointer (0) + frames);
+    // round 190px (perf 7): FL's Ogg samples are decoded whole already; their channels move into the sample (the same
+    // floats AudioFormatReader::read copies, without the two copies of every sample that made the open's peak)
+    juce::AudioBuffer<float> buffer;
+    if (auto* ogg = dynamic_cast<DecodedReader*> (reader.get());
+        ogg != nullptr && (int) ogg->decodedData().data.size() >= channels && (juce::int64) ogg->decodedData().data[0].size() >= frames)
+    {
+        auto& d = ogg->decodedData().data;
+        data->left = std::move (d[0]);
+        data->left.resize ((std::size_t) frames);
+        if (channels > 1)
+        {
+            data->right = std::move (d[1]);
+            data->right.resize ((std::size_t) frames, 0.0f); // (as the reader's zeros past a shorter channel)
+        }
+        for (auto* v : { &data->left, &data->right }) // (cut at the 10-minute limit: no large spare room kept)
+            if (v->capacity() - v->size() > 16384)
+                v->shrink_to_fit();
+    }
+    else
+    {
+        buffer.setSize (channels, frames);
+        reader->read (&buffer, 0, frames, 0, true, channels > 1);
+        data->left.assign (buffer.getReadPointer (0), buffer.getReadPointer (0) + frames);
+        if (channels > 1)
+            data->right.assign (buffer.getReadPointer (1), buffer.getReadPointer (1) + frames);
+    }
     // the file's own loop (WAV smpl, first loop; JUCE gives the end frame inclusive)
     {
         const auto& meta = reader->metadataValues;
@@ -1199,8 +1279,6 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
         }
     }
 
-    if (channels > 1)
-        data->right.assign (buffer.getReadPointer (1), buffer.getReadPointer (1) + frames);
     readWavExtras (file, *data);
 
     return data;
