@@ -12647,3 +12647,9 @@ countries: id
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Otomasi frekuensi filter dan Mod X / Y / Z Harmor tidak berpengaruh di rilis ini: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Di rilis ini Sytrus memainkan setiap not dengan Mod X / Y bawaan: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Di rilis ini ekspor memutar lagu tanpa henti (dari bar 1, melewati marker skip)"
+# round 190qe (TOP-NEXT R1): Keep labels on screen, the view stack, Restore selection
+"Keep labels on screen" = "Pertahankan label di layar"
+"Previous view" = "Tampilan sebelumnya"
+"Previous view (before the zoom to the selection)" = "Tampilan sebelumnya (sebelum zoom ke pilihan)"
+"Restore selection" = "Pulihkan pilihan"
+"No earlier selection to restore" = "Tidak ada pilihan sebelumnya untuk dipulihkan"

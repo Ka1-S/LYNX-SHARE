@@ -12647,3 +12647,9 @@ countries: nl be
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Automatisering van de filterfrequenties en Mod X / Y / Z van Harmor doet in deze versie niets: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "In deze versie speelt Sytrus elke noot met de standaard-Mod X / Y: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "In deze versie speelt de export het nummer in één keer door (vanaf maat 1, over de skipmarkers heen)"
+# round 190qe (TOP-NEXT R1): Keep labels on screen, the view stack, Restore selection
+"Keep labels on screen" = "Labels in beeld houden"
+"Previous view" = "Vorige weergave"
+"Previous view (before the zoom to the selection)" = "Vorige weergave (voor het zoomen naar de selectie)"
+"Restore selection" = "Selectie herstellen"
+"No earlier selection to restore" = "Geen eerdere selectie om te herstellen"

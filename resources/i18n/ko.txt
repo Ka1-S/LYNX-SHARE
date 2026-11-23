@@ -12647,3 +12647,9 @@ countries: kr
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor 필터 주파수와 Mod X / Y / Z의 오토메이션은 이 릴리스에서 아무 동작도 하지 않습니다: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "이 릴리스에서 Sytrus는 모든 노트를 기본 Mod X / Y로 재생합니다: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "이 릴리스에서는 내보내기가 곡을 처음부터 끝까지 재생합니다(1마디부터, 건너뛰기 마커 무시)"
+# round 190qe (TOP-NEXT R1): Keep labels on screen, the view stack, Restore selection
+"Keep labels on screen" = "레이블을 화면에 유지"
+"Previous view" = "이전 보기"
+"Previous view (before the zoom to the selection)" = "이전 보기 (선택 영역으로 확대하기 전)"
+"Restore selection" = "선택 복원"
+"No earlier selection to restore" = "복원할 이전 선택이 없습니다"

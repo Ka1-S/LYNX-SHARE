@@ -18,6 +18,9 @@
 #include "ui/Dialogs.h"
 #include "ui/MidiClipboard.h"
 #include "ui/MotionOverlay.h"
+#include "ui/FrameTicker.h"
+#include "core/EditorFeel.h" // round 190qe (R1)
+#include "core/LayoutStyle.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -427,6 +430,13 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        // round 190qe (D2-PL1): a stroke, a line or a selection past the plot's left or right edge scrolls it (FL's event
+        // editor window, measured in round 190qc: the same law as the Playlist's); the point stays at the edge meanwhile
+        if (e.mods.isAnyMouseButtonDown() && (lastDraw || lineFrom || (selectButton.getToggleState() && selectionAnchor >= 0)))
+        {
+            edgeDragEvent.emplace (e);
+            edgeFrames.wake();
+        }
         const auto tick = snap (xToTick (juce::jlimit (plotArea().getX(), plotArea().getRight() - 1, e.x)));
         hoverValue = yToValue (e.y);
 
@@ -454,6 +464,8 @@ public:
 
     void mouseUp (const juce::MouseEvent& e) override
     {
+        edgeScroller.stop(); // (round 190qe: the release ends the edge scroll)
+        edgeDragEvent.reset();
         if (selectButton.getToggleState())
         {
             if (selectionEnd <= selectionStart) // a click clears the selection
@@ -633,6 +645,35 @@ private:
         valueBar.setVisible (zoomed);
         updateTitle();
         resized();
+    }
+
+    // Round 190qe (core/EditorFeel.h): one frame of the edge scroll; the stroke goes on under the still pointer
+    bool edgeFrame (double nowMs)
+    {
+        if (! edgeDragEvent.has_value() || ! (isMouseButtonDown() || edgescroll::buttonHeldForTests) || ! (lastDraw || lineFrom || (selectButton.getToggleState() && selectionAnchor >= 0)))
+        {
+            edgeScroller.stop();
+            return false;
+        }
+        if (juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::escapeKey))
+            edgeScroller.hold();
+        const auto area = plotArea();
+        const auto law = layoutstyle::current() == layoutstyle::Style::pattern ? edgescroll::Law::fl : edgescroll::Law::smooth;
+        const auto quantum = (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this));
+        const auto at = edgeDragEvent->position;
+        const auto step = edgeScroller.update (nowMs, at.x, at.y, area.getX(), area.getY(), area.getRight(), area.getBottom(), true, false, law, quantum);
+        if (step.dx != 0.0)
+        {
+            const auto old = scroll;
+            scroll = juce::jmax (0.0, scroll + step.dx / pixelsPerTick);
+            if (scroll != old)
+            {
+                repaint();
+                const auto event = *edgeDragEvent;
+                mouseDrag (event);
+            }
+        }
+        return step.running;
     }
 
     void scrollBarMoved (juce::ScrollBar*, double start) override
@@ -1075,6 +1116,10 @@ private:
     juce::Point<int> lineTo;
     std::optional<std::vector<PatternEvents>> gestureStart;
     std::uint32_t seed = 1;
+    // round 190qe: the edge scroll of a stroke (at the display's rate while it runs, nothing otherwise)
+    edgescroll::Scroller edgeScroller;
+    std::optional<juce::MouseEvent> edgeDragEvent;
+    ui::FrameTicker edgeFrames { *this, [this] (double ms) { return edgeFrame (ms); } };
 };
 } // namespace
 

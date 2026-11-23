@@ -277,6 +277,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.zoom3", TR_NOOP ("Zoom: sixteen bars"), Context::pianoRoll, { chord ('3', shift) }, true },
         { "pianoRoll.zoomAll", TR_NOOP ("Zoom to show everything"), Context::pianoRoll, { chord ('4', shift) }, true },
         { "pianoRoll.zoomSelection", TR_NOOP ("Zoom to the selection"), Context::pianoRoll, { chord ('5', shift) }, true },
+        { "pianoRoll.previousView", TR_NOOP ("Previous view (before the zoom to the selection)"), Context::pianoRoll, {} }, // round 190qe
+        { "pianoRoll.restoreSelection", TR_NOOP ("Restore selection"), Context::pianoRoll, {} },
         { "pianoRoll.centrePlayhead", TR_NOOP ("Centre the view on the playhead"), Context::pianoRoll, { chord ('0', shift) }, true },
         // quick quantize (round 162, issue #9): FL's Ctrl+Q / Shift+Q, plus a 50% one to give a key of your own
         { "pianoRoll.quickQuantize", TR_NOOP ("Quick quantize (starts and lengths)"), Context::pianoRoll, { chord ('Q', ctrl) } },
@@ -341,6 +343,10 @@ std::vector<Action> makeActions()
         { "playlist.zoom3", TR_NOOP ("Zoom: sixteen bars"), Context::playlist, { chord ('3', shift) }, true },
         { "playlist.zoomAll", TR_NOOP ("Zoom to show everything"), Context::playlist, { chord ('4', shift) }, true },
         { "playlist.zoomSelection", TR_NOOP ("Zoom to the selection"), Context::playlist, { chord ('5', shift) }, true },
+        // round 190qe (D2-PL8, D2-PL9; LYNX's own, FL has neither, so no key by default: bind one in Manage shortcuts). Shift+5
+        // again already goes back from a zoom to the selection
+        { "playlist.previousView", TR_NOOP ("Previous view (before the zoom to the selection)"), Context::playlist, {} },
+        { "playlist.restoreSelection", TR_NOOP ("Restore selection"), Context::playlist, {} },
         { "playlist.centrePlayhead", TR_NOOP ("Centre the view on the playhead"), Context::playlist, { chord ('0', shift) }, true },
         { "playlist.rippleDelete", TR_NOOP ("Delete the selected clips and close the gaps"), Context::playlist, { chord (del, shift) } },
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },

@@ -12647,3 +12647,9 @@ countries: de at ch li lu
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Die Automation der Filterfrequenzen und von Mod X / Y / Z in Harmor bewirkt in dieser Version nichts: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Sytrus spielt in dieser Version jede Note mit dem Standard-Mod X / Y: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Der Export spielt den Song in dieser Version am Stück (ab Takt 1, über die Skip-Marker hinweg)"
+# round 190qe (TOP-NEXT R1): Keep labels on screen, the view stack, Restore selection
+"Keep labels on screen" = "Beschriftungen im Bild halten"
+"Previous view" = "Vorherige Ansicht"
+"Previous view (before the zoom to the selection)" = "Vorherige Ansicht (vor dem Zoom auf die Auswahl)"
+"Restore selection" = "Auswahl wiederherstellen"
+"No earlier selection to restore" = "Keine frühere Auswahl zum Wiederherstellen"

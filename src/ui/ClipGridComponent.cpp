@@ -7,6 +7,8 @@
 #include "ui/PluginOffTag.h"
 #include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
 #include "ui/WindowClipboard.h"
+#include "ui/FrameTicker.h"
+#include "core/EditorFeel.h" // round 190qe (R1)
 
 #include <algorithm>
 #include <set>
@@ -619,7 +621,18 @@ public:
         }
         if (rubberBand) // round 190lr (DL-29): the rectangle from the empty slot pressed to the slot under the pointer
         {
-            const auto hit = hitTestCell (e.getPosition());
+            // round 190qe (D2-PL1): past the slots' edge the grid scrolls (Live-like law), the range grows into what comes in
+            if (! edgeReplaying)
+            {
+                edgePointer = e.position;
+                edgeDragEvent.emplace (e);
+                edgeFromDrop = false;
+                edgeFrames.wake();
+            }
+            const auto cells = cellArea();
+            const auto at = juce::Point<int> ((int) edgescroll::clampInto (e.x, cells.getX(), cells.getRight()),
+                                              (int) edgescroll::clampInto (e.y, cells.getY(), cells.getBottom()));
+            const auto hit = hitTestCell (at);
             if (hit.track >= 0 && hit.scene >= 0 && (hit.track != selectedTrack || hit.scene != selectedScene || ! rangeLive()))
             {
                 if (! rangeLive())
@@ -654,6 +667,11 @@ public:
     void itemDragEnter (const SourceDetails& details) override { itemDragMove (details); }
     void itemDragMove (const SourceDetails& details) override
     {
+        // round 190qe (D2-PL1): a clip, a pattern or a file dragged near the slots' edge scrolls the grid (Live-like law)
+        edgePointer = details.localPosition.toFloat();
+        edgeDragEvent.reset();
+        edgeFromDrop = true;
+        edgeFrames.wake();
         int insert = 0, slot = 0;
         if (detailDeviceDrag (details.description, insert, slot) || BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
         {
@@ -664,11 +682,13 @@ public:
     }
     void itemDragExit (const SourceDetails&) override
     {
+        stopEdgeScroll();
         setDropCell ({ -1, -1 });
         setDeviceDropTrack (-1);
     }
     void itemDropped (const SourceDetails& details) override
     {
+        stopEdgeScroll();
         if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
         {
             setDeviceDropTrack (-1);
@@ -825,6 +845,7 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override
     {
+        stopEdgeScroll(); // (round 190qe)
         if (stopAllDown) // (round 190iv)
         {
             stopAllDown = false;
@@ -1488,6 +1509,54 @@ public:
         return next >= 0 ? next : columnCount();
     }
     int firstRow() const noexcept { return juce::jmax (0, scrollY / rowHeight); }
+
+    // Round 190qe (TOP-NEXT R1, core/EditorFeel.h): the grid scrolls while a range is dragged past the slots' edge, or a
+    // clip / pattern / file is dragged over the grid near it (the Clip-launch layout: the Live / Logic-like law); it stops
+    // on the release, the drop, leaving the grid, or Esc (until the pointer is back inside)
+    edgescroll::Scroller edgeScroller;
+    std::optional<juce::Point<float>> edgePointer;
+    std::optional<juce::MouseEvent> edgeDragEvent;
+    bool edgeFromDrop = false, edgeReplaying = false;
+    ui::FrameTicker edgeFrames { *this, [this] (double ms) { return edgeFrame (ms); } };
+    void stopEdgeScroll()
+    {
+        edgeScroller.stop();
+        edgePointer.reset();
+        edgeDragEvent.reset();
+    }
+    bool edgeFrame (double nowMs)
+    {
+        if (! edgePointer.has_value() || ! (edgeFromDrop ? juce::Desktop::getInstance().getMainMouseSource().isDragging() : (rubberBand && isMouseButtonDown())))
+        {
+            edgeScroller.stop();
+            return false;
+        }
+        if (juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::escapeKey))
+            edgeScroller.hold();
+        const auto cells = cellArea();
+        const auto quantum = (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this));
+        const auto step = edgeScroller.update (nowMs, edgePointer->x, edgePointer->y, cells.getX(), cells.getY(), cells.getRight(), cells.getBottom(), true,
+                                               true, edgescroll::Law::smooth, quantum);
+        if (step.dx == 0.0 && step.dy == 0.0)
+            return step.running;
+        const auto oldX = scrollX, oldY = scrollY;
+        scrollX += (int) step.dx;
+        scrollY += (int) step.dy;
+        clampScroll();
+        if (scrollX != oldX || scrollY != oldY)
+        {
+            repaint();
+            if (edgeFromDrop)
+                setDropCell (edgePointer->toInt());
+            else if (edgeDragEvent.has_value())
+            {
+                const juce::ScopedValueSetter<bool> replay (edgeReplaying, true);
+                const auto event = *edgeDragEvent;
+                mouseDrag (event);
+            }
+        }
+        return step.running;
+    }
 
     void clampScroll()
     {
