@@ -64,6 +64,19 @@ std::map<std::string, std::string> parseKeyValues (const std::string& text)
     return out;
 }
 
+std::string encodeSettingsPath (const std::string& path)
+{
+    // (a trailing separator keeps the spaces before it: parseKeyValues only trims the end of the value)
+    return ! path.empty() && (path.back() == ' ' || path.back() == '\t') ? path + "/" : path;
+}
+
+std::string decodeSettingsPath (const std::string& value)
+{
+    if (value.size() > 1 && value.back() == '/' && (value[value.size() - 2] == ' ' || value[value.size() - 2] == '\t'))
+        return value.substr (0, value.size() - 1);
+    return value;
+}
+
 // --- autosave ---------------------------------------------------------------------------------------------------
 
 const std::vector<int>& autosaveIntervals()
