@@ -5,7 +5,7 @@ status: full
 ---
 ![The Clip-launch layout: a grid of clips and scenes on the left, the Picker and the Playlist on the right](/assets/img/cliplaunch.webp)
 
-`View › Layout style` has three entries: `Pattern layout (default)`, `Clip-launch layout` and `Simple layout`. The same choice is in `Options › General settings`, under Layout. The choice is kept when you close the program.
+`View › Layout style` has three entries: `Pattern layout (default)`, `Clip-launch layout` and `Simple layout`. The same choice is in `Options › General settings`, under Layout. The choice is kept when you close the program. The first time LYNX SHARE starts, a welcome card asks where you are coming from and picks the layout for you.
 
 The Pattern layout, the default, works the way FL Studio does: the Channel rack, patterns, the Piano roll, the Playlist and the Mixer. The Clip-launch layout, in the style of Ableton Live, adds a clip grid with scenes beside the Playlist, a Session mixer and the clip and device views; patterns and the Channel rack stay available. The Simple layout mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording. Switching moves the windows only: the project stays the same.
 

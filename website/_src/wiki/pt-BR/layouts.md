@@ -1,9 +1,9 @@
 ---
-source: 9974ffb64e
+source: 54ebedc064
 ---
 ![O layout de lançamento de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
 
-`Exibir › Estilo de layout` tem três entradas: `Layout Pattern (padrão)`, `Layout de lançamento de clipes` e `Layout Simple`. A mesma escolha está em `Opções › Configurações gerais`, em Layout. A escolha é mantida quando você fecha o programa.
+`Exibir › Estilo de layout` tem três entradas: `Layout Pattern (padrão)`, `Layout de lançamento de clipes` e `Layout Simple`. A mesma escolha está em `Opções › Configurações gerais`, em Layout. A escolha é mantida quando você fecha o programa. Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem e escolhe o layout certo.
 
 O layout Pattern, o que abre de início, funciona como o FL Studio: o Channel Rack, os patterns, o Piano Roll, a Playlist e o Mixer. O layout de lançamento de clipes, no estilo do Ableton Live, acrescenta uma grade de clipes com cenas ao lado da Playlist, um mixer da sessão e as visões de clipe e de dispositivo; os patterns e o Channel Rack continuam disponíveis. O layout Simple mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile: faixas e linha do tempo, loops, pads e gravação rápida. Trocar de layout só muda as janelas: o projeto continua o mesmo.
 

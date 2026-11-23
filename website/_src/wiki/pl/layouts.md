@@ -1,9 +1,9 @@
 ---
-source: 9974ffb64e
+source: 54ebedc064
 ---
 ![Układ z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 
-`Widok › Styl układu` ma trzy pozycje: `Układ Pattern (domyślnie)`, `Układ z uruchamianiem klipów` i `Prosty układ`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Układ. Wybór jest zapamiętywany po zamknięciu programu.
+`Widok › Styl układu` ma trzy pozycje: `Układ Pattern (domyślnie)`, `Układ z uruchamianiem klipów` i `Prosty układ`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Układ. Wybór jest zapamiętywany po zamknięciu programu. Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz, i wybiera pasujący układ.
 
 Układ Pattern, domyślny, działa tak jak FL Studio: Channel Rack, patterny, Piano Roll, Playlist i Mixer. Układ z uruchamianiem klipów, w stylu Ableton Live, dodaje obok Playlisty siatkę klipów ze scenami, mikser sesji oraz widok klipu i urządzeń; patterny i Channel Rack pozostają dostępne. Prosty układ łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile: ścieżki i oś czasu, pętle, pady i szybkie nagrywanie. Przełączenie przestawia tylko okna: projekt zostaje ten sam.
 

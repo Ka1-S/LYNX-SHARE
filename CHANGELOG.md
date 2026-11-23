@@ -60,7 +60,8 @@ The short version of each release. The full notes, with measurements, known issu
   their sound.
 
 **Fixed**
-- #193, #218, #222, #225–#244, #246, #247, #249–#254, discussion #202 (Transistor Bass *Copy as MIDI*).
+- #193, #218 and #222 (follow-ups), #225–#244, #246, #247, #249–#254; discussions #105 (Chord helper part 2) and #202
+  (Transistor Bass *Copy as MIDI*).
 
 **From contributors**
 - Docked channel and plugin windows have a gear in their title bar that hides the header strip (tabs, presets, the
