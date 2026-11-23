@@ -99,3 +99,4 @@ grają bliżej FL; i poprawki dla około 30 zgłoszonych problemów.
 - 07-chord-helper.png — Pomocnik akordów podpowiada pokrewne tonacje i akordy zapożyczone do zaznaczonego akordu
 - 08-drum-machine.png — Zaprogramuj bit w automacie perkusyjnym w stylu BandLab w Prostym układzie
 - 09-helix-plus.png — Helix, syntezator wavetable, z Helix+: trzeci oscylator, warstwy granularna i widmowa, 8 makr, rysowane LFO i efekty
+- 10-song-lanes-tracker.png — Ścieżka sekcji i ścieżka akordów dla części i akordów utworu, wbudowany tracker i modulatory, które poruszają dowolnym pokrętłem

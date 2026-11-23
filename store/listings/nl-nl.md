@@ -99,3 +99,4 @@ bij FL spelen; en fixes voor ongeveer 30 gemelde problemen.
 - 07-chord-helper.png — De akkoordhulp stelt verwante toonsoorten en geleende akkoorden voor bij het geselecteerde akkoord
 - 08-drum-machine.png — Programmeer een beat in de drummachine in BandLab-stijl van de Eenvoudige lay-out
 - 09-helix-plus.png — Helix, de wavetable-synth, met Helix+: een derde oscillator, granulaire en spectrale lagen, 8 macro's, getekende LFO's en effecten
+- 10-song-lanes-tracker.png — De sectiebaan en het akkoordspoor voor de delen en akkoorden van het nummer, de ingebouwde tracker en modulators die elke knop bewegen

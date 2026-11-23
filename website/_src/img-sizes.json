@@ -5,7 +5,7 @@
 ],
 "/assets/img/cliplaunch.webp": [
 1920,
-1080
+573
 ],
 "/assets/img/eq.webp": [
 960,
@@ -421,7 +421,7 @@
 ],
 "/assets/img/wiki/crash-report.webp": [
 640,
-244
+289
 ],
 "/assets/img/wiki/desktop.webp": [
 1600,
@@ -444,8 +444,8 @@
 420
 ],
 "/assets/img/wiki/midi-import-dialog.webp": [
-550,
-373
+488,
+394
 ],
 "/assets/img/wiki/missing-files.webp": [
 760,
@@ -472,7 +472,7 @@
 270
 ],
 "/assets/img/wiki/plugin-monitor.webp": [
-720,
+840,
 380
 ],
 "/assets/img/wiki/quickadd.webp": [
@@ -484,12 +484,12 @@
 900
 ],
 "/assets/img/wiki/record-dialog.webp": [
-475,
-389
+428,
+410
 ],
 "/assets/img/wiki/report-problem.webp": [
 640,
-364
+409
 ],
 "/assets/img/wiki/session-chat.webp": [
 436,
@@ -509,19 +509,19 @@
 ],
 "/assets/img/wiki/settings-audio.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-general.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-midi.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-project.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/shortcuts.webp": [
 860,

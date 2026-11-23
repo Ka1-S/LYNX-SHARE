@@ -99,3 +99,4 @@ projeleri; ve bildirilen yaklaşık 30 sorun için düzeltmeler.
 - 07-chord-helper.png — Akor yardımcısı, seçili akor için ilgili tonları ve ödünç akorları önerir
 - 08-drum-machine.png — Basit iş akışındaki BandLab tarzı Drum Machine'de bir ritim programlayın
 - 09-helix-plus.png — Wavetable synth Helix, Helix+ ile: üçüncü bir osilatör, granüler ve spektral katmanlar, 8 makro, çizilen LFO'lar ve efektler
+- 10-song-lanes-tracker.png — Şarkının bölümleri ve akorları için Bölümler şeridi ve Akor şeridi, dahili tracker ve herhangi bir düğmeyi hareket ettiren modülatörler

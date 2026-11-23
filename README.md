@@ -245,6 +245,67 @@ filter types, eight macros, drawn LFOs, chaos sources and a rack of effects.
   without a click, so the bars follow the performance and the audio stays exactly as recorded.
 - Audio clips also convert to MIDI (polyphonic too), stems can be extracted from a sample, and Newtone corrects vocals.
 
+### Song lanes, tracker and more
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/song-lanes.png" alt="The Playlist with the Sections lane (Intro, Verse, Outro) and the Chord lane above the tracks">
+
+**Sections and Chord lanes.** The song's parts on a Sections lane that moves, copies and repeats them as a whole, and its chords on a Chord lane under the ruler.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/command-palette.png" alt="Search actions: a searchable list of every command with its shortcut">
+
+**Search actions.** `?` or Ctrl+Shift+Y lists every command, menu item, LYNX extra and Settings page; type a few letters and press Enter.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/tracker.png" alt="The built-in tracker: a pattern's notes as rows and channels, with the song's sequence beside it">
+
+**Tracker.** *View › Windows and tools › Tracker* (Shift+F7) shows a pattern's notes the tracker way, in step with the Piano Roll; tracker modules open too.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/welcome.png" alt="The welcome card: where are you coming from?">
+
+**Welcome.** The first start asks where you are coming from and opens the matching layout.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/modulators.png" alt="The Modulators panel with an LFO and an envelope follower, beside a synth whose knobs show modulation rings">
+
+**Modulators.** LFO, envelope follower, ADSR, steps, random, macro, keytrack and velocity move any knob around its own value; a ring shows the movement.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/automation-modes.png" alt="The record button's write-mode badge and the Automation write mode menu: Read, Touch, Latch, Write">
+
+**Automation write modes.** Read (FL Studio's Record automation), Touch, Latch and Write; the record button shows the mode.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/lynx-model.png" alt="LYNX Model: a physical model of a marimba bar with mallet, bar and output controls">
+
+**LYNX Model.** Physical models of marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/jsfx.png" alt="JSFX scripts in the Browser and a JSFX effect's slider panel">
+
+**JSFX.** REAPER's JSFX effects and instruments run on every system, with free scripts included.
+
+</td>
+</tr>
+</table>
+
 ### Automation and modulation
 
 - **Automation clips** for any knob or fader of a channel, the mixer, an effect or a plugin, with points and all 13 of

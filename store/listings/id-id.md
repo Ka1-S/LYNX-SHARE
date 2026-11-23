@@ -99,3 +99,4 @@ dekat ke FL; dan perbaikan untuk sekitar 30 masalah yang dilaporkan.
 - 07-chord-helper.png — Asisten akor menyarankan kunci terkait dan akor pinjaman untuk akor yang dipilih
 - 08-drum-machine.png — Program beat di Drum Machine bergaya BandLab pada Alur kerja sederhana
 - 09-helix-plus.png — Helix, synth wavetable, dengan Helix+: osilator ketiga, lapisan granular dan spektral, 8 makro, LFO yang digambar, dan efek
+- 10-song-lanes-tracker.png — Lajur bagian dan lajur akor untuk bagian dan akor lagu, tracker bawaan, serta modulator yang menggerakkan kenop mana pun

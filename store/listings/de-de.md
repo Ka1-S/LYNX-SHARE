@@ -100,3 +100,4 @@ rund 30 gemeldete Probleme.
 - 07-chord-helper.png — Der Akkord-Helfer schlägt verwandte Tonarten und geliehene Akkorde für den ausgewählten Akkord vor
 - 08-drum-machine.png — Einen Beat in der Drum Machine im Stil von BandLab im Einfachen Arbeitsablauf programmieren
 - 09-helix-plus.png — Helix, der Wavetable-Synthesizer, mit Helix+: dritter Oszillator, Granular- und Spektral-Ebenen, 8 Makros, gezeichnete LFOs und Effekte
+- 10-song-lanes-tracker.png — Abschnittsspur und Akkordspur für die Teile und Akkorde des Songs, der eingebaute Tracker und Modulatoren, die jeden Regler bewegen
