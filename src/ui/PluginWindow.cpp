@@ -527,10 +527,12 @@ public:
         engine.addChangeListener (this);
         refresh();
         showTab (0);
-        setSize (520, preferredHeight());
+        setSize (preferredWidth, preferredHeight());
     }
 
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
+
+    static constexpr int preferredWidth = 520; // (round 190pw: the wrapper is this wide on this page, as FL's: 566 px in FL 2026)
 
     // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
     // (round 190ks: + the MIDI group's "Record notes from the plugin window" row)
@@ -1180,12 +1182,7 @@ public:
         keyboardPriority.setVisible (visible);
         if (! presetsInTitle)
             presets.setVisible (visible);
-        if (down)
-            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight(), getHeight()));
-        else if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderHeight()));
-        else
-            fitEditor();
+        fitShownPage();
         resized();
     }
 
@@ -1289,6 +1286,7 @@ public:
         menuArrow.setVisible (false);
         presets.setTitleLook (true);
         titleOwner.addAndMakeVisible (presets);
+        fitShownPage(); // (round 190pw: the strip's minimum width shrank)
         resized();
     }
     juce::Component& presetComponent() noexcept { return presets; }
@@ -1350,8 +1348,21 @@ public:
 
 private:
     // round 190in (FW-5 / FW-7): FL's 46 px strip; ▸, two 44 px tabs, the keyboard button, the presets
-    static constexpr int headerHeight = 46, minWidth = 20 + 44 + 1 + 44 + 9 + 30 + 250 + 4;
-    int minimumWidth() const { return minWidth + (channelControls != nullptr ? channelHeaderControlsWidth() + 4 : 0); }
+    static constexpr int headerHeight = 46;
+    // the window is at least as wide as its strip needs (round 190pw, PR #259: only what the strip shows: a docked
+    // frame's title strip holds the ▸ and the presets, and a strip hidden by the gear needs nothing), so a small editor
+    // never squeezes the tabs, the keyboard button or a channel's ON / PAN / VOL ... TRACK
+    int minimumWidth() const
+    {
+        if (headerCollapsed)
+            return 1;
+        auto width = 44 + 1 + 44 + 9 + 30;
+        if (! presetsInTitle)
+            width += 20 + 250 + 4;
+        if (channelControls != nullptr)
+            width += channelHeaderControlsWidth() + 4;
+        return width;
+    }
     AudioEngine& engineRef;
     juce::AudioPluginInstance& hosted; // (round 190df: the plugin menu's spare state and parameter items)
     int sideTrack = -1, sideSlot = -1;
@@ -1365,7 +1376,23 @@ private:
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
             setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + currentHeaderHeight(), getHeight()));
         else if (editor != nullptr)
-            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + currentHeaderHeight());
+        {
+            // PR #259: a fixed-size editor (most VST2/VST3 UIs) never stretches to fill the header's width, so a window
+            // forced wider than the strip needs just left blank space beside it. Round 190pw: the floor stays for an
+            // editor narrower than the strip (it would squeeze the tabs and the channel's controls), but minimumWidth()
+            // counts only what the strip shows: docked (the presets in the title strip) a channel's is 364 px
+            const auto w = juce::jmax (minimumWidth(), editor->getWidth());
+            setSize (w, editor->getHeight() + currentHeaderHeight());
+        }
+    }
+
+    // the window's size for the page it shows (PR #259: FL's wrapper is the size of its shown tab)
+    void fitShownPage()
+    {
+        if (settings) // (its own width: the page itself is laid out to the window's, round 190pw)
+            setSize (juce::jmax (minimumWidth(), WrapperSettingsPage::preferredWidth), page.preferredHeight() + currentHeaderHeight());
+        else
+            fitEditor();
     }
 
     int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
@@ -1387,10 +1414,7 @@ private:
             if (settings || down)
                 editor->setTopLeftPosition (-12000, -12000); // (X11 positions are 16-bit, also when scaled)
         }
-        if (settings)
-            setSize (juce::jmax (getWidth(), page.getWidth()), juce::jmax (getHeight(), page.preferredHeight() + currentHeaderHeight()));
-        else
-            fitEditor();
+        fitShownPage();
         resized();
         if (editor != nullptr)
             followNativeChildren (*editor);
@@ -2558,6 +2582,17 @@ bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& 
     return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
 }
 
+std::optional<std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> showWindowPage (const juce::AudioPluginInstance& plugin, int page)
+{
+    const auto it = windows().find (const_cast<juce::AudioPluginInstance*> (&plugin));
+    auto* window = it != windows().end() ? dynamic_cast<juce::Component*> (it->second.get()) : nullptr;
+    if (window == nullptr || it->second->contentForShot() == nullptr)
+        return std::nullopt;
+    if (auto* wrapped = dynamic_cast<WrappedEditor*> (it->second->contentForShot()); wrapped != nullptr && page >= 0)
+        wrapped->showPage (page == 1);
+    return std::make_pair (window->getBounds(), it->second->contentForShot()->getLocalBounds());
+}
+
 void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const juce::String& title, WrapperContext context)
 {
     auto& open = windows();
@@ -2606,7 +2641,14 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
     dpi.reset();
     if (auto* window = dynamic_cast<juce::Component*> (open[&plugin].get()); window != nullptr && placeKey.isNotEmpty())
+    {
         windowplaces::tag (*window, placeKey);
+        // round 190pw (PR #259): the window is the size of the page it shows, so a place kept while the Wrapper settings
+        // showed is the wrong size for the editor it opens on: a fixed-size editor's window takes the editor's size
+        // again (the place gives the position); a resizable one keeps the size the user gave it
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (open[&plugin]->contentForShot()); wrapped != nullptr && ! wrapped->isEditorResizable())
+            wrapped->showPage (false);
+    }
     if (auto* frame = dynamic_cast<DockedPluginFrame*> (open[&plugin].get())) // (the header gear's choice, PR #256)
         frame->rememberHeader (windowplaces::headerKey ("plugin", placeKey));
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
