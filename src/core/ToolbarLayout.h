@@ -138,6 +138,12 @@ struct Layout
     int uiScale = 100; // percent
     bool separators = true; // hairlines between the panels (FL's "Separators")
     bool visible = true;    // the whole toolbar (Ctrl+F11 hides it, as in FL)
+    // Round 190qg (Discord #feedback 11-23): FL's "Single line" toolbar preset puts every panel on one ~41 px row (the
+    // menus, the hint panel, then the panels); LYNX's two rows stay the default
+    bool oneRow = false;
+    // Round 190qg: the "Grouped" look (LYNX's own): every panel in a raised frame, the frames evenly spaced and packed
+    // left and right of one spacer, so nothing drifts while the window is resized. Off by default.
+    bool grouped = false;
 
     static Layout makeDefault()
     {
@@ -209,7 +215,8 @@ struct Layout
     bool isDefault() const
     {
         const auto d = makeDefault();
-        if (iconSize != d.iconSize || uiScale != d.uiScale || separators != d.separators || visible != d.visible)
+        if (iconSize != d.iconSize || uiScale != d.uiScale || separators != d.separators || visible != d.visible || oneRow != d.oneRow
+            || grouped != d.grouped)
             return false;
         for (std::size_t i = 0; i < entries.size(); ++i)
             if (entries[i].group != d.entries[i].group || entries[i].shown != d.entries[i].shown)
@@ -324,10 +331,11 @@ inline int dropBefore (const std::vector<std::pair<Group, int>>& shown, Group dr
 // Ready-made layouts (LYNX's own, like FL's toolbar presets): which groups show, in the default order.
 enum class Preset
 {
-    standard, // every group
-    compact,  // transport, master, snap and pattern, windows
-    minimal,  // transport and windows
-    mixing,   // transport, master, windows, meters, output
+    standard,  // every group
+    compact,   // transport, master, snap and pattern, windows
+    minimal,   // transport and windows
+    mixing,    // transport, master, windows, meters, output
+    flClassic, // round 190qg: FL's "Single line" preset, one row in FL's order (flClassicOrder)
     count_
 };
 
@@ -336,15 +344,30 @@ constexpr int presetCount = (int) Preset::count_;
 inline const char* presetName (Preset p)
 {
     static constexpr std::array<const char*, presetCount> names { TR_NOOP ("Default (everything)"), TR_NOOP ("Compact"),
-                                                                  TR_NOOP ("Minimal"), TR_NOOP ("Mixing") };
+                                                                  TR_NOOP ("Minimal"), TR_NOOP ("Mixing"), TR_NOOP ("FL classic (one row)") };
     return names[(std::size_t) p];
 }
 
-// The preset applied to `from` (icon size, UI scale and the other options are kept).
+// Round 190qg: FL Studio 2026's "Single line" toolbar preset (System/Config/Toolbar presets, captured in FL at 1920 px:
+// /mnt/e/lynx-work/toolbar_190qg/raw/fs-1920.png): the menus, the hint panel, then PAT/SONG with play / stop / record and
+// the tempo, the time, the output monitor, the pattern and snap selectors, the Playlist / Piano roll / Channel rack /
+// Mixer / Browser buttons and the CPU panel, on one row. LYNX's groups in that order; the rest stay hidden (they can be
+// shown, and then follow in the default order).
+inline const std::array<Group, groupCount>& flClassicOrder()
+{
+    static constexpr std::array<Group, groupCount> order { Group::transport, Group::output, Group::snap, Group::windows, Group::meters,
+                                                           Group::link, Group::master, Group::record, Group::multilink, Group::file, Group::key, Group::chord };
+    return order;
+}
+constexpr int flClassicShownCount = 5; // the first five of flClassicOrder
+
+// The preset applied to `from` (icon size, UI scale and the other options are kept; the FL classic preset also turns the
+// one-row toolbar on, the others turn it off).
 inline Layout applyPreset (Layout from, Preset p)
 {
     const auto d = Layout::makeDefault();
     from.entries = d.entries;
+    from.oneRow = p == Preset::flClassic;
     auto show = [&from] (std::initializer_list<Group> groups) {
         for (auto& e : from.entries)
             e.shown = std::find (groups.begin(), groups.end(), e.group) != groups.end();
@@ -354,6 +377,14 @@ inline Layout applyPreset (Layout from, Preset p)
         case Preset::compact: show ({ Group::transport, Group::master, Group::snap, Group::windows }); break;
         case Preset::minimal: show ({ Group::transport, Group::windows }); break;
         case Preset::mixing: show ({ Group::transport, Group::master, Group::windows, Group::meters, Group::output }); break;
+        case Preset::flClassic:
+        {
+            from.entries.clear();
+            const auto& order = flClassicOrder();
+            for (std::size_t i = 0; i < order.size(); ++i)
+                from.entries.push_back ({ order[i], (int) i < flClassicShownCount });
+            break;
+        }
         case Preset::standard:
         case Preset::count_: break;
     }
@@ -364,10 +395,124 @@ inline Layout applyPreset (Layout from, Preset p)
 inline int matchingPreset (const Layout& l)
 {
     for (int p = 0; p < presetCount; ++p)
-        if (applyPreset (l, (Preset) p).orderToString() == l.orderToString())
+        if (const auto a = applyPreset (l, (Preset) p); a.orderToString() == l.orderToString() && a.oneRow == l.oneRow)
             return p;
     return presetCount;
 }
+
+// Round 190qg: the shown groups at the toolbar's right end, after its one spacer: the run of right-aligned groups
+// (rightAligned) that ends the shown order. The default order ends with Chord, CPU and Output (as before); FL's one-row
+// order ends with the CPU panel alone, as FL's "Single line" (its last spacer sits before the CPU panel).
+inline int firstOfRightRun (const Layout& l, const std::array<bool, groupCount>& visible)
+{
+    int first = -1;
+    for (int i = (int) l.entries.size(); i-- > 0;)
+    {
+        const auto g = l.entries[(std::size_t) i].group;
+        if (! visible[(std::size_t) g])
+            continue;
+        if (! rightAligned (g))
+            break;
+        first = i;
+    }
+    return first; // an index into l.entries, -1: none
+}
+
+// --- round 190qg: nothing on the toolbar is hidden silently ------------------------------------------------------------
+// Discord #feedback (11-23): "when Interface size changes, toolbar elements appear or disappear depending on the space,
+// and that is confusing". Everything the window has no room for goes to an overflow button ("»") at the toolbar's right
+// end, which lists it with its icon and name. FL 2026 does the same for its buttons (a ▸ at the right end opens "More
+// actions", raw/fs-1280-arrow.png) but drops its panels (monitor, CPU, snap) silently; LYNX lists those too.
+//
+// Every item of the Pattern-layout toolbar, by group, in toolbar order.
+enum class Item
+{
+    patternSong, play, stop, record, tempo, tapTempo, time, songPosition,                                 // transport
+    masterVolume, masterPitch,                                                                             // master
+    metronome, waitInput, countIn, blend, typingPiano, loopRecord, stepEdit, punch, recordMenu, midiLight, // record
+    snap, pattern,                                                                                         // snap (+ its buttons)
+    playlist, channelRack, pianoRoll, mixer, browser, pluginPicker,                                        // windows
+    newFile, open, save, exportFile, undo, redo, audioEditor,                                              // file
+    meters, output, chord, multilink, key, link,
+    count_
+};
+constexpr int itemCount = (int) Item::count_;
+
+inline Group groupOf (Item i) noexcept
+{
+    if (i <= Item::songPosition) return Group::transport;
+    if (i <= Item::masterPitch) return Group::master;
+    if (i <= Item::midiLight) return Group::record;
+    if (i <= Item::pattern) return Group::snap;
+    if (i <= Item::pluginPicker) return Group::windows;
+    if (i <= Item::audioEditor) return Group::file;
+    switch (i)
+    {
+        case Item::meters: return Group::meters;
+        case Item::output: return Group::output;
+        case Item::chord: return Group::chord;
+        case Item::multilink: return Group::multilink;
+        case Item::key: return Group::key;
+        default: return Group::link;
+    }
+}
+
+// A stable id (tests, reports).
+inline const char* itemId (Item i)
+{
+    static constexpr std::array<const char*, itemCount> ids {
+        "patternSong", "play", "stop", "record", "tempo", "tapTempo", "time", "songPosition", "masterVolume", "masterPitch",
+        "metronome", "waitInput", "countIn", "blend", "typingPiano", "loopRecord", "stepEdit", "punch", "recordMenu", "midiLight",
+        "snap", "pattern", "playlist", "channelRack", "pianoRoll", "mixer", "browser", "pluginPicker",
+        "newFile", "open", "save", "export", "undo", "redo", "audioEditor", "meters", "output", "chord", "multilink", "key", "link"
+    };
+    return ids[(std::size_t) i];
+}
+
+// The name the overflow menu shows (translated by the UI). Window names stay FL's (not translated: tr() is not applied
+// to them, as in the rest of LYNX).
+inline const char* itemName (Item i)
+{
+    static constexpr std::array<const char*, itemCount> names {
+        TR_NOOP ("Pattern / Song"), TR_NOOP ("Play"), TR_NOOP ("Stop"), TR_NOOP ("Record"), TR_NOOP ("Tempo"), TR_NOOP ("Tap tempo"),
+        TR_NOOP ("Time"), TR_NOOP ("Song position"), TR_NOOP ("Master volume"), TR_NOOP ("Master pitch"),
+        TR_NOOP ("Metronome"), TR_NOOP ("Wait for input"), TR_NOOP ("Count-in"), TR_NOOP ("Blend recorded notes"), TR_NOOP ("Typing keyboard to piano"),
+        TR_NOOP ("Loop record"), TR_NOOP ("Step edit"), TR_NOOP ("Punch in / out"), TR_NOOP ("Recording options: what to record"), TR_NOOP ("MIDI input activity"),
+        TR_NOOP ("Snap"), TR_NOOP ("Patterns"), "Playlist", "Channel Rack", "Piano Roll", "Mixer", "Browser", TR_NOOP ("Plugin picker"),
+        TR_NOOP ("New"), TR_NOOP ("Open..."), TR_NOOP ("Save"), TR_NOOP ("Export"), TR_NOOP ("Undo"), TR_NOOP ("Redo"), TR_NOOP ("Audio editor"),
+        TR_NOOP ("CPU, memory and polyphony"), TR_NOOP ("Output monitor"), TR_NOOP ("Chord detection"), TR_NOOP ("Multilink to controllers"),
+        TR_NOOP ("Project key"), TR_NOOP ("Ableton Link")
+    };
+    return names[(std::size_t) i];
+}
+
+// The overflow list: every item of a group the user shows that the window had no room for (whole groups, in toolbar
+// order), then the single items a tighter form of a shown panel left out (`droppedInside`, e.g. the typing-piano switch
+// of the four-column recording panel). Groups the user hid are not listed (the toolbar menu shows them again).
+inline std::vector<Item> overflowItems (const Layout& l, const std::array<bool, groupCount>& visible, const std::vector<Item>& droppedInside)
+{
+    std::vector<Item> out;
+    if (! l.visible)
+        return out; // (Ctrl+F11: the panels are hidden on purpose; the toolbar menu brings them back)
+    for (const auto& e : l.entries)
+        if (e.shown && ! visible[(std::size_t) e.group])
+            for (int i = 0; i < itemCount; ++i)
+                if (groupOf ((Item) i) == e.group)
+                    out.push_back ((Item) i);
+    for (const auto& e : l.entries)
+        if (e.shown && visible[(std::size_t) e.group])
+            for (auto i : droppedInside)
+                if (groupOf (i) == e.group && std::find (out.begin(), out.end(), i) == out.end())
+                    out.push_back (i);
+    return out;
+}
+
+// The overflow button's width at a row height (a column at the toolbar's right end).
+inline int overflowWidth (int rowHeight) noexcept { return std::max (18, rowHeight * 2 / 3); }
+
+// The one-row toolbar's height for a row height: FL's "Single line" row is 41 px at 100 % (raw/fs-1920.png, the band
+// y 0..40); LYNX's medium row (31) + 10 gives the same.
+inline int oneRowHeight (int rowHeight) noexcept { return rowHeight + 10; }
 
 // Decides which groups are visible for `room` px: every shown group needs widths[group] (+ `gap`); while
 // they don't fit with `minFlexible` px left for the hint column, the shown group with the lowest priority
@@ -399,6 +544,55 @@ inline std::array<bool, groupCount> fit (const Layout& layout, const std::array<
 
     return visible;
 }
+// Round 190qg: FL's one-row toolbar drops its panels from the right end (FL 2026 "Single line", raw/fs-*.png: at 1600 px
+// the CPU panel goes, at 1366 the window buttons, at 1280 the snap, at 1024 the monitor and the pattern selector); the
+// transport stays. Returns visibility per group.
+inline std::array<bool, groupCount> fitFromTheRight (const Layout& layout, const std::array<int, groupCount>& widths, int gap, int room, int minFlexible)
+{
+    std::array<bool, groupCount> visible {};
+    for (const auto& e : layout.entries)
+        visible[(std::size_t) e.group] = e.shown;
+    for (;;)
+    {
+        int total = 0;
+        for (int i = 0; i < groupCount; ++i)
+            total += visible[(std::size_t) i] ? widths[(std::size_t) i] + gap : 0;
+        if (total + minFlexible <= room)
+            break;
+        int last = -1;
+        for (int i = (int) layout.entries.size(); i-- > 0;)
+            if (const auto g = layout.entries[(std::size_t) i].group; visible[(std::size_t) g] && g != Group::transport)
+            {
+                last = (int) g;
+                break;
+            }
+        if (last < 0)
+            break;
+        visible[(std::size_t) last] = false;
+    }
+    return visible;
+}
+
+// Round 190qg: the two-row toolbar when the overflow button needs its room: while the panels and the hint column's
+// minimum do not fit `room`, the shown panel with the lowest priority goes too (never the transport).
+inline void dropUntilFits (std::array<bool, groupCount>& visible, const std::array<int, groupCount>& widths, int gap, int room, int minFlexible)
+{
+    for (;;)
+    {
+        int total = 0, lowest = -1;
+        for (int i = 0; i < groupCount; ++i)
+            if (visible[(std::size_t) i])
+            {
+                total += widths[(std::size_t) i] + gap;
+                if (groupPriority ((Group) i) < 100 && (lowest < 0 || groupPriority ((Group) i) < groupPriority ((Group) lowest)))
+                    lowest = i;
+            }
+        if (total + minFlexible <= room || lowest < 0)
+            return;
+        visible[(std::size_t) lowest] = false;
+    }
+}
+
 // --- round 190iv: one toolbar, a different layout per layout style (design190ia PLAN §2 "Toolbar per layout style") ---
 // The Pattern (FL) layout keeps the toolbar above exactly as it is: two rows of panels, the menu over the hint bar at
 // the left. The Simple layout keeps that frame with BandLab's landmarks (slice SG-A): the transport as one 40 px capsule
@@ -477,7 +671,8 @@ inline constexpr int partCount = (int) Part::count_;
 // What stays when the room is short: the lowest first goes (the transport, the menu and Finish stay).
 inline int priority (Part p) noexcept
 {
-    static constexpr std::array<int, partCount> pr { 100, 90, 70, 40, 50, 45, 95, 60, 100, 55 };
+    // (round 190qg: "⋯" 95 -> 100, it holds what the bar leaves out, so it never goes itself)
+    static constexpr std::array<int, partCount> pr { 100, 90, 70, 40, 50, 45, 100, 60, 100, 55 };
     return pr[(std::size_t) p];
 }
 

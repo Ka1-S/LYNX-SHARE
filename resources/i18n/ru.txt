@@ -12652,3 +12652,15 @@ countries: ru by kz
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "Имя экспортируемого файла. Подстановки вроде $project, $date или $bpm заполняются при экспорте. Знак / кладёт файл в папку с этим именем внутри папки экспорта (создаётся при необходимости)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Пустой слот: клик добавляет эффект, двойной клик или клик средней кнопкой — поиск эффекта"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Эффекты дорожки: [LMB] добавить эффект на её дорожку микшера  [MMB] или двойной клик: найти эффект  (сюда же можно перетащить эффект из Браузера)"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL классический (одна строка)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "Активность MIDI-входа"
+"One row (FL single line)" = "Одна строка (однострочная панель FL)"
+"Grouped look (framed panels, steady spacing)" = "Сгруппированный вид (панели в рамках, ровные интервалы)"
+"More toolbar items: what this window size has no room for" = "Ещё элементы панели: то, что не помещается при этом размере окна"
+"reconnect the MIDI inputs" = "переподключить MIDI-входы"
+"Nudge the tempo down" = "Подтолкнуть темп вниз"
+"Nudge the tempo up" = "Подтолкнуть темп вверх"
+"Launch quantization" = "Квантизация запуска"

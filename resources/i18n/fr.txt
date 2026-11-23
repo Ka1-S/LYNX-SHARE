@@ -12652,3 +12652,15 @@ countries: fr be ch ca lu
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "Le nom du fichier exporté. Les jokers comme $project, $date ou $bpm sont remplis à l'export. Un / place le fichier dans un dossier de ce nom à l'intérieur du dossier d'export (créé si besoin)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Slot vide : cliquez pour ajouter un effet, double-cliquez ou cliquez avec la molette pour en chercher un"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Effets de la piste : [LMB] ajouter un effet à sa piste de mixage  [MMB] ou double-clic : en chercher un  (on peut aussi y déposer un effet du Navigateur)"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL classique (une ligne)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "Activité de l'entrée MIDI"
+"One row (FL single line)" = "Une ligne (ligne unique de FL)"
+"Grouped look (framed panels, steady spacing)" = "Aspect groupé (panneaux encadrés, espacement fixe)"
+"More toolbar items: what this window size has no room for" = "Autres éléments de la barre : ce qui ne tient pas à cette taille de fenêtre"
+"reconnect the MIDI inputs" = "reconnecter les entrées MIDI"
+"Nudge the tempo down" = "Pousser le tempo vers le bas"
+"Nudge the tempo up" = "Pousser le tempo vers le haut"
+"Launch quantization" = "Quantification de lancement"

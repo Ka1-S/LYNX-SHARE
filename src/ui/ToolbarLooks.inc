@@ -395,6 +395,7 @@ void MainComponent::hideToolbarParts()
         parts.push_back (&b);
     for (auto* c : lookOnlyParts())
         parts.push_back (c);
+    parts.push_back (&overflowButton); // (round 190qg)
     for (auto* c : parts)
         if (c->isVisible())
             c->setVisible (false);
@@ -458,7 +459,7 @@ std::uint64_t MainComponent::toolbarBackdropStamp (juce::Rectangle<int> b) const
         return 0;
     const auto near = b.expanded (2); // (an anti-aliased edge reaches past its shape)
     auto h = mix (mix (0x13198a2e03707344ull, (std::uint64_t) getWidth()), (std::uint64_t) toolbarHeight);
-    for (auto c : { colour::bg1, colour::bg2, colour::bg3, colour::border, colour::borderStrong, colour::textSecondary, colour::textDisabled })
+    for (auto c : { colour::bg1, colour::bg2, colour::bg3, colour::bg4, colour::border, colour::borderStrong, colour::textSecondary, colour::textDisabled })
         h = mix (h, c.getARGB());
     const auto rect = [&] (juce::Rectangle<int> r) {
         h = r.intersects (near) ? mix (mix (mix (mix (h, (std::uint64_t) (std::uint32_t) r.getX()), (std::uint64_t) (std::uint32_t) r.getY()),
@@ -467,7 +468,9 @@ std::uint64_t MainComponent::toolbarBackdropStamp (juce::Rectangle<int> b) const
     };
     rect ({ 0, 0, getWidth(), toolbarHeight });
     h = mix (h, toolbarLayout.separators ? 2u : 3u);
-    if (toolbarLayout.separators)
+    if (toolbarLayout.grouped) // (round 190qg: the Grouped look's frames)
+        h = mix (h, 5u);
+    if (toolbarLayout.separators || toolbarLayout.grouped)
         for (const auto& r : panelBounds)
             rect (r);
     else
@@ -598,6 +601,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     using toolbarlayout::Group;
     using P = sb::Part;
     hideToolbarParts();
+    overflowList.clear(); // (round 190qg: the FL look's overflow; this look has its "⋯")
     dividers.clear();
     panelBounds = {};
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};
@@ -645,6 +649,9 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         minHint = menuWidth + 8;
         shown = sb::fit (widths, sb::gap, toolbar.getWidth() - minHint);
     }
+    for (int i = 0; i < sb::partCount; ++i) // (round 190qg: what "⋯" must list)
+        simpleWanted[(std::size_t) i] = widths[(std::size_t) i] > 0;
+    simpleShown = shown;
     int used = 0;
     for (int i = 0; i < sb::partCount; ++i)
         used += shown[(std::size_t) i] ? widths[(std::size_t) i] + sb::gap : 0;
@@ -778,6 +785,7 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     using toolbarlayout::Group;
     using I = lb::Item;
     hideToolbarParts();
+    overflowList.clear(); // (round 190qg)
     dividers.clear();
     panelBounds = {};
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};
@@ -816,6 +824,8 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     widths[(std::size_t) I::cpu] = toolbarLayout.isShown (Group::meters) ? lb::defaultWidth (I::cpu) : 0;
     widths[(std::size_t) I::metronome] = 24; // (the ring-and-dot box; its options are on the right-click, as FL's)
     liveShown = lb::fit (widths, bar.getWidth() - 16 - 3 * lb::sectionGap);
+    for (int i = 0; i < lb::itemCount; ++i) // (round 190qg)
+        liveWanted[(std::size_t) i] = widths[(std::size_t) i] > 0;
 
     const auto y = lookBand.getY() + (lookBand.getHeight() - lb::box) / 2;
     auto component = [this] (I item) -> juce::Component* {
@@ -1042,6 +1052,13 @@ void MainComponent::setSaveStatusForSnapshot (toolbarlayout::SaveState state)
 
 juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name)
 {
+    if (name.startsWith ("190qg:")) // round 190qg: a Pattern-look item by its id (core/ToolbarLayout.h itemId)
+    {
+        for (int i = 0; i < toolbarlayout::itemCount; ++i)
+            if (name.substring (6) == toolbarlayout::itemId ((toolbarlayout::Item) i))
+                return toolbarItemComponent ((toolbarlayout::Item) i);
+        return nullptr;
+    }
     const std::pair<const char*, juce::Component*> parts[] {
         { "play", &playButton }, { "stop", &stopButton }, { "record", &recordButton }, { "metronome", &metronomeButton }, { "tap", &tapTempoButton },
         { "tempo", &tempoDisplay }, { "signature", &signatureBox }, { "quantisation", &quantBox }, { "key", &keyPanel }, { "link", &linkToggle },
@@ -1095,39 +1112,11 @@ void MainComponent::setSessionButtonRowShown (bool shown)
 juce::PopupMenu MainComponent::makeToolbarMoreMenu()
 {
     using toolbarlayout::Group;
-    using I = lb::Item;
     juce::PopupMenu menu;
     const auto live = toolbarLook == Look::live;
-    auto liveDropped = [&] (I item) { return live && ! liveShown[(std::size_t) item]; };
 
-    // the control-bar items the window had no room for
-    if (live)
-    {
-        bool any = false;
-        auto item = [&] (I i, const juce::String& text, bool on, std::function<void()> act) {
-            if (! liveDropped (i))
-                return;
-            if (! any)
-                menu.addSectionHeader (tr ("Control bar"));
-            any = true;
-            menu.addItem (text, true, on, std::move (act));
-        };
-        item (I::tap, tr ("Tap tempo"), false, [this] { tapTempoButton.triggerClick(); });
-        item (I::overdub, tr ("Blend recorded notes"), blendButton.getToggleState(), [this] { runAction ("record.blend"); });
-        item (I::automationArm, tr ("Automation Arm"), engine.getRecordOptions().recordAutomation, [this] { automationArmButton.triggerClick(); });
-        item (I::reEnableAutomation, tr ("Re-Enable Automation"), engine.automationOverridden(), [this] { engine.reEnableAutomation(); });
-        item (I::capture, tr ("Capture MIDI: the notes just played without recording into the pattern"), false, [this] { runAction ("record.captureMidi"); });
-        item (I::punch, tr ("Punch-In"), punchButton.getToggleState(), [this] { runAction ("record.punchIn"); });
-        item (I::loopSwitch, tr ("Loop"), liveLoopButton.getToggleState(), [this] { toggleLiveLoop(); });
-        item (I::punchOut, tr ("Punch-Out"), punchOutButton.getToggleState(), [this] { runAction ("record.punchOut"); });
-        item (I::computerKeys, tr ("Typing keyboard to piano"), typingPianoButton.getToggleState(), [this] { runAction ("view.typingPiano"); });
-        item (I::draw, tr ("Draw Mode"), drawmode::isOn(), [] { drawmode::toggle(); });
-        item (I::keyMap, tr ("Key Map Mode: map computer keys to clips, scenes, buttons and controls (Ctrl+K)"), getMapMode() == remotemap::Mode::key,
-              [this] { keyMapButton.triggerClick(); });
-        item (I::midiMap, tr ("MIDI Map Mode: map MIDI controls to clips, scenes, buttons and controls (Ctrl+M)"), getMapMode() == remotemap::Mode::midi,
-              [this] { midiMapButton.triggerClick(); });
-        item (I::browser, "Browser", workspace.isPanelVisible (Panel::browser), [this] { runAction ("panel.browser"); });
-    }
+    // the bar's items the window had no room for (round 190qg: every one of them, ui/ToolbarOverflow.inc)
+    addLookDroppedItems (menu);
 
     // Pattern / Song (FL's switch in front of its transport)
     menu.addSectionHeader (tr ("Transport"));

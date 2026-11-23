@@ -455,7 +455,8 @@ void TimeDisplay::paint (juce::Graphics& g)
         {
             fit = key;
             fit.caption = textcache::stringWidth (captionFont, caption);
-            const auto room = (float) area.getWidth() - 8.0f;
+            // round 190qg: a short display (FL's one-row toolbar) keeps the caption's corner free of digits
+            const auto room = (float) area.getWidth() - 8.0f - (area.getHeight() < 36 ? fit.caption + 6.0f : 0.0f);
             for (int i = 0; i < 16 && textcache::stringWidth (big, readout) > room; ++i)
                 big = big.withHeight (big.getHeight() * 0.94f);
             fit.digits = big.getHeight();
@@ -463,7 +464,8 @@ void TimeDisplay::paint (juce::Graphics& g)
         big = big.withHeight (fit.digits);
         const auto captionWidth = fit.caption;
         g.setFont (big);
-        g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
+        g.drawText (readout, (area.getHeight() < 36 ? area.withTrimmedRight ((int) std::ceil (captionWidth) + 6) : area).withTrimmedTop (2),
+                    juce::Justification::centred, false);
         g.setColour (colour::textSecondary);
         g.setFont (captionFont);
         g.drawText (caption, area.withTrimmedRight (4).withTrimmedTop (2).withHeight (10).withLeft (area.getRight() - 4 - (int) std::ceil (captionWidth) - 1),
@@ -977,7 +979,7 @@ void PerformanceMeter::setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, st
 juce::Rectangle<float> PerformanceMeter::barBox() const
 {
     auto area = getLocalBounds();
-    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
+    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, getHeight() < 50 ? 1 : 4); // (round 190qg: as paint)
     row1.removeFromLeft (30);
     row1.removeFromRight (34);
     if (underruns > 0)
@@ -1098,8 +1100,9 @@ void PerformanceMeter::paint (juce::Graphics& g)
         return;
     }
     auto area = getLocalBounds();
-    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
-    auto row2 = area.reduced (0, 4);
+    const auto pad = getHeight() < 50 ? 1 : 4; // (round 190qg: FL's one-row toolbar gives the panel ~37 px)
+    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, pad);
+    auto row2 = area.reduced (0, pad);
     const juce::Font caption (font (type::caption - 1.0f, true)), number (font (type::caption));
 
     // CPU: caption, bar, percent

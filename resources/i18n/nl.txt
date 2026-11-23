@@ -12652,3 +12652,15 @@ countries: nl be
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "De naam van het geëxporteerde bestand. Jokertekens zoals $project, $date of $bpm worden ingevuld bij het exporteren. Een / zet het bestand in een map met die naam in de exportmap (wordt zo nodig gemaakt)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Leeg slot: klik om een effect toe te voegen, dubbelklik of middelklik om er een te zoeken"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Spooreffecten: [LMB] een effect aan het mixerspoor toevoegen  [MMB] of dubbelklik: er een zoeken  (een effect uit de Browser kan hier ook neergezet worden)"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL klassiek (één rij)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "MIDI-invoeractiviteit"
+"One row (FL single line)" = "Eén rij (FL enkele regel)"
+"Grouped look (framed panels, steady spacing)" = "Gegroepeerde weergave (omkaderde panelen, vaste afstand)"
+"More toolbar items: what this window size has no room for" = "Meer werkbalkitems: wat bij deze venstergrootte niet past"
+"reconnect the MIDI inputs" = "MIDI-ingangen opnieuw verbinden"
+"Nudge the tempo down" = "Tempo omlaag duwen"
+"Nudge the tempo up" = "Tempo omhoog duwen"
+"Launch quantization" = "Startkwantisering"
