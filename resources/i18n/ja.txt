@@ -12652,3 +12652,5 @@ countries: jp
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "書き出すファイルの名前です。$project、$date、$bpm などのワイルドカードは書き出し時に置き換えられます。/ を入れると、書き出し先フォルダー内のその名前のフォルダーにファイルを置きます (必要なら作成)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空きスロット: クリックでエフェクトを追加、ダブルクリックまたは中クリックで検索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "トラックのエフェクト: [LMB] ミキサートラックにエフェクトを追加  [MMB] またはダブルクリック: 検索  (ブラウザーからここへドロップも可)"
+"Darken switched-off tracks (LYNX)" = "オフにしたトラックを暗くする (LYNX)"
+"In the Pattern layout, a Playlist track switched off (its LED dark) also steps back as a whole row: its lane and clips go under a dark veil. FL Studio greys only the track's clips and header: switch this off for FL's look. Also in Playlist › View." = "Pattern レイアウトで、オフにした Playlist トラック (LED が暗い) は行全体でも一歩下がります: レーンとクリップが暗いベールの下になります。FL Studio はトラックのクリップとヘッダーだけをグレーにします: FL の見た目にするにはこれをオフにします。Playlist › View にもあります。"

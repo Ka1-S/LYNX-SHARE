@@ -12652,3 +12652,5 @@ countries: cn sg
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "导出文件的名称。导出时会填入 $project、$date 或 $bpm 等通配符。/ 会把文件放进导出文件夹内同名的文件夹（需要时自动创建）"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空插槽：单击添加效果器，双击或中键单击可搜索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "音轨效果：[LMB] 为其混音器轨道添加效果  [MMB] 或双击：搜索效果（也可从浏览器拖放到这里）"
+"Darken switched-off tracks (LYNX)" = "调暗已关闭的轨道 (LYNX)"
+"In the Pattern layout, a Playlist track switched off (its LED dark) also steps back as a whole row: its lane and clips go under a dark veil. FL Studio greys only the track's clips and header: switch this off for FL's look. Also in Playlist › View." = "在 Pattern 布局中，已关闭的 Playlist 轨道（其 LED 变暗）也会整行退后：其轨道行和片段处于深色遮罩下。FL Studio 只把该轨道的片段和标题变灰：关闭此项即为 FL 的外观。也在 Playlist › View 中。"

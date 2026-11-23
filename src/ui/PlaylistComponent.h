@@ -136,6 +136,11 @@ public:
     // Pattern layout also shades what a fade takes away, as the Clip-launch layout and issue #230's reference (Live) do;
     // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
     static inline bool shadeFadedAudio = false;
+    // PR #268 (round 190qm, a LYNX extra: FL 2026 greys a switched-off track's clips and header, its lane unchanged): a
+    // switched-off track's whole row steps back under a dark veil in the Pattern layout. On by default (owner, 2026-11-23:
+    // a visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras
+    // ("darkenMutedTracks").
+    static inline bool darkenMutedTracks = true;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
@@ -651,8 +656,8 @@ private:
     double zoomEndMs = -1.0e9;
     juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintStickyTitles (juce::Graphics& g);
-    // FL (Pattern layout): a track switched off (its LED dark) steps back under a dark veil - its lane, clips and
-    // automation lanes, and its header; drawn over the cached picture (a mute changes without a lane repaint)
+    // PR #268 (Pattern layout, the LYNX extra darkenMutedTracks): a track switched off (its LED dark) steps back under a
+    // dark veil - its lane, clips and automation lanes; drawn over the cached picture and in paint() alike
     void paintMutedTracks (juce::Graphics& g);
     void paintHeldClip (juce::Graphics& g, int index); // round 190im: one audio / automation clip as paint() draws it
     struct HeldTitlesKey // round 190ig: what the held clip titles were last found for

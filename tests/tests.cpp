@@ -18109,3 +18109,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
+#include "Pr268_190qmTests.inc" // round 190qm: PR #268, a switched-off Playlist track (FL's greyed clips + the LYNX row veil)
