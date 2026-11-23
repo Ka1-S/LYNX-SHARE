@@ -55,6 +55,16 @@ void notes (Pattern& p, int channel, std::initializer_list<std::array<int, 3>> l
         p.notes.push_back (n);
     }
 }
+
+// The "Default" new project (the New project window's first entry, and a File > New that follows LYNX's default): the
+// channel set with its inserts and the Master limiter, and EMPTY steps (round 170h2: the four-on-the-floor is the "Basic
+// beat" template). The "Empty" template is FL's: one Sampler channel, added below.
+Song defaultChannelsProject()
+{
+    auto s = Song::makeDefault();
+    s.patterns[0].notes.clear();
+    return s;
+}
 } // namespace
 
 std::vector<std::string> templateNames()
@@ -69,7 +79,15 @@ Song makeTemplate (int index)
 
     if (index == 0)
     {
+        // FL's Empty template: one Sampler channel with no sample (a sample dropped on it fills it), an empty pattern, the
+        // default inserts and the Master limiter
         auto s = Song::makeDefault();
+        s.channels.clear();
+        ChannelDef sampler;
+        sampler.name = "Sampler";
+        sampler.instrument = InstrumentKind::sampler;
+        sampler.mixerTrack = 1;
+        s.channels.push_back (sampler);
         s.patterns[0].notes.clear();
         return s;
     }
@@ -349,8 +367,9 @@ NewProjectDefaults& newProjectDefaults()
 Song makeNewProject (int templateIndex)
 {
     // round 170h2 (user decision): the default new project is FL's way — the channels, their inserts and the Master
-    // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template)
-    auto song = makeTemplate (templateIndex < 0 ? 0 : templateIndex);
+    // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template). The built-in "Empty" template
+    // (index 0) is a single Sampler instead, as FL's.
+    auto song = templateIndex < 0 ? defaultChannelsProject() : makeTemplate (templateIndex);
     applyNewProjectDefaults (song, newProjectDefaults());
     adoptFlPluginLevels (song); // (the built-in templates hold no hosted plugin: every new project gets FL's levels)
     return song;

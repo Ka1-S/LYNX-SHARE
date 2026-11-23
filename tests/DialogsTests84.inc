@@ -414,6 +414,28 @@ TEST (new_project_setup_and_templates)
     CHECK (templateDisplayName ("C:/T/Trap kit.lynx") == "Trap kit" && templateDisplayName (".hidden") == ".hidden");
 }
 
+// The "Empty" template is FL's empty project: one Sampler channel and nothing in the patterns. The "Default" new project
+// keeps the channel set (the New project window's "Drums and a synth on the first inserts").
+TEST (empty_template_is_one_sampler)
+{
+    using namespace lynx;
+    const auto empty = makeTemplate (builtInTemplateIndex ("Empty"));
+    CHECK (empty.channels.size() == 1);
+    if (empty.channels.size() == 1)
+    {
+        CHECK (empty.channels[0].instrument == InstrumentKind::sampler);
+        CHECK (empty.channels[0].name == "Sampler");
+        CHECK (empty.channels[0].mixerTrack == 1);
+    }
+    CHECK (empty.patterns.size() == 1 && empty.patterns[0].notes.empty());
+    CHECK (makeNewProject (builtInTemplateIndex ("Empty")).channels.size() == 1);
+    // the default new project: still the channel set, with empty steps
+    const auto defaults = makeNewProject();
+    CHECK (defaults.channels.size() == 5);
+    CHECK (defaults.channels.front().name == "Kick" && defaults.channels.back().name == "Synth");
+    CHECK (defaults.patterns.size() == 1 && defaults.patterns[0].notes.empty());
+}
+
 // Issue #123: the default template's saved form (FL's Options › General › "Default template")
 TEST (default_template_choice_text_round_trip_and_rejects_paths)
 {
