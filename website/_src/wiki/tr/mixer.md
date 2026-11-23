@@ -1,9 +1,9 @@
 ---
-source: 6d9e90a4d1
+source: 620ff357bd
 ---
 ![Mixer](/assets/img/mixer.webp)
 
-Her kanal bir Mixer insert'i üzerinden çalar. Her insert'in bir fader'ı, pan'ı, mute ve solo düğmeleri, bir tepe ölçeri, her biri kendi dry/wet miktarına sahip on efekt yuvası ve dahili bir EQ'su vardır. Başka yere yönlendirmedikçe bütün insert'ler Master'da buluşur. Mixer'ı göstermek veya gizlemek için `F9` tuşuna basın.
+Her kanal bir Mixer insert'i üzerinden çalar. Her insert'in bir fader'ı, pan'ı, mute ve solo düğmeleri, bir tepe ölçeri, her biri kendi dry/wet miktarına sahip en fazla 25 efekt yuvası ve dahili bir EQ'su vardır. Başka yere yönlendirmedikçe bütün insert'ler Master'da buluşur. Mixer'ı göstermek veya gizlemek için `F9` tuşuna basın.
 
 Bir projede en fazla 500 insert olabilir. Mixer'da yeni bir tane için ekleme şeridi vardır. Mixer'ın başlık çubuğundaki kutu, `Kompakt` ile `Çok büyük` arasında sekiz kanal şeridi düzeninden birini seçer.
 
@@ -43,7 +43,7 @@ Sessize alınmış bir insert'in metresi hareket etmeye devam eder. Yeni projele
 
 ## Efektler
 
-Efekt paneli, seçili insert'in on yuvasını gösterir.
+Efekt paneli, seçili insert'in yuvalarını bir seferde on satır olarak gösterir; insert'te daha fazlası varsa liste kayar. Listenin altındaki `+` sekmesi her tıklamada bir yuva ekler, en fazla 25'e kadar.
 
 - Bir yuvayı yukarı veya aşağı taşımak için sürükleyin ya da üzerinde tekerleği kullanın.
 - Seçenekleri (değiştir, taşı, sil) için bir yuvaya sağ tıklayın.
@@ -115,7 +115,8 @@ Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYN
 - Birden fazla çıkışı olan bir enstrüman plugin'i her çıkışını kendi insert'inde çalabilir. Bkz. [Üçüncü taraf plugin'ler](/wiki/plugins/).
 - `Ctrl+L` Channel Rack'te ve Mixer'da farklı işler yapar. Rack'te boş insert'leri seçer. Mixer'da seçili insert'i kullanır.
 - Yönlendirme anahtarları seçili şeridde değil, diğer şeritlerde görünür.
-- Sınır, proje başına 500 insert ve insert başına on efekt yuvasıdır.
+- Sınır, proje başına 500 insert ve insert başına en fazla 25 efekt yuvasıdır (FL Studio'da varsayılan 10'dur). `.flp` ve `.flm` dosyaları FL'nin 10 yuvasını taşır; `.flp` dışa aktarımı 10. yuvadan sonraki efektleri atlanmış olarak listeler.
+- `Seçenekler › Genel ayarlar` içindeki `Yeni mikser kanallarındaki efekt slotu sayısı`, eklediğiniz insert'lerin kaç yuvayla başlayacağını (1 ile 25 arası, varsayılan 10) belirler.
 - Edison'ın kaydı, proje dosyasının içinde değil, projenin klasöründe bir WAV dosyası olarak saklanır.
 - Klip gridinin altındaki Session mixer yalnızca Klip başlatma iş akışına aittir. Bu Mixer'daki insert'lerin aynısını gösterir. Bkz. [Düzenler](/wiki/layouts/).
 

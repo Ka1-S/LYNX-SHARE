@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![Die Schnellauswahl: Instrumente links, Effekte rechts, jeweils als eingebaut oder als eingebaute FL-Engine gekennzeichnet](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ Der Schalter heißt `Fehlende Plugins durch LYNX-SHARE-Entsprechungen ersetzen` 
 - Fehlende Instrumente werden noch nicht ersetzt. Ein fehlendes Instrument-Plugin wird zu einem eingebauten Synth, der nach dem Kanalnamen gewählt wird.
 - Die Automation der Parameter des Original-Plugins bleibt erhalten, steuert den Platzhalter aber nicht.
 - FLEX-Packs sind verschlüsselt und werden nie geöffnet. Ein FLEX-Kanal bekommt einen Synth-Patch, der nach seinem Preset-Namen gewählt wird.
-- Ein Insert hat 10 Effekt-Slots.
+- Ein Insert hat bis zu 25 Effekt-Slots (zehn sind sichtbar, die Liste scrollt).
 
 ## Verwandt
 

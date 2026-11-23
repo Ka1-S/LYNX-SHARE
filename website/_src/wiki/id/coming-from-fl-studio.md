@@ -1,5 +1,5 @@
 ---
-source: f6f0977999
+source: 979232caef
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
@@ -37,7 +37,7 @@ Yang berbeda dari FL Studio:
 | Urungkan | `Ctrl+Z` mengurungkan, atau mengulangi setelah sebuah urungkan. `Ctrl+Alt+Z` mengurungkan mundur |
 | Simpan versi baru | `Ctrl+Alt+S` |
 | Ekspor | `Ctrl+R`, MP3 di `Ctrl+Shift+R`, MIDI di `Ctrl+Shift+M` |
-| Insert, send, dan sidechain Mixer | Sama, dengan 10 slot efek per insert |
+| Insert, send, dan sidechain Mixer | Sama, dengan hingga 25 slot efek per insert (bawaan 10) |
 | Fruity Wrapper | Plugin pihak ketiga di-host langsung, lihat [Plugin pihak ketiga](/wiki/plugins/) |
 | Generator dan efek bawaan FL | Dimainkan di engine yang dibuat ulang LYNX SHARE, lihat di bawah |
 | File proyek `.flp` | File proyek `.lynx` |

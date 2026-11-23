@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Ta strona przechodzi raz przez całą drogę: pattern perkusyjny, melodia, aranżacja, miks i wyeksportowany plik. Każda część odsyła do strony, która opisuje dane okno w całości. Jeśli w którymkolwiek momencie nic nie słychać, zajrzyj do [Ustawień audio](/wiki/audio-setup/).
 
@@ -37,7 +37,7 @@ Aby dodać brakujący dźwięk, kliknij pole `+ dodaj kanał` pod ostatnim wiers
 1. Naciśnij `F9`, aby pokazać [Mixer](/wiki/mixer/). Pięć początkowych kanałów już gra przez inserty od 1 do 5, a kanał dodany z menu `+ dodaj kanał` zajmuje wolny insert. Numer w polu routingu kanału w Channel Rack mówi, który.
 2. Aby przenieść kanały na własne wolne inserty, zaznacz je w Channel Rack i naciśnij `Ctrl+L`. Każdy insert przejmuje nazwę i kolor kanału.
 3. Przeciągnij suwak inserta, aby ustawić poziom.
-4. Kliknij insert, aby go zaznaczyć. Panel efektów po prawej pokazuje jego dziesięć slotów.
+4. Kliknij insert, aby go zaznaczyć. Panel efektów po prawej pokazuje jego sloty efektów (dziesięć wierszy, lista się przewija).
 5. Kliknij pusty slot i wybierz efekt. Kliknij nazwę slotu, aby pokazać lub ukryć okno efektu. Lampka slotu omija efekt.
 
 ## Wyeksportuj utwór

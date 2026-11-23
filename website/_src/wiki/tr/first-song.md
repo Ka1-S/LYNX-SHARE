@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Bu sayfa tüm yolu bir kez baştan sona gösterir: bir davul pattern'i, bir melodi, bir aranjman, bir mix ve dışa aktarılmış bir dosya. Her bölüm, penceresini ayrıntısıyla anlatan sayfaya bağlanır. Herhangi bir noktada hiçbir şey duymuyorsanız [Ses ayarı](/wiki/audio-setup/) sayfasına bakın.
 
@@ -37,7 +37,7 @@ Olmayan bir ses eklemek için son satırın altındaki `+ kanal ekle` kutusuna t
 1. [Mixer](/wiki/mixer/)'i göstermek için `F9` tuşuna basın. Başlangıçtaki beş kanal zaten 1'den 5'e kadar insert'ler üzerinden çalar; `+ kanal ekle` menüsünden eklenen kanal boş bir insert alır. Channel Rack'te kanalın yönlendirme kutusundaki sayı hangisi olduğunu söyler.
 2. Kanalları kendilerine ait boş insert'lere taşımak için Channel Rack'te seçin ve `Ctrl+L` tuşuna basın. Her insert kanalın adını ve rengini alır.
 3. Seviyesini ayarlamak için bir insert'in fader'ını sürükleyin.
-4. Seçmek için bir insert'e tıklayın. Sağdaki efekt paneli on yuvasını gösterir.
+4. Seçmek için bir insert'e tıklayın. Sağdaki efekt paneli efekt yuvalarını gösterir (on satır, liste kayar).
 5. Boş bir yuvaya tıklayın ve bir efekt seçin. Efektin penceresini göstermek veya gizlemek için yuvanın adına tıklayın. Yuvanın ışığı efekti bypass eder.
 
 ## Şarkıyı dışa aktarma

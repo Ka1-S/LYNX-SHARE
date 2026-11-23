@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![La paleta de inserción rápida: instrumentos a la izquierda, efectos a la derecha, cada uno marcado como integrado o motor FL integrado](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ El interruptor es `Sustituir los plugins que faltan por equivalentes de LYNX SHA
 - Los instrumentos que faltan todavía no se sustituyen. Un plugin de instrumento que falta se convierte en un sintetizador integrado elegido según el nombre del canal.
 - La automatización de los parámetros del plugin original se conserva, pero no controla al sustituto.
 - Los paquetes FLEX están cifrados y nunca se abren. Un canal FLEX recibe un patch de sintetizador elegido según el nombre de su preset.
-- Un insert tiene 10 ranuras de efecto.
+- Un insert tiene hasta 25 ranuras de efecto (se ven diez y la lista se desplaza).
 
 ## Relacionado
 

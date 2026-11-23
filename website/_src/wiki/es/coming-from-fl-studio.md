@@ -1,5 +1,5 @@
 ---
-source: f6f0977999
+source: 979232caef
 ---
 LYNX SHARE mantiene el diseño que ya conoces: un Channel Rack, patrones, una Playlist y un Mixer, con las mismas teclas. Abre proyectos `.flp` directamente y puede escribir uno de vuelta.
 
@@ -37,7 +37,7 @@ Qué es distinto de FL Studio:
 | Deshacer | `Ctrl+Z` deshace, o rehace tras un deshacer. `Ctrl+Alt+Z` deshace hacia atrás |
 | Guardar nueva versión | `Ctrl+Alt+S` |
 | Exportar | `Ctrl+R`, MP3 en `Ctrl+Shift+R`, MIDI en `Ctrl+Shift+M` |
-| Inserts, envíos y sidechain del Mixer | Igual, con 10 ranuras de efecto por insert |
+| Inserts, envíos y sidechain del Mixer | Igual, con hasta 25 ranuras de efecto por insert (10 por defecto) |
 | Fruity Wrapper | Los plugins de terceros se alojan directamente, mira [Plugins de terceros](/wiki/plugins/) |
 | Generadores y efectos nativos | Suenan con motores que LYNX SHARE recreó, mira más abajo |
 | Archivo de proyecto `.flp` | Archivo de proyecto `.lynx` |

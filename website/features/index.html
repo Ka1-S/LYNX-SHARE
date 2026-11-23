@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="1a08436e";
+window.LYNX_LANG=lang;window.LYNX_V="ff0aa1f0";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=1a08436e">
+<link rel="stylesheet" href="/assets/site.css?v=ff0aa1f0">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -126,7 +126,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="frow flip">
       <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="960" height="540" poster="/assets/media/loops/mixer.webp?v=0.1.31" aria-label="The Mixer while the demo song plays" data-i18n-aria="fe.mxA2"><source src="/assets/media/loops/mixer.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div><h3>Mixer</h3>
-        <p data-i18n="fe.mxP">Up to 500 insert tracks. Each has 10 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
+        <p data-i18n="fe.mxP">Up to 500 insert tracks. Each has up to 25 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
         <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li><li data-i18n="fe.mxD">An optional loudness meter (LUFS and true peak) beside the Master</li><li data-i18n="fe.mxE">Edison on any mixer slot, recording even with its window closed</li><li data-i18n="fe.mxF">ARA plugins such as Melodyne on an insert, editing every audio clip routed there</li></ul>
       </div>
     </div>
@@ -345,8 +345,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=1a08436e" defer></script>
-<script src="/assets/features.js?v=1a08436e" defer></script>
-<script src="/assets/motion.js?v=1a08436e" defer></script>
+<script src="/assets/site.js?v=ff0aa1f0" defer></script>
+<script src="/assets/features.js?v=ff0aa1f0" defer></script>
+<script src="/assets/motion.js?v=ff0aa1f0" defer></script>
 </body>
 </html>

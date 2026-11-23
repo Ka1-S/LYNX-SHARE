@@ -5,7 +5,7 @@ status: full
 ---
 ![The Mixer](/assets/img/mixer.webp)
 
-Every channel plays through a Mixer insert. Each insert has a fader, pan, mute and solo, a peak meter, ten effect slots with a dry/wet amount each, and a built-in EQ. All inserts end up in the Master unless you route them elsewhere. Press `F9` to show or hide the Mixer.
+Every channel plays through a Mixer insert. Each insert has a fader, pan, mute and solo, a peak meter, up to 25 effect slots with a dry/wet amount each, and a built-in EQ. All inserts end up in the Master unless you route them elsewhere. Press `F9` to show or hide the Mixer.
 
 A project can have up to 500 inserts. The Mixer has an add strip for a new one. The box in the Mixer's title bar picks one of eight strip layouts, from `Compact` to `Extra large`.
 
@@ -45,7 +45,7 @@ A muted insert keeps its meter moving. In new projects and in imported FL Studio
 
 ## Effects
 
-The effects panel shows the ten slots of the selected insert.
+The effects panel shows the slots of the selected insert, ten rows at a time; the list scrolls when the insert has more. The `+` tab under the list adds a slot, one per click, up to 25.
 
 - Drag a slot, or use the wheel over it, to move it up or down.
 - Right-click a slot for its options (replace, move, delete).
@@ -117,7 +117,8 @@ When you pick an external input for an insert that also records other audio, LYN
 - An instrument plugin with several outputs can play each output on its own insert. See [Third-party plugins](/wiki/plugins/).
 - `Ctrl+L` does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.
 - The route switches appear on the other strips, not on the selected one.
-- The limit is 500 inserts per project and ten effect slots per insert.
+- The limit is 500 inserts per project and up to 25 effect slots per insert (FL Studio's default is 10). `.flp` and `.flm` files carry FL's 10 slots, so a `.flp` export lists effects past slot 10 as dropped.
+- `Number of effect slots on new mixer tracks`, in `Options › General settings`, sets how many slots (1 to 25, default 10) the inserts you add start with.
 - Edison's recording is kept as a WAV file in the project's folder, not inside the project file.
 - The Session mixer under the clip grid belongs to the Clip-launch layout only. It shows the same inserts as this Mixer. See [Layouts](/wiki/layouts/).
 

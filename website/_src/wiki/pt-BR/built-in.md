@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![A paleta de inserção rápida: instrumentos à esquerda, efeitos à direita, cada um marcado como embutido ou motor FL embutido](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ A chave é `Substituir plugins ausentes por equivalentes do LYNX SHARE` em `Opç
 - Instrumentos ausentes ainda não são substituídos. Um plugin de instrumento ausente vira um sintetizador embutido, escolhido pelo nome do canal.
 - A automação dos parâmetros do plugin original é mantida, mas não controla o substituto.
 - Os pacotes FLEX são criptografados e nunca são abertos. Um canal FLEX recebe um patch de sintetizador escolhido pelo nome do preset.
-- Um insert tem 10 slots de efeito.
+- Um insert tem até 25 slots de efeito (dez aparecem e a lista rola).
 
 ## Veja também
 

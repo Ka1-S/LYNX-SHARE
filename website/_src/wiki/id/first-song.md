@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Halaman ini menelusuri seluruh jalurnya sekali jalan: pattern drum, melodi, aransemen, mix, dan file hasil ekspor. Setiap bagian menaut ke halaman yang membahas jendelanya secara lengkap. Jika di titik mana pun kamu tidak mendengar apa-apa, lihat [Pengaturan audio](/wiki/audio-setup/).
 
@@ -37,7 +37,7 @@ Untuk menambah suara yang belum ada, klik kotak `+ tambah channel` di bawah bari
 1. Tekan `F9` untuk menampilkan [Mixer](/wiki/mixer/). Lima channel awal sudah dimainkan lewat insert 1 sampai 5, dan channel yang ditambahkan dari menu `+ tambah channel` mengambil insert kosong. Angka di kotak rute channel di Channel Rack menunjukkan insert yang mana.
 2. Untuk memindahkan channel ke insert kosong miliknya sendiri, pilih channel di Channel Rack dan tekan `Ctrl+L`. Setiap insert memakai nama dan warna channel.
 3. Seret fader insert untuk mengatur levelnya.
-4. Klik sebuah insert untuk memilihnya. Panel efek di sebelah kanan menampilkan kesepuluh slotnya.
+4. Klik sebuah insert untuk memilihnya. Panel efek di sebelah kanan menampilkan slot efeknya (sepuluh baris, daftarnya bisa digulir).
 5. Klik slot kosong dan pilih efek. Klik nama slot untuk menampilkan atau menyembunyikan jendela efek. Lampu slot mem-bypass efek.
 
 ## Mengekspor song

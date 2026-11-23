@@ -1,9 +1,9 @@
 ---
-source: 6d9e90a4d1
+source: 620ff357bd
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
-Elk kanaal speelt via een Mixer-insert. Elke insert heeft een fader, pan, mute en solo, een piekmeter, tien effectslots met elk een dry/wet-hoeveelheid, en een ingebouwde EQ. Alle inserts komen uiteindelijk in de Master tenzij je ze elders naartoe routeert. Druk op `F9` om de Mixer te tonen of te verbergen.
+Elk kanaal speelt via een Mixer-insert. Elke insert heeft een fader, pan, mute en solo, een piekmeter, tot 25 effectslots met elk een dry/wet-hoeveelheid, en een ingebouwde EQ. Alle inserts komen uiteindelijk in de Master tenzij je ze elders naartoe routeert. Druk op `F9` om de Mixer te tonen of te verbergen.
 
 Een project kan tot 500 inserts hebben. De Mixer heeft een toevoegstrook voor een nieuwe. Het vak in de titelbalk van de Mixer kiest een van acht striplayouts, van `Compact` tot `Extra groot`.
 
@@ -43,7 +43,7 @@ Een gemute insert houdt zijn meter in beweging. In nieuwe projecten en in geïmp
 
 ## Effecten
 
-Het effectenpaneel toont de tien slots van de geselecteerde insert.
+Het effectenpaneel toont de slots van de geselecteerde insert, tien rijen tegelijk; de lijst scrolt als de insert er meer heeft. Het tabblad `+` onder de lijst voegt een slot toe, één per klik, tot 25.
 
 - Sleep een slot, of gebruik het wiel erboven, om het omhoog of omlaag te verplaatsen.
 - Klik met rechts op een slot voor zijn opties (vervangen, verplaatsen, verwijderen).
@@ -115,7 +115,8 @@ Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt
 - Een instrumentplugin met meerdere uitgangen kan elke uitgang op een eigen insert laten spelen. Zie [Plugins van derden](/wiki/plugins/).
 - `Ctrl+L` doet verschillende dingen in het Channel Rack en in de Mixer. In het rack kiest het vrije inserts. In de Mixer gebruikt het de geselecteerde insert.
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.
-- De limiet is 500 inserts per project en tien effectslots per insert.
+- De limiet is 500 inserts per project en tot 25 effectslots per insert (in FL Studio zijn het er standaard 10). `.flp`- en `.flm`-bestanden bevatten de 10 slots van FL; een `.flp`-export vermeldt effecten na slot 10 als weggelaten.
+- `Aantal effectslots op nieuwe mixertracks`, in `Opties › Algemene instellingen`, bepaalt met hoeveel slots (1 tot 25, standaard 10) de inserts beginnen die je toevoegt.
 - De opname van Edison wordt bewaard als WAV-bestand in de map van het project, niet in het projectbestand zelf.
 - De Sessiemixer onder het clipraster hoort alleen bij de Clipstart-lay-out. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
 

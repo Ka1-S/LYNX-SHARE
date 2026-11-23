@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![Paleta szybkiego dodawania: instrumenty po lewej, efekty po prawej, każdy z oznaczeniem wbudowany lub wbudowany silnik FL](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ Przełącznik to `Zastępuj brakujące pluginy odpowiednikami LYNX SHARE` w `Opc
 - Brakujące instrumenty nie są jeszcze zastępowane. Brakujący plugin instrumentu staje się wbudowanym syntezatorem dobranym według nazwy kanału.
 - Automatyka parametrów oryginalnego pluginu zostaje zachowana, ale nie steruje zamiennikiem.
 - Paczki FLEX są zaszyfrowane i nigdy nie są otwierane. Kanał FLEX dostaje patch syntezatora dobrany według nazwy presetu.
-- Insert ma 10 slotów efektów.
+- Insert ma do 25 slotów efektów (widać dziesięć, lista się przewija).
 
 ## Powiązane
 

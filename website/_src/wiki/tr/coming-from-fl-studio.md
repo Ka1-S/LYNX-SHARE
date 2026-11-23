@@ -1,5 +1,5 @@
 ---
-source: f6f0977999
+source: 979232caef
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
@@ -37,7 +37,7 @@ FL Studio'dan farklı olanlar:
 | Geri al | `Ctrl+Z` geri alır, geri aldıktan sonra basılırsa yineler. `Ctrl+Alt+Z` geriye doğru geri alır |
 | Yeni sürüm kaydet | `Ctrl+Alt+S` |
 | Dışa aktar | `Ctrl+R`, MP3 için `Ctrl+Shift+R`, MIDI için `Ctrl+Shift+M` |
-| Mixer insert'leri, send'ler ve sidechain | Aynıdır; insert başına 10 efekt yuvası vardır |
+| Mixer insert'leri, send'ler ve sidechain | Aynıdır; insert başına en fazla 25 efekt yuvası vardır (varsayılan 10) |
 | Fruity Wrapper | Üçüncü taraf plugin'ler doğrudan barındırılır, bkz. [Üçüncü taraf plugin'ler](/wiki/plugins/) |
 | Yerel jeneratörler ve efektler | LYNX SHARE'in yeniden oluşturduğu motorlarda çalar, aşağıya bakın |
 | `.flp` proje dosyası | `.lynx` proje dosyası |

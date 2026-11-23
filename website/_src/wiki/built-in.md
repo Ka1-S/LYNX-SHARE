@@ -83,7 +83,7 @@ The switch is `Substitute missing plugins with LYNX SHARE equivalents` in `Optio
 - Missing instruments are not substituted yet. A missing instrument plugin becomes a built-in synth chosen by the channel name.
 - Automation of the original plugin's parameters is kept but does not drive the stand-in.
 - FLEX packs are encrypted and are never opened. A FLEX channel gets a synth patch chosen by its preset name.
-- An insert has 10 effect slots.
+- An insert has up to 25 effect slots (ten are shown, and the list scrolls).
 
 ## Related
 

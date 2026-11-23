@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![La palette di aggiunta rapida: strumenti a sinistra, effetti a destra, ciascuno contrassegnato come integrato o motore FL integrato](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ L'interruttore è `Sostituisci i plugin mancanti con equivalenti LYNX SHARE` in 
 - Gli strumenti mancanti non vengono ancora sostituiti. Un plugin strumento mancante diventa un synth integrato scelto in base al nome del canale.
 - L'automazione dei parametri del plugin originale viene conservata ma non pilota il sostituto.
 - I pacchetti FLEX sono cifrati e non vengono mai aperti. Un canale FLEX riceve una patch di synth scelta in base al nome del suo preset.
-- Un insert ha 10 slot di effetto.
+- Un insert ha fino a 25 slot di effetto (dieci visibili, l'elenco scorre).
 
 ## Correlati
 

@@ -1,5 +1,5 @@
 ---
-source: e1ff018baf
+source: 96ea3b3012
 ---
 LYNX SHARE guarda los proyectos como archivos `.lynx`. También abre proyectos de otros programas, carga los archivos de audio habituales y exporta audio, MIDI y proyectos para otros programas. La tabla lista todos los formatos de la 0.1.31 alpha.
 
@@ -16,7 +16,7 @@ Un proyecto abierto desde el formato de otro programa es una importación. Enton
 
 | Formato | Abrir | Guardar / Exportar | Notas |
 |---|---|---|---|
-| `.lynx` | `Archivo › Abrir...` | `Archivo › Guardar`, con autoguardado | El formato de proyecto propio de LYNX SHARE (JSON). `Archivo › Guardar una copia para un LYNX anterior...` escribe una copia que abre 0.1.27 o 0.1.28, y lista lo que esa versión no puede conservar |
+| `.lynx` | `Archivo › Abrir...` | `Archivo › Guardar`, con autoguardado | El formato de proyecto propio de LYNX SHARE (JSON). `Archivo › Guardar una copia para un LYNX anterior...` escribe una copia que abre 0.1.27, 0.1.28, 0.1.30 o 0.1.31, y lista lo que esa versión no puede conservar |
 | `.zip` | `Archivo › Abrir...` lo extrae a una carpeta y abre el proyecto de dentro | `Archivo › Exportar › Paquete de loops comprimido...` | También abre el paquete de loops comprimido de FL Studio |
 | `.lynxpack` | Se abre tras un resumen. Una parte se fusiona con el proyecto del anfitrión | `Archivo › Sesión online › Enviar proyecto...` | Un proyecto o una parte enviados en una [sesión online](/wiki/online-sessions/). Las partes con plugins de terceros viajan como renders de audio más los ajustes del plugin |
 | `.flp` | `Archivo › Abrir...` | `Archivo › Exportar › Proyecto de FL Studio...`, un proyecto de FL Studio 2026 o un paquete de loops comprimido | Los plugins nativos suenan con motores recreados de exactitud variable. Los packs FLEX nunca se abren. Al exportar, los instrumentos y efectos exclusivos de LYNX se renderizan a audio o se cambian por el plugin de FL más cercano, y los moduladores se dejan fuera. Mira [Si vienes de FL Studio](/wiki/coming-from-fl-studio/) |

@@ -39,7 +39,7 @@ To add a sound that is not there, click the `+ add channel` box under the last r
 1. Press `F9` to show the [Mixer](/wiki/mixer/). The five starting channels already play through inserts 1 to 5, and a channel added from the `+ add channel` menu takes a free insert. The number in the channel's route box in the Channel rack says which one.
 2. To move channels to free inserts of their own, select them in the Channel rack and press `Ctrl+L`. Each insert takes the channel's name and colour.
 3. Drag an insert's fader to set its level.
-4. Click an insert to select it. The effects panel on the right shows its ten slots.
+4. Click an insert to select it. The effects panel on the right shows its effect slots (ten rows, and the list scrolls).
 5. Click an empty slot and pick an effect. Click the slot's name to show or hide the effect's window. The slot's light bypasses the effect.
 
 ## Export the song

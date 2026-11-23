@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Diese Seite geht einmal den ganzen Weg durch: ein Drum-Pattern, eine Melodie, ein Arrangement, ein Mix und eine exportierte Datei. Jeder Abschnitt verweist auf die Seite, die sein Fenster vollständig behandelt. Wenn du an irgendeiner Stelle nichts hörst, lies [Audio einrichten](/wiki/audio-setup/).
 
@@ -37,7 +37,7 @@ Um einen Sound hinzuzufügen, der noch fehlt, klicke unter der letzten Zeile auf
 1. Drücke `F9`, um den [Mixer](/wiki/mixer/) anzuzeigen. Die fünf Start-Kanäle spielen bereits über die Inserts 1 bis 5, und ein Kanal, der über das Menü `+ Kanal hinzufügen` hinzukommt, nimmt einen freien Insert. Die Zahl im Routing-Feld des Kanals im Channel Rack sagt, welchen.
 2. Um Kanäle auf eigene freie Inserts zu legen, wähle sie im Channel Rack aus und drücke `Ctrl+L`. Jeder Insert übernimmt Namen und Farbe des Kanals.
 3. Ziehe am Fader eines Inserts, um den Pegel einzustellen.
-4. Klicke auf ein Insert, um ihn zu wählen. Der Effektbereich rechts zeigt seine zehn Slots.
+4. Klicke auf ein Insert, um ihn zu wählen. Der Effektbereich rechts zeigt seine Effekt-Slots (zehn Zeilen, die Liste scrollt).
 5. Klicke auf einen leeren Slot und wähle einen Effekt. Klicke auf den Namen des Slots, um das Fenster des Effekts ein- oder auszublenden. Das Lämpchen des Slots schaltet den Effekt auf Bypass.
 
 ## Den Song exportieren

@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Esta página percorre uma vez o caminho inteiro: um pattern de bateria, uma melodia, um arranjo, uma mixagem e um arquivo exportado. Cada parte tem um link para a página que cobre a janela correspondente por completo. Se você não ouvir nada em algum ponto, veja [Configuração de áudio](/wiki/audio-setup/).
 
@@ -37,7 +37,7 @@ Para adicionar um som que não está lá, clique na caixa `+ adicionar canal` so
 1. Pressione `F9` para mostrar o [Mixer](/wiki/mixer/). Os cinco canais iniciais já tocam pelos inserts 1 a 5, e um canal adicionado pelo menu `+ adicionar canal` usa um insert livre. O número na caixa de rota do canal, no Channel Rack, diz qual.
 2. Para mover canais para inserts livres só deles, selecione-os no Channel Rack e pressione `Ctrl+L`. Cada insert recebe o nome e a cor do canal.
 3. Arraste o fader de um insert para definir o nível.
-4. Clique em um insert para selecioná-lo. O painel de efeitos à direita mostra os dez slots dele.
+4. Clique em um insert para selecioná-lo. O painel de efeitos à direita mostra os slots de efeito dele (dez linhas, e a lista rola).
 5. Clique em um slot vazio e escolha um efeito. Clique no nome do slot para mostrar ou ocultar a janela do efeito. A luz do slot faz o bypass do efeito.
 
 ## Exportar a música

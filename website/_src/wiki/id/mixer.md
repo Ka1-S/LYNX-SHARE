@@ -1,9 +1,9 @@
 ---
-source: 6d9e90a4d1
+source: 620ff357bd
 ---
 ![Mixer](/assets/img/mixer.webp)
 
-Setiap channel diputar lewat sebuah insert Mixer. Setiap insert punya fader, pan, mute dan solo, meter puncak, sepuluh slot efek dengan jumlah dry/wet masing-masing, dan EQ bawaan. Semua insert berakhir di Master kecuali kamu mengarahkannya ke tempat lain. Tekan `F9` untuk menampilkan atau menyembunyikan Mixer.
+Setiap channel diputar lewat sebuah insert Mixer. Setiap insert punya fader, pan, mute dan solo, meter puncak, hingga 25 slot efek dengan jumlah dry/wet masing-masing, dan EQ bawaan. Semua insert berakhir di Master kecuali kamu mengarahkannya ke tempat lain. Tekan `F9` untuk menampilkan atau menyembunyikan Mixer.
 
 Satu proyek bisa punya hingga 500 insert. Mixer punya strip tambah untuk insert baru. Kotak di bilah judul Mixer memilih satu dari delapan tata letak strip, dari `Ringkas` sampai `Ekstra besar`.
 
@@ -43,7 +43,7 @@ Insert yang dibisukan tetap menggerakkan meternya. Di proyek baru dan di proyek 
 
 ## Efek
 
-Panel efek menampilkan sepuluh slot dari insert terpilih.
+Panel efek menampilkan slot dari insert terpilih, sepuluh baris sekaligus; daftarnya bisa digulir saat insert punya lebih banyak. Tab `+` di bawah daftar menambah satu slot, satu per klik, hingga 25.
 
 - Seret sebuah slot, atau pakai roda di atasnya, untuk memindahkannya ke atas atau ke bawah.
 - Klik kanan sebuah slot untuk opsinya (ganti, pindah, hapus).
@@ -115,7 +115,8 @@ Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYN
 - Plugin instrumen dengan beberapa output bisa memutar tiap output di insert-nya sendiri. Lihat [Plugin pihak ketiga](/wiki/plugins/).
 - `Ctrl+L` melakukan hal berbeda di Channel Rack dan di Mixer. Di rack ia memilih insert kosong. Di Mixer ia memakai insert terpilih.
 - Sakelar rute muncul di strip lain, bukan di strip yang terpilih.
-- Batasnya 500 insert per proyek dan sepuluh slot efek per insert.
+- Batasnya 500 insert per proyek dan hingga 25 slot efek per insert (bawaan FL Studio 10). File `.flp` dan `.flm` membawa 10 slot FL; ekspor `.flp` mencantumkan efek setelah slot 10 sebagai dibuang.
+- `Jumlah slot efek pada trek mixer baru`, di `Opsi › Pengaturan umum`, menentukan jumlah slot awal (1 sampai 25, bawaan 10) untuk insert yang kamu tambahkan.
 - Rekaman Edison disimpan sebagai file WAV di folder proyek, bukan di dalam file proyek.
 - Mixer Session di bawah grid clip hanya milik alur kerja Clip-launch. Ia menampilkan insert yang sama dengan Mixer ini. Lihat [Layout](/wiki/layouts/).
 

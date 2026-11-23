@@ -1,5 +1,5 @@
 ---
-source: de4ead4a7a
+source: 76e742e396
 ---
 Deze pagina loopt één keer het hele traject door: een drumpattern, een melodie, een arrangement, een mix en een geëxporteerd bestand. Elk onderdeel verwijst naar de pagina die het bijbehorende venster volledig behandelt. Hoor je op enig moment niets, zie dan [Audio instellen](/wiki/audio-setup/).
 
@@ -37,7 +37,7 @@ Om een geluid toe te voegen dat er niet is, klik je op het vak `+ kanaal toevoeg
 1. Druk op `F9` om de [Mixer](/wiki/mixer/) te tonen. De vijf beginkanalen spelen al via insert 1 tot 5, en een kanaal dat je via het menu `+ kanaal toevoegen` toevoegt, neemt een vrije insert. Het nummer in het routevak van het kanaal in het Channel Rack geeft aan welke.
 2. Om kanalen naar eigen vrije inserts te verplaatsen, selecteer je ze in het Channel Rack en druk je op `Ctrl+L`. Elke insert neemt de naam en kleur van het kanaal over.
 3. Sleep aan de fader van een insert om het niveau in te stellen.
-4. Klik op een insert om hem te selecteren. Het effectenpaneel rechts toont de tien slots ervan.
+4. Klik op een insert om hem te selecteren. Het effectenpaneel rechts toont de effectslots ervan (tien rijen, de lijst scrolt).
 5. Klik op een leeg slot en kies een effect. Klik op de naam van het slot om het venster van het effect te tonen of te verbergen. Het lampje van het slot zet het effect op bypass.
 
 ## Het nummer exporteren

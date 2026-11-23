@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![Het Snel-toevoegpalet: instrumenten links, effecten rechts, elk gelabeld als ingebouwd of ingebouwde FL-engine](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ De schakelaar is `Ontbrekende plugins vervangen door LYNX-SHARE-equivalenten` in
 - Ontbrekende instrumenten worden nog niet vervangen. Een ontbrekende instrumentplugin wordt een ingebouwde synth, gekozen op de naam van het kanaal.
 - Automatisering van de parameters van de originele plugin blijft bewaard, maar stuurt de vervanger niet aan.
 - FLEX-packs zijn versleuteld en worden nooit geopend. Een FLEX-kanaal krijgt een synthpatch die op de naam van de preset wordt gekozen.
-- Een insert heeft 10 effectslots.
+- Een insert heeft tot 25 effectslots (tien zichtbaar, de lijst scrolt).
 
 ## Gerelateerd
 

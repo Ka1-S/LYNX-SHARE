@@ -18,7 +18,7 @@ A project opened from another program's format is an import. `File › Save` the
 
 | Format | Open | Save / Export | Notes |
 |---|---|---|---|
-| `.lynx` | `File › Open...` | `File › Save`, with autosave | LYNX SHARE's own project format (JSON). `File › Save a copy for an older LYNX...` writes a copy that 0.1.27 or 0.1.28 opens, and lists what that version cannot keep |
+| `.lynx` | `File › Open...` | `File › Save`, with autosave | LYNX SHARE's own project format (JSON). `File › Save a copy for an older LYNX...` writes a copy that 0.1.27, 0.1.28, 0.1.30 or 0.1.31 opens, and lists what that version cannot keep |
 | `.zip` | `File › Open...` extracts it to a folder and opens the project inside | `File › Export › Zipped loop package...` | Also opens FL Studio's zipped loop package |
 | `.lynxpack` | Opens after a summary. A part is merged into the host's project | `File › Online session › Send project...` | A project or a part sent in an [online session](/wiki/online-sessions/). Third-party plugin parts travel as audio renders plus the plugin settings |
 | `.flp` | `File › Open...` | `File › Export › FL Studio project...`, an FL Studio 2026 project or a zipped loop package | Native plugins play on recreated engines of varying exactness. FLEX packs are never opened. On export, LYNX-only instruments and effects are rendered to audio or swapped for the nearest FL plugin, and modulators are left out. See [Coming from FL Studio](/wiki/coming-from-fl-studio/) |

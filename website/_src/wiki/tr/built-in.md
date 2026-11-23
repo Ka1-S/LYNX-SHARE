@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![Hızlı ekleme paleti: solda enstrümanlar, sağda efektler; her biri dahili veya dahili FL motoru olarak etiketli](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ Anahtar, `Seçenekler › Genel ayarlar...` altındaki `Eksik plugin'lerin yerin
 - Eksik enstrümanların yerine henüz bir şey konmaz. Eksik bir enstrüman plugin'i, kanal adına göre seçilen dahili bir synth olur.
 - Orijinal plugin'in parametrelerinin otomasyonu korunur ama yerini tutan efekti yönetmez.
 - FLEX paketleri şifrelidir ve asla açılmaz. Bir FLEX kanalı, preset adına göre seçilen bir synth patch'i alır.
-- Bir insert'in 10 efekt yuvası vardır.
+- Bir insert'in en fazla 25 efekt yuvası vardır (on tanesi görünür, liste kayar).
 
 ## İlgili sayfalar
 

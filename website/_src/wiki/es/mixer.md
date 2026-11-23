@@ -1,9 +1,9 @@
 ---
-source: 6d9e90a4d1
+source: 620ff357bd
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
-Cada canal suena a través de un insert del Mixer. Cada insert tiene un fader, pan, silenciar y solo, un medidor de picos, diez ranuras de efecto con su propia cantidad dry/wet, y un EQ integrado. Todos los inserts acaban en el Master salvo que los enrutes a otro sitio. Pulsa `F9` para mostrar u ocultar el Mixer.
+Cada canal suena a través de un insert del Mixer. Cada insert tiene un fader, pan, silenciar y solo, un medidor de picos, hasta 25 ranuras de efecto con su propia cantidad dry/wet, y un EQ integrado. Todos los inserts acaban en el Master salvo que los enrutes a otro sitio. Pulsa `F9` para mostrar u ocultar el Mixer.
 
 Un proyecto puede tener hasta 500 inserts. El Mixer tiene una franja para añadir uno nuevo. La caja de la barra de título del Mixer elige uno de ocho diseños de franja, de `Compacto` a `Extra grande`.
 
@@ -43,7 +43,7 @@ Un insert silenciado mantiene su medidor en movimiento. En proyectos nuevos y en
 
 ## Efectos
 
-El panel de efectos muestra las diez ranuras del insert seleccionado.
+El panel de efectos muestra las ranuras del insert seleccionado, diez filas a la vez; la lista se desplaza cuando el insert tiene más. La pestaña `+` bajo la lista añade una ranura, una por clic, hasta 25.
 
 - Arrastra una ranura, o usa la rueda sobre ella, para subirla o bajarla.
 - Haz clic derecho en una ranura para ver sus opciones (reemplazar, mover, eliminar).
@@ -115,7 +115,8 @@ Cuando eliges una entrada externa para un insert que también graba otro audio, 
 - Un plugin de instrumento con varias salidas puede reproducir cada salida en su propio insert. Consulta [Plugins de terceros](/wiki/plugins/).
 - `Ctrl+L` hace cosas distintas en el Channel Rack y en el Mixer. En el rack elige inserts libres. En el Mixer usa el insert seleccionado.
 - Los interruptores de ruta aparecen en las demás franjas, no en la seleccionada.
-- El límite es de 500 inserts por proyecto y diez ranuras de efecto por insert.
+- El límite es de 500 inserts por proyecto y hasta 25 ranuras de efecto por insert (en FL Studio son 10 por defecto). Los archivos `.flp` y `.flm` llevan las 10 ranuras de FL; una exportación `.flp` lista los efectos pasada la ranura 10 como descartados.
+- `Número de ranuras de efecto en las pistas nuevas del mezclador`, en `Opciones › Configuración general`, fija con cuántas ranuras (de 1 a 25, 10 por defecto) empiezan los inserts que añades.
 - La grabación de Edison se guarda como archivo WAV en la carpeta del proyecto, no dentro del archivo del proyecto.
 - El mixer de Session bajo la cuadrícula de clips pertenece solo al diseño Clip-launch. Muestra los mismos inserts que este Mixer. Mira [Diseños](/wiki/layouts/).
 

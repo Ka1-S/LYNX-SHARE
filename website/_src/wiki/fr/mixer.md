@@ -1,9 +1,9 @@
 ---
-source: 6d9e90a4d1
+source: 620ff357bd
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
-Chaque canal passe par un insert du Mixer. Chaque insert a un fader, un pan, un bouton Muet et un solo, un vumètre de crête, dix emplacements d'effets avec chacun un taux dry/wet, et un EQ intégré. Tous les inserts finissent dans le Master, sauf si vous les routez ailleurs. Appuyez sur `F9` pour afficher ou masquer le Mixer.
+Chaque canal passe par un insert du Mixer. Chaque insert a un fader, un pan, un bouton Muet et un solo, un vumètre de crête, jusqu'à 25 emplacements d'effets avec chacun un taux dry/wet, et un EQ intégré. Tous les inserts finissent dans le Master, sauf si vous les routez ailleurs. Appuyez sur `F9` pour afficher ou masquer le Mixer.
 
 Un projet peut avoir jusqu'à 500 inserts. Le Mixer a une bande d'ajout pour en créer un nouveau. La liste dans la barre de titre du Mixer choisit l'une des huit dispositions de bandes, de `Compacte` à `Très grand`.
 
@@ -43,7 +43,7 @@ Un insert muet garde son vumètre actif. Dans les nouveaux projets et dans les p
 
 ## Effets
 
-Le panneau d'effets montre les dix emplacements de l'insert sélectionné.
+Le panneau d'effets montre les emplacements de l'insert sélectionné, dix lignes à la fois ; la liste défile quand l'insert en a plus. L'onglet `+` sous la liste ajoute un emplacement, un par clic, jusqu'à 25.
 
 - Faites glisser un emplacement, ou utilisez la molette dessus, pour le monter ou le descendre.
 - Faites un clic droit sur un emplacement pour ses options (remplacer, déplacer, supprimer).
@@ -115,7 +115,8 @@ Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'
 - Un plugin instrument à plusieurs sorties peut jouer chaque sortie sur son propre insert. Voir [Plugins tiers](/wiki/plugins/).
 - `Ctrl+L` ne fait pas la même chose dans le Channel Rack et dans le Mixer. Dans le Channel Rack, il choisit des inserts libres. Dans le Mixer, il utilise l'insert sélectionné.
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.
-- La limite est de 500 inserts par projet et de dix emplacements d'effets par insert.
+- La limite est de 500 inserts par projet et jusqu'à 25 emplacements d'effets par insert (10 par défaut dans FL Studio). Les fichiers `.flp` et `.flm` gardent les 10 emplacements de FL ; un export `.flp` liste les effets au-delà du 10e comme abandonnés.
+- `Nombre de slots d'effet des nouvelles pistes du mixeur`, dans `Options › Réglages généraux`, fixe le nombre d'emplacements (de 1 à 25, 10 par défaut) des inserts que vous ajoutez.
 - L'enregistrement d'Edison est conservé sous forme de fichier WAV dans le dossier du projet, et non dans le fichier du projet.
 - La table de mixage de session sous la grille de clips n'appartient qu'à la disposition par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
 

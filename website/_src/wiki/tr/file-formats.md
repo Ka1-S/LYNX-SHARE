@@ -1,5 +1,5 @@
 ---
-source: e1ff018baf
+source: 96ea3b3012
 ---
 LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.31 alpha sürümünün bütün formatlarını listeler.
 
@@ -16,7 +16,7 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 
 | Format | Açma | Kaydetme / Dışa aktarma | Notlar |
 |---|---|---|---|
-| `.lynx` | `Dosya › Aç...` | `Dosya › Kaydet`, otomatik kayıtla birlikte | LYNX SHARE'in kendi proje formatı (JSON). `Dosya › Eski bir LYNX için kopya kaydet...`, 0.1.27 veya 0.1.28'in açabildiği bir kopya yazar ve o sürümün tutamadıklarını listeler |
+| `.lynx` | `Dosya › Aç...` | `Dosya › Kaydet`, otomatik kayıtla birlikte | LYNX SHARE'in kendi proje formatı (JSON). `Dosya › Eski bir LYNX için kopya kaydet...`, 0.1.27, 0.1.28, 0.1.30 veya 0.1.31'in açabildiği bir kopya yazar ve o sürümün tutamadıklarını listeler |
 | `.zip` | `Dosya › Aç...` onu bir klasöre çıkarır ve içindeki projeyi açar | `Dosya › Dışa aktar › Sıkıştırılmış loop paketi...` | FL Studio'nun sıkıştırılmış loop paketini de açar |
 | `.lynxpack` | Bir özetten sonra açılır. Bir parti, host'un projesine birleştirilir | `Dosya › Çevrimiçi oturum › Projeyi gönder...` | Bir [çevrimiçi oturumda](/wiki/online-sessions/) gönderilen proje veya parti. Üçüncü taraf plugin partileri, ses render'ları ve plugin ayarlarıyla birlikte taşınır |
 | `.flp` | `Dosya › Aç...` | `Dosya › Dışa aktar › FL Studio projesi...`, bir FL Studio 2026 projesi veya sıkıştırılmış loop paketi | Yerel plugin'ler, değişen doğrulukta yeniden oluşturulmuş motorlarda çalar. FLEX paketleri asla açılmaz. Dışa aktarırken yalnızca LYNX'e özgü enstrümanlar ve efektler sese render edilir ya da en yakın FL plugin'iyle değiştirilir, modülatörler dışarıda bırakılır. Bkz. [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) |

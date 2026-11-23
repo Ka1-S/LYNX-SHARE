@@ -1,5 +1,5 @@
 ---
-source: e1ff018baf
+source: 96ea3b3012
 ---
 LYNX SHARE menyimpan proyek sebagai file `.lynx`. Program ini juga membuka proyek dari program lain, memuat file audio yang umum, dan mengekspor audio, MIDI, dan proyek untuk program lain. Tabel mencantumkan setiap format di 0.1.31 alpha.
 
@@ -16,7 +16,7 @@ Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu
 
 | Format | Buka | Simpan / Ekspor | Catatan |
 |---|---|---|---|
-| `.lynx` | `File › Buka...` | `File › Simpan`, dengan simpan otomatis | Format proyek milik LYNX SHARE (JSON). `File › Simpan salinan untuk LYNX yang lebih lama...` menulis salinan yang bisa dibuka 0.1.27 atau 0.1.28, dan mencantumkan apa yang tidak bisa disimpan versi itu |
+| `.lynx` | `File › Buka...` | `File › Simpan`, dengan simpan otomatis | Format proyek milik LYNX SHARE (JSON). `File › Simpan salinan untuk LYNX yang lebih lama...` menulis salinan yang bisa dibuka 0.1.27, 0.1.28, 0.1.30 atau 0.1.31, dan mencantumkan apa yang tidak bisa disimpan versi itu |
 | `.zip` | `File › Buka...` mengekstraknya ke folder dan membuka proyek di dalamnya | `File › Ekspor › Paket loop zip...` | Juga membuka paket loop zip FL Studio |
 | `.lynxpack` | Terbuka setelah ringkasan. Sebuah bagian digabungkan ke proyek host | `File › Sesi online › Kirim proyek...` | Proyek atau bagian yang dikirim dalam [sesi online](/wiki/online-sessions/). Bagian plugin pihak ketiga dikirim sebagai render audio plus pengaturan plugin |
 | `.flp` | `File › Buka...` | `File › Ekspor › Proyek FL Studio...`, proyek FL Studio 2026 atau paket loop zip | Plugin bawaan dimainkan di engine buatan ulang dengan tingkat kemiripan yang beragam. Paket FLEX tidak pernah dibuka. Saat ekspor, instrumen dan efek yang hanya ada di LYNX di-render ke audio atau ditukar dengan plugin FL terdekat, dan modulator dilewati. Lihat [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/) |

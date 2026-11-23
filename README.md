@@ -119,7 +119,7 @@ and, as LYNX extras, tracks can be hidden, or deactivated to free CPU and memory
 <td width="50%" valign="top">
 <img src="docs/img/mixer.png" alt="Mixer">
 
-**Mixer.** Up to 500 inserts with 10 effect slots each (up to 25, as FL Studio 2026.2), sends, sidechain, a built-in EQ per track, VCA faders and
+**Mixer.** Up to 500 inserts with up to 25 effect slots each (FL Studio 2026.2's count; 10 are shown and the list scrolls), sends, sidechain, a built-in EQ per track, VCA faders and
 groups, delay compensation and smart disable, a loudness meter, Edison on any slot, ARA plugins on an insert, and any
 insert to any hardware output.
 
@@ -423,7 +423,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-layout tracks. |
 | **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Volume and pan changes become the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes become the notes' pitch curves; what is left out is counted in the report. The built-in Tracker (*View › Tracker*) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
-| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.30, 0.1.28 or 0.1.27 can open, and lists what that release loses. |
+| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.31, 0.1.30, 0.1.28 or 0.1.27 can open, and lists what that release loses. |
 
 Instruments and samples of other samplers open too: DirectWave programs and banks (`.dwp`, `.dwb`), GigaStudio `.gig`
 instruments (as DirectWave channels) and Kontakt's `.ncw` samples. Kontakt `.nki` instruments need Kontakt itself as a

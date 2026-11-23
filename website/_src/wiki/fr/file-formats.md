@@ -1,5 +1,5 @@
 ---
-source: e1ff018baf
+source: 96ea3b3012
 ---
 LYNX SHARE enregistre les projets en fichiers `.lynx`. Il ouvre aussi les projets d'autres programmes, charge les fichiers audio usuels et exporte de l'audio, du MIDI et des projets pour d'autres programmes. Le tableau liste tous les formats de la version 0.1.31 alpha.
 
@@ -16,7 +16,7 @@ Un projet ouvert depuis le format d'un autre programme est un import. `Fichier �
 
 | Format | Ouvrir | Enregistrer / Exporter | Remarques |
 |---|---|---|---|
-| `.lynx` | `Fichier › Ouvrir...` | `Fichier › Enregistrer`, avec sauvegarde automatique | Le format de projet propre à LYNX SHARE (JSON). `Fichier › Enregistrer une copie pour un ancien LYNX...` écrit une copie que 0.1.27 ou 0.1.28 ouvre, et liste ce que cette version ne peut pas garder |
+| `.lynx` | `Fichier › Ouvrir...` | `Fichier › Enregistrer`, avec sauvegarde automatique | Le format de projet propre à LYNX SHARE (JSON). `Fichier › Enregistrer une copie pour un ancien LYNX...` écrit une copie que 0.1.27, 0.1.28, 0.1.30 ou 0.1.31 ouvre, et liste ce que cette version ne peut pas garder |
 | `.zip` | `Fichier › Ouvrir...` l'extrait dans un dossier et ouvre le projet qui s'y trouve | `Fichier › Exporter › Paquet de loops zippé...` | Ouvre aussi le paquet de boucles zippé de FL Studio |
 | `.lynxpack` | S'ouvre après un résumé. Une partie est fusionnée dans le projet de l'hôte | `Fichier › Session en ligne › Envoyer le projet...` | Un projet ou une partie envoyé dans une [session en ligne](/wiki/online-sessions/). Les parties à plugins tiers voyagent sous forme de rendus audio avec les réglages du plugin |
 | `.flp` | `Fichier › Ouvrir...` | `Fichier › Exporter › Projet FL Studio...`, un projet FL Studio 2026 ou un paquet de boucles zippé | Les plugins natifs jouent sur des moteurs recréés, plus ou moins exacts. Les packs FLEX ne sont jamais ouverts. À l'export, les instruments et effets propres à LYNX sont rendus en audio ou remplacés par le plugin FL le plus proche, et les modulateurs sont laissés de côté. Voir [Venir de FL Studio](/wiki/coming-from-fl-studio/) |

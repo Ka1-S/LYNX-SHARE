@@ -1,5 +1,5 @@
 ---
-source: e1ff018baf
+source: 96ea3b3012
 ---
 LYNX SHARE speichert Projekte als `.lynx`-Dateien. Es öffnet auch Projekte anderer Programme, lädt die gängigen Audiodateien und exportiert Audio, MIDI und Projekte für andere Programme. Die Tabelle listet jedes Format von 0.1.31 alpha.
 
@@ -16,7 +16,7 @@ Ein Projekt, das aus dem Format eines anderen Programms geöffnet wurde, ist ein
 
 | Format | Öffnen | Speichern / Exportieren | Hinweise |
 |---|---|---|---|
-| `.lynx` | `Datei › Öffnen...` | `Datei › Speichern`, mit Autosave | Das eigene Projektformat von LYNX SHARE (JSON). `Datei › Eine Kopie für ein älteres LYNX speichern...` schreibt eine Kopie, die 0.1.27 oder 0.1.28 öffnet, und listet auf, was diese Version nicht behalten kann |
+| `.lynx` | `Datei › Öffnen...` | `Datei › Speichern`, mit Autosave | Das eigene Projektformat von LYNX SHARE (JSON). `Datei › Eine Kopie für ein älteres LYNX speichern...` schreibt eine Kopie, die 0.1.27, 0.1.28, 0.1.30 oder 0.1.31 öffnet, und listet auf, was diese Version nicht behalten kann |
 | `.zip` | `Datei › Öffnen...` entpackt es in einen Ordner und öffnet das Projekt darin | `Datei › Exportieren › Gezipptes Loop-Paket...` | Öffnet auch das gezippte Loop-Paket von FL Studio |
 | `.lynxpack` | Öffnet sich nach einer Zusammenfassung. Ein Part wird in das Projekt des Hosts eingefügt | `Datei › Online-Session › Projekt senden...` | Ein Projekt oder ein Part, der in einer [Online-Session](/wiki/online-sessions/) gesendet wurde. Parts mit Plugins von Drittanbietern reisen als Audio-Renders plus Plugin-Einstellungen |
 | `.flp` | `Datei › Öffnen...` | `Datei › Exportieren › FL Studio-Projekt...`, ein FL-Studio-2026-Projekt oder ein gezipptes Loop-Paket | Native Plugins laufen auf nachgebauten Engines unterschiedlicher Genauigkeit. FLEX-Packs werden nie geöffnet. Beim Export werden Instrumente und Effekte nur für LYNX in Audio gerendert oder durch das nächstliegende FL-Plugin ersetzt, und Modulatoren werden weggelassen. Siehe [Umstieg von FL Studio](/wiki/coming-from-fl-studio/) |

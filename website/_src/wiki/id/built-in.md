@@ -1,5 +1,5 @@
 ---
-source: 7ca5e689db
+source: 3fa93d4af9
 ---
 ![Palet tambah cepat: instrumen di kiri, efek di kanan, masing-masing diberi label bawaan atau engine FL bawaan](/assets/img/wiki/quickadd.webp)
 
@@ -81,7 +81,7 @@ Sakelarnya adalah `Ganti plugin yang hilang dengan padanan LYNX SHARE` di `Opsi 
 - Instrumen yang hilang belum diganti. Plugin instrumen yang hilang menjadi synth bawaan yang dipilih berdasarkan nama channel.
 - Otomasi parameter plugin asli tetap disimpan tetapi tidak menggerakkan pengganti.
 - Paket FLEX dienkripsi dan tidak pernah dibuka. Channel FLEX mendapat patch synth yang dipilih berdasarkan nama presetnya.
-- Satu insert punya 10 slot efek.
+- Satu insert punya hingga 25 slot efek (sepuluh terlihat, daftarnya bisa digulir).
 
 ## Terkait
 

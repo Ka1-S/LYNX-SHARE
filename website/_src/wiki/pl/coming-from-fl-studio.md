@@ -1,5 +1,5 @@
 ---
-source: f6f0977999
+source: 979232caef
 ---
 LYNX SHARE zachowuje workflow, który znasz: Channel Rack, patterny, Playlist i Mixer, na tych samych klawiszach. Otwiera projekty `.flp` bezpośrednio i potrafi je zapisać z powrotem.
 
@@ -37,7 +37,7 @@ Czym różni się od FL Studio:
 | Cofnij | `Ctrl+Z` cofa albo, po cofnięciu, ponawia. `Ctrl+Alt+Z` cofa wstecz |
 | Zapisz nową wersję | `Ctrl+Alt+S` |
 | Eksportuj | `Ctrl+R`, MP3 pod `Ctrl+Shift+R`, MIDI pod `Ctrl+Shift+M` |
-| Inserty, sendy i sidechain w Mixerze | Tak samo, z 10 slotami efektów na insert |
+| Inserty, sendy i sidechain w Mixerze | Tak samo, z maksymalnie 25 slotami efektów na insert (domyślnie 10) |
 | Fruity Wrapper | Pluginy zewnętrzne są hostowane bezpośrednio, zobacz [Pluginy zewnętrzne](/wiki/plugins/) |
 | Natywne generatory i efekty | Grają na silnikach odtworzonych przez LYNX SHARE, zobacz niżej |
 | Plik projektu `.flp` | Plik projektu `.lynx` |
