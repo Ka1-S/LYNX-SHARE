@@ -5,10 +5,12 @@
 
 #include "core/Effects.h"
 #include "core/PluginSubstitutes.h"
+#include "core/PluginPicks.h"
 #include "core/SearchQuery.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/QuickPick.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -25,6 +27,7 @@ struct Entry
     juce::String name, detail;
     std::function<void()> add;
     std::string key = {}; // its Plugin database key (core/Preferences.h plugin names): a renamed one shows its new name
+    bool recent = false;  // round 190qi: a copy at the top of the list, one of the plugins picked last (only while nothing is typed)
 };
 
 class EntryList final : public juce::ListBox,
@@ -47,8 +50,9 @@ public:
     {
         const auto q = search::parse (query.toStdString());
         shown.clear();
+        const auto typed = query.trim().isNotEmpty();
         for (const auto& e : all)
-            if (search::matches (q, (e.name + " " + e.detail).toStdString()))
+            if (e.recent ? ! typed : search::matches (q, (e.name + " " + e.detail).toStdString()))
                 shown.push_back (e);
         updateContent();
         selectRow (shown.empty() ? -1 : 0);
@@ -79,15 +83,28 @@ private:
         const auto& e = shown[(std::size_t) row];
         auto area = juce::Rectangle<int> (8, 0, width - 16, height);
 
+        // round 190qi: the recent picks first, marked by the accent's edge and a "Recent" caption; a line under the last
+        if (e.recent)
+        {
+            g.setColour (theme::colour::accent);
+            g.fillRect (0, 0, 2, height);
+            const auto last = row + 1 >= (int) shown.size() || ! shown[(std::size_t) row + 1].recent;
+            if (last)
+            {
+                g.setColour (theme::colour::border);
+                g.fillRect (0, height - 1, width, 1);
+            }
+        }
         // the source on the right first, then the name in what is left (cut with "..."): a long name no longer runs
         // under the source (round 165q)
-        if (e.detail.isNotEmpty())
+        const auto detail = e.recent ? tr ("Recent") : e.detail;
+        if (detail.isNotEmpty())
         {
             const auto caption = theme::font (theme::type::caption);
-            const auto detailWidth = juce::jmin (juce::GlyphArrangement::getStringWidthInt (juce::Font (caption), e.detail) + 2, area.getWidth() * 2 / 5);
+            const auto detailWidth = juce::jmin (juce::GlyphArrangement::getStringWidthInt (juce::Font (caption), detail) + 2, area.getWidth() * 2 / 5);
             g.setFont (caption);
-            g.setColour (theme::colour::textSecondary);
-            g.drawText (e.detail, area.removeFromRight (detailWidth), juce::Justification::centredRight, true);
+            g.setColour (e.recent ? theme::colour::accent : theme::colour::textSecondary);
+            g.drawText (detail, area.removeFromRight (detailWidth), juce::Justification::centredRight, true);
             area.removeFromRight (10);
         }
 
@@ -108,7 +125,7 @@ class QuickAddPalette final : public juce::Component,
                               private juce::KeyListener
 {
 public:
-    QuickAddPalette (AudioEngine& engine, QuickAddTargets t) : targets (std::move (t))
+    QuickAddPalette (AudioEngine& engine, QuickAddTargets t) : targets (std::move (t)), pluginHost (engine.getPluginHost())
     {
         search.setTextToShowWhenEmpty (tr ("Type to filter (e.g. reverb, synth OR bass, -delay)"), theme::colour::textDisabled);
         search.addListener (this);
@@ -217,40 +234,73 @@ public:
                                          tr ("built-in") + " " + juce::String::fromUTF8 (entry.vendor.c_str()),
                                          [this, entry] { targets.addEffect (makeSubstituteSlot (entry)); } });
 
-        // plugins: favourites (Plugin manager) first, each group by name
-        auto types = engine.getPluginHost().getKnownPlugins().getTypes();
-        const auto& favourites = engine.getPluginHost().favourites();
+        // plugins: favourites (Plugin manager) first, each group by name; round 190qi: none hidden in the Plugin manager,
+        // and one entry per plugin installed in several formats (core/PluginPicks.h: CLAP › VST3 › VST2), its other
+        // formats named in the detail
+        auto& host = engine.getPluginHost();
+        juce::Array<juce::PluginDescription> types, otherBuilds;
+        std::vector<juce::StringArray> otherFormats;
+        {
+            juce::Array<juce::PluginDescription> builds;
+            for (const auto& t : host.getKnownPlugins().getTypes())
+                if (! host.isHidden (t.createIdentifierString().toStdString()))
+                    builds.add (t);
+            std::vector<pluginpicks::Item> items;
+            for (const auto& t : builds)
+                items.push_back ({ t.name.toStdString(), t.manufacturerName.toStdString(), t.pluginFormatName.toStdString(), t.isInstrument });
+            for (const auto& group : pluginpicks::groupByFormat (items))
+            {
+                types.add (builds.getReference (group.preferred()));
+                juce::StringArray others;
+                for (std::size_t m = 1; m < group.members.size(); ++m)
+                {
+                    others.add (builds.getReference (group.members[m]).pluginFormatName);
+                    otherBuilds.add (builds.getReference (group.members[m])); // (a recent pick of that format: Recent)
+                }
+                otherFormats.push_back (others);
+            }
+        }
+        const auto& favourites = host.favourites();
         const auto isFavourite = [&favourites] (const juce::PluginDescription& t) { return favourites.count (t.createIdentifierString().toStdString()) > 0; };
-        std::sort (types.begin(), types.end(), [&] (const auto& a, const auto& b) {
+        std::vector<int> order ((std::size_t) types.size());
+        for (int i = 0; i < types.size(); ++i)
+            order[(std::size_t) i] = i;
+        std::sort (order.begin(), order.end(), [&] (int ia, int ib) {
+            const auto& a = types.getReference (ia);
+            const auto& b = types.getReference (ib);
             if (isFavourite (a) != isFavourite (b))
                 return isFavourite (a);
             return a.name.compareIgnoreCase (b.name) < 0;
         });
 
-        for (const auto& type : types)
-        {
+        // one plugin build as an entry (`detail` after its vendor and format)
+        auto pluginEntry = [this, &isFavourite] (const juce::PluginDescription& type, const juce::String& more) {
             PluginRef ref;
             ref.id = type.createIdentifierString().toStdString();
             ref.name = type.name.toStdString();
-            const auto detail = (isFavourite (type) ? juce::String::fromUTF8 ("\xe2\x98\x85 ") : juce::String()) + type.manufacturerName + " · " + type.pluginFormatName;
-
+            auto detail = (isFavourite (type) ? juce::String::fromUTF8 ("\xe2\x98\x85 ") : juce::String()) + type.manufacturerName + " · " + type.pluginFormatName + more;
             if (type.isInstrument)
-                instruments.all.push_back ({ type.name, detail, [this, ref] {
-                                                ChannelDef c;
-                                                c.name = ref.name;
-                                                c.instrument = InstrumentKind::plugin;
-                                                c.plugin = ref;
-                                                targets.addInstrument (c);
-                                            },
-                                             ref.id });
-            else
-                effects.all.push_back ({ type.name, detail, [this, ref] {
-                                            EffectSlot slot;
-                                            slot.kind = EffectKind::plugin;
-                                            slot.plugin = ref;
-                                            targets.addEffect (slot);
-                                        },
-                                         ref.id });
+                return Entry { type.name, detail, [this, ref] {
+                                  ChannelDef c;
+                                  c.name = ref.name;
+                                  c.instrument = InstrumentKind::plugin;
+                                  c.plugin = ref;
+                                  targets.addInstrument (c);
+                              },
+                               ref.id };
+            return Entry { type.name, detail, [this, ref] {
+                              EffectSlot slot;
+                              slot.kind = EffectKind::plugin;
+                              slot.plugin = ref;
+                              targets.addEffect (slot);
+                          },
+                           ref.id };
+        };
+        for (const auto index : order)
+        {
+            const auto& type = types.getReference (index);
+            const auto& others = otherFormats[(std::size_t) index];
+            (type.isInstrument ? instruments : effects).all.push_back (pluginEntry (type, others.isEmpty() ? juce::String() : " (+" + others.joinIntoString (", ") + ")"));
         }
 
         // plugins renamed in the Plugin database (FL, issue #11: "1_EQ"): their new name, first in the list; the
@@ -274,6 +324,36 @@ public:
             std::stable_sort (renamed.begin(), renamed.end(), [] (const Entry& a, const Entry& b) { return a.name.compareNatural (b.name) < 0; });
             renamed.insert (renamed.end(), std::make_move_iterator (rest.begin()), std::make_move_iterator (rest.end()));
             list->all = std::move (renamed);
+        }
+
+        // round 190qi: the plugins picked last first (copies, while nothing is typed), newest first; a recent build of a
+        // plugin now listed under another format is found by its other builds
+        for (auto* list : { &instruments, &effects })
+        {
+            std::vector<Entry> recent;
+            for (const auto& key : host.recentPlugins())
+            {
+                if (host.isHidden (key))
+                    continue;
+                auto it = std::find_if (list->all.begin(), list->all.end(), [&key] (const Entry& e) { return e.key == key; });
+                if (it != list->all.end())
+                {
+                    auto copy = *it;
+                    copy.recent = true;
+                    recent.push_back (std::move (copy));
+                    continue;
+                }
+                for (const auto& build : otherBuilds) // (the format picked last time, not the row's own)
+                    if (build.isInstrument == (list == &instruments) && build.createIdentifierString().toStdString() == key)
+                    {
+                        auto copy = pluginEntry (build, {});
+                        copy.name = quickpick::shownName (engine, key, build.name);
+                        copy.recent = true;
+                        recent.push_back (std::move (copy));
+                        break;
+                    }
+            }
+            list->all.insert (list->all.begin(), recent.begin(), recent.end());
         }
 
         for (auto* list : { &instruments, &effects })
@@ -376,12 +456,15 @@ private:
 
     void choose (const Entry& e)
     {
+        if (! e.key.empty())
+            pluginHost.notePluginPicked (e.key); // (round 190qi: Recent)
         if (e.add)
             e.add();
         closeToolWindowOf (*this);
     }
 
     QuickAddTargets targets;
+    PluginHost& pluginHost;
     juce::TextEditor search;
     juce::Label instrumentsTitle, effectsTitle, hint;
     EntryList instruments, effects;

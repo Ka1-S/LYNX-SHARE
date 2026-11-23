@@ -767,6 +767,7 @@ std::vector<int> visiblePlugins (const std::vector<PluginRow>& rows, const std::
             case PluginFilter::effects: if (r.instrument || r.status == PluginStatus::failed) continue; break;
             case PluginFilter::favourites: if (! r.favourite) continue; break;
             case PluginFilter::failed: if (r.status == PluginStatus::ok) continue; break;
+            case PluginFilter::hidden: if (! r.hidden) continue; break;
             case PluginFilter::all: break;
         }
 

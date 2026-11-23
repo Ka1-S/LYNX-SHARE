@@ -3045,14 +3045,19 @@ void addPluginItems (juce::PopupMenu& menu, AudioEngine& engine, bool instrument
     {
         if (type.isInstrument != instruments)
             continue;
-        ++kind;
         PluginRef ref;
         ref.id = type.createIdentifierString().toStdString();
         ref.name = type.name.toStdString();
+        if (engine.getPluginHost().isHidden (ref.id)) // (round 190qi: hidden in the Plugin manager)
+            continue;
+        ++kind;
         if (favourites.count (ref.id) == 0)
             continue;
         menu.addItem (juce::String::fromUTF8 ("\xe2\x98\x85 ") + type.name + " (" + type.manufacturerName + ")  [" + type.pluginFormatName + "]",
-                      [ref, onChosen] { onChosen (ref); });
+                      [&engine, ref, onChosen] {
+                          engine.getPluginHost().notePluginPicked (ref.id); // (round 190qi: Recent)
+                          onChosen (ref);
+                      });
     }
     if (menu.getNumItems() > 0)
         menu.addSeparator();

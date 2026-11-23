@@ -13,6 +13,8 @@
 #include "ui/I18n.h"
 #include "ui/PluginWindow.h"
 #include "ui/Theme.h"
+#include "ui/PaintStamp.h"
+#include "ui/TextCache.h"
 #include "ui/ToolWindow.h"
 
 namespace lynx
@@ -31,8 +33,10 @@ enum Column
     statusColumn,
     fileColumn,
     bitsColumn, // (FL's Bits column, round 176a; Windows x64 only)
-    separateColumn // (round 190gg, LYNX-own: "always run in a separate process")
+    separateColumn, // (round 190gg, LYNX-own: "always run in a separate process")
+    hiddenColumn    // (round 190qi, LYNX-own: left out of the plugin lists)
 };
+constexpr int filterCount = 6;
 
 juce::String statusText (prefs::PluginStatus s)
 {
@@ -56,7 +60,7 @@ std::vector<prefs::PluginRow> sampleRows()
         { "TDR Nova", "Tokyo Dawn Labs", "VST3", "EQ", "C:\\Program Files\\Common Files\\VST3\\TDR Nova.vst3", "VST3-Nova", false, PluginStatus::ok, true },
         { "Valhalla Supermassive", "Valhalla DSP", "VST3", "Reverb", "C:\\Program Files\\Common Files\\VST3\\ValhallaSupermassive.vst3", "VST3-VS", false, PluginStatus::ok, false, {}, true },
         { "OTT", "Xfer Records", "VST3", "Dynamics", "C:\\Program Files\\Common Files\\VST3\\OTT.vst3", "VST3-OTT", false, PluginStatus::ok, false },
-        { "Surge XT Effects", "Surge Synth Team", "CLAP", "Fx", "C:\\Program Files\\Common Files\\CLAP\\Surge XT Effects.clap", "CLAP-SurgeFx", false, PluginStatus::ok, false },
+        { "Surge XT Effects", "Surge Synth Team", "CLAP", "Fx", "C:\\Program Files\\Common Files\\CLAP\\Surge XT Effects.clap", "CLAP-SurgeFx", false, PluginStatus::ok, false, {}, false, true },
         { "Spectral Gate", "", "VST3", "", "D:\\Old plugins\\SpectralGate.vst3", "", false, PluginStatus::failed, false },
         { "Analog Strings", "Free Instruments", "VST3", "Synth", "E:\\VST3\\Analog Strings.vst3", "VST3-AS", true, PluginStatus::missingFile, false },
     };
@@ -78,14 +82,15 @@ public:
         search.onTextChange = [this] { refilter(); };
         addAndMakeVisible (search);
 
-        const char* filterNames[] = { TR_NOOP ("All"), TR_NOOP ("Instruments"), TR_NOOP ("Effects"), TR_NOOP ("Favourites"), TR_NOOP ("Failed") };
-        for (int i = 0; i < 5; ++i)
+        const char* filterNames[] = { TR_NOOP ("All"), TR_NOOP ("Instruments"), TR_NOOP ("Effects"), TR_NOOP ("Favourites"), TR_NOOP ("Failed"),
+                                      TR_NOOP ("Hidden") };
+        for (int i = 0; i < filterCount; ++i)
         {
             auto& b = filterButtons[(std::size_t) i];
             b.setButtonText (tr (filterNames[i]));
             b.setClickingTogglesState (true);
             b.setRadioGroupId (8201);
-            b.setConnectedEdges ((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i < 4 ? juce::Button::ConnectedOnRight : 0));
+            b.setConnectedEdges ((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i < filterCount - 1 ? juce::Button::ConnectedOnRight : 0));
             b.onClick = [this, i] {
                 if (filterButtons[(std::size_t) i].getToggleState())
                 {
@@ -113,6 +118,7 @@ public:
             header.addColumn (tr ("Bits"), bitsColumn, 52, 40, 80, flags & ~juce::TableHeaderComponent::sortable);
         header.addColumn (tr ("Status"), statusColumn, 110, 70, 200, flags);
         header.addColumn (tr ("Separate process"), separateColumn, 116, 60, 180, flags & ~juce::TableHeaderComponent::sortable);
+        header.addColumn (tr ("Hidden"), hiddenColumn, 64, 50, 120, flags & ~juce::TableHeaderComponent::sortable);
         header.addColumn (tr ("File"), fileColumn, 300, 80, 2000, flags);
         header.setSortColumnId (nameColumn, true);
         header.setStretchToFitActive (true);
@@ -170,8 +176,8 @@ public:
         foldersButton.setComponentID ("pluginManager.folders");
         addFile.setComponentID ("pluginManager.addFile");
         scanStatus.setComponentID ("pluginManager.status");
-        static const char* filterIds[] { "all", "instruments", "effects", "favourites", "failed" };
-        for (int i = 0; i < 5; ++i)
+        static const char* filterIds[] { "all", "instruments", "effects", "favourites", "failed", "hidden" };
+        for (int i = 0; i < filterCount; ++i)
             filterButtons[(std::size_t) i].setComponentID (juce::String ("pluginManager.filter.") + filterIds[i]);
 
         lastFinished = host.backgroundScan().finished;
@@ -179,7 +185,7 @@ public:
         updateScan();
         if (persistent)
             startTimerHz (4);
-        setSize (980, 600);
+        setSize (1040, 600);
     }
 
     juce::Rectangle<int> demoCellBounds (int row, int) const override
@@ -205,7 +211,7 @@ public:
         search.setBounds (top.removeFromLeft (juce::jmin (300, top.getWidth() / 3)));
         top.removeFromLeft (12);
         for (auto& b : filterButtons)
-            b.setBounds (top.removeFromLeft (96));
+            b.setBounds (top.removeFromLeft (90));
         count.setBounds (top);
         area.removeFromTop (10);
 
@@ -278,6 +284,7 @@ private:
             r.instrument = t.isInstrument;
             r.favourite = favourites.count (r.id) > 0;
             r.separate = separate.contains (t.name.trim(), true);
+            r.hidden = host.isHidden (r.id);
             if (juce::File::isAbsolutePath (t.fileOrIdentifier) && ! juce::File (t.fileOrIdentifier).exists())
                 r.status = prefs::PluginStatus::missingFile;
             rows.push_back (r);
@@ -357,7 +364,7 @@ private:
         g.setFont (theme::font (theme::type::body));
         auto text = [&] (const juce::String& s, juce::Colour c) {
             g.setColour (c);
-            g.drawText (s, 8, 0, width - 12, height, juce::Justification::centredLeft, true);
+            textcache::drawText (g, s, 8, 0, width - 12, height, juce::Justification::centredLeft, true); // (round 190qi: the laid-out text kept)
         };
         switch (column)
         {
@@ -366,9 +373,9 @@ private:
                     break;
                 g.setColour (r->favourite ? theme::colour::warning : theme::colour::textDisabled.withAlpha (0.6f));
                 g.setFont (theme::font (theme::type::title));
-                g.drawText (juce::String::fromUTF8 (r->favourite ? "\xe2\x98\x85" : "\xe2\x98\x86"), 0, 0, width, height, juce::Justification::centred);
+                textcache::drawText (g, juce::String::fromUTF8 (r->favourite ? "\xe2\x98\x85" : "\xe2\x98\x86"), 0, 0, width, height, juce::Justification::centred);
                 break;
-            case nameColumn: text (u8 (r->name), ok ? theme::colour::textPrimary : theme::colour::textSecondary); break;
+            case nameColumn: text (u8 (r->name), ok && ! r->hidden ? theme::colour::textPrimary : theme::colour::textSecondary); break;
             case vendorColumn: text (u8 (r->vendor), theme::colour::textSecondary); break;
             case typeColumn:
                 text (r->status == prefs::PluginStatus::failed ? juce::String ("-") : r->instrument ? tr ("Instrument") : tr ("Effect"),
@@ -386,17 +393,14 @@ private:
                     break;
                 }
                 const auto all = allSeparate;
-                const auto box = juce::Rectangle<float> (10.0f, height * 0.5f - 7.0f, 14.0f, 14.0f);
-                g.setColour (theme::colour::bg0);
-                g.fillRoundedRectangle (box, 3.0f);
-                g.setColour (all ? theme::colour::border : theme::colour::borderStrong);
-                g.drawRoundedRectangle (box, 3.0f, 1.0f);
-                if (r->separate || all)
-                {
-                    g.setColour (all ? theme::colour::textDisabled : theme::colour::accent);
-                    g.setFont (theme::font (theme::type::body, true));
-                    g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), box.toNearestInt(), juce::Justification::centred);
-                }
+                paintCheckbox (g, height, r->separate || all, all);
+                break;
+            }
+            case hiddenColumn:
+            {
+                if (r->id.empty())
+                    break;
+                paintCheckbox (g, height, r->hidden, false);
                 break;
             }
             case statusColumn:
@@ -405,7 +409,7 @@ private:
                 g.setColour (colour);
                 g.fillEllipse (8.0f, height * 0.5f - 3.5f, 7.0f, 7.0f);
                 g.setColour (ok ? theme::colour::textSecondary : colour);
-                g.drawText (statusText (r->status), 22, 0, width - 26, height, juce::Justification::centredLeft, true);
+                textcache::drawText (g, statusText (r->status), 22, 0, width - 26, height, juce::Justification::centredLeft, true);
                 break;
             }
             case fileColumn:
@@ -414,6 +418,24 @@ private:
                 break;
             default: break;
         }
+    }
+
+    // the Separate process / Hidden columns' box (round 190qi: a stamp, drawn once per state and scale, ui/PaintStamp.h)
+    static void paintCheckbox (juce::Graphics& g, int height, bool ticked, bool dim)
+    {
+        const auto key = juce::String ("pmcheck|") + (ticked ? "1" : "0") + (dim ? "1" : "0") + juce::String::toHexString ((juce::int64) theme::colour::accent.getARGB());
+        paintstamp::stamp (g, key, { 10, height / 2 - 7, 14, 14 }, [ticked, dim] (juce::Graphics& cg, juce::Rectangle<float> box) {
+            cg.setColour (theme::colour::bg0);
+            cg.fillRoundedRectangle (box, 3.0f);
+            cg.setColour (dim ? theme::colour::border : theme::colour::borderStrong);
+            cg.drawRoundedRectangle (box, 3.0f, 1.0f);
+            if (ticked)
+            {
+                cg.setColour (dim ? theme::colour::textDisabled : theme::colour::accent);
+                cg.setFont (theme::font (theme::type::body, true));
+                cg.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), box.toNearestInt(), juce::Justification::centred);
+            }
+        });
     }
 
     void sortOrderChanged (int, bool) override { refilter(); }
@@ -430,11 +452,13 @@ private:
             toggleFavourite (row);
         if (column == separateColumn)
             toggleSeparate (row);
+        if (column == hiddenColumn)
+            toggleHidden (row);
     }
 
     void cellDoubleClicked (int row, int column, const juce::MouseEvent&) override
     {
-        if (column != favouriteColumn && column != separateColumn)
+        if (column != favouriteColumn && column != separateColumn && column != hiddenColumn)
             toggleFavourite (row);
     }
 
@@ -450,6 +474,8 @@ private:
         if (column == separateColumn)
             return allSeparate ? tr ("Every plugin runs in a separate process (Options > General settings).")
                                           : tr ("Always run this plugin in a separate process (click to switch).") + " " + PluginWindows::alwaysSeparateHint();
+        if (column == hiddenColumn)
+            return tr ("Hidden: left out of the plugin lists (picker, menus, Quick-add palette). Projects still load it; click to switch.");
         if (column == statusColumn && r->status == prefs::PluginStatus::failed)
             return tr ("The scan couldn't load this file (it crashed, hung or isn't a plugin). Right-click > Try again.");
         return u8 (r->file);
@@ -466,6 +492,23 @@ private:
             host.setFavourite (r->id, on);
         rows[(std::size_t) visible[(std::size_t) row]].favourite = on;
         if (filter == prefs::PluginFilter::favourites)
+            refilter();
+        else
+            table.repaintRow (row);
+    }
+
+    // Round 190qi (core/PluginPicks.h): the plugin out of / back into the plugin lists (the pickers, the menus, the
+    // Quick-add palette); projects that use it still load it
+    void toggleHidden (int row)
+    {
+        const auto* r = rowAt (row);
+        if (r == nullptr || r->id.empty())
+            return;
+        const auto on = ! r->hidden;
+        if (persistent)
+            host.setHidden (r->id, on);
+        rows[(std::size_t) visible[(std::size_t) row]].hidden = on;
+        if (filter == prefs::PluginFilter::hidden)
             refilter();
         else
             table.repaintRow (row);
@@ -500,7 +543,10 @@ private:
         const auto file = u8 (r->file);
         juce::PopupMenu menu;
         if (! r->id.empty())
+        {
             menu.addItem (r->favourite ? tr ("Remove from favourites") : tr ("Add to favourites"), [this, row] { toggleFavourite (row); });
+            menu.addItem (r->hidden ? tr ("Show in the plugin lists") : tr ("Hide from the plugin lists"), [this, row] { toggleHidden (row); });
+        }
         if (r->status == prefs::PluginStatus::failed)
             menu.addItem (tr ("Try again (scan this file now)"), persistent && ! host.backgroundScan().running, false, [this, file] {
                 host.forgetFile (file);
@@ -612,7 +658,7 @@ private:
     double progressValue = 0.0;
 
     juce::TextEditor search;
-    std::array<juce::TextButton, 5> filterButtons;
+    std::array<juce::TextButton, filterCount> filterButtons;
     juce::Label count, scanStatus, emptyHint;
     juce::TableListBox table;
     juce::ProgressBar progress { progressValue };

@@ -45,13 +45,35 @@ inline std::string trim (const std::string& s)
 } // namespace detail
 
 // A tag name as it is stored: trimmed, the characters the file format uses ('|', tab, line breaks, ',') removed.
+// Round 190qi: '/' makes a tag a child of another ("Drums/Kick" sits under "Drums" in the tag lists); each part is
+// trimmed and empty parts go ("Drums / /Kick/" = "Drums/Kick").
 inline std::string cleanTag (const std::string& name)
 {
     std::string out;
     for (const auto c : name)
         if (c != '|' && c != '\t' && c != '\n' && c != '\r' && c != ',')
             out += c;
-    return detail::trim (out);
+    out = detail::trim (out);
+    if (out.find ('/') == std::string::npos)
+        return out;
+    std::string joined, part;
+    std::istringstream in (out);
+    while (std::getline (in, part, '/'))
+        if (const auto t = detail::trim (part); ! t.empty())
+            joined += (joined.empty() ? "" : "/") + t;
+    return joined;
+}
+
+// "Drums/Kick" -> "Drums" ("" for a top-level tag) and "Kick"
+inline std::string tagParent (const std::string& tag)
+{
+    const auto slash = tag.rfind ('/');
+    return slash == std::string::npos ? std::string() : tag.substr (0, slash);
+}
+inline std::string tagLeaf (const std::string& tag)
+{
+    const auto slash = tag.rfind ('/');
+    return slash == std::string::npos ? tag : tag.substr (slash + 1);
 }
 
 // FL's "Add a tag" text: names separated by commas, each trimmed, empty ones and repeats (ASCII case ignored) dropped.
@@ -209,7 +231,18 @@ struct Store
         return count;
     }
 
-    // Does the item pass the tag filter? No tags picked: everything passes.
+    // Whether a set of tag keys has `k` or a tag under it ("drums" has "drums/kick": round 190qi's tag tree)
+    static bool hasOrBelow (const std::set<std::string>& tags, const std::string& k)
+    {
+        if (tags.count (k) > 0)
+            return true;
+        const auto below = k + "/";
+        const auto it = tags.lower_bound (below);
+        return it != tags.end() && it->compare (0, below.size(), below) == 0;
+    }
+
+    // Does the item pass the tag filter? No tags picked: everything passes. A picked tag also takes the items of the
+    // tags under it (round 190qi: "Drums" shows what is tagged "Drums/Kick").
     bool matches (const std::string& item, const std::vector<std::string>& picked, Match match) const
     {
         if (picked.empty())
@@ -219,7 +252,7 @@ struct Store
             return false;
         for (const auto& tag : picked)
         {
-            const auto in = it->second.count (key (tag)) > 0;
+            const auto in = hasOrBelow (it->second, key (tag));
             if (match == Match::any && in)
                 return true;
             if (match == Match::all && ! in)
@@ -307,6 +340,86 @@ struct Store
 
     bool operator== (const Store&) const = default;
 };
+
+// --- round 190qi: "a/b" tags as a tree (the tags panel, the Tags menus) ------------------------------------------------
+struct TagNode
+{
+    std::string name, path; // "Kick", "Drums/Kick"
+    bool exists = false;    // a tag of that name exists (a group made only by its children's names does not)
+    int items = 0;          // items tagged with it exactly
+    std::vector<TagNode> children;
+};
+
+// Every tag of `all` (Store::all: A-Z) under its parents; parents nobody made are groups (exists false). Children
+// keep the A-Z order (ASCII case ignored).
+inline std::vector<TagNode> tagTree (const std::vector<TagCount>& all)
+{
+    std::vector<TagNode> roots;
+    auto childNamed = [] (std::vector<TagNode>& list, const std::string& name, const std::string& path) -> TagNode& {
+        for (auto& n : list)
+            if (detail::lower (n.name) == detail::lower (name))
+                return n;
+        const auto lowered = detail::lower (name);
+        auto at = std::find_if (list.begin(), list.end(), [&lowered] (const TagNode& n) { return detail::lower (n.name) > lowered; });
+        return *list.insert (at, TagNode { name, path });
+    };
+    for (const auto& t : all)
+    {
+        auto* level = &roots;
+        TagNode* node = nullptr;
+        std::string path, part;
+        std::istringstream in (t.name);
+        while (std::getline (in, part, '/'))
+        {
+            path += (path.empty() ? "" : "/") + part;
+            node = &childNamed (*level, part, path);
+            level = &node->children;
+        }
+        if (node != nullptr)
+        {
+            node->exists = true;
+            node->items = t.items;
+            node->name = tagLeaf (t.name); // (its own spelling, not a child's)
+        }
+    }
+    return roots;
+}
+
+// --- round 190qi: the search box's Tab -------------------------------------------------------------------------------
+// The last word of `query` completed to the shortest candidate that starts with it (ASCII case ignored; equal lengths:
+// A-Z) and is longer than it: a "#word" completes to a tag (tags with spaces can't be a "#" word), any other word to
+// one of `names` (folder names...) or else a tag. "#" alone takes the first tag. Returns the whole new query; "" =
+// nothing to complete.
+inline std::string completeQuery (const std::string& query, const std::vector<std::string>& tags, const std::vector<std::string>& names)
+{
+    if (query.empty() || std::isspace ((unsigned char) query.back()))
+        return {};
+    const auto start = query.find_last_of (" \t") == std::string::npos ? 0 : query.find_last_of (" \t") + 1;
+    const auto word = query.substr (start);
+    const auto hashed = word[0] == '#';
+    const auto typed = detail::lower (hashed ? word.substr (1) : word);
+    if (! hashed && typed.empty())
+        return {};
+    auto best = [&typed] (const std::vector<std::string>& list, bool noSpaces) {
+        std::string found;
+        for (const auto& c : list)
+        {
+            if (c.size() <= typed.size() || (noSpaces && c.find (' ') != std::string::npos))
+                continue;
+            if (detail::lower (c.substr (0, typed.size())) != typed)
+                continue;
+            if (found.empty() || c.size() < found.size() || (c.size() == found.size() && detail::lower (c) < detail::lower (found)))
+                found = c;
+        }
+        return found;
+    };
+    auto found = hashed ? best (tags, true) : best (names, false);
+    if (found.empty() && ! hashed)
+        found = best (tags, false);
+    if (found.empty())
+        return {};
+    return query.substr (0, start) + (hashed ? "#" : "") + found;
+}
 
 // The search box: words starting with '#' pick tags (Live's "#tag"; "#808 kick" = the items tagged 808 whose name has
 // "kick"), the rest is searched as before.

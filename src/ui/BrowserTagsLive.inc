@@ -201,7 +201,7 @@ public:
                             : chip.kind == ChipKind::all ? browser.tagMatch() == browsertags::Match::all
                                                          : isPicked (chip.tag);
             // Live's chips: #363636 at rest, #464646 hovered; a picked tag (FL's filter) in the accent
-            g.setColour (on ? colour::accent : hover ? juce::Colour (0xff464646) : juce::Colour (0xff363636));
+            g.setColour (on ? colour::accent : hover ? juce::Colour (0xff464646) : chip.depth > 0 ? juce::Colour (0xff2c2c2c) : juce::Colour (0xff363636));
             g.fillRoundedRectangle (chip.box.toFloat(), 3.0f);
             g.setColour (on ? juce::Colours::white : chip.kind == ChipKind::tag ? colour::textPrimary : colour::textSecondary);
             g.drawText (chip.text, chip.box, juce::Justification::centred, false);
@@ -278,6 +278,7 @@ private:
         juce::String text;
         int count = 0;
         juce::Rectangle<int> box;
+        int depth = 0; // round 190qi: under a tag group ("a/b")
     };
 
     bool isPicked (const std::string& tag) const
@@ -312,10 +313,29 @@ private:
         x += 4;
         const auto all = BrowserComponent::shownTags().all(); // (round 190ke: LYNX content's tags in Simple)
         const auto simple = layoutstyle::current() == layoutstyle::Style::simple;
+        // round 190qi: "a/b" tags as a tree — a group's chip ("Drums ›", pickable: it shows everything under it) and then
+        // its children by their own names, on a darker chip
+        std::vector<std::pair<const browsertags::TagNode*, int>> order;
+        const auto tree = browsertags::tagTree (all);
+        std::function<void (const std::vector<browsertags::TagNode>&, int)> walk = [&] (const std::vector<browsertags::TagNode>& nodes, int depth) {
+            for (const auto& n : nodes)
+            {
+                order.emplace_back (&n, depth);
+                walk (n.children, depth + 1);
+            }
+        };
+        walk (tree, 0);
         for (int pass = simple ? 0 : 1; pass < 2; ++pass)
-            for (const auto& t : all)
-                if (! simple || isPicked (t.name) == (pass == 0))
-                    place ({ ChipKind::tag, t.name, juce::String::fromUTF8 (t.name.c_str()), t.items, {} });
+            for (const auto& [node, depth] : order)
+                if (! simple || isPicked (node->path) == (pass == 0))
+                {
+                    auto text = juce::String::fromUTF8 (node->name.c_str());
+                    if (! node->children.empty())
+                        text << juce::String::fromUTF8 (" \xe2\x80\xba");
+                    Chip chip { ChipKind::tag, node->path, text, node->items, {} };
+                    chip.depth = depth;
+                    place (std::move (chip));
+                }
     }
 
     void tagMenu (const std::string& tag)

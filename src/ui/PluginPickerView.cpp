@@ -445,7 +445,7 @@ private:
         };
 
         auto add = [&] (Tile t) {
-            if (t.category == installedTab)
+            if (t.category == installedTab || host.isHidden (t.key)) // (round 190qi: hidden in the Plugin manager)
                 return;
             t.png = budgeted (pngSize (pluginthumbs::fileFor (t.key, t.native)));
             tiles.push_back (std::move (t));
@@ -542,6 +542,8 @@ private:
         auto addEffect = targets.addEffect;
         auto makeGenerator = t.makeGenerator;
         auto makeEffect = t.makeEffect;
+        if (t.key.rfind ("lynx:clip:", 0) != 0)
+            engine.getPluginHost().notePluginPicked (t.key); // (round 190qi: the Recent lists)
         if (close)
             close(); // (this view is gone after this)
         if (makeGenerator && addInstrument)

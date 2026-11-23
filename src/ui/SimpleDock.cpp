@@ -1,4 +1,5 @@
 #include "ui/SimpleDock.h"
+#include "core/PluginPicks.h" // round 190qi
 #include "ui/TrackerComponent.h"
 #include "ui/DemoMode.h" // (round 190np: the Drum Machine is a demo::CellSource)
 
@@ -1501,11 +1502,19 @@ private:
     // the plugin host's scanned instruments (the list the plugin picker shows)
     void takePlugins()
     {
-        std::vector<soundlib::InstalledPlugin> installed;
-        for (const auto& t : engine.getPluginHost().getKnownPlugins().getTypes())
-            if (t.isInstrument)
-                installed.push_back ({ t.createIdentifierString().toStdString(), t.name.toStdString(), t.manufacturerName.toStdString(),
-                                       t.pluginFormatName.toStdString(), t.category.toStdString() });
+        // round 190qi (core/PluginPicks.h): none hidden in the Plugin manager, one entry per plugin (CLAP › VST3 › VST2)
+        std::vector<soundlib::InstalledPlugin> builds, installed;
+        std::vector<pluginpicks::Item> items;
+        auto& host = engine.getPluginHost();
+        for (const auto& t : host.getKnownPlugins().getTypes())
+            if (t.isInstrument && ! host.isHidden (t.createIdentifierString().toStdString()))
+            {
+                builds.push_back ({ t.createIdentifierString().toStdString(), t.name.toStdString(), t.manufacturerName.toStdString(),
+                                    t.pluginFormatName.toStdString(), t.category.toStdString() });
+                items.push_back ({ t.name.toStdString(), t.manufacturerName.toStdString(), t.pluginFormatName.toStdString(), true });
+            }
+        for (const auto& group : pluginpicks::groupByFormat (items))
+            installed.push_back (builds[(std::size_t) group.preferred()]);
         pluginSounds = soundlib::fromPlugins (installed);
         known = false;
     }

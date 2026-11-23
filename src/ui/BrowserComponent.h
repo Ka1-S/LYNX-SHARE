@@ -353,6 +353,8 @@ public:
     // FL's "Tags" section of a row's menu: Tags ▸ (each tag ticked on / off), Add tag..., Edit tags...
     void addTagItems (juce::PopupMenu& menu, const std::string& item);
     void askAddTag (const std::string& item); // FL's "Add a tag": names separated by commas
+    // Round 190qi: the same for several items at once (a multi-selection: Ctrl / Shift + click in the list)
+    void askAddTag (const std::vector<std::string>& items);
     void showEditTags();                      // FL's "Edit tags": rename / delete a tag everywhere
     void setTagged (const std::string& item, const juce::String& tag, bool on);
     // The search row's TAGS button (FL's) shows the tags panel; the tags picked there filter the list, Any or All.
@@ -386,6 +388,25 @@ public:
     void hoverRowForSnapshot (const juce::String& label);
     juce::PopupMenu buildFileMenu (const juce::File& file);
     void showPreviewPlayedForSnapshot (const juce::File& file, double fromFraction);
+    // --picker190qishot (round 190qi): a file previewed as a click does (a MIDI file plays on the selected channel), files
+    // marked as by Ctrl+click, the search box typed into (its completion shown), the "File types..." window, and the
+    // MIDI preview's state
+    void previewForSnapshot (const juce::File& file) { fileSelected (file, true); }
+    void markForSnapshot (const juce::Array<juce::File>& files);
+    void typeSearchForSnapshot (const juce::String& text);
+    bool acceptSearchForSnapshot() { return acceptSearchSuggestion(); }
+    juce::String searchTextForSnapshot() const { return searchBox.getText(); }
+    juce::String searchSuggestionForSnapshot() const { return searchSuggestion; }
+    std::unique_ptr<juce::Component> makeFileTypesPanelForSnapshot();
+    bool midiPreviewPlaying() const;
+    int midiPreviewChannel() const;
+    int listedRowsForSnapshot() const;
+    juce::StringArray listedLabelsForSnapshot() const;
+    void addViewItemsForSnapshot (juce::PopupMenu& menu) { addViewItems (menu); }
+    void tagsChangedForSnapshot() { tagsChanged(); }
+    // Round 190qi: Browser ▾ › "File types..." (lower-case extensions; none = every type) and "Hide folders named..."
+    void setFileTypes (std::set<std::string> types);
+    void setHiddenFolderNames (std::vector<std::string> names);
     // --shots: the Browser's prefs file is not read (a clean look)
     static inline bool readPrefs = true;
     class TagsPanel;
@@ -428,6 +449,7 @@ private:
     void textEditorTextChanged (juce::TextEditor&) override;
     void textEditorEscapeKeyPressed (juce::TextEditor&) override;
     void textEditorReturnKeyPressed (juce::TextEditor&) override;
+    void textEditorFocusLost (juce::TextEditor&) override; // (round 190qi: the completion's greyed rest goes)
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
     void runSearch (bool quiet = false); // quiet: the index changed, the results are replaced without "Searching..."
@@ -455,7 +477,26 @@ private:
     void loadView();
     void saveView() const;
     bool viewLoaded = false, viewFromFile = false;
-    bool lists (const juce::File& file) const; // a file listed under the content filter
+    bool lists (const juce::File& file) const; // a file listed under the content filter (and the user's file types)
+    // Round 190qi (core/BrowserView.h): the user's "File types..." and "Hide folders named..." (Browser ▾)
+    bool userHides (const juce::File& file) const;        // a search answer left out by them
+    bool hidesFolderNamed (const juce::String& name) const;
+    void showFileTypesDialog();
+    void askHiddenFolderNames();
+    class FileTypesPanel;
+    // Round 190qi: Tab completes the search box's last word (core/BrowserTags.h completeQuery), the rest shown greyed
+    void updateSearchSuggestion (bool evenWithoutFocus = false);
+    bool acceptSearchSuggestion();
+    std::vector<std::string> searchNames() const; // the folder names the completion offers
+    juce::String searchSuggestion;
+    class SearchGhost;
+    std::unique_ptr<SearchGhost> searchGhost;
+    std::unique_ptr<juce::KeyListener> searchKeys;
+    // Round 190qi (core/MidiPreview.h): a MIDI file played on the selected channel at the project's tempo
+    class MidiPreviewPlayer;
+    std::unique_ptr<MidiPreviewPlayer> midiPreview;
+    void startMidiPreview (const juce::File& file);
+    void stopMidiPreview();
     // round 164: a folder whose files are all left out by the content filter (from the search index; unknown: false)
     bool filterHides (const juce::File& folder) const;
     std::shared_ptr<const search::FolderMatches> filterMatches() const;

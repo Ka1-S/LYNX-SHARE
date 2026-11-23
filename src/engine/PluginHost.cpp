@@ -1,4 +1,5 @@
 #include "engine/PluginHost.h"
+#include "core/PluginPicks.h"
 #include "core/FlSettings.h"
 #include "platform/PrefaultMemory.h"
 #include "platform/Paths.h"
@@ -2457,6 +2458,8 @@ PluginHost::PluginHost (bool keep)
         if (auto xml = juce::XmlDocument::parse (settingsFolder().getChildFile ("plugins.xml")))
             known.recreateFromXml (*xml);
         favouriteIds = prefs::parseFavourites (settingsFolder().getChildFile ("plugin-favourites.txt").loadFileAsString().toStdString());
+        recentKeys = pluginpicks::parseRecent (settingsFolder().getChildFile ("plugin-recent.txt").loadFileAsString().toStdString());
+        hiddenIds = prefs::parseFavourites (settingsFolder().getChildFile ("plugin-hidden.txt").loadFileAsString().toStdString());
         userNames = prefs::parsePluginNames (settingsFolder().getChildFile ("plugin-names.txt").loadFileAsString().toStdString());
         // (plugin-database.txt since round 190ba; before, the folders shared plugin-folders.txt with the scan folders)
         const auto databaseFile = settingsFolder().getChildFile ("plugin-database.txt");
@@ -3145,6 +3148,24 @@ void PluginHost::setFavourite (const std::string& id, bool favourite)
         favouriteIds.erase (id);
     if (persistent)
         settingsFolder().getChildFile ("plugin-favourites.txt").replaceWithText (juce::String (prefs::formatFavourites (favouriteIds)));
+}
+
+void PluginHost::notePluginPicked (const std::string& key)
+{
+    auto now = pluginpicks::pushRecent (recentKeys, key);
+    if (now == recentKeys)
+        return;
+    recentKeys = std::move (now);
+    if (persistent)
+        settingsFolder().getChildFile ("plugin-recent.txt").replaceWithText (juce::String::fromUTF8 (pluginpicks::formatRecent (recentKeys).c_str()));
+}
+
+void PluginHost::setHidden (const std::string& id, bool hidden)
+{
+    if (id.empty() || (hidden ? ! hiddenIds.insert (id).second : hiddenIds.erase (id) == 0))
+        return;
+    if (persistent)
+        settingsFolder().getChildFile ("plugin-hidden.txt").replaceWithText (juce::String::fromUTF8 (prefs::formatFavourites (hiddenIds).c_str()));
 }
 
 void PluginHost::setPluginName (const std::string& key, const std::string& name)

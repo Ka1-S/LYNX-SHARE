@@ -8112,6 +8112,8 @@ void EffectsPanel::showAddMenu (int row)
     };
     auto picks = quickpick::renamedEffects (engine, addFx);
     quickpick::addPicks (menu, picks);
+    // round 190qi (LYNX-own, Studio One's "Recent"): the effects picked last, newest first, above FL's categories
+    quickpick::addRecentItems (menu, engine, std::function<void (EffectSlot)> (addFx));
     // rounds 166f / 170b (Busy Works: "random order"): every effect under its category heading, A-Z, as FL's slot menu
     // (LYNX SHARE first, then FL's Plugin database categories, the user's own folders among them)
     quickpick::addFolderGroups (menu, engine, std::function<void (EffectSlot)> (addFx));

@@ -1,6 +1,7 @@
 #include "ui/PluginPicker.h"
 
 #include "core/PluginCatalog.h"
+#include "core/PluginPicks.h"
 #include "core/Vfx.h"
 #include "ui/DemoMode.h"
 #include "ui/I18n.h"
@@ -10,6 +11,7 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "ui/TextCache.h"
+#include "ui/PaintStamp.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 #include "platform/Paths.h"
@@ -29,7 +31,7 @@ const juce::String star = juce::String::fromUTF8 ("\xe2\x98\x85");
 // One row of the left column: a filter.
 struct Group
 {
-    enum class Kind { all, favourites, category, heading, vendor } kind = Kind::all;
+    enum class Kind { all, favourites, recent, category, heading, vendor } kind = Kind::all;
     std::string value;
     int count = 0;
 };
@@ -132,20 +134,56 @@ public:
                 builds.emplace_back (PluginHost::bitnessKey (type), knownPlugin32Bit (type).value_or (false));
             bits = plugincatalog::combinedBits (builds);
         }
+        std::vector<plugincatalog::Entry> builds;
+        const auto& host = engine.getPluginHost();
         for (int i = 0; i < types.size(); ++i)
         {
             const auto& type = types.getReference (i);
             if (bridge32Supported() && bits[(std::size_t) i].empty())
                 continue; // the 32-bit build of a "32+64" plugin: its 64-bit entry stands for both
             const auto id = type.createIdentifierString().toStdString();
+            if (host.isHidden (id))
+                continue; // round 190qi: hidden in the Plugin manager (its "Hidden" filter shows it again)
             const auto it = renamed.find (id);
-            entries.push_back ({ id, type.name.toStdString(), type.manufacturerName.toStdString(), type.pluginFormatName.toStdString(),
-                                 type.category.toStdString(), type.isInstrument, it != renamed.end() ? it->second : std::string(),
-                                 bits[(std::size_t) i] });
+            builds.push_back ({ id, type.name.toStdString(), type.manufacturerName.toStdString(), type.pluginFormatName.toStdString(),
+                                type.category.toStdString(), type.isInstrument, it != renamed.end() ? it->second : std::string(),
+                                bits[(std::size_t) i] });
+        }
+        // round 190qi (core/PluginPicks.h): a plugin installed as VST2 / VST3 / CLAP is one row, the build a pick loads
+        // (CLAP › VST3 › VST2) standing for the others (a right-click picks another)
+        std::vector<pluginpicks::Item> items;
+        items.reserve (builds.size());
+        for (const auto& b : builds)
+            items.push_back ({ b.name, b.vendor, b.format, b.instrument });
+        members.clear();
+        for (const auto& group : pluginpicks::groupByFormat (items))
+        {
+            entries.push_back (builds[(std::size_t) group.preferred()]);
+            std::vector<plugincatalog::Entry> all;
+            for (const auto m : group.members)
+                all.push_back (builds[(std::size_t) m]);
+            members.push_back (std::move (all));
         }
         if (onBuiltIn) // FL's VFX note effects, built in (round 164b)
             for (const auto kind : vfx::allKinds)
+            {
                 entries.push_back ({ builtInPrefix + std::to_string ((int) kind), vfx::flName (kind), "LYNX SHARE", "Built-in", "Note effect", true });
+                members.push_back ({ entries.back() });
+            }
+        // the Category column's text, once (round 190qi: it was worked out from the name on every paint of every row)
+        categoryText.clear();
+        for (const auto& e : entries)
+            categoryText.push_back (tr (juce::String (plugincatalog::categoryOf (e))));
+    }
+
+    // the row of entry `index` holds the build `id` (any of its formats)
+    int entryWithBuild (const std::string& id) const
+    {
+        for (int i = 0; i < (int) members.size(); ++i)
+            for (const auto& m : members[(std::size_t) i])
+                if (m.id == id)
+                    return i;
+        return -1;
     }
 
     // the background look at the plugins' files found new answers: the same list, its Bits column (and the "32+64"
@@ -224,8 +262,9 @@ public:
         static constexpr int starWidth = 26, columnCount = 5;
         static juce::Rectangle<int> column (int index, int width, int height)
         {
-            static const float withBits[] = { 0.0f, 0.42f, 0.66f, 0.76f, 0.84f, 1.0f };
-            static const float withoutBits[] = { 0.0f, 0.44f, 0.70f, 0.80f, 0.80f, 1.0f };
+            // (round 190qi: the Format column holds the format chips of every build of the plugin)
+            static const float withBits[] = { 0.0f, 0.38f, 0.58f, 0.76f, 0.83f, 1.0f };
+            static const float withoutBits[] = { 0.0f, 0.40f, 0.62f, 0.81f, 0.81f, 1.0f };
             const auto* splits = bridge32Supported() ? withBits : withoutBits;
             const auto rest = (float) (width - starWidth);
             const auto x0 = starWidth + (int) (rest * splits[index]), x1 = starWidth + (int) (rest * splits[index + 1]);
@@ -267,23 +306,95 @@ public:
                 g.setColour (theme::colour::bg2.withAlpha (0.45f));
                 g.fillRect (0, 0, width, height);
             }
-            const auto favourite = picker->isFavourite (e.id);
+            const auto entryIndex = picker->shown[(std::size_t) row];
+            const auto favourite = picker->isFavouriteEntry (entryIndex);
             g.setColour (favourite ? theme::colour::accent : theme::colour::textDisabled.withAlpha (0.5f));
             g.setFont (theme::font (theme::type::body));
             textcache::drawText (g, star, juce::Rectangle<int> (0, 0, starWidth, height), juce::Justification::centred);
             const juce::String cells[] = { juce::String::fromUTF8 (e.shownName().c_str()), juce::String::fromUTF8 (e.vendor.c_str()),
-                                           juce::String::fromUTF8 (e.format.c_str()), juce::String::fromUTF8 (e.bits.c_str()),
-                                           tr (juce::String (plugincatalog::categoryOf (e))) };
+                                           {}, juce::String::fromUTF8 (e.bits.c_str()),
+                                           picker->categoryText[(std::size_t) entryIndex] };
             for (int i = 0; i < columnCount; ++i)
             {
+                if (i == 2)
+                {
+                    // (the colour under the chips: the row's own, over the list's)
+                    const auto under = selected ? theme::colour::accentMuted
+                                       : row % 2 == 1 ? theme::colour::bg1.overlaidWith (theme::colour::bg2.withAlpha (0.45f)) : theme::colour::bg1;
+                    paintFormatChips (g, picker->members[(std::size_t) entryIndex], picker->pickedBuild (row), column (i, width, height), under);
+                    continue;
+                }
                 g.setColour (i == 0 ? theme::colour::textPrimary : theme::colour::textSecondary);
                 g.setFont (theme::font (i == 0 ? theme::type::body : theme::type::small));
                 textcache::drawText (g, cells[i], column (i, width, height), juce::Justification::centredLeft, true);
             }
         }
 
+        // Round 190qi: the build a pick loads as a chip (the accent's muted fill), the plugin's other formats as outlined
+        // chips after it while they fit, else "+n"
+        static void paintFormatChips (juce::Graphics& g, const std::vector<plugincatalog::Entry>& builds, int picked, juce::Rectangle<int> area,
+                                      juce::Colour under)
+        {
+            if (builds.empty())
+                return;
+            const auto font = theme::font (theme::type::caption, true);
+            auto x = area.getX();
+            const auto chipH = juce::jmin (area.getHeight() - 6, 15), y = area.getCentreY() - chipH / 2;
+            const auto first = juce::jlimit (0, (int) builds.size() - 1, picked);
+            const auto widthOf = [&font] (const juce::String& text) { return (int) std::ceil (textcache::stringWidth (font, text)) + 8; };
+            // (each chip an opaque stamp over the row's colour: drawn once per format, row colour and scale, then copied,
+            // ui/PaintStamp.h)
+            auto chip = [&] (const juce::String& text, bool main) {
+                const auto w = widthOf (text);
+                paintstamp::stamp (g, (main ? "pickerchip1|" : "pickerchip0|") + text + juce::String::toHexString ((juce::int64) theme::colour::accentMuted.getARGB()),
+                                   { x, y, w, chipH }, [&font, text, main] (juce::Graphics& cg, juce::Rectangle<float> box) {
+                    if (main)
+                    {
+                        cg.setColour (theme::colour::accentMuted);
+                        cg.fillRoundedRectangle (box, 3.0f);
+                        cg.setColour (theme::colour::textPrimary);
+                    }
+                    else
+                    {
+                        cg.setColour (theme::colour::border);
+                        cg.drawRoundedRectangle (box.reduced (0.5f), 3.0f, 1.0f);
+                        cg.setColour (theme::colour::textDisabled);
+                    }
+                    cg.setFont (font);
+                    cg.drawText (text, box, juce::Justification::centred, false);
+                }, under);
+                x += w + 3;
+            };
+            chip (juce::String::fromUTF8 (builds[(std::size_t) first].format.c_str()), true);
+            const auto others = (int) builds.size() - 1;
+            int drawn = 0;
+            for (int i = 0; i < (int) builds.size(); ++i)
+            {
+                if (i == first)
+                    continue;
+                const auto text = juce::String::fromUTF8 (builds[(std::size_t) i].format.c_str());
+                const auto rest = others - drawn;
+                if (x + widthOf (text) + (rest > 1 ? 24 : 0) > area.getRight())
+                {
+                    g.setFont (font);
+                    g.setColour (theme::colour::textDisabled);
+                    textcache::drawText (g, "+" + juce::String (rest), juce::Rectangle<int> (x, area.getY(), juce::jmax (0, area.getRight() - x), area.getHeight()),
+                                         juce::Justification::centredLeft);
+                    return;
+                }
+                chip (text, false);
+                ++drawn;
+            }
+        }
+
         void listBoxItemClicked (int row, const juce::MouseEvent& e) override
         {
+            if (picker != nullptr && e.mods.isPopupMenu()) // round 190qi: another format, favourite, hide
+            {
+                selectRow (row);
+                picker->showRowMenu (row);
+                return;
+            }
             if (picker != nullptr && e.x < starWidth) // the star: favourite on / off (the Plugin manager's favourites)
                 picker->toggleFavourite (row);
         }
@@ -349,6 +460,7 @@ private:
             {
                 case Group::Kind::all: name = tr ("All"); break;
                 case Group::Kind::favourites: name = star + " " + tr ("Favourites"); break;
+                case Group::Kind::recent: name = tr ("Recent"); break;
                 case Group::Kind::category: name = tr (juce::String (r.value)); break;
                 case Group::Kind::vendor: name = juce::String::fromUTF8 (r.value.c_str()); break;
                 case Group::Kind::heading: break;
@@ -377,10 +489,12 @@ private:
         groupRows.clear();
         const auto& favourites = engine.getPluginHost().favourites();
         groupRows.push_back ({ Group::Kind::all, {}, plugincatalog::countIn (entries, instruments, {}) });
+        (void) favourites;
         int favouriteCount = 0;
-        for (const auto& e : entries)
-            favouriteCount += e.instrument == instruments && favourites.count (e.id) > 0 ? 1 : 0;
+        for (int i = 0; i < (int) entries.size(); ++i)
+            favouriteCount += entries[(std::size_t) i].instrument == instruments && isFavouriteEntry (i) ? 1 : 0;
         groupRows.push_back ({ Group::Kind::favourites, {}, favouriteCount });
+        groupRows.push_back ({ Group::Kind::recent, {}, (int) recentRows ({}).size() }); // round 190qi
         groupRows.push_back ({ Group::Kind::heading, TR_NOOP ("Categories"), 0 });
         for (const auto& c : plugincatalog::categories (instruments))
             groupRows.push_back ({ Group::Kind::category, c, plugincatalog::countIn (entries, instruments, c) });
@@ -414,7 +528,20 @@ private:
             if (r.kind == Group::Kind::vendor)
                 f.vendor = r.value;
         }
-        shown = plugincatalog::select (entries, engine.getPluginHost().favourites(), f);
+        recentShown = group >= 0 && group < (int) groupRows.size() && groupRows[(std::size_t) group].kind == Group::Kind::recent;
+        if (recentShown)
+        {
+            const auto rows = recentRows (f.query);
+            shown.clear();
+            recentBuild.clear();
+            for (const auto& [entry, id] : rows)
+            {
+                shown.push_back (entry);
+                recentBuild.push_back (id);
+            }
+        }
+        else
+            shown = plugincatalog::select (entries, favouriteRows(), f);
         list.updateContent();
         list.selectRow (shown.empty() ? -1 : 0);
         list.repaint();
@@ -427,30 +554,132 @@ private:
     }
 
     bool isFavourite (const std::string& id) const { return engine.getPluginHost().favourites().count (id) > 0; }
+    // round 190qi: a row is a favourite when any of its builds is (a VST2 starred before 0.1.32 keeps its star)
+    bool isFavouriteEntry (int index) const
+    {
+        if (! juce::isPositiveAndBelow (index, (int) members.size()))
+            return false;
+        const auto& builds = members[(std::size_t) index];
+        return std::any_of (builds.begin(), builds.end(), [this] (const plugincatalog::Entry& b) { return isFavourite (b.id); });
+    }
+    // the shown rows' ids that count as favourites (plugincatalog::select reads the row's own id)
+    std::set<std::string> favouriteRows() const
+    {
+        std::set<std::string> out;
+        for (int i = 0; i < (int) entries.size(); ++i)
+            if (isFavouriteEntry (i))
+                out.insert (entries[(std::size_t) i].id);
+        return out;
+    }
+
+    // round 190qi: the recent picks of this kind still listed, newest first, as (row, the build picked); `query` filters
+    // them like the list
+    std::vector<std::pair<int, std::string>> recentRows (const std::string& query) const
+    {
+        std::vector<std::pair<int, std::string>> out;
+        plugincatalog::Filter f;
+        f.instruments = instruments;
+        f.query = query;
+        f.favouritesFirst = false;
+        const auto passing = plugincatalog::select (entries, {}, f);
+        for (const auto& key : engine.getPluginHost().recentPlugins())
+        {
+            const auto entry = entryWithBuild (key);
+            if (entry < 0 || std::find (passing.begin(), passing.end(), entry) == passing.end()
+                || std::any_of (out.begin(), out.end(), [entry] (const auto& r) { return r.first == entry; }))
+                continue;
+            out.emplace_back (entry, key);
+        }
+        return out;
+    }
+
+    // the build a pick of `row` loads: in Recent the one picked last, else the preferred one (index into its builds)
+    int pickedBuild (int row) const
+    {
+        if (! recentShown || ! juce::isPositiveAndBelow (row, (int) recentBuild.size()) || ! juce::isPositiveAndBelow (row, (int) shown.size()))
+            return 0;
+        const auto& builds = members[(std::size_t) shown[(std::size_t) row]];
+        for (int i = 0; i < (int) builds.size(); ++i)
+            if (builds[(std::size_t) i].id == recentBuild[(std::size_t) row])
+                return i;
+        return 0;
+    }
 
     void toggleFavourite (int row)
     {
         if (row < 0 || row >= (int) shown.size())
             return;
-        const auto& id = entries[(std::size_t) shown[(std::size_t) row]].id;
-        engine.getPluginHost().setFavourite (id, ! isFavourite (id));
+        const auto index = shown[(std::size_t) row];
+        auto& host = engine.getPluginHost();
+        if (isFavouriteEntry (index)) // (off for every build of it)
+        {
+            for (const auto& b : members[(std::size_t) index])
+                if (isFavourite (b.id))
+                    host.setFavourite (b.id, false);
+        }
+        else
+            host.setFavourite (entries[(std::size_t) index].id, true);
         // the counts change; the list keeps its order until the next filter (the row does not jump away)
         for (auto& r : groupRows)
             if (r.kind == Group::Kind::favourites)
             {
                 r.count = 0;
-                for (const auto& e : entries)
-                    r.count += e.instrument == instruments && isFavourite (e.id) ? 1 : 0;
+                for (int i = 0; i < (int) entries.size(); ++i)
+                    r.count += entries[(std::size_t) i].instrument == instruments && isFavouriteEntry (i) ? 1 : 0;
             }
         list.repaintRow (row);
         groups.repaint();
     }
 
-    void choose (int row)
+    // Round 190qi: the row's menu — add one of its other formats (only this pick: the row keeps its order), the
+    // favourite star, hide it from the pickers (the Plugin manager shows it again)
+    void showRowMenu (int row)
+    {
+        if (row < 0 || row >= (int) shown.size())
+            return;
+        const auto index = shown[(std::size_t) row];
+        const auto& builds = members[(std::size_t) index];
+        const auto builtIn = entries[(std::size_t) index].id.rfind (builtInPrefix, 0) == 0;
+        juce::PopupMenu menu;
+        juce::Component::SafePointer<PluginPicker> safe (this);
+        if (! builtIn)
+        {
+            menu.addSectionHeader (juce::String::fromUTF8 (entries[(std::size_t) index].shownName().c_str()));
+            const auto picked = pickedBuild (row);
+            for (int i = 0; i < (int) builds.size(); ++i)
+            {
+                const auto format = juce::String::fromUTF8 (builds[(std::size_t) i].format.c_str());
+                menu.addItem (i == picked ? tr ("Add as {0} (default)", { format }) : tr ("Add as {0}", { format }), [safe, row, i] {
+                    if (safe != nullptr)
+                        safe->choose (row, i);
+                });
+            }
+            menu.addSeparator();
+        }
+        menu.addItem (isFavouriteEntry (index) ? tr ("Remove from favourites") : tr ("Add to favourites"), [safe, row] {
+            if (safe != nullptr)
+                safe->toggleFavourite (row);
+        });
+        if (! builtIn)
+            menu.addItem (tr ("Hide from the plugin lists"), [safe, index] {
+                if (safe == nullptr)
+                    return;
+                for (const auto& b : safe->members[(std::size_t) index])
+                    safe->engine.getPluginHost().setHidden (b.id, true);
+                safe->bitsChanged(); // (the same list without it)
+            });
+        menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+    }
+
+    void choose (int row, int build = -1)
     {
         if (row < 0 || row >= (int) shown.size() || ! onChosen)
             return;
-        const auto& e = entries[(std::size_t) shown[(std::size_t) row]];
+        const auto& builds = members[(std::size_t) shown[(std::size_t) row]];
+        if (build < 0)
+            build = pickedBuild (row);
+        const auto e = builds[(std::size_t) juce::jlimit (0, (int) builds.size() - 1, build)];
+        engine.getPluginHost().notePluginPicked (e.id); // (round 190qi: Recent)
         if (e.id.rfind (builtInPrefix, 0) == 0)
         {
             ChannelDef c;
@@ -504,8 +733,12 @@ private:
     std::function<void (PluginRef)> onChosen;
     std::function<void (ChannelDef)> onBuiltIn;
     inline static const std::string builtInPrefix = "lynx:vfx:";
-    std::vector<plugincatalog::Entry> entries;
+    std::vector<plugincatalog::Entry> entries;               // one row per plugin: its preferred build (round 190qi)
+    std::vector<std::vector<plugincatalog::Entry>> members;  // every build of each row, the preferred one first
+    std::vector<juce::String> categoryText;                  // each row's category, translated
     std::vector<int> shown;
+    std::vector<std::string> recentBuild; // the Recent group: the build picked last, per shown row
+    bool recentShown = false;
     std::vector<Group> groupRows;
     int group = 0;
     bool instruments = true;

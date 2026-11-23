@@ -136,14 +136,16 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
 {
     std::vector<std::string> keys;
     std::vector<plugincatalog::BuiltinPlugin> builtins;
+    auto& host = engine.getPluginHost();
     for (const auto& e : entries)
     {
-        keys.push_back (e.key);
-        if (e.folder != 3) // (installed plugins only under a folder the user made)
+        // round 190qi: a plugin hidden in the Plugin manager has no key here, so no folder lists it
+        const auto hidden = host.isHidden (e.key);
+        keys.push_back (hidden ? std::string() : e.key);
+        if (e.folder != 3 && ! hidden) // (installed plugins only under a folder the user made)
             builtins.push_back (builtinOf (e));
     }
     refreshPluginDatabase (engine); // (the folders as they are on disk now: issue #104)
-    auto& host = engine.getPluginHost();
     const auto folders = plugincatalog::withDefaultCategories (host.databaseFolders(), instruments, builtins);
     const auto tree = plugincatalog::menuTree (folders, instruments, keys);
     // FL's root entries (round 190bf, fl190be Q3): plugins at the top of Effects / Generators, in no folder
@@ -191,7 +193,58 @@ bool categorizedItems (juce::PopupMenu& menu, AudioEngine& engine, const std::ve
     menu.addSeparator();
     return true;
 }
+
+// Round 190qi (core/PluginPicks.h): the plugins picked last that `entries` still has (not hidden), newest first, under
+// a "Recent" heading; each pick goes to the top again
+template <typename Entry, typename Thing>
+bool recentItems (juce::PopupMenu& menu, AudioEngine& engine, const std::vector<Entry>& entries, std::function<void (Thing)> add)
+{
+    auto& host = engine.getPluginHost();
+    bool any = false;
+    for (const auto& key : host.recentPlugins())
+    {
+        if (host.isHidden (key))
+            continue;
+        const auto it = std::find_if (entries.begin(), entries.end(), [&key] (const Entry& e) { return e.key == key; });
+        if (it == entries.end() || ! it->available || ! it->make)
+            continue;
+        if (! any)
+            menu.addSectionHeader (tr ("Recent"));
+        any = true;
+        menu.addItem (shownName (engine, it->key, it->label), [&engine, key, make = it->make, add] {
+            if (auto thing = make())
+            {
+                engine.getPluginHost().notePluginPicked (key);
+                add (std::move (*thing));
+            }
+        });
+    }
+    if (any)
+        menu.addSeparator();
+    return any;
+}
 } // namespace
+
+bool addRecentItems (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (EffectSlot)> add)
+{
+    return recentItems<EffectEntry, EffectSlot> (menu, engine, effectEntries (engine), std::move (add));
+}
+
+bool addRecentItems (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> add)
+{
+    return recentItems<GeneratorEntry, ChannelDef> (menu, engine, generatorEntries (engine), std::move (add));
+}
+
+std::string effectKey (const EffectSlot& slot)
+{
+    if (slot.kind == EffectKind::plugin)
+        return slot.plugin.id;
+    if (slot.kind == EffectKind::patcher && slot.patcher.isRack())
+        return "lynx:fx:Audio Effect Rack";
+    if (slot.isSubstitute())
+        return {};
+    return std::string ("lynx:fx:") + effectInfo (slot.kind).name;
+}
 
 void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> pick,
                        std::function<void()> chooseSample, const ChannelDef* current, juce::Component* owner)
@@ -209,14 +262,18 @@ void addGeneratorMenu (juce::PopupMenu& menu, AudioEngine& engine, std::function
     }, owner, pick);
     menu.addSubMenu (tr ("Plugin (VST/VST3/CLAP)"), plugins);
     menu.addSeparator();
+    recentItems<GeneratorEntry, ChannelDef> (menu, engine, entries, pick); // round 190qi: the instruments picked last (the list above, not read again)
     // FL's Add menu (round 170b): the generators under their categories, A-Z (FL's Plugin database folders, LYNX's own
     // first); the channel's own generator is ticked (only kinds with one entry: the VFX and FL engines share kinds / names)
     categorizedItems<GeneratorEntry> (menu, engine, entries, true, [&] (juce::PopupMenu& m, int i) {
         const auto& e = entries[(std::size_t) i];
         const auto own = current != nullptr && current->instrument == e.kind && e.folder == 0 && e.kind != InstrumentKind::controller;
-        m.addItem (shownName (engine, e.key, e.label), e.available, own, [make = e.make, pick] {
+        m.addItem (shownName (engine, e.key, e.label), e.available, own, [&engine, key = e.key, make = e.make, pick] {
             if (auto c = make())
+            {
+                engine.getPluginHost().notePluginPicked (key); // (round 190qi: Recent)
                 pick (std::move (*c));
+            }
             else
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL engines"),
                                                         tr ("This engine needs the data files of an FL Studio installation, which were not found or could not be read."));
@@ -551,9 +608,12 @@ bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<
     const auto entries = effectEntries (engine, true);
     return categorizedItems<EffectEntry> (menu, engine, entries, false, [&] (juce::PopupMenu& m, int i) {
         const auto& e = entries[(std::size_t) i];
-        m.addItem (shownName (engine, e.key, e.label), e.available, false, [make = e.make, add] {
+        m.addItem (shownName (engine, e.key, e.label), e.available, false, [&engine, key = e.key, make = e.make, add] {
             if (auto thing = make())
+            {
+                engine.getPluginHost().notePluginPicked (key); // (round 190qi: Recent)
                 add (std::move (*thing));
+            }
         });
     });
 }
@@ -563,9 +623,12 @@ bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<
     const auto entries = generatorEntries (engine);
     return categorizedItems<GeneratorEntry> (menu, engine, entries, true, [&] (juce::PopupMenu& m, int i) {
         const auto& e = entries[(std::size_t) i];
-        m.addItem (shownName (engine, e.key, e.label), e.available, false, [make = e.make, add] {
+        m.addItem (shownName (engine, e.key, e.label), e.available, false, [&engine, key = e.key, make = e.make, add] {
             if (auto thing = make())
+            {
+                engine.getPluginHost().notePluginPicked (key); // (round 190qi: Recent)
                 add (std::move (*thing));
+            }
         });
     });
 }
