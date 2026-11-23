@@ -7948,6 +7948,19 @@ bool pressChannelHeaderGear (juce::Component& root)
     return false;
 }
 
+bool showChannelWindowTab (juce::Component& root, int tab)
+{
+    if (auto* frame = dynamic_cast<ChannelFrame*> (&root))
+    {
+        frame->showTab (tab < 0 ? frame->tabCount() - 1 : tab);
+        return true;
+    }
+    for (auto* child : root.getChildren())
+        if (showChannelWindowTab (*child, tab))
+            return true;
+    return false;
+}
+
 std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root)
 {
     if (auto* frame = dynamic_cast<ChannelFrame*> (&root))

@@ -82,6 +82,9 @@ std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root);
 // and a press of the gear in its title bar (false: none; docked windows only)
 std::optional<bool> channelWindowHeaderShown (juce::Component& root);
 bool pressChannelHeaderGear (juce::Component& root);
+// Round 190pw (PR #259, tests): the channel window or frame inside `root` shows tab `tab` (< 0 = Misc), as a click on
+// the tab does; false: no channel frame there
+bool showChannelWindowTab (juce::Component& root, int tab);
 int channelHeaderControlsWidth() noexcept;
 // The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
 // of its layout (0 = no pages)
