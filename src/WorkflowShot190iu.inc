@@ -221,6 +221,50 @@
         }
         workflowextras::setExtra ("playlist.midiDrop", false);
 
+        // ---- 3b. the same .mid dropped on a Channel Rack row: its notes into that channel, shown in the Piano roll
+        {
+            auto& rack = ui.getRackForSnapshot();
+            auto& ws = ui.workspaceForTest();
+            const auto leadChannel = song().playlistTracks[2].channel;
+            const auto pattern = song().currentPattern;
+            const auto noteCount = [&] (int channel) {
+                const auto& notes = song().patterns[(std::size_t) pattern].notes;
+                return (int) std::count_if (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; });
+            };
+            // the drag shows where the file would go: that row outlined, and a tag for a MIDI file
+            ui.showPanelsForSnapshot ({ workspace::Panel::channelRack });
+            engine.dispatchPendingMessages();
+            const auto rowCentre = rack.rowTopForSnapshot (leadChannel) + ChannelRackComponent::rowHeight / 2;
+            rack.fileDragEnter (files, 10, rowCentre);
+            check ("rack_mid_drag_shows_the_row", rack.fileDropRowForSnapshot() == leadChannel, juce::String (rack.fileDropRowForSnapshot()));
+            check ("rack_mid_drag_knows_it_is_midi", rack.fileDropIsMidiForSnapshot());
+            savePng (shot::snapshot (rack, juce::Rectangle<int> (0, 0, juce::jmin (rack.getWidth(), 1000),
+                                                                 juce::jmin (rowCentre + ChannelRackComponent::rowHeight, rack.getHeight()))),
+                     prefix + "-mid-drag-over-rack.png");
+            // (over the empty space under the channels: the selected channel, where the drop would go)
+            rack.fileDragMove (files, 10, rack.rowTopForSnapshot ((int) song().channels.size() - 1) + 3 * ChannelRackComponent::rowHeight);
+            check ("rack_mid_drag_over_empty_space_shows_the_selected_channel", rack.fileDropRowForSnapshot() == engine.getSelectedChannel());
+            rack.fileDragExit (files);
+            check ("rack_mid_drag_indicator_goes_away", rack.fileDropRowForSnapshot() == -1 && ! rack.fileDropIsMidiForSnapshot());
+
+            check ("rack_takes_mid", rack.isInterestedInFileDrag (files));
+            check ("piano_roll_hidden_before_the_rack_drop", ! ws.isPanelVisible (workspace::Panel::pianoRoll));
+            const auto before = noteCount (leadChannel);
+            const auto othersBefore = (int) song().patterns[(std::size_t) pattern].notes.size() - before;
+            rack.filesDropped (files, 10, rack.rowTopForSnapshot (leadChannel) + ChannelRackComponent::rowHeight / 2);
+            engine.dispatchPendingMessages();
+            // (the file's 4 bass and 32 drum notes, both tracks merged into the channel it was dropped on)
+            check ("rack_drop_puts_the_notes_in_that_channel", noteCount (leadChannel) == 36, juce::String (noteCount (leadChannel)));
+            check ("rack_drop_keeps_the_other_channels", (int) song().patterns[(std::size_t) pattern].notes.size() - noteCount (leadChannel) == othersBefore);
+            check ("rack_drop_selects_the_channel", engine.getSelectedChannel() == leadChannel, juce::String (engine.getSelectedChannel()));
+            check ("rack_drop_opens_the_piano_roll", ws.isPanelVisible (workspace::Panel::pianoRoll));
+            engine.undo();
+            engine.dispatchPendingMessages();
+            check ("rack_drop_is_one_undo_step", noteCount (leadChannel) == before, juce::String (noteCount (leadChannel)));
+            ui.selectTabForSnapshot (2); // (the Playlist again, as the rest of this shot expects it)
+            engine.dispatchPendingMessages();
+        }
+
         // ---- 4. #191.6 the picker's takes and envelopes: the Playlist menu (the Picker panel submenu holds the clean-up)
         {
             const auto menu = ui.getPanelMenuForSnapshot (workspace::Panel::playlist);
