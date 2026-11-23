@@ -145,6 +145,10 @@ inline constexpr Item items[] = {
     { "playlist.shadeFadedAudio", TR_NOOP ("Playlist"), TR_NOOP ("Shade faded audio (LYNX)"),
       TR_NOOP ("The Pattern layout also darkens the part of an audio clip that a fade takes away, as the Clip-launch layout and Live do; FL Studio draws only the fade curve. Also in Playlist › View."),
       "ui-options.txt:shadeFadedAudio" },
+    // PR #267 (round 190qj, on by default: owner 2026-11-23): FL 2026 marks a selected track with a strip at its lane's start only
+    { "playlist.dimUnselectedTracks", TR_NOOP ("Playlist"), TR_NOOP ("Dim unselected tracks (LYNX)"),
+      TR_NOOP ("In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View."),
+      "ui-options.txt:dimUnselectedTracks" },
     // round 190oo (CS O-3): Live folds a track's automation lanes; LYNX's Clip-launch arrangement shows them open
     { "playlist.clipLanesFolded", TR_NOOP ("Playlist"), TR_NOOP ("Automation lanes start folded when a project opens (Clip-launch layout)"),
       TR_NOOP ("As in Live, a project opened or imported shows its tracks' automation lanes folded the first time the Clip-launch arrangement shows it; each track's lane arrow unfolds them. Also in the Playlist menu of the Clip-launch layout."),

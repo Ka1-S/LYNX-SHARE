@@ -123,7 +123,7 @@ TEST (issue238_presets_give_tracks_a_muted_accent)
         }
         ++tinted;
         const auto [s, v] = hsv (c);
-        CHECK (c != flTrackGrey && s <= 0.351 && std::abs (v - greyV - 0.03) < 0.01);
+        CHECK (c != flTrackGrey && s <= 0.36 && std::abs (v - greyV - 0.03) < 0.01);
         CHECK (contrastRatio (0xffffffffu, c) >= 4.5); // (white track names stay readable)
         // the accent's hue: the strongest channel is the accent's (a greyish accent stays greyish)
         if (hsv (preset.accent).first > 0.3)

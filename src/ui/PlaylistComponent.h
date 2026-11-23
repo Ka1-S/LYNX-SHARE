@@ -136,6 +136,11 @@ public:
     // Pattern layout also shades what a fade takes away, as the Clip-launch layout and issue #230's reference (Live) do;
     // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
     static inline bool shadeFadedAudio = false;
+    // PR #267 (round 190qj, a LYNX extra: FL 2026 marks a selected track with a strip at its lane's start only): with tracks selected, the
+    // other tracks' rows step back under a light dark veil in the Pattern layout. On by default (owner, 2026-11-23: a
+    // visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras
+    // ("dimUnselectedTracks").
+    static inline bool dimUnselectedTracks = true;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 

@@ -444,12 +444,28 @@
             {
                 pl.selectTrack (selected);
                 engine.dispatchPendingMessages();
-                const auto image = shot::snapshot (pl);
-                const auto x = juce::jlimit (0, image.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
-                const auto lit = image.getPixelAt (x, pl.trackRowForSnapshot (selected).getCentreY()).getBrightness();
-                const auto dark = image.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
-                check ("playlist_selected_track_leaves_the_others_darker", lit > dark + 0.006f, juce::String (lit, 4) + " / " + juce::String (dark, 4));
-                savePng (image, prefix + "-playlist-selected-track.png");
+                const auto x = juce::jlimit (0, pl.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
+                const auto brightness = [&] (const juce::Image& image, int t) { return image.getPixelAt (x, pl.trackRowForSnapshot (t).getCentreY()).getBrightness(); };
+                // the LYNX extra, on by default (owner 2026-11-23; Playlist › View › Dim unselected tracks): the others step back
+                PlaylistComponent::dimUnselectedTracks = true;
+                pl.repaint();
+                {
+                    const auto image = shot::snapshot (pl);
+                    const auto lit = brightness (image, selected), dark = brightness (image, other);
+                    check ("playlist_selected_track_leaves_the_others_darker", lit > dark + 0.005f, juce::String (lit, 4) + " / " + juce::String (dark, 4));
+                    savePng (image, prefix + "-playlist-selected-track.png");
+                    savePng (pl.createComponentSnapshot (pl.getLocalBounds(), true, 1.5f), prefix + "-playlist-selected-track@150.png");
+                }
+                // switched off: FL-exact (FL 2026 marks a selected track in its header only)
+                PlaylistComponent::dimUnselectedTracks = false;
+                pl.repaint();
+                {
+                    const auto image = shot::snapshot (pl);
+                    check ("playlist_selection_dims_nothing_when_off_as_fl", std::abs (brightness (image, selected) - brightness (image, other)) < 0.002f,
+                           juce::String (brightness (image, selected), 4) + " / " + juce::String (brightness (image, other), 4));
+                    savePng (image, prefix + "-playlist-selected-track-fl.png");
+                }
+                PlaylistComponent::dimUnselectedTracks = true;
             }
         }
 

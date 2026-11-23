@@ -21,7 +21,8 @@ TEST (design190oo_cliplaunch_strips_option)
         listed = listed || (item.id == "project.clipLaunchStrips" && item.settingsKey == "ui-options.txt:newClipLaunchStrips");
     CHECK (listed);
 
-    auto song = makeTemplate (0);
+    // (round 190qj: the default new project's channel set; the "Empty" template is FL's one Sampler on the Master now)
+    auto song = makeNewProject();
     applyNewProjectDefaults (song, NewProjectDefaults {});
     const auto before = song;
     const auto linked = linkClipLaunchStrips (song, 16);

@@ -2696,6 +2696,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
+    if (id == "playlist.dimUnselectedTracks") return PlaylistComponent::dimUnselectedTracks; // (PR #267, round 190qj)
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
@@ -2788,6 +2789,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     {
         PlaylistComponent::shadeFadedAudio = on;
         saved(); // (saves and repaints the Playlist)
+    }
+    else if (id == "playlist.dimUnselectedTracks") // PR #267 (round 190qj): Playlist › View › Dim unselected tracks
+    {
+        PlaylistComponent::dimUnselectedTracks = on;
+        saved();
     }
     else if (id == "pianoRoll.songBarsRuler")
     {

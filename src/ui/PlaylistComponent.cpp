@@ -2108,6 +2108,57 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 g.fillRectList (background);
             }
 
+            // PR #264 (FL's Playlist, checked in FL 2026 in round 190qj): the bars come in groups of 4 and every other group
+            // (5-8, 13-16...) is a shade darker, in any time signature; with the lanes' alternating shades that is FL's
+            // light/dark plaid. Round 190qj (paint gate: the PR's bg0 veil per bar blended half the grid once more, +15 %
+            // Playlist paint instructions): each lane is filled in opaque spans, the dark groups in the lane's own colour
+            // with that veil already applied, so every pixel is still painted once.
+            struct Span { int x0, x1; bool dark; };
+            std::vector<Span> spans;
+            if (fl)
+            {
+                const auto from = grid.getIntersection (paintedRows);
+                const auto tickFrom = juce::jmax ((std::int64_t) 0, (std::int64_t) xToTick (from.getX()) - bar);
+                const auto tickTo = (std::int64_t) xToTick (from.getRight()) + 1;
+                const auto groupDark = [] (int number) { return number >= 1 && ((number - 1) / 4) % 2 == 1; };
+                auto at = grid.getX();
+                std::optional<bool> dark; // (the shade left of the first bar line: that of the bar before it)
+                for (const auto& b : song.barsBetween (tickFrom, tickTo))
+                {
+                    const auto x = juce::jlimit (grid.getX(), grid.getRight(), (int) std::lround (tickToX ((double) b.tick)));
+                    if (! dark.has_value())
+                        dark = groupDark (b.number - 1);
+                    if (x > at)
+                        spans.push_back ({ at, x, *dark });
+                    at = juce::jmax (at, x);
+                    dark = groupDark (b.number);
+                }
+                if (at < grid.getRight())
+                    spans.push_back ({ at, grid.getRight(), dark.value_or (false) });
+                // merge neighbours of one shade (a group is 4 bars: 1 span instead of 4)
+                std::vector<Span> merged;
+                for (const auto& sp : spans)
+                    if (! merged.empty() && merged.back().dark == sp.dark && merged.back().x1 == sp.x0)
+                        merged.back().x1 = sp.x1;
+                    else
+                        merged.push_back (sp);
+                spans.swap (merged);
+            }
+            const auto groupShade = [] (juce::Colour c) { return c.overlaidWith (colour::bg0.withAlpha (0.30f)); };
+            const auto fillLane = [&] (juce::Colour c, int y, int h) {
+                if (spans.empty())
+                {
+                    g.setColour (c);
+                    g.fillRect (grid.getX(), y, grid.getWidth(), h);
+                    return;
+                }
+                for (const auto& sp : spans)
+                {
+                    g.setColour (sp.dark ? groupShade (c) : c);
+                    g.fillRect (sp.x0, y, sp.x1 - sp.x0, h);
+                }
+            };
+
             for (int t = 0; t < rows; ++t)
             {
                 const auto y = trackToY (t);
@@ -2133,8 +2184,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         lane = colour::bg1.interpolatedWith (colour::bg2, 0.35f);
                     if (t == hover.track && drag == Drag::none)
                         lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
-                    g.setColour (ink (lane));
-                    g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
+                    fillLane (ink (lane), y, trackHeight);
                     g.setColour (ink (colour::bg0));
                     g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
                 }
@@ -2168,15 +2218,6 @@ void PlaylistComponent::paint (juce::Graphics& g)
             for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
                                                    juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
             {
-                // FL's Playlist: the bars come in groups of 4 and every other group is a shade darker (with the lanes'
-                // alternating shades that is FL's light/dark plaid); the Clip-launch layout has Live's own lane groups
-                if (fl && ((b.number - 1) / 4) % 2 == 1)
-                {
-                    const auto x0 = (float) tickToX ((double) b.tick);
-                    const auto x1 = (float) tickToX ((double) (b.tick + b.length));
-                    g.setColour (ink (colour::bg0.withAlpha (0.30f)));
-                    g.fillRect (juce::Rectangle<float> (x0, (float) grid.getY(), x1 - x0, (float) grid.getHeight()));
-                }
                 if (barEvery > 1 && (b.number - 1) % barEvery != 0)
                     continue;
                 g.setColour (ink (colour::gridBar));
@@ -3322,7 +3363,7 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 // its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
 void PlaylistComponent::paintTrackSelectionDim (juce::Graphics& g)
 {
-    if (selectedTracks.empty() || ! flClipLook())
+    if (! dimUnselectedTracks || selectedTracks.empty() || ! flClipLook())
         return;
 
     const auto grid = gridArea();
@@ -3333,7 +3374,7 @@ void PlaylistComponent::paintTrackSelectionDim (juce::Graphics& g)
     if (! g.reduceClipRegion (grid))
         return;
 
-    g.setColour (juce::Colours::black.withAlpha (0.20f));
+    g.setColour (juce::Colours::black.withAlpha (0.16f)); // (round 190qj: subtle; clip names and notes on them stay readable)
     for (int t = 0; t < numTracks(); ++t)
         if (! isTrackSelected (t))
         {

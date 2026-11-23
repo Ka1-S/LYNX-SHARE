@@ -12655,3 +12655,5 @@ countries: tw hk mo
 "(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "（這裡的部分片段透過其他混音器軌道播放：{0}；M 也會將此播放清單軌道靜音）"
 "Tracks take a muted shade of the accent color (LYNX extra)" = "軌道使用強調色的柔和色調（LYNX 附加功能）"
 "Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "沒有自身顏色的軌道、混音器軌道和通道使用強調色的柔和色調。關閉時，或使用 LYNX 自帶的紅色強調色時：FL 的灰色。「軌道」色點優先。"
+"Dim unselected tracks (LYNX)" = "調暗未選取的軌道（LYNX）"
+"In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "在 Pattern 版面中，選取播放清單軌道時，其他軌道的列會退到一層淡淡的暗色遮罩之下，讓目光落在選取上。FL Studio 不會調暗它們：關閉此項即為 FL 的外觀。也在 播放清單 › 檢視 中。"

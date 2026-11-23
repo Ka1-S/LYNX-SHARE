@@ -3583,6 +3583,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showFadePreviews = on;
         else if (key == "shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio (LYNX)
             PlaylistComponent::shadeFadedAudio = on;
+        else if (key == "dimUnselectedTracks") // PR #267 (round 190qj): Playlist › View › Dim unselected tracks (LYNX)
+            PlaylistComponent::dimUnselectedTracks = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -4004,6 +4006,7 @@ void MainComponent::saveUiSettings()
                                       + "\nshowHiddenTracks=" + juce::String (PlaylistComponent::showHiddenTracks ? 1 : 0)
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
                                       + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
+                                      + "\ndimUnselectedTracks=" + juce::String (PlaylistComponent::dimUnselectedTracks ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -5510,6 +5513,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 // round 190oo (design review O-1, a LYNX extra): shade the faded part as the Clip-launch layout does
                 view.addItem (tr ("Shade faded audio (LYNX)"), true, PlaylistComponent::shadeFadedAudio, [this] {
                     PlaylistComponent::shadeFadedAudio = ! PlaylistComponent::shadeFadedAudio;
+                    playlist.headerOptionsChanged();
+                    saveUiSettings();
+                });
+                // PR #267 (round 190qj, a LYNX extra): the selected tracks stand out, the others step back
+                view.addItem (tr ("Dim unselected tracks (LYNX)"), true, PlaylistComponent::dimUnselectedTracks, [this] {
+                    PlaylistComponent::dimUnselectedTracks = ! PlaylistComponent::dimUnselectedTracks;
                     playlist.headerOptionsChanged();
                     saveUiSettings();
                 });
