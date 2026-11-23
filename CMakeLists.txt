@@ -507,6 +507,14 @@ add_executable(perfbench tools/perfbench.cpp)
 target_link_libraries(perfbench PRIVATE lynx_core)
 target_include_directories(perfbench PRIVATE tools)
 
+# every LYNX native effect and instrument: CPU per block, silence, automation, memory (round 190pz): nativebench [--fl <Data>] ...
+add_executable(nativebench tools/nativebench.cpp)
+target_link_libraries(nativebench PRIVATE lynx_core)
+target_include_directories(nativebench PRIVATE tools)
+# the recording path (take streams + WAV writers) without an audio device (round 190pz): recbench --dir <folder> [--takes N] ...
+add_executable(recbench tools/recbench.cpp)
+target_link_libraries(recbench PRIVATE lynx_core)
+
 # LYNX Model (round 190ni): renders notes for the timbre score / calibration and measures the cost per voice
 add_executable(physmodrender tools/physmodrender.cpp)
 target_link_libraries(physmodrender PRIVATE lynx_core)
