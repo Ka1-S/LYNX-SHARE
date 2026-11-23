@@ -12647,3 +12647,4 @@ countries: es mx ar co cl pe ve
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "La automatización de las frecuencias de filtro y de Mod X / Y / Z de Harmor no hace nada en esta versión: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "En esta versión Sytrus toca cada nota con el Mod X / Y por defecto: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "En esta versión la exportación reproduce la canción de corrido (desde el compás 1, sin seguir los marcadores de salto)"
+"Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}" = "Las leyes Kilohearts Flanger y Dual Delay de Effector (los sustitutos de kHs Flanger y kHs Dual Delay) tocan el propio Flanger y el propio Delay de Effector: {0}"
