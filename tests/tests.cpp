@@ -18095,6 +18095,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlParity190piTests.inc" // round 190pi: Sytrus slide velocity, arpeggio glides, chord slides, Ogun link velocity, FL 11 parameters
 #include "FlParity190prTests.inc" // round 190pr: Harmor automation, FL song-start values of Harmor / Sytrus / FL effects
 #include "PatcherXyz190ptTests.inc" // round 190pt: Patcher Control Surface / X-Y-Z links, Vocodex controls under automation
+#include "Parity190pyTests.inc" // round 190py: channel PITCH automation, Gross Beat automation, Love Philter / Harmless scales, 3x Osc automation
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
 #include "Rollup031s6Tests.inc" // rollup 0.1.31 step 6: gold sweep for 190om decisions 4-5 (LYNX_SWEEP_DIR)

@@ -12646,4 +12646,6 @@ countries: fr be ch ca lu
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "L'automation des boutons principaux de Sytrus (master level, LFO, pitch, Mod X / Y) ne fait rien dans cette version : {0}"
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "L'automation des fréquences de filtre et de Mod X / Y / Z de Harmor ne fait rien dans cette version : {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Dans cette version, Sytrus joue chaque note avec le Mod X / Y par défaut : {0}"
+"Automation of a channel's Pitch knob does nothing in this release: {0}" = "L'automation du bouton Pitch d'un canal ne fait rien dans cette version : {0}"
+"Automation of 3x Osc's parameters does nothing in this release: {0}" = "L'automation des paramètres de 3x Osc ne fait rien dans cette version : {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Dans cette version, l'export joue le morceau d'une traite (depuis la mesure 1, sans suivre les marqueurs de saut)"

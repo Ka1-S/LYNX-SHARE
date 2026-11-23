@@ -1017,6 +1017,9 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
         case AutomationTargetKind::mixerPan: return trackName + " - " + tr ("Pan");
 
         case AutomationTargetKind::channelParam:
+            if (t.param == channelPitchParam) // (round 190py: the channel's PITCH knob, FL's channel parameter 4)
+                return channelName + " - " + tr ("Pitch");
+            [[fallthrough]];
         case AutomationTargetKind::effectParam:
         {
             juce::String param = tr ("Param {0}", { juce::String (t.param + 1) });
@@ -1098,6 +1101,14 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
 juce::String targetValueTextAt (AudioEngine& engine, const AutomationTarget& target, float value)
 {
     value = juce::jlimit (0.0f, 1.0f, value);
+    if (target.kind == AutomationTargetKind::channelParam && target.param == channelPitchParam) // (round 190py)
+    {
+        const auto& song = engine.getSong();
+        if (target.index < 0 || target.index >= (int) song.channels.size())
+            return {};
+        const auto cents = juce::roundToInt (channelPitchSemitones (song.channels[(std::size_t) target.index], value) * 100.0f);
+        return (cents > 0 ? "+" : "") + juce::String (cents) + " " + tr ("cents");
+    }
     if (target.kind == AutomationTargetKind::channelParam || target.kind == AutomationTargetKind::effectParam)
     {
         if (midictl::isMidiParam (target.param))

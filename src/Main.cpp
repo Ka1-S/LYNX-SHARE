@@ -8860,7 +8860,7 @@ private:
             if (! plain.ok || has (plain, markerLine) || has (plain, harmorLine) || has (plain, sytrusLine))
                 flparity190prResult = "ERROR lines for a project without markers, Harmor automation or Sytrus Mod X / Y";
             else if (! json.contains ("exportMarkers") || ! back || ! back->exportMarkers || back->channels.size() != n
-                     || back->channels[n - 2].engineRev != 3 || back->channels[n - 1].engineRev != 3)
+                     || back->channels[n - 2].engineRev < 3 || back->channels[n - 1].engineRev < 3) // (round 190py: 4 is current)
                 flparity190prResult = "ERROR the .lynx keys " + why;
             else if (! copy.ok || ! has (copy, markerLine) || ! has (copy, harmorLine) || ! has (copy, sytrusLine))
                 flparity190prResult = "ERROR the copy's lines " + copy.error;
@@ -9241,10 +9241,10 @@ private:
             const auto json = lynx::ProjectFile::toJson (song);
             const auto back = lynx::ProjectFile::fromJson (json, why);
             const auto n = (int) song.channels.size();
-            if (std::any_of (song.channels.begin() + first, song.channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev != 3; }))
-                rollup031s8Result = "ERROR set-up: a new channel is not at revision 3";
+            if (std::any_of (song.channels.begin() + first, song.channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev < 3; }))
+                rollup031s8Result = "ERROR set-up: a new channel is not at revision 3 or later"; // (round 190py: 4 is current)
             else if (! back || ! back->exportMarkers || (int) back->channels.size() != n
-                     || std::any_of (back->channels.begin() + first, back->channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev != 3; }))
+                     || std::any_of (back->channels.begin() + first, back->channels.end(), [] (const lynx::ChannelDef& c) { return c.engineRev < 3; }))
                 rollup031s8Result = "ERROR the .lynx did not keep revision 3 / the export's markers " + why;
             for (const auto* release : { "0.1.30", "0.1.28" })
             {

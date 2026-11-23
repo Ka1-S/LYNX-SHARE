@@ -108,5 +108,17 @@ bool isFlmTarget (int k) noexcept; // k = 1…24, 26…105, 107…112, 114
 // 114 (the gain, not in the state) and non-targets.
 bool writeFlmParam (std::uint8_t* state, int k, double v, int stepsPerBeat, double bpm) noexcept;
 // --- end of round 190fe
+
+// --- round 190py: FL's own automation of a desktop 3x Osc (ChannelDef::engineRev 4 on). AutomationTargetKind::
+// channelParam k is FL's ProcessParam number k with FL's normalised value (raw = min + v · (max − min), the DLL's
+// REC_FromMIDI law): 0…20 the plugin's parameters (state 4 + 4k), 24…113 the channel's voice-processor values
+// FL keeps in the plugin (the 364-byte snapshot's int k − 23: five envelope / LFO blocks of 17, Mod X 110, Mod Y 111,
+// filter type 113). Ranges and places read from the installation's DLL (REA_rodada190py: ProcessParam 0 / 2^30 and a
+// saved state after each set). FL's channel Mod X / Y (channel parameters 2 / 3, 0…256) are 110 / 111. Not targets:
+// the five blocks' first int (FL passes it unscaled) and the unused 21…23, 108, 109, 112.
+bool isFlTarget (int k) noexcept;
+std::pair<int, int> flRange (int k) noexcept; // FL's raw range of target k ({ 0, 0 } for a non-target)
+bool writeFlParam (std::uint8_t* state, int k, int raw) noexcept; // into a normalised (version-14) state
+// --- end of round 190py
 } // namespace threeosc
 } // namespace lynx

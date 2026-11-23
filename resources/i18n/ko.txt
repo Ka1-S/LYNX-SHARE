@@ -12646,4 +12646,6 @@ countries: kr
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus 메인 노브(master level, LFO, pitch, Mod X / Y)의 오토메이션은 이 릴리스에서 아무 동작도 하지 않습니다: {0}"
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor 필터 주파수와 Mod X / Y / Z의 오토메이션은 이 릴리스에서 아무 동작도 하지 않습니다: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "이 릴리스에서 Sytrus는 모든 노트를 기본 Mod X / Y로 재생합니다: {0}"
+"Automation of a channel's Pitch knob does nothing in this release: {0}" = "이 릴리스에서는 채널 Pitch 노브의 오토메이션이 아무 작용도 하지 않습니다: {0}"
+"Automation of 3x Osc's parameters does nothing in this release: {0}" = "이 릴리스에서는 3x Osc 파라미터의 오토메이션이 아무 작용도 하지 않습니다: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "이 릴리스에서는 내보내기가 곡을 처음부터 끝까지 재생합니다(1마디부터, 건너뛰기 마커 무시)"

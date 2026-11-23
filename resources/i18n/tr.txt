@@ -12646,4 +12646,6 @@ countries: tr
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus'un ana düğmelerinin otomasyonu (master level, LFO, pitch, Mod X / Y) bu sürümde hiçbir şey yapmaz: {0}"
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor'un filtre frekanslarının ve Mod X / Y / Z'nin otomasyonu bu sürümde hiçbir şey yapmaz: {0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "Bu sürümde Sytrus her notayı varsayılan Mod X / Y ile çalar: {0}"
+"Automation of a channel's Pitch knob does nothing in this release: {0}" = "Bir kanalın Pitch düğmesinin otomasyonu bu sürümde hiçbir şey yapmaz: {0}"
+"Automation of 3x Osc's parameters does nothing in this release: {0}" = "3x Osc parametrelerinin otomasyonu bu sürümde hiçbir şey yapmaz: {0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "Bu sürümde dışa aktarım şarkıyı baştan sona çalar (1. ölçüden, atlama işaretçilerini geçerek)"

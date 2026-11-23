@@ -1054,7 +1054,9 @@ struct ChannelDef
     // section) played as FL plays it (0: such a part plays its timbres, as LYNX did before). SimSynth: 2 = the note
     // velocity reaches its level through FL's Init.Vol law (round 190om; 0 and 1: every note at full level, as before).
     // Harmor 3 (round 190pr): automation of its filter frequencies and Mod X / Y / Z moves them as in FL (before: ignored).
-    int engineRev = 3;
+    // 3x Osc 4 (round 190py): FL's automation of its parameters and the channel's voice-processor values (filter cut /
+    // res, envelopes; threeosc::isFlTarget) moves them as in FL (before: ignored).
+    int engineRev = 4;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
     float swingMix = 1.0f;   // how much of the global swing applies to this channel (0..1), as in FL
@@ -1155,6 +1157,17 @@ struct ChannelDef
             flWrapperFlags = on ? (flWrapperFlags | 0x20) : (flWrapperFlags & ~0x20);
     }
 };
+
+// Round 190py: FL's channel parameter 4, a channel's PITCH knob, as an automation target — channelParam with this param
+// (past midictl's range) on any channel. 0..1 = −48 … +48 semitones (FL's parameter: cents −4800 … 4800, what .flp 0xD8
+// / pattern events carry; Lightning's "pling riser - pitch" clip at 0.625 plays +12 st in FL's render). The knob's range
+// (ChannelMisc::pitchRange) is its travel on screen only: FL saves and plays values past it (Bombs Away's "3x Osc #2" at
+// +1200 cents with range 2, its clip's ±12 semitones heard in FL's render). The knob is the part of
+// SamplerSettings::pitch that is not the root note's (60 − root) shift nor FL's stretch PITCH (FlpImport / FlpExport).
+constexpr int channelPitchParam = 0x10A0;
+float channelPitchShift (const ChannelDef& c) noexcept;           // semitones in sampler.pitch that are not the knob
+float channelPitchValue (const ChannelDef& c) noexcept;           // the knob as 0..1 over ±48 semitones
+float channelPitchSemitones (const ChannelDef& c, float v) noexcept; // the knob at value v (semitones)
 
 enum class EffectKind : std::uint8_t
 {

@@ -20,6 +20,7 @@
 #include "core/MixSuite.h"
 #include "core/Ogun.h"
 #include "core/SytrusEngine.h"
+#include "core/ThreeOsc.h"
 #include "core/NewtoneFx.h"
 #include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
@@ -2235,10 +2236,52 @@ void toRelease0130 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Sytrus plays every note at the default Mod X / Y in this release: {0}"), listOf (sytrusNotes), true });
     }
 
+    // round 190py: (a) FL's channel PITCH knob as an automation target (channelParam channelPitchParam) — 0.1.30 has no such
+    // target: the clip plays nothing there; (b) a desktop 3x Osc follows FL's automation of its parameters from
+    // ChannelDef::engineRev 4 on, 0.1.30 ignores it (written at 2 below). Lines; the data stays
+    {
+        juce::StringArray pitchClips, oscClips;
+        std::set<int> oscChannels;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() == "threeosc" && (int) c.getProperty ("engineRev") >= 4)
+                oscChannels.insert (i);
+        });
+        const auto pitch = [] (const juce::var& t) {
+            return t.isArray() && t.size() >= 4 && t[0].toString() == "channelParam" && (int) t[3] == channelPitchParam;
+        };
+        const auto osc = [&] (const juce::var& t) {
+            return t.isArray() && t.size() >= 4 && t[0].toString() == "channelParam" && oscChannels.count ((int) t[1]) != 0
+                   && threeosc::isFlTarget ((int) t[3]);
+        };
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+            {
+                if (pitch (a["target"]))
+                    addOnce (pitchClips, a["name"].toString());
+                if (osc (a["target"]))
+                    addOnce (oscClips, a["name"].toString());
+            }
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (const auto& p : *patterns)
+                if (auto* lanes = arrayOf (p["events"]))
+                    for (const auto& l : *lanes)
+                    {
+                        if (pitch (l["target"]))
+                            addOnce (pitchClips, p["name"].toString());
+                        if (osc (l["target"]))
+                            addOnce (oscClips, p["name"].toString());
+                    }
+        if (! pitchClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation of a channel's Pitch knob does nothing in this release: {0}"), listOf (pitchClips), true });
+        if (! oscClips.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation of 3x Osc's parameters does nothing in this release: {0}"), listOf (oscClips), true });
+    }
+
     // rollup 0.1.31 step 8: every other channel at engine revision 3 (FL imports and new channels since round 190pr) is
     // written at 2. Revision 3 changes only Harmor and Sytrus (both written at 2 above) and revision 2 only SimSynth and
     // Ogun / Autogun (written at 1 above), so the copy plays the same here and in newer LYNX, and a channel 0.1.30 later
     // turns into a Harmor or Sytrus cannot carry revision 3's laws back into a newer LYNX. 0.1.28 drops the key.
+    // (Round 190py: revision 4 changes only a desktop 3x Osc's automation — its line above.)
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {
         if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 2)
             c.setProperty ("engineRev", 2);
