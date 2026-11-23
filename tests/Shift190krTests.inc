@@ -114,19 +114,20 @@ TEST (perf190kr_pitch_shifter_renders_as_the_base_commit_did)
         bool mono;
         double factor;
         std::uint64_t hash;
+        std::uint64_t clangHash = 0; // the second known-good set (0 = the same as GCC's), see below
     };
     // (factor = the voice's transposition: 0.5 = -12 st, 2.3784 = +15 st)
     const Case cases[] = {
         { 44100.0, StretchMethod::general, true, 0.5, 0xb4f59def5ba47ee2ull },
         { 44100.0, StretchMethod::general, false, 0.9438743126816935, 0x3cf31293dd5a2c4full },
         { 44100.0, StretchMethod::general, true, 1.4983070768766815, 0x74f9fa3d1f717942ull },
-        { 44100.0, StretchMethod::general, false, 2.378414230005442, 0x384b3e2758c99e3bull },
-        { 44100.0, StretchMethod::general, true, 4.0, 0x991803e03af60bfaull },
+        { 44100.0, StretchMethod::general, false, 2.378414230005442, 0x384b3e2758c99e3bull, 0xab92afb1ef35fb2full },
+        { 44100.0, StretchMethod::general, true, 4.0, 0x991803e03af60bfaull, 0x0022cd25eabb6e26ull },
         { 48000.0, StretchMethod::transients, false, 0.7491535384383408, 0x06ef0db166d5a700ull },
         { 48000.0, StretchMethod::transients, true, 1.122462048309373, 0x493fe619f4a95f7bull },
-        { 48000.0, StretchMethod::transients, false, 3.174802103936399, 0xdc4da78068703dbdull },
+        { 48000.0, StretchMethod::transients, false, 3.174802103936399, 0xdc4da78068703dbdull, 0xc705be2727a0cfebull },
     };
-    int same = 0, total = 0;
+    int same = 0, sameClang = 0, total = 0;
     for (const auto& c : cases)
     {
         double energy = 0.0;
@@ -137,16 +138,18 @@ TEST (perf190kr_pitch_shifter_renders_as_the_base_commit_did)
         CHECK (energy > 1.0 && std::isfinite (energy)); // it sounds (any maths library)
         ++total;
         same += h == c.hash ? 1 : 0;
+        sameClang += h == (c.clangHash != 0 ? c.clangHash : c.hash) ? 1 : 0;
     }
     const struct
     {
         bool mono;
         double ratio;
         std::uint64_t hash;
+        std::uint64_t clangHash = 0;
     } offline[] = {
         { false, 1.37, 0x9c0f10dccb027459ull },
         { true, 0.6, 0x41691f3968f9fca7ull },
-        { false, 2.6, 0x3305e574d70141dbull },
+        { false, 2.6, 0x3305e574d70141dbull, 0x28249fb87dddd3b8ull },
     };
     for (const auto& c : offline)
     {
@@ -157,11 +160,16 @@ TEST (perf190kr_pitch_shifter_renders_as_the_base_commit_did)
         CHECK (energy > 1.0 && std::isfinite (energy));
         ++total;
         same += h == c.hash ? 1 : 0;
+        sameClang += h == (c.clangHash != 0 ? c.clangHash : c.hash) ? 1 : 0;
     }
     // bit for bit where the maths library is the one the hashes were made with (glibc 2.43 on x86-64, as round 190bz):
     // the window, the twiddles and the rotations come from libm's sin / cos / exp
-    std::printf ("  Signalsmith Stretch: %d of %d renders hash-identical to the base commit\n", same, total);
+    // Two known-good sets (round 190qd, the 0.1.31 release): GCC's (the base commit's, CMake g++ builds) and zig's clang
+    // (build-local.sh / the release train's LTO build), which computes four of these paths differently against the same
+    // glibc 2.43 libm (main 0.1.30 built that way gives the same four). Every render must match ONE set as a whole.
+    std::printf ("  Signalsmith Stretch: %d of %d renders hash-identical to the base commit (GCC set), %d of %d to the zig / clang set\n",
+                 same, total, sameClang, total);
    #if defined (__linux__) && defined (__x86_64__) && defined (__GLIBC__) && (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 43)
-    CHECK (same == total);
+    CHECK (same == total || sameClang == total);
    #endif
 }
