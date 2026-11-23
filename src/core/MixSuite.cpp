@@ -1,4 +1,5 @@
 #include "core/MixSuite.h"
+#include "core/CpuFeatures.h"
 #include "core/FastMath.h"
 #include "core/RenDynamics.h"
 #include "core/VitaminLaw.h"
@@ -253,8 +254,49 @@ namespace
 {
 // acc[k] = Σ coef[j] · lin[L − 1 + k − j] over j = 0 … L − 1, summed in that order from 0 (as up and down sum one
 // output), for k in [0, count): eight and four outputs side by side in SSE lanes, the rest one by one
+void halfBandBlock (const float* coef, int L, const float* lin, int count, float* acc) noexcept;
+
+#if LYNX_CPU_DISPATCH
+// Round 190px (perf 7): sixteen and eight outputs side by side in AVX lanes. Each lane does what an SSE lane does — a
+// multiply, then an add, tap after tap in the same order (AVX has no fused multiply-add) — so every output is the same
+// float; the outputs left over go to the SSE / scalar loops (lin and acc moved by the outputs done).
+LYNX_TARGET_AVX void halfBandBlockAvx (const float* coef, int L, const float* lin, int count, float* acc) noexcept
+{
+    const int P = L - 1;
+    int k = 0;
+    for (; k + 16 <= count; k += 16)
+    {
+        auto a0 = _mm256_setzero_ps(), a1 = _mm256_setzero_ps();
+        for (int j = 0; j < L; ++j)
+        {
+            const auto c = _mm256_set1_ps (coef[j]);
+            a0 = _mm256_add_ps (a0, _mm256_mul_ps (c, _mm256_loadu_ps (lin + P + k - j)));
+            a1 = _mm256_add_ps (a1, _mm256_mul_ps (c, _mm256_loadu_ps (lin + P + k + 8 - j)));
+        }
+        _mm256_storeu_ps (acc + k, a0);
+        _mm256_storeu_ps (acc + k + 8, a1);
+    }
+    for (; k + 8 <= count; k += 8)
+    {
+        auto a0 = _mm256_setzero_ps();
+        for (int j = 0; j < L; ++j)
+            a0 = _mm256_add_ps (a0, _mm256_mul_ps (_mm256_set1_ps (coef[j]), _mm256_loadu_ps (lin + P + k - j)));
+        _mm256_storeu_ps (acc + k, a0);
+    }
+    if (k < count)
+        halfBandBlock (coef, L, lin + k, count - k, acc + k);
+}
+#endif
+
 void halfBandBlock (const float* coef, int L, const float* lin, int count, float* acc) noexcept
 {
+#if LYNX_CPU_DISPATCH
+    if (count >= 8 && cpu::hasAvx())
+    {
+        halfBandBlockAvx (coef, L, lin, count, acc);
+        return;
+    }
+#endif
     const int P = L - 1;
     int k = 0;
 #if defined(LYNX_X86)
