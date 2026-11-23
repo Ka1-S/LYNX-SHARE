@@ -1955,6 +1955,15 @@ public:
             return;
         }
 
+        if (args.contains ("--issue258test"))
+        {
+            // LYNX --issue258test report.txt (round 190pv, issue #258): a cloned channel's own automation clip drives its
+            // sound, through the app's engine with render-ahead off and on (src/Issue258Test.inc; Transistor Bass needs
+            // FL Studio, LYNX_FL_INSTALL on Linux)
+            runIssue258Test (args[args.indexOf ("--issue258test") + 1].unquoted());
+            return;
+        }
+
         if (args.contains ("--hwheel254test"))
         {
             // LYNX --hwheel254test report.txt (round 190ou, issue #254): the horizontal wheel in the Playlist (three layouts),
@@ -9336,6 +9345,11 @@ private:
             lynx::windowplaces::fromVar ({});
         }
 
+        // round 190pv (issue #258): a cloned channel's own automation clip drives its sound (src/Issue258Test.inc: the app's
+        // engine, render-ahead off and on; Transistor Bass when FL Studio is here, LYNX Synth always)
+        juce::String issue258Log;
+        const auto issue258Result = issue258Check (issue258Log);
+
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
@@ -10563,7 +10577,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" // (rollup 0.1.31 step 7, and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -10675,6 +10689,7 @@ private:
                << "headergear248=" << headerGearResult << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
+               << "issue258=" << issue258Result << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -20510,6 +20525,7 @@ private:
 #include "DetailsShot190mp.inc" // round 190mp
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
+#include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my
