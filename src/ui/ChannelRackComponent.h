@@ -108,6 +108,13 @@ public:
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void filesDropped (const juce::StringArray& files, int x, int y) override;
+    // a file dragged over the rack: the row the drop would go to (the selected channel over the empty space) and whether
+    // the drag holds a MIDI file (the row then says "Drop the MIDI file here")
+    void fileDragEnter (const juce::StringArray& files, int x, int y) override;
+    void fileDragMove (const juce::StringArray& files, int x, int y) override;
+    void fileDragExit (const juce::StringArray& files) override;
+    int fileDropRowForSnapshot() const noexcept { return fileDropRow; }
+    bool fileDropIsMidiForSnapshot() const noexcept { return fileDropMidi; }
 
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
@@ -372,6 +379,9 @@ private:
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
     void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
+    // A .mid dropped on a channel's row (or on the rack with no row: the selected channel): its notes into that channel's
+    // part of the current pattern, then the channel is selected and the Piano roll shows the notes.
+    void importMidiOnChannel (int channel, const juce::File& file);
     void openPluginWindow (int channel);
     // Freeze (round 190ay, ui/ExportDialog.h freezeChannel): the frozen channel's hint; "Unfreeze to edit" in the hint
     // bar when an edit of a frozen channel is refused (true = refused); Freeze / Re-freeze of several channels, one
@@ -408,6 +418,9 @@ private:
     void showTip (Area area, int row, bool transient);
     Area hoverArea = Area::none;
     int hoverRow = -1, hoverStep = -1;
+    int fileDropRow = -1;        // (a file dragged over the rack: where it would go, -1 = none)
+    bool fileDropMidi = false;   // (the drag holds a .mid)
+    void paintFileDropTarget (juce::Graphics& g); // the row's outline and its tag, over the rows
 
     // the control contract for the row's knobs and route box
     ui::ValueSpec specFor (Area area, int row) const;
@@ -459,6 +472,17 @@ public:
         const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
         rack.filesDropped (files, p.x, p.y);
     }
+    void fileDragEnter (const juce::StringArray& files, int x, int y) override
+    {
+        const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
+        rack.fileDragEnter (files, p.x, p.y);
+    }
+    void fileDragMove (const juce::StringArray& files, int x, int y) override
+    {
+        const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
+        rack.fileDragMove (files, p.x, p.y);
+    }
+    void fileDragExit (const juce::StringArray& files) override { rack.fileDragExit (files); }
     bool isInterestedInDragSource (const SourceDetails& details) override { return rack.isInterestedInDragSource (details); }
     void itemDropped (const SourceDetails& details) override
     {
