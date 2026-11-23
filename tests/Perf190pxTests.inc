@@ -107,6 +107,11 @@ TEST (perf190px_guard_sees_the_ui_starving)
     g.setEnabled (true);
     g.uiPulse (1200.0);
     CHECK (! g.uiStarving (1220.0));
+    // ("ralate": render-ahead's own threshold, for an A/B)
+    lynx::OverloadGuard h;
+    h.configure ("ralate=30");
+    h.uiPulse (1000.0);
+    CHECK (! h.uiStarving (1029.0) && h.uiStarving (1031.0));
     g.notePaced (1.5);
     g.notePaced (0.5);
     CHECK (g.timesPaced() == 2 && std::abs (g.pacedMs() - 2.0) < 1e-9);

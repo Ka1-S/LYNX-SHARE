@@ -55,6 +55,9 @@ public:
         // 190os: the stop now lets go at once, and the processing time it judges does not include the yield, so the
         // windows above see the same; each probe starved the screen for its 250 ms (perf190os/HANDOFF.md)
         double probeEveryMs = 0.0, probeMs = 250.0;
+        // round 190px: how late the pulse is when render-ahead starts pacing its catch-up ("ralate"; 50 = uiLateMs's
+        // default). Pacing costs the audio nothing while the ring holds blocks, so it may act earlier than the yield.
+        double aheadLateMs = 50.0;
     };
     const Params& params() const noexcept { return p; }
     // "key=value,…" (missing keys keep their value; any thread before the device starts)
@@ -85,6 +88,7 @@ public:
             else if (key == "probe") p.probeMs = v;
             else if (key == "probeevery") p.probeEveryMs = v;
             else if (key == "stopgrace") p.stopGraceMs = v;
+            else if (key == "ralate") p.aheadLateMs = v;
             at = end;
             while (*at != 0 && *at != ',')
                 ++at;
@@ -100,14 +104,14 @@ public:
     // Message thread: its 30 Hz pulse (the engine's timer), `nowMs` on the callbacks' clock.
     void uiPulse (double nowMs) noexcept { lastUiMs.store (nowMs, std::memory_order_relaxed); }
 
-    // Round 190px (perf 7): the UI starves right now — "Safe overloads" on and the 30 Hz pulse late by uiLateMs. Any
+    // Round 190px (perf 7): the UI starves right now — "Safe overloads" on and the 30 Hz pulse late by aheadLateMs. Any
     // thread (the render-ahead thread paces its catch-up with it: after an overload, the callbacks keep their deadline
     // while render-ahead refills its window with the workers on both CPUs of a small PC, which the callbacks' windows
     // above never see; 190os measured 90-130 ms frame gaps there).
     bool uiStarving (double nowMs) const noexcept
     {
         const auto ui = lastUiMs.load (std::memory_order_relaxed);
-        return enabled.load (std::memory_order_relaxed) && ui > 0.0 && nowMs - ui > p.uiLateMs;
+        return enabled.load (std::memory_order_relaxed) && ui > 0.0 && nowMs - ui > p.aheadLateMs;
     }
     // what the render-ahead thread gave up that way (for --uiperf and the tests)
     void notePaced (double ms) noexcept
