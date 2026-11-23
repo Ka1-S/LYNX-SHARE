@@ -12646,9 +12646,12 @@ countries: tw hk mo
 "Automation of Sytrus' main knobs (master level, LFO, pitch, Mod X / Y) does nothing in this release: {0}" = "Sytrus 主旋鈕（master level、LFO、pitch、Mod X / Y）的自動化在此版本中不起作用：{0}"
 "Automation of Harmor's filter frequencies and Mod X / Y / Z does nothing in this release: {0}" = "Harmor 濾波器頻率和 Mod X / Y / Z 的自動化在此版本中不起作用：{0}"
 "Sytrus plays every note at the default Mod X / Y in this release: {0}" = "在此版本中，Sytrus 以預設的 Mod X / Y 演奏每個音符：{0}"
+"Automation of a channel's Pitch knob does nothing in this release: {0}" = "在此版本中，通道 Pitch 旋鈕的自動化不起作用：{0}"
+"Automation of 3x Osc's parameters does nothing in this release: {0}" = "在此版本中，3x Osc 參數的自動化不起作用：{0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "在此版本中，匯出會從頭到尾播放歌曲（從第 1 小節開始，忽略跳過標記）"
 
 # round 190qb: issue follow-ups #206 (middle-click / double-click effect search), #215 (folders in the export name)
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "匯出檔案的名稱。匯出時會填入 $project、$date 或 $bpm 等萬用字元。/ 會把檔案放進匯出資料夾內同名的資料夾（需要時自動建立）"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空插槽：點擊新增效果器，雙擊或中鍵點擊可搜尋"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "音軌效果：[LMB] 為其混音器軌道新增效果  [MMB] 或雙擊：搜尋效果（也可從瀏覽器拖放到這裡）"
+"Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}" = "Effector 的 Kilohearts Flanger 與 Dual Delay 規律（kHs Flanger 與 kHs Dual Delay 的替代）改為播放 Effector 自身的 Flanger 與 Delay：{0}"

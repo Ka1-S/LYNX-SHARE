@@ -139,6 +139,7 @@ struct RackState
     std::vector<std::vector<int>> automationGroups;
     std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
+    std::vector<int> channelPitchAuto; // round 190py: the automation slot of each channel's PITCH knob (−1 = none)
     // FL's Levels adjustment (round 190dz): the automation slot of each channel's pan / volume offset ([channel][param],
     // leveladjust::pan / volume; −1 = none). Mod X / Y offsets apply when the instrument is configured.
     std::vector<std::array<int, 2>> channelAdjustAuto;
@@ -1143,6 +1144,7 @@ private:
     PieceValue<double> compensateTick { -1.0 };          // the song position of this block's automation (song mode), −1 = none
     PieceValue<double> compensateTicksPerSample { 0.0 }; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;
+    float channelKnobCents (const RackState& state, int channel) const noexcept;
     float* trackBuffer (int track, int channel) noexcept;
     // Round 190gp (lazy-zero track buffers): an insert's buffer nobody has written in this chunk holds zeros without
     // storing them (trackUnwritten). trackBuffer — for the insert's own work and what is added into it — stores the

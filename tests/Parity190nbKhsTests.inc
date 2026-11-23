@@ -143,9 +143,11 @@ TEST (parity190nbkhs_measured_maps_of_the_earlier_stand_ins)
     CHECK (std::abs (facet::hz (f.params[(std::size_t) facet::param (0, 1)]) - 550.0) < 1.0);
     CHECK (facet::shape (f.params[(std::size_t) facet::param (1, 0)]) == facet::Shape::highCut);
     CHECK (std::abs (facet::gainDb (f.params[(std::size_t) facet::param (0, 2)]) - 12.04) < 0.05);
-    // kHs Flanger: dry cos / wet sin of mix × 45°, no cross-feed
+    // kHs Flanger: dry cos / wet sin of mix × 45° (round 190py: on Effector's Flanger law, which plays that mix itself —
+    // tests/Parity190pyKhsTests.inc; the Fruity Flanger map stays for slots saved with it)
     auto fl = load ("kHs Flanger", state ("\"delay\": \"0.001\", \"mix\": \"1\", \"mod_depth\": \"0.001\", \"mod_rate\": \"0.3\", \"feedback\": \"0\", \"$type\": \"flanger\""), n);
-    CHECK (text (fl, named (fl, "Dry")) == "71%" && text (fl, named (fl, "Wet")) == "71%" && text (fl, named (fl, "Cross")) == "0%");
+    CHECK (fl.kind == EffectKind::effector && khsdsp::lawOf (fl.params[(std::size_t) khsdsp::lawParam]) == khsdsp::Law::flanger);
+    CHECK (fl.params[(std::size_t) effector::wetMix] == 1.0f);
     // kHs Transient Shaper: Sustain is a steady-state gain of 17.93 dB × sustain, on Strike Shaper's Output
     auto t = load ("kHs Transient Shaper", state ("\"attack\": \"0\", \"pump\": \"0\", \"clip\": \"false\", \"sustain\": \"-0.5\", \"speed\": \"1\", \"$type\": \"transient_shaper\""), n);
     CHECK (text (t, named (t, "Sustain")) == "+0.0 dB");

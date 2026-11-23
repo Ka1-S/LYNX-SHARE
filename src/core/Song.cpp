@@ -1377,6 +1377,19 @@ void set (SamplerSettings& s, int param, float value) noexcept
 }
 } // namespace samplerparam
 
+float channelPitchShift (const ChannelDef& c) noexcept
+{
+    return (float) (60 - c.misc.rootNote) + (c.sampler.keepPitch ? (float) c.sampler.flStretchPitch / 100.0f : 0.0f);
+}
+float channelPitchValue (const ChannelDef& c) noexcept
+{
+    return std::clamp (((c.sampler.pitch - channelPitchShift (c)) / 48.0f + 1.0f) * 0.5f, 0.0f, 1.0f);
+}
+float channelPitchSemitones (const ChannelDef&, float v) noexcept
+{
+    return (std::clamp (v, 0.0f, 1.0f) * 2.0f - 1.0f) * 48.0f; // (the knob's range does not hold it: see Song.h)
+}
+
 float Song::targetValue (const AutomationTarget& t) const noexcept
 {
     const auto validChannel = t.index >= 0 && t.index < (int) channels.size();
@@ -1403,6 +1416,8 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                 return mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].params[(std::size_t) t.param];
             return validTrack ? 0.5f : -1.0f; // plugin parameter: the value lives in the plugin
         case AutomationTargetKind::channelParam:
+            if (validChannel && t.param == channelPitchParam) // (round 190py: the PITCH knob)
+                return channelPitchValue (channels[(std::size_t) t.index]);
             if (! validChannel)
                 return -1.0f;
             // an Envelope Controller's global Mod X / Y (round 164f): the value lives in its state
@@ -1528,6 +1543,12 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
             }
             return false;
         case AutomationTargetKind::channelParam:
+            if (validChannel && t.param == channelPitchParam) // (round 190py: the PITCH knob, as FL's song-start value sets it)
+            {
+                auto& c = channels[(std::size_t) t.index];
+                c.sampler.pitch = channelPitchShift (c) + channelPitchSemitones (c, v);
+                return true;
+            }
             if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::controller
                 && (t.param == envelopeControllerModXParam || t.param == envelopeControllerModYParam))
                 if (auto ec = parseEnvelopeController (channels[(std::size_t) t.index].controllerState))

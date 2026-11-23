@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -874,6 +875,57 @@ int threeOscParamCount() noexcept { return paramCount + extraCount; }
 
 std::pair<int, int> threeOscParamRange (int index) noexcept { return rangeOf (index); }
 
+namespace threeosc
+{
+// round 190py: FL's ProcessParam ranges of a desktop 3x Osc (the DLL: REC_FromMIDI at 0 and 2^30, read back)
+std::pair<int, int> flRange (int k) noexcept
+{
+    if (k >= 0 && k <= 20)
+    {
+        const int i = k % 7; // per oscillator: pan, shape, coarse, fine, stereo phase, stereo detune, mix (2 / 3); 20 = phase randomness
+        if (k == 20)
+            return { 0, 64 };
+        static const std::pair<int, int> osc[7] { { -64, 64 }, { 0, 6 }, { -24, 24 }, { -100, 100 }, { -64, 64 }, { -50, 50 }, { 0, 128 } };
+        return osc[(std::size_t) i];
+    }
+    if (k >= 24 && k <= 107)
+    {
+        const int e = (k - 23) / 17, i = (k - 23) % 17; // e: the pan, volume, cutoff, resonance, pitch blocks
+        const std::pair<int, int> amount = e == 0 ? std::pair { -64, 64 } : e == 4 ? std::pair { -2400, 2400 } : std::pair { -128, 128 };
+        switch (i)
+        {
+            case 0: return { 0, 0 }; // (unscaled in FL)
+            case 1: return { 0, 1 };
+            case 6: return { 0, 128 };
+            case 8: case 11: return amount;
+            case 12: return { 200, 65536 };
+            case 13: return { 0, 2 };
+            case 14: case 15: case 16: return { -128, 128 };
+            default: return { 100, 65536 }; // 2…5, 7, 9, 10: times
+        }
+    }
+    if (k == 110 || k == 111)
+        return { 0, 256 };
+    if (k == 113)
+        return { 0, 7 };
+    return { 0, 0 };
+}
+bool isFlTarget (int k) noexcept
+{
+    const auto [lo, hi] = flRange (k);
+    return hi > lo;
+}
+bool writeFlParam (std::uint8_t* state, int k, int raw) noexcept
+{
+    if (! isFlTarget (k))
+        return false;
+    const auto [lo, hi] = flRange (k);
+    const auto v = (std::int32_t) std::clamp (raw, lo, hi);
+    std::memcpy (state + (k <= 20 ? 4 + 4 * (std::size_t) k : 0x60 + 4 * (std::size_t) (k - 23)), &v, 4);
+    return true;
+}
+} // namespace threeosc
+
 std::optional<int> threeOscParam (const std::vector<std::uint8_t>& state, int index)
 {
     Params p;
@@ -1111,6 +1163,24 @@ public:
     // round 190fe: a lane of an imported .flm on FLM's parameter k (threeosc::flmParamBase + k, FLM's own value)
     void setParameter (int index, float value) noexcept override
     {
+        // round 190py: FL's own automation of a desktop 3x Osc (the rack binds it from engine revision 4)
+        if (index >= 0 && index < threeosc::flmParamBase)
+        {
+            if (! threeosc::isFlTarget (index) || ! std::isfinite (value))
+                return;
+            take();
+            if (current.mobile)
+                return;
+            const auto [lo, hi] = threeosc::flRange (index);
+            const auto raw = lo + (int) std::lround ((double) std::clamp (value, 0.0f, 1.0f) * (double) (hi - lo));
+            if (deskAuto[(std::size_t) index] == raw)
+                return;
+            deskAuto[(std::size_t) index] = raw;
+            anyDeskAuto = true;
+            threeosc::writeFlParam (work.data(), index, raw);
+            loadWork();
+            return;
+        }
         const auto k = index - threeosc::flmParamBase;
         if (k < 1 || k >= threeosc::flmParamCount || ! threeosc::isFlmTarget (k) || ! std::isfinite (value))
             return;
@@ -1248,6 +1318,14 @@ private:
     {
         work = current.raw;
         autoGain = NAN;
+        if (anyDeskAuto && ! current.mobile) // (round 190py: FL's automated values on top of a new state)
+        {
+            for (int k = 0; k < (int) deskAuto.size(); ++k)
+                if (deskAuto[(std::size_t) k] != noDeskAuto)
+                    threeosc::writeFlParam (work.data(), k, deskAuto[(std::size_t) k]);
+            loadWork();
+            return;
+        }
         if (! anyFlmAuto || ! current.mobile)
             return;
         bool gain = false, state = false;
@@ -1270,6 +1348,10 @@ private:
     float autoGain = NAN;
     bool anyFlmAuto = false;
     // --- end of round 190fe
+    // round 190py: the raw values FL's automation last gave a desktop 3x Osc (noDeskAuto = none)
+    static constexpr int noDeskAuto = std::numeric_limits<int>::min();
+    std::array<int, 114> deskAuto = [] { std::array<int, 114> a; a.fill (noDeskAuto); return a; }();
+    bool anyDeskAuto = false;
 
     static constexpr int blockSize = 512;
     Engine engine;

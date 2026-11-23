@@ -2142,6 +2142,7 @@ void RackState::buildAutomationTables()
             liveAutomations.push_back (a);
 
     channelVolumeAuto.assign (song.channels.size(), -1);
+    channelPitchAuto.assign (song.channels.size(), -1);
     channelPanAuto.assign (song.channels.size(), -1);
     channelAdjustAuto.assign (song.channels.size(), { -1, -1 });
     mixerVolumeAuto.assign (song.mixer.size(), -1);
@@ -2187,6 +2188,12 @@ void RackState::buildAutomationTables()
             case AutomationTargetKind::mixerPan: if (trackOk) mixerPanAuto[(std::size_t) t.index] = a; else used = false; break;
 
             case AutomationTargetKind::channelParam:
+                // round 190py: FL's PITCH knob of any channel (the rack hands it to the instrument as its channel pitch)
+                if (channelOk && t.param == channelPitchParam)
+                {
+                    channelPitchAuto[(std::size_t) t.index] = a;
+                    break;
+                }
                 // VST plugins and the exact engines that take FL's parameter automation (FL Slayer: REA_rodada79)
                 if (channelOk && (song.channels[(std::size_t) t.index].instrument == InstrumentKind::plugin
                                   || song.channels[(std::size_t) t.index].instrument == InstrumentKind::patcher // (its published parameters)
@@ -2224,6 +2231,10 @@ void RackState::buildAutomationTables()
                                   // FL Studio Mobile's 3x Osc: FLM's own values of its parameters (an imported .flm's lanes, round 190fe)
                                   || (threeOscIsFlm (song.channels[(std::size_t) t.index]) && t.param > threeosc::flmParamBase
                                       && threeosc::isFlmTarget (t.param - threeosc::flmParamBase))
+                                  // a desktop 3x Osc: FL's own parameter numbers (round 190py; engine revision 4 on)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::threeosc
+                                      && song.channels[(std::size_t) t.index].engineRev >= 4
+                                      && ! threeOscIsFlm (song.channels[(std::size_t) t.index]) && threeosc::isFlTarget (t.param))
                                   // FL Studio Mobile's GMSynth: its own 75 values P[k] (an imported .flm's lanes, round 190de)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::gms
                                       && song.channels[(std::size_t) t.index].modelParams.size() == 1
@@ -2504,6 +2515,8 @@ void RackState::buildAutomationTables()
                 return -1;
             case AutomationTargetKind::channelParam:
             {
+                if (t.param == channelPitchParam) // (round 190py)
+                    return channelOk ? channelPitchAuto[(std::size_t) t.index] : -1;
                 auto found = -1;
                 for (const auto& p : pluginParams)
                     if (p.channel == t.index && p.param == t.param)
@@ -3163,6 +3176,20 @@ const float* RackRenderer::trackInput (int track, int channel) noexcept
 float* RackRenderer::tapBuffer (int tap, int side) noexcept
 {
     return tapBuffers.data() + ((std::size_t) tap * 2 + (std::size_t) side) * chunkCapacity + (std::size_t) pieceOffset.get();
+}
+
+// the channel's PITCH knob as it plays now (cents, with the root / stretch shift configure() gave the engine): its
+// automation when it has one (round 190py), the knob otherwise
+float RackRenderer::channelKnobCents (const RackState& state, int channel) const noexcept
+{
+    const auto& c = state.song.channels[(std::size_t) channel];
+    if (state.hasAutomation && (std::size_t) channel < state.channelPitchAuto.size() && state.channelPitchAuto[(std::size_t) channel] >= 0)
+    {
+        const auto v = automationValues[(std::size_t) state.channelPitchAuto[(std::size_t) channel]];
+        if (! std::isnan (v))
+            return (channelPitchShift (c) + channelPitchSemitones (c, v)) * 100.0f;
+    }
+    return c.sampler.pitch * 100.0f;
 }
 
 float RackRenderer::automated (int automation, float base) const noexcept
@@ -4154,7 +4181,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
     // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)
-    instrument.setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument.wheelCents());
+    instrument.setChannelPitchNow (channelKnobCents (state, i), c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument.wheelCents());
     if (c.instrument == InstrumentKind::patcher) // its Hardware Insert nodes: this chunk's device buses (round 165c)
         instrument.setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
@@ -5877,7 +5904,7 @@ void RackRenderer::applyLiveControl (const RackState& state, const NoteEvent& e)
         if (const auto& ch = state.song.channels; (std::size_t) e.channel < ch.size())
         {
             const auto& c = ch[(std::size_t) e.channel];
-            instrument->setChannelPitchNow (c.sampler.pitch * 100.0f, c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument->wheelCents());
+            instrument->setChannelPitchNow (channelKnobCents (state, e.channel), c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f) + instrument->wheelCents());
         }
     }
     else if (e.key < 128)
@@ -7260,6 +7287,7 @@ bool RackRenderer::buildLivePlan (const RackState& state) noexcept
         const auto at = (std::size_t) c;
         if ((at < state.channelVolumeAuto.size() && ! readOk (c, state.channelVolumeAuto[at]))
             || (at < state.channelPanAuto.size() && ! readOk (c, state.channelPanAuto[at]))
+            || (at < state.channelPitchAuto.size() && ! readOk (c, state.channelPitchAuto[at]))
             || (at < state.channelAdjustAuto.size() && (! readOk (c, state.channelAdjustAuto[at][0]) || ! readOk (c, state.channelAdjustAuto[at][1]))))
             return lateRead (c);
     }

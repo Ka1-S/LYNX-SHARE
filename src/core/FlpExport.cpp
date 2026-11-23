@@ -228,9 +228,14 @@ std::optional<std::pair<std::string, std::vector<std::uint8_t>>> substituteFor (
 }
 
 // LYNX's 0..1 automation value → FL's raw parameter value for a pattern event / initial value
-std::int32_t rawValue (const AutomationTarget& t, float v)
+std::int32_t rawValue (const AutomationTarget& t, float v, const Song* song = nullptr)
 {
     v = std::clamp (v, 0.0f, 1.0f);
+    // the PITCH knob (round 190py): cents within the channel's ±range
+    if (t.kind == AutomationTargetKind::channelParam && t.param == channelPitchParam)
+        return song != nullptr && t.index >= 0 && t.index < (int) song->channels.size()
+                   ? iround (channelPitchSemitones (song->channels[(std::size_t) t.index], v) * 100.0)
+                   : 0;
     switch (t.kind)
     {
         case AutomationTargetKind::channelVolume:
@@ -1204,6 +1209,11 @@ struct Converter
                 id.raw = ((std::uint32_t) t.index << 16) | (std::uint32_t) (0x10 + t.param);
                 return id;
             case AutomationTargetKind::channelParam:
+                if (t.param == channelPitchParam && t.index >= 0 && t.index < (int) song.channels.size()) // (round 190py: PITCH)
+                {
+                    id.raw = ((std::uint32_t) t.index << 16) | 4u;
+                    return id;
+                }
                 if (t.index < 0 || t.index >= (int) song.channels.size() || song.channels[(std::size_t) t.index].instrument != InstrumentKind::plugin
                     || out.channels[(std::size_t) t.index].pluginName != "Fruity Wrapper")
                     return std::nullopt;
@@ -1360,7 +1370,7 @@ struct Converter
                     continue;
                 }
                 for (const auto& e : lane.events)
-                    p.controlEvents.push_back ({ ticks (e.tick), *id, rawValue (lane.target, map ? map (e.value) : e.value) });
+                    p.controlEvents.push_back ({ ticks (e.tick), *id, rawValue (lane.target, map ? map (e.value) : e.value, &song) });
             }
             out.patterns.push_back (std::move (p));
         }
@@ -1512,7 +1522,7 @@ struct Converter
             report.exact.push_back (std::to_string (automationChannel.size()) + " automation clips (points, curves, links)");
         for (const auto& v : song.initialValues)
             if (const auto id = controlFor (v.target))
-                out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value) });
+                out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value, &song) });
         if (! song.midiLinks.empty())
             report.notes.push_back ("MIDI controller links stay in LYNX (FL keeps them per machine)");
         // round 190om: a note's own pitch / timbre / pressure curves (MPE, an imported module's slides, vibrato and

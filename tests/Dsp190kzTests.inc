@@ -72,7 +72,7 @@ TEST (dsp190kz_new_channels_and_slots_take_the_current_revisions)
     // since natives190kj and now for effect slots: a project saved before plays the old revisions)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::audioClip;
-    CHECK (c.engineRev == 3); // (round 190om: revision 2, SimSynth's velocity law; round 190pr: 3, Harmor's automation)
+    CHECK (c.engineRev == 4); // (round 190om: revision 2, SimSynth's velocity law; round 190pr: 3, Harmor's automation; round 190py: 4, 3x Osc's)
     CHECK (lynx::makeEffectSlot (lynx::EffectKind::maximus).engineRev == 2); // (round 190ok: revision 2, FastMath)
     lynx::EffectSlot a = lynx::makeEffectSlot (lynx::EffectKind::maximus), b = a;
     b.engineRev = 0;

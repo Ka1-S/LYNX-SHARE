@@ -1044,7 +1044,8 @@ translate = fresh-air
 # Disperser plays on Facet EQ's hidden all-pass cascade (its structure read statically). Round 190nb: Ring Mod, Reverser,
 # Resonator, Phase Distortion and Shaper play Kilohearts laws hidden in Effector (below). Round 190nh: Comb Filter, Chorus,
 # Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter and Ensemble too (their DSP read in HeartCore 2.4,
-# REA_rodada190nh); a slot saved with the earlier stand-in keeps it.
+# REA_rodada190nh); a slot saved with the earlier stand-in keeps it. Round 190py: Flanger and Dual Delay too (FlangerDsp,
+# DualdelayDsp; REA_rodada190py-khs).
 [kilohearts-disperser]
 product = Disperser
 vendor = Kilohearts
@@ -1223,7 +1224,7 @@ translate = kilohearts
 [khs-flanger]
 product = kHs Flanger
 vendor = Kilohearts
-lynx = Fruity Flanger
+lynx = Effector
 names = kHs Flanger
 translate = kilohearts
 
@@ -1244,7 +1245,7 @@ translate = kilohearts
 [khs-dual-delay]
 product = kHs Dual Delay
 vendor = Kilohearts
-lynx = Echoform
+lynx = Effector
 names = kHs Dual Delay
 translate = kilohearts
 

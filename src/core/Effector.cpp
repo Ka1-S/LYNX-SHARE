@@ -237,7 +237,8 @@ private:
 class Effector final : public Effect
 {
 public:
-    explicit Effector (bool kiloheartsLaw = false, int kiloheartsLatency = 0) : khsBuffers (kiloheartsLaw), khsLatency (kiloheartsLatency)
+    explicit Effector (bool kiloheartsLaw = false, int kiloheartsLatency = 0, int kiloheartsLawCode = 0)
+        : khsBuffers (kiloheartsLaw), khsLatency (kiloheartsLatency), khsCreated (khsdsp::lawOf ((float) kiloheartsLawCode / 64.0f))
     {
         delayLine[0].assign ((std::size_t) (1.5 * maxRate) + 8, 0.0f);
         delayLine[1].assign (delayLine[0].size(), 0.0f);
@@ -251,7 +252,7 @@ public:
     {
         fs = std::min (sr, maxRate);
         rev.prepare (fs);
-        khs.prepare (fs, khsBuffers); // round 190nb: the Kilohearts laws' buffers, only for a slot created with one
+        khs.prepare (fs, khsBuffers, khsCreated); // round 190nb: the Kilohearts laws' buffers, only for a slot created with one
         reset();
     }
 
@@ -748,6 +749,7 @@ private:
     EffectorReverb rev;
     bool khsBuffers = false;
     int khsLatency = 0;
+    khsdsp::Law khsCreated = khsdsp::Law::none; // round 190py: the law the slot was created with
     khsdsp::Engine khs;
 };
 } // namespace
@@ -793,8 +795,8 @@ std::string formatParam (int param, float v, double bpm)
     }
 }
 
-std::unique_ptr<Effect> make (bool kiloheartsLaw, int kiloheartsLatency)
+std::unique_ptr<Effect> make (bool kiloheartsLaw, int kiloheartsLatency, int kiloheartsLawCode)
 {
-    return std::make_unique<Effector> (kiloheartsLaw, kiloheartsLatency);
+    return std::make_unique<Effector> (kiloheartsLaw, kiloheartsLatency, kiloheartsLawCode);
 }
 } // namespace lynx::effector

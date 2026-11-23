@@ -17928,6 +17928,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190nbKhsTests.inc" // round 190nb: Kilohearts laws on Effector (Ring Mod, Reverser, Resonator, Phase Distortion, Shaper) + measured maps
 #include "Parity190nhKhsTests.inc" // round 190nh: Kilohearts part 2 (Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter, Ensemble)
 #include "Parity190ocKhsTests.inc" // round 190oc: Kilohearts Nonlinear Filter
+#include "Parity190pyKhsTests.inc" // round 190py: Kilohearts Flanger and Dual Delay on Effector
 #include "Parity190kwR2Tests.inc" // round 190kw: Pro-R 2 → LuxeVerb Space, the Space engine's revision 1 (recovered laws)
 #include "Parity190lpR2Tests.inc" // round 190lp: Pro-R 2 → LuxeVerb Space revision 1, the reference's fixed early taps (after Parity190kwR2: its helpers)
 #include "Parity190mgC4Tests.inc" // round 190mg: Prism's hidden C4 law (REA of the Waves C4), C4 on it
@@ -18095,6 +18096,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlParity190piTests.inc" // round 190pi: Sytrus slide velocity, arpeggio glides, chord slides, Ogun link velocity, FL 11 parameters
 #include "FlParity190prTests.inc" // round 190pr: Harmor automation, FL song-start values of Harmor / Sytrus / FL effects
 #include "PatcherXyz190ptTests.inc" // round 190pt: Patcher Control Surface / X-Y-Z links, Vocodex controls under automation
+#include "Parity190pyTests.inc" // round 190py: channel PITCH automation, Gross Beat automation, Love Philter / Harmless scales, 3x Osc automation
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Perf190pxTests.inc" // round 190px: AVX half-band, kept minimum-phase poles, Ogg samples without spare room, render-ahead paced
 #include "NativePerf190pzTests.inc" // round 190pz: recording path (no yield while takes record, durable sync every 5 s, two-piece copies)

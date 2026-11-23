@@ -30,6 +30,7 @@
 #include "core/HardcoreFx.h"
 #include "core/GrossBeat.h"
 #include "core/LovePhilter.h"
+#include "core/ModelParamsSynths.h" // (round 190py: Harmless's raw ranges)
 #include "core/DrumSynthLive.h"
 #include "core/KeyRegions.h"
 #include "core/Gms.h"
@@ -307,6 +308,8 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
             return std::pair { 0, 12800 };
         // Levels adjustment (round 190dz, TPluginForm OfsLevelsPanel): pan offset ±6400, volume multiplier 0..25600,
         // Mod X / Y offsets ±256
+        if (p == 2 || p == 3) // Mod X / Y (round 190py: a desktop 3x Osc's 110 / 111)
+            return std::pair { 0, 256 };
         if (p == 0x10)
             return std::pair { -6400, 6400 };
         if (p == 0x11)
@@ -397,6 +400,34 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
             if (plugin == r.plugin && k < (int) r.ranges.size())
                 return r.ranges[(std::size_t) k];
     }
+    // Round 190py: Love Philter's raw ranges are the exact engine's own (core/LovePhilter.h, REA_rodada16 §2.4: the global
+    // controls and the 12 automatable fields of each of its 8 units); its DLL does not run in the parameter harness
+    // ... a desktop 3x Osc's (core/ThreeOsc.h, threeosc::flRange)
+    if (plugin == "3x Osc" && id.isChannel() && threeosc::isFlTarget (k))
+        return threeosc::flRange (k);
+    // ... Gross Beat's 9 (the DLL's ProcessParam, REA_rodada190py: 0…35 ×2, 0…256 ×2, 0…10000 ×2, −256…256, 0…1, 0…65536)
+    if (plugin == "Gross Beat" && id.isMixer() && k >= 0 && k < grossbeat::paramCount)
+    {
+        const auto lo = grossbeat::rawFromParam (k, k == grossbeat::scratchParam ? 1.0f : 0.0f);
+        const auto hi = grossbeat::rawFromParam (k, k == grossbeat::scratchParam ? 0.0f : 1.0f);
+        return std::pair { lo, hi };
+    }
+    if (plugin == "Fruity Love Philter" && id.isMixer() && k >= 0 && k < 8 + 44 * 8 && (k < 8 || (k - 8) % 44 < 12))
+    {
+        int lo = 0, hi = 0;
+        philter::rawRange (k, lo, hi);
+        if (hi > lo)
+            return std::pair { lo, hi };
+    }
+    // ... and Harmless' 100 parameters: the engine's knob table holds FL's raw integers, checked against the DLL's
+    // ProcessParam (REC_FromMIDI 0 / 2^30, REA_rodada190py: 99 of 100 equal; 72 "Phaser scale" is 0…2 in the DLL)
+    if (plugin == "Harmless" && id.isChannel() && k >= 0 && k < 100)
+    {
+        if (k == 72)
+            return std::pair { 0, 2 };
+        if (const auto* e = findEngineParam (harmlessEngineParams(), k); e != nullptr && e->high > e->low)
+            return std::pair { (int) std::lround (e->low), (int) std::lround (e->high) };
+    }
     if (plugin == "Sytrus" && id.isChannel() && sytrus::automatable (k)) // (round 190pr: the main page round 190pi automates)
     {
         static constexpr int low[3] { 0, -128, -24 }, high[3] { 160, 128, 24 };
@@ -429,6 +460,11 @@ AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int
             t.kind = AutomationTargetKind::channelVolume;
         else if (p == 1)
             t.kind = AutomationTargetKind::channelPan;
+        else if (p == 4) // the PITCH knob (round 190py; it had no target, its clips played nothing)
+        {
+            t.kind = AutomationTargetKind::channelParam;
+            t.param = channelPitchParam;
+        }
         else if (p >= 0x10 && p <= 0x14 && leveladjust::valid (p - 0x10)) // Levels adjustment (round 190dz)
         {
             t.kind = AutomationTargetKind::channelAdjust;
@@ -3803,9 +3839,21 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     auto resolveTarget = [&] (flp::ControlId id, std::function<float (float)>& valueMap) {
         auto target = automationTargetFor (id, channelMap, (int) song.mixer.size());
 
+        // round 190py: FL's channel Mod X / Y (channel parameters 2 / 3) on a desktop 3x Osc are its parameters 110 / 111
+        // (the channel's filter cut / res it keeps in its state, core/ThreeOsc.h)
+        if (id.isChannel() && (id.param() == 2 || id.param() == 3))
+            if (const auto ch = channelMap.find (id.channel()); ch != channelMap.end() && ch->second >= 0
+                && ch->second < (int) song.channels.size() && song.channels[(std::size_t) ch->second].instrument == InstrumentKind::threeosc
+                && ! threeOscIsFlm (song.channels[(std::size_t) ch->second]))
+            {
+                target.kind = AutomationTargetKind::channelParam;
+                target.index = ch->second;
+                target.param = id.param() == 2 ? 110 : 111;
+            }
+
         // FL Soundfont Player → LYNX Soundfont: FL's P index and scale → LYNX's parameter (REA_rodada158 §1)
-        if (target.kind == AutomationTargetKind::channelParam && target.index >= 0 && target.index < (int) song.channels.size()
-            && song.channels[(std::size_t) target.index].instrument == InstrumentKind::soundfont)
+        if (target.kind == AutomationTargetKind::channelParam && target.param != channelPitchParam && target.index >= 0
+            && target.index < (int) song.channels.size() && song.channels[(std::size_t) target.index].instrument == InstrumentKind::soundfont)
         {
             const auto flIndex = target.param;
             if (const auto mapped = sf::automationFromFl (flIndex, 0.0f))
@@ -3819,7 +3867,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         // round 165: FL's Dashboard parameter p ≥ 1 = record p − 1 = LYNX's control p − 1 (its output); 0 is the patch
         // selector (not a LYNX target). The Voltage Controller's 0…15 (offsets, scales) are LYNX's own numbers.
-        if (target.kind == AutomationTargetKind::channelParam && target.index >= 0 && target.index < (int) song.channels.size())
+        if (target.kind == AutomationTargetKind::channelParam && target.param != channelPitchParam && target.index >= 0
+            && target.index < (int) song.channels.size())
         {
             const auto& channel = song.channels[(std::size_t) target.index];
             if (channel.instrument == InstrumentKind::dashboard)
@@ -3882,6 +3931,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     // the exact Reeverbs keep FL's controls as (raw − min) / range: FL's normalised value as is
                     if (target.param < 0 || target.param >= (fx.kind == EffectKind::reeverb2 ? 15 : reeverb1ParamCount))
                         target.kind = AutomationTargetKind::none;
+                }
+                else if (target.kind == AutomationTargetKind::effectParam && fx.kind == EffectKind::grossBeat)
+                {
+                    // round 190py: the exact Gross Beat keeps FL's 9 parameters as (raw − min) / range (the scratch dial's
+                    // offset turned round, grossbeat::paramFromRaw); FL's normalised value is that, its clips had no target
+                    if (target.param < 0 || target.param >= grossbeat::paramCount)
+                        target.kind = AutomationTargetKind::none;
+                    else if (target.param == grossbeat::scratchParam)
+                        valueMap = [] (float v) { return 1.0f - v; };
                 }
                 else if (target.kind == AutomationTargetKind::effectParam && fx.kind == EffectKind::patcher)
                 {
@@ -3950,7 +4008,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 note ("target not reproduced" + (plugin.empty() ? std::string() : " (" + plugin + ")"));
                 return {};
             }
-            const auto range = flRawRange (id, plugin);
+            auto range = flRawRange (id, plugin);
+            // the PITCH knob (round 190py): FL's cents −4800 … 4800 (held within the channel's ±range when played)
+            if (target.kind == AutomationTargetKind::channelParam && target.param == channelPitchParam)
+                range = std::pair { -4800, 4800 };
             if (! range || range->second <= range->first)
             {
                 note ("value scale not known (" + (plugin.empty() ? std::string ("FL parameter") : plugin) + ")");

@@ -11,7 +11,8 @@
 // keeps law 0 = FL's Effector, bit for bit):
 //   [12] law: code / 64 — 8 Ring Mod, 16 Reverser, 24 Resonator, 32 Phase Distortion, 40 Shaper (round 190nb's k / 8,
 //        the same floats), round 190nh: 41 Comb Filter, 42 Chorus, 43 Trance Gate, 44 Distortion, 45 Bitcrush,
-//        46 Frequency Shifter, 47 Phaser, 48 Ensemble, 49 Nonlinear Filter; 0 = none
+//        46 Frequency Shifter, 47 Phaser, 48 Ensemble, 49 Nonlinear Filter; round 190py: 50 Flanger, 51 Dual Delay,
+//        52 Ensemble with the plug-in's own voice motions (48 stays for slots saved with it); 0 = none
 //   [13 …] the law's values (encodings below); the mix is Effector's own Wet knob [2]
 //   Shaper: [17] point count / 16, [18 + 2 k] x, [19 + 2 k] y as (v + 1) / 2, k < 12
 //   Trance Gate: [24 + k] step k as (on + 2 tie) / 3, k < 64
@@ -25,7 +26,8 @@
 namespace lynx::khsdsp
 {
 enum class Law { none = 0, ringMod, reverser, resonator, phaseDistortion, shaper,
-                 comb, chorus, tranceGate, distortion, bitcrush, freqShift, phaser, ensemble, nonlinearFilter };
+                 comb, chorus, tranceGate, distortion, bitcrush, freqShift, phaser, ensemble, nonlinearFilter,
+                 flanger, dualDelay, ensemble2 }; // round 190py: codes 50, 51, 52 (ensemble2: the plug-in's own voice motions)
 constexpr int lawParam = 12;
 constexpr int valueParam = 13; // + k
 constexpr int shaperCountParam = 17, shaperPointParam = 18, maxShaperPoints = 12;
@@ -43,11 +45,12 @@ inline Law lawOf (float v) noexcept
     const int c = (int) std::lround (v * 64.0f);
     if (c >= 8 && c <= 40 && c % 8 == 0)
         return (Law) (c / 8);
-    return c >= 41 && c <= 49 ? (Law) (6 + c - 41) : Law::none;
+    return c >= 41 && c <= 52 ? (Law) (6 + c - 41) : Law::none;
 }
 inline float lawValue (Law l) noexcept { return (float) lawCode (l) / 64.0f; }
-// the latency a law reports (the comb filter's 16-tap sinc read is centred 7 samples late, dry and wet alike)
-inline int lawLatency (Law l) noexcept { return l == Law::comb ? 7 : 0; }
+// the latency a law reports (the comb filter's 16-tap sinc read is centred 7 samples late, dry and wet alike; round
+// 190py: the Flanger's dry and wet come 16 samples late, the centre of its 2× up-sampler's 32 taps)
+inline int lawLatency (Law l) noexcept { return l == Law::comb ? 7 : l == Law::flanger ? 16 : 0; }
 
 constexpr double pi = 3.141592653589793, twoPi = 6.283185307179586;
 
@@ -92,11 +95,18 @@ constexpr double driveLo = 0.25, driveHi = 16.0;
 // [18] quantize; the mix is Wet
 constexpr double crushLo = 100.0, crushHi = 50000.0;
 // Frequency Shifter: [13] shift (v − ½) · 10 kHz (±5 kHz)
-// Ensemble: [13] voices / 16, [14] detune, [15] spread, [16] motion / 2 (random, symmetric, sine); the mix is Wet
+// Ensemble (laws 48 and 52): [13] voices / 16, [14] detune, [15] spread, [16] motion / 2 (random, symmetric, sine); the mix is Wet
 // round 190oc — Nonlinear Filter: [13] type / 4 (low, band, high pass, notch, all-pass), [14] mode / 8 (clean, saturated,
 // tubular, clipped, warm, biased, fuzzy, metallic, digital: the plug-in's order), [15] cutoff logv 20 … 20 480 Hz,
 // [16] Q logv 0.5 … 24, [17] drive; the mix is Wet
 constexpr double nlfCutLo = 20.0, nlfCutHi = 20480.0, nlfQLo = 0.5, nlfQHi = 24.0;
+// round 190py — Flanger: [13] delay × 64 s, [14] depth × 64 s (powers of two: the snapin's floats come back exactly),
+// [15] rate / 32 Hz, [16] offset (v + 1) / 2, [17] motion (v + 10) / 20 Hz, [18] feedback (v + 1) / 2, [19] spread,
+// [20] barber-pole (1); the mix is Wet
+constexpr float flSeconds = 64.0f, flRateHz = 32.0f;
+// Dual Delay: [13] time / 16 s, [14] ratio / 4, [15] steps / 64, [16] denominator index / 6 (4, 4t, 8, 8t, 16, 16t, 32),
+// [17] sync (1), [18] feedback, [19] cross-talk, [20] spread, [21] tone (v + 1) / 2, [22] duck; the mix is Wet
+constexpr float ddSeconds = 16.0f, ddRatio = 4.0f;
 inline double gateStepsPerBeat (float v) noexcept
 {
     static constexpr double steps[7] { 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0 };
@@ -138,8 +148,9 @@ struct Ring
 class Engine
 {
 public:
-    // buffers (Reverser, Resonator) are allocated only for a slot that holds a Kilohearts law when it is created
-    void prepare (double sampleRate, bool allocate)
+    // buffers (Reverser, Resonator) are allocated only for a slot that holds a Kilohearts law when it is created; round
+    // 190py: the Dual Delay's second pair of lines only for a slot created with that law
+    void prepare (double sampleRate, bool allocate, Law createdWith = Law::none)
     {
         fs = sampleRate;
         if (allocate)
@@ -150,6 +161,9 @@ public:
                 c.allocate ((std::size_t) (fs / 8.0) + 16);
             for (auto& c : line) // round 190nh: comb (1 / 10 Hz), chorus (0.1 + 0.1 s) and ensemble (31 ms) lines
                 c.allocate ((std::size_t) (0.25 * fs) + 64);
+            if (createdWith == Law::dualDelay) // round 190py: the second time's lines (time × ratio, up to 2.56 s × 2)
+                for (auto& c : ddLine2)
+                    c.allocate ((std::size_t) (5.2 * fs) + 16);
         }
         reset();
     }
@@ -205,11 +219,21 @@ public:
         for (auto& v : ensAp)
             v = {};
         nlfReset();
+        flReset();
+        ddReset();
+        ens2Reset();
     }
     void setSongBeats (double b) noexcept { songBeats = b; songKnown = true; }
     // round 190oc: LYNX's own half-band (the Nonlinear Filter's 2× resampler): its all-pass coefficients, A0's at the even
     // places, A1's at the odd ones (tests, docs)
     static std::vector<double> nonlinearHalfBand() { const auto& a = nlfHalfBand().a; return { a.begin(), a.end() }; }
+    // round 190py: one of the Ensemble law's voice curves (motion 0 random / 1 symmetric / 2 sine, voice 0 … 15, curve 0
+    // delay / 1 cutoff), its 1024 points (tests, docs)
+    static std::vector<float> ensembleCurve (int motion, int voice, int curve)
+    {
+        const float* t = ensCurves().data() + ((std::size_t) (std::clamp (motion, 0, 2) * 16 + std::clamp (voice, 0, 15)) * 2 + (std::size_t) std::clamp (curve, 0, 1)) * ensStride;
+        return { t, t + ensPoints };
+    }
     // round 190nh: the Trance Gate follows a song position only when it moves (a stopped transport: free running)
 
     void process (Law law, float* l, float* r, int n, const float* p, float mix, double bpm) noexcept
@@ -230,6 +254,9 @@ public:
             case Law::freqShift: freqShift (l, r, n, p, mix); break;
             case Law::ensemble: ensemble (l, r, n, p, mix); break;
             case Law::nonlinearFilter: nonlinearFilter (l, r, n, p, mix); break;
+            case Law::flanger: flanger (l, r, n, p, mix); break;
+            case Law::dualDelay: dualDelay (l, r, n, p, mix, bpm); break;
+            case Law::ensemble2: ensemble2 (l, r, n, p, mix); break;
             default: break;
         }
     }
@@ -1363,6 +1390,650 @@ private:
             l[i] = (float) ((1.0 - mix) * line[0].back (b) + sl);
             r[i] = (float) ((1.0 - mix) * line[1].back (b) + sr);
         }
+    }
+    // ==== round 190py =============================================================================================
+    // FlangerDsp and DualdelayDsp read statically in HeartCore 2.4 (docs/analise/REA_rodada190py-khs.md) and fitted on
+    // round 190nb's references; LYNX's own code restating the laws as formulas (the up-sampler's taps are LYNX's own).
+
+    // HeartCore's parameter ramp: the first block after a reset (or a sleeping block) takes the setting at once; later a
+    // change moves linearly across the block from the last setting, and a change under 1e-15 holds
+    struct Ramp
+    {
+        float start = 0.0f, target = 0.0f, value = 0.0f, inc = 0.0f, t = 0.0f;
+        bool fresh = true;
+        void set (float v, int steps) noexcept
+        {
+            t = 0.0f;
+            if (fresh)
+            {
+                start = target = value = v;
+                inc = 0.0f;
+                fresh = false;
+            }
+            else if ((double) std::abs (v - target) < 1e-15)
+            {
+                start = target = value = v;
+                inc = 0.0f;
+            }
+            else
+            {
+                start = value = target;
+                target = v;
+                inc = 1.0f / (float) steps;
+            }
+        }
+        void snap (float v) noexcept { start = target = value = v, inc = 0.0f, t = 0.0f, fresh = false; }
+        float step() noexcept
+        {
+            t += 1.0f;
+            value = (target - start) * t * inc + start;
+            return value;
+        }
+    };
+    // a delay line as the snapins keep it: read before the write, the read clamped to what has been written (from 3)
+    struct Line
+    {
+        Ring* ring = nullptr;
+        std::uint32_t fill = 3;
+        void clear() noexcept
+        {
+            if (ring != nullptr && ring->ready())
+                ring->clear();
+            fill = 3;
+        }
+        void push (float v) noexcept
+        {
+            ring->push (v);
+            fill = std::min (fill + 1, ring->mask + 1);
+        }
+        float at (std::uint32_t d) const noexcept { return ring->back (std::min (d, fill)); } // d + 1 samples late
+        // the Catmull-Rom read at `d` samples (taps from ⌊d⌋ + 2 back, t = 1 − frac d)
+        float catmull (float d) const noexcept
+        {
+            const auto i0 = (std::uint32_t) (int) d;
+            const std::uint32_t i = std::min (i0 + 2u, fill);
+            const float t = (1.0f - d) + (float) (int) d, t2 = t * t;
+            const float p0 = ring->back (i), p1 = ring->back (i - 1), p2 = ring->back (i - 2), p3 = ring->back (i - 3);
+            return ((-0.5f * t + 0.0f) + (-0.5f * t + 1.0f) * t2) * p0 + ((0.0f * t + 1.0f) + (1.5f * t - 2.5f) * t2) * p1
+                   + ((0.5f * t + 0.0f) + (-1.5f * t + 2.0f) * t2) * p2 + ((0.0f * t + 0.0f) + (0.5f * t - 0.5f) * t2) * p3;
+        }
+    };
+
+    // ---- Flanger -----------------------------------------------------------------------------------------------
+    // [STATIC] FlangerDsp: the input up 2× (even samples: the input 16 samples late; odd ones: a 32-tap interpolator),
+    // at 2 fs per channel: d = (delay − 1.5 / fs + depth · (½ sin 2π (φ ∓ spread / 4) + ½)) · 2 fs, the line read by
+    // Catmull-Rom (wet) and written with x + feedback · wet; only the even 2× samples are kept (no down-sampling filter):
+    // out = cos (mix π/4) · x + sin (mix π/4) · wet. φ (in turns, double) += rate / 2 fs a 2× sample, wrapped a block.
+    // Barber-pole: an analytic pair (I, Q) of the 2× input feeds two lines per channel (A, B, read at d); with
+    // ψ = 2π (θ − (offset ∓ spread / 4) / 2) (left −, right +), θ += −motion / 4 fs a 2× sample (wrapped a block):
+    // w = cos ψ · A − sin ψ · B, A ← I + fb · w, B ← Q + fb · (cos ψ · B + sin ψ · A), out = dry · (sin ψ · Q + cos ψ · I) +
+    // wet · w. The plug-in's 90° pair is its own design: LYNX uses its own (round 190nb's minimax pair), so the barber-pole
+    // matches in kind, not sample for sample. Asleep (HeartCore's tail: 10 ms), φ and θ advance by the block at once.
+    // The interpolator: LYNX's own windowed sinc at the odd half-sample positions (a Kaiser window over the 32 taps,
+    // β = 5.5, chosen black-box on the references: lab/sweepfl.sh, REA_rodada190py-khs §3), unity at DC.
+    static constexpr double flUpBeta = 5.5;
+    static const std::array<float, 32>& flUpTaps() noexcept
+    {
+        static const std::array<float, 32> taps = [] {
+            auto i0 = [] (double x) { double s = 1.0, t = 1.0; for (int k = 1; k < 40; ++k) { t *= (x / (2.0 * k)) * (x / (2.0 * k)); s += t; } return s; };
+            std::array<double, 32> h {};
+            double sum = 0.0;
+            for (int k = 0; k < 32; ++k)
+            {
+                const double u = k - 15.5, r = u / 16.0;
+                h[(std::size_t) k] = std::sin (pi * u) / (pi * u) * i0 (flUpBeta * std::sqrt (std::max (0.0, 1.0 - r * r))) / i0 (flUpBeta);
+                sum += h[(std::size_t) k];
+            }
+            std::array<float, 32> f {};
+            for (int k = 0; k < 32; ++k)
+                f[(std::size_t) k] = (float) (h[(std::size_t) k] / sum);
+            return f;
+        }();
+        return taps;
+    }
+    struct FlUp
+    {
+        std::array<float, 32> x {}; // x[k]: the input k samples back
+    };
+    std::array<FlUp, 2> flUp {};
+    std::array<Line, 4> flLines {}; // A left / right (line[0, 1]), B left / right (res[0, 1]: barber-pole)
+    std::array<Hilbert, 2> flHil {};
+    Ramp flDelay, flDepth, flFeedback, flOffset, flDry, flWet;
+    std::array<float, 2> flSpreadOld {}, flSpreadNew {};
+    float flSpreadT = 0.0f, flSpreadInc = 0.0f;
+    bool flSpreadFresh = true, flBarber = false;
+    double flPhase = 0.0, flScroll = 0.0;
+    void flReset() noexcept
+    {
+        flLines[0].ring = &line[0], flLines[1].ring = &line[1], flLines[2].ring = &res[0], flLines[3].ring = &res[1];
+        for (auto& ln : flLines)
+            ln.fill = 3;
+        flUp = {};
+        flHil = {};
+        for (auto* r : { &flDelay, &flDepth, &flFeedback, &flOffset, &flDry, &flWet })
+            *r = {};
+        flSpreadOld = flSpreadNew = {};
+        flSpreadT = flSpreadInc = 0.0f;
+        flSpreadFresh = true;
+        flBarber = false;
+        flPhase = flScroll = 0.0;
+    }
+    void flanger (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        if (! line[0].ready() || ! res[0].ready())
+            return;
+        const float sr = (float) fs, sr2 = sr + sr;
+        const float delay = (float) std::clamp ((double) p[valueParam], 0.0, 1.0) / enc::flSeconds;
+        const float depth = (float) std::clamp ((double) p[valueParam + 1], 0.0, 1.0) / enc::flSeconds;
+        const float rate = (float) std::clamp ((double) p[valueParam + 2], 0.0, 1.0) * enc::flRateHz;
+        const float offset = (float) (2.0 * std::clamp ((double) p[valueParam + 3], 0.0, 1.0) - 1.0);
+        const float scroll = (float) (20.0 * std::clamp ((double) p[valueParam + 4], 0.0, 1.0) - 10.0);
+        const float fb = (float) (2.0 * std::clamp ((double) p[valueParam + 5], 0.0, 1.0) - 1.0);
+        const float spread = (float) std::clamp ((double) p[valueParam + 6], 0.0, 1.0);
+        const bool barber = p[valueParam + 7] >= 0.5f;
+        const float a = mix * 0.7853981852531433f, dryV = std::cos (a), wetV = std::sin (a);
+        const std::array<float, 2> sv { spread * -0.25f, spread * 0.25f };
+        auto clearLines = [&] { for (auto& ln : flLines) ln.clear(); };
+        // [MEASURED as round 190nh's sleep] asleep (HeartCore's tail: 10 ms), the LFOs advance by the block at once
+        if (sleeping (l, r, n, std::ceil (0.01 * fs + 0.01) - 61.0))
+        {
+            flOffset.snap (-offset), flDelay.snap (delay), flDepth.snap (depth), flFeedback.snap (fb), flDry.snap (dryV), flWet.snap (wetV);
+            flSpreadOld = flSpreadNew = sv, flSpreadT = flSpreadInc = 0.0f, flSpreadFresh = false;
+            const double dS = barber ? (double) -scroll / (double) sr2 : 0.0;
+            if (barber != flBarber)
+                clearLines();
+            flBarber = barber;
+            flPhase += (double) n * (double) rate / (double) sr;
+            flScroll = barber ? dS * (double) n + flScroll : 0.0;
+            flScroll -= std::floor (flScroll);
+            flPhase -= std::floor (flPhase);
+            return;
+        }
+        flOffset.set (-offset, 2 * n), flDelay.set (delay, 2 * n), flDepth.set (depth, 2 * n), flFeedback.set (fb, 2 * n);
+        if (flSpreadFresh)
+            flSpreadOld = flSpreadNew = sv, flSpreadInc = 0.0f, flSpreadFresh = false;
+        else
+            flSpreadOld = flSpreadNew, flSpreadNew = sv, flSpreadInc = 1.0f / (float) (2 * n);
+        flSpreadT = 0.0f;
+        flDry.set (dryV, n), flWet.set (wetV, n);
+        const double dS = barber ? (double) scroll / (double) (-4.0f * sr) : 0.0;
+        if (! barber)
+            flScroll = 0.0;
+        if (barber != flBarber)
+            clearLines();
+        flBarber = barber;
+        const double dRate = (double) rate / (double) sr2;
+        const float lead = 1.5f / sr;
+        const auto& taps = flUpTaps();
+        float* io[2] { l, r };
+        for (int i = 0; i < n; ++i)
+        {
+            const float dry = flDry.step(), wet = flWet.step();
+            float sub[2][2]; // [2× sample][channel]
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& h = flUp[(std::size_t) c].x;
+                for (int k = 31; k > 0; --k)
+                    h[(std::size_t) k] = h[(std::size_t) k - 1];
+                h[0] = io[c][i];
+                float odd = 0.0f;
+                for (int k = 0; k < 32; ++k)
+                    odd += taps[(std::size_t) k] * h[(std::size_t) k];
+                sub[0][c] = h[16];
+                sub[1][c] = odd;
+            }
+            for (int s = 0; s < 2; ++s)
+            {
+                const float dep = flDepth.step(), fbv = flFeedback.step(), del = flDelay.step(), off = flOffset.step();
+                flSpreadT += 1.0f;
+                const float f = flSpreadT * flSpreadInc, g = 1.0f - f;
+                const float vec[2] { f * flSpreadNew[0] + g * flSpreadOld[0], f * flSpreadNew[1] + g * flSpreadOld[1] };
+                flPhase += dRate;
+                const auto ph = (float) flPhase;
+                float d[2];
+                for (int c = 0; c < 2; ++c)
+                    d[c] = ((del - lead) + dep * (std::sin ((ph + vec[c]) * twoPiF) * 0.5f + 0.5f)) * sr2;
+                if (! barber)
+                {
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        auto& ln = flLines[(std::size_t) c];
+                        const float w = ln.catmull (d[c]);
+                        ln.push (fbv * w + sub[s][c]);
+                        if (s == 0)
+                            io[c][i] = dry * sub[0][c] + wet * w;
+                    }
+                    continue;
+                }
+                flScroll += dS;
+                const auto th = (float) flScroll;
+                for (int c = 0; c < 2; ++c)
+                {
+                    double re, im;
+                    analytic (flHil[(std::size_t) c], (double) sub[s][c], re, im);
+                    const auto in = (float) re, q = (float) im;
+                    const float psi = (th + (off - vec[c]) * 0.5f) * twoPiF, sn = std::sin (psi), cs = std::cos (psi);
+                    auto& A = flLines[(std::size_t) c];
+                    auto& B = flLines[(std::size_t) c + 2];
+                    const float ra = A.catmull (d[c]), rb = B.catmull (d[c]);
+                    const float w = cs * ra - sn * rb;
+                    A.push (w * fbv + in);
+                    B.push ((rb * cs + ra * sn) * fbv + q);
+                    if (s == 0)
+                        io[c][i] = dry * (sn * q + cs * in) + wet * w;
+                }
+            }
+        }
+        flScroll -= std::floor (flScroll);
+        flPhase -= std::floor (flPhase);
+    }
+
+    // ---- Dual Delay --------------------------------------------------------------------------------------------
+    // [STATIC] DualdelayDsp: two stereo lines at T1 = [time · fs] and T2 = [ratio · time · fs] samples (synced: steps ×
+    // the note at the tempo), each read one sample after its time; a time change crossfades the reads over 50 ms
+    // (smoothstep). Feedback with cross-talk as a rotation: u1 = x + fb c · a1 − fb s · a2, u2 = x + fb s · a1 + fb c · a2
+    // (c, s = cos, sin of cross-talk · π/4), each through a tone shelf (a state-variable filter at min (800 Hz, 0.4999 fs),
+    // Q ½: tone ≥ 0 scales its low pass, below 0 its high pass, by 10^(−48 dB · T · |tone| / 20), T the mean time in
+    // seconds: 48 dB a second of echo; the band pass × (0.586 g + 1.414)) into its line. Out: wet_L = √2 (sin β · a1_L +
+    // cos β · a2_L), wet_R = √2 (cos β · a1_R + sin β · a2_R), β = π/4 (1 + spread) (the block's spread takes effect a
+    // block later); ducking: an RMS follower e (e += k (p / e − e), p = the input's mean square, from 0.005) and
+    // gain = clamp (1 − 10 duck² · e, 0, 1); out = (1 − mix) · x + mix · gain · wet.
+    std::array<Ring, 2> ddLine2;
+    std::array<Line, 4> ddLines {}; // line 1 left / right (rev[0, 1]), line 2 left / right (ddLine2)
+    int ddT[2] { -1, -1 }, ddPrev[2] { -1, -1 }, ddXfLeft = 0;
+    Ramp ddFb, ddCt, ddDry, ddWet, ddDuck;
+    std::array<float, 2> ddSpread {};
+    bool ddSpreadFresh = true;
+    float ddEnv = 0.005f;
+    double ddS1[2][2] {}, ddS2[2][2] {}; // the tone filters' states [line][channel]
+    void ddReset() noexcept
+    {
+        ddLines[0].ring = &rev[0], ddLines[1].ring = &rev[1], ddLines[2].ring = &ddLine2[0], ddLines[3].ring = &ddLine2[1];
+        for (auto& ln : ddLines)
+            ln.clear();
+        ddT[0] = ddT[1] = ddPrev[0] = ddPrev[1] = -1;
+        ddXfLeft = 0;
+        for (auto* r : { &ddFb, &ddCt, &ddDry, &ddWet, &ddDuck })
+            *r = {};
+        ddSpread = {};
+        ddSpreadFresh = true;
+        ddEnv = 0.005f;
+        for (auto& a : ddS1)
+            a[0] = a[1] = 0.0;
+        for (auto& a : ddS2)
+            a[0] = a[1] = 0.0;
+    }
+    void dualDelay (float* l, float* r, int n, const float* p, float mix, double bpm) noexcept
+    {
+        if (! rev[0].ready() || ! ddLine2[0].ready())
+            return;
+        const float sr = (float) fs;
+        const float time = (float) std::clamp ((double) p[valueParam], 0.0, 1.0) * enc::ddSeconds;
+        const float ratio = (float) std::clamp ((double) p[valueParam + 1], 0.0, 1.0) * enc::ddRatio;
+        const bool sync = p[valueParam + 4] >= 0.5f;
+        const float fbk = (float) std::clamp ((double) p[valueParam + 5], 0.0, 1.0);
+        const float cross = (float) std::clamp ((double) p[valueParam + 6], 0.0, 1.0);
+        const float spread = (float) std::clamp ((double) p[valueParam + 7], 0.0, 1.0);
+        const float tone = (float) (2.0 * std::clamp ((double) p[valueParam + 8], 0.0, 1.0) - 1.0);
+        const float duck = (float) std::clamp ((double) p[valueParam + 9], 0.0, 1.0);
+        const int xfLen = (int) std::round (sr * 0.05f);
+        // the lines' times (whole samples), at a block's start when no crossfade runs
+        if (ddXfLeft < 1)
+        {
+            ddPrev[0] = ddT[0], ddPrev[1] = ddT[1];
+            float t;
+            if (! sync)
+                t = time;
+            else
+            {
+                const int steps = std::max (1, (int) std::lround (64.0 * std::clamp ((double) p[valueParam + 2], 0.0, 1.0)));
+                const int den = (int) std::lround (6.0 * std::clamp ((double) p[valueParam + 3], 0.0, 1.0));
+                t = (float) ((double) steps * enc::reverserBeats (den) / (double) (float) (std::max (bpm, 1.0) / 60.0));
+            }
+            const float maxT = (float) ((double) ddLines[0].ring->mask / fs) - 0.01f, maxT2 = (float) ((double) ddLine2[0].mask / fs) - 0.01f;
+            t = std::min (std::max (t, 0.0f), maxT);
+            const float t2 = std::min (std::max (ratio * t, 0.0f), maxT2);
+            const int n1 = (int) std::round (t * sr), n2 = (int) std::round (t2 * sr);
+            if (n1 != ddT[0] || n2 != ddT[1])
+            {
+                const bool first = ddT[0] < 0;
+                ddT[0] = n1, ddT[1] = n2;
+                if (first)
+                    ddPrev[0] = n1, ddPrev[1] = n2;
+                else
+                    ddXfLeft = xfLen;
+            }
+        }
+        const float invFs = 1.0f / sr;
+        const float meanNow = (float) (ddT[0] + ddT[1]) * 0.5f * invFs, meanWas = (float) (ddPrev[0] + ddPrev[1]) * 0.5f;
+        const float xf = std::min (1.0f, std::max (0.0f, (float) std::max (0, ddXfLeft - n) / (float) xfLen));
+        const float meanT = xf * xf * (meanWas * invFs - meanNow) * (3.0f - (xf + xf)) + meanNow;
+        // gains: the rotation, the mix, the duck depth (ramped over the block)
+        const float ang = cross * 0.7853981852531433f;
+        ddFb.set (std::cos (ang) * fbk, n), ddCt.set (std::sin (ang) * fbk, n), ddDry.set (1.0f - mix, n), ddWet.set (mix, n);
+        ddDuck.set (duck * duck * 10.0f, n);
+        const float be = spread * 0.7853981852531433f + 0.7853981852531433f;
+        const std::array<float, 2> sp { std::sin (be) * 1.4142135381698608f, std::cos (be) * 1.4142135381698608f };
+        std::array<float, 2> spUse = ddSpread; // the spread set by the block before
+        if (ddSpreadFresh)
+            spUse = sp, ddSpreadFresh = false;
+        ddSpread = sp;
+        // the tone shelf
+        const float x = meanT * 48.0f * tone;
+        double gH = 1.0, gL = 1.0, gB;
+        if (x >= 0.0f)
+        {
+            const float g = std::exp2 (x * -0.16609640419483185f);
+            gL = (double) g, gB = (double) (g * 0.5857864618301392f + 1.4142135381698608f);
+        }
+        else
+        {
+            const float g = std::exp2 (x * 0.16609640419483185f);
+            gH = (double) g, gB = (double) (g * 0.5857864618301392f + 1.4142135381698608f);
+        }
+        const double gc = std::tan (std::min (0.4999 * (double) sr, 800.0) * pi / (double) sr);
+        const double A = 2.0 + gc, D = 1.0 / (A * gc + 1.0), E = D * gc, G = gc + gc;
+        const float k = ddFollow();
+        // HeartCore's sleep: the input silent for longer than the tail (the longer time + 64, as the plug-in reports it;
+        // round 190nh's offset), a block whose echoes reach 2^-20 counting as sound; no advance call
+        if (sleeping (l, r, n, (double) std::max (ddT[0], ddT[1]) + 3.0))
+            return;
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            const float fbv = ddFb.step(), ctv = ddCt.step(), dry = ddDry.step(), wet = ddWet.step(), dk = ddDuck.step();
+            const float x0[2] { l[i], r[i] };
+            float a1[2], a2[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                a1[c] = ddLines[(std::size_t) c].at ((std::uint32_t) ddT[0]);
+                a2[c] = ddLines[(std::size_t) c + 2].at ((std::uint32_t) ddT[1]);
+            }
+            if (ddXfLeft > 0)
+            {
+                --ddXfLeft;
+                float f = std::min (1.0f, std::max (0.0f, (float) ddXfLeft / (float) xfLen));
+                f = (3.0f - (f + f)) * f * f;
+                for (int c = 0; c < 2; ++c)
+                {
+                    a1[c] += (ddLines[(std::size_t) c].at ((std::uint32_t) ddPrev[0]) - a1[c]) * f;
+                    a2[c] += (ddLines[(std::size_t) c + 2].at ((std::uint32_t) ddPrev[1]) - a2[c]) * f;
+                }
+            }
+            for (int c = 0; c < 2; ++c)
+            {
+                const double u[2] { (double) ((fbv * a1[c] + x0[c]) - a2[c] * ctv), (double) (ctv * a1[c] + fbv * a2[c] + x0[c]) };
+                for (int j = 0; j < 2; ++j)
+                {
+                    double& s1 = ddS1[j][c];
+                    double& s2 = ddS2[j][c];
+                    const double v = gc * u[j] + s1;
+                    const double hp = u[j] - (v * A + s2) * D;
+                    const double bp = hp * gc + s1;
+                    const double lp = (v - s2 * gc) * E + s2;
+                    s1 = ((u[j] - lp) - (bp + bp)) * G + s1;
+                    s2 = bp * G + s2;
+                    ddLines[(std::size_t) (c + 2 * j)].push ((float) (hp * gH + lp * gL + bp * gB));
+                }
+            }
+            const float wl = a1[0] * spUse[0] + a2[0] * spUse[1], wr = a1[1] * spUse[1] + a2[1] * spUse[0];
+            peak = std::max (peak, std::max (std::abs (wl), std::abs (wr)));
+            const float pw = std::max ((x0[0] * x0[0] + x0[1] * x0[1]) * 0.5f, 9.5367431640625e-07f);
+            ddEnv = (pw / ddEnv - ddEnv) * k + ddEnv;
+            const float gain = std::min (1.0f, std::max (0.0f, 1.0f - ddEnv * dk)) * wet;
+            l[i] = gain * wl + dry * x0[0];
+            r[i] = gain * wr + dry * x0[1];
+        }
+        if (peak > 9.5367431640625e-07f)
+            quietRun = 0;
+    }
+    // the ducking follower's step: ½ (1 − 2^(−1 / (fs · 50 ms))) [STATIC form; the 50 ms fitted on the Duck renders]
+    float ddFollow() const noexcept { return 0.5f - std::exp2 (-1.0f / ((float) fs * 0.05f)) * 0.5f; }
+    // ---- Ensemble (round 190py: the plug-in's own voice motions) -----------------------------------------------
+    // [STATIC] UnisonDsp, as round 190nh's law 48 but with the plug-in's motion curves and its 2× line: the input goes up
+    // 2× (the Flanger's up-sampler) into one stereo line; voice v reads it by Catmull-Rom 2 d_v − 1 2× samples behind
+    // the newest (d_v = (B − D) + 2D · m_v (u), B = ⌈0.016 fs⌉, D = 0.015 fs; the up-sampler's 16 samples on top), through
+    // its own all-pass (TPT state-variable, Q 1/√2) at f_v = e^(3.912 + 2.996 c_v (w)) Hz (50 … 1000 Hz, ≤ 0.4999 fs, once
+    // a block); gains mix / √n · √2 (cos, sin) θ_v, θ = π/4 ± spread · π/4 (odd voices left, even right, the first centred
+    // when n is odd), voices 2, 3, 6, 7 … inverted, ramped over the block; out = (1 − mix) · x (t − 15 − B) + Σ voices.
+    // u (in curve turns) += (8 detune² + 0.4) / 1024 fs a sample, w += n / 128 fs a block; both wrap.
+    // The curves m_v, c_v (16 voices × delay / cutoff × random / symmetric / sine, 1024 points + 4) are generated as the
+    // plug-in generates them at start-up: random — 1024 draws of the 48-bit linear congruential generator (a · 0x5DEECE66D
+    // + 11, the POSIX drand48 recurrence) from seed 123124439, uniform [0, 1) from bits 24 … 47, three passes of a circular
+    // two-point average, scaled to 0 … 1; symmetric — the random ones, except that odd voices' delay curves mirror the
+    // voice before (1 − m); sine — ½ sin 2π (k · 100 / 1024 + 0.618034 · (16 · curve + v)) + ½. LYNX's own code of that
+    // generator (no table of the plug-in is kept: the curves are made at first use).
+    static constexpr int ensPoints = 1024, ensStride = 1028;
+    static const std::vector<float>& ensCurves() noexcept
+    {
+        static const std::vector<float> t = [] {
+            std::vector<float> c ((std::size_t) 3 * 16 * 2 * ensStride, 0.0f);
+            auto at = [&] (int motion, int voice, int curve) { return c.data() + ((std::size_t) (motion * 16 + voice) * 2 + (std::size_t) curve) * ensStride; };
+            constexpr std::uint64_t mask = (1ULL << 48) - 1;
+            std::uint64_t s = 0x756bad7ULL & mask;
+            auto next = [&] {
+                s = (s * 0x5DEECE66DULL + 0xBULL) & mask;
+                return (float) (int) (s >> 24) * 1.0f * 5.9604644775390625e-08f + 0.0f;
+            };
+            std::vector<float> a ((std::size_t) ensPoints);
+            for (int v = 0; v < 16; ++v)
+                for (int curve = 0; curve < 2; ++curve)
+                    for (int motion = 0; motion < 3; ++motion)
+                    {
+                        float* T = at (motion, v, curve);
+                        if (motion == 0 || (motion == 1 && ((v & 1) == 0 || curve == 1)))
+                        {
+                            for (auto& x : a)
+                                x = next();
+                            auto smooth = [] (const float* from, float* to) {
+                                for (int i = 0; i < ensPoints; ++i)
+                                    to[i] = (from[i] + from[(i + 1) & (ensPoints - 1)]) * 0.5f;
+                            };
+                            smooth (a.data(), T);
+                            smooth (T, a.data());
+                            smooth (a.data(), T);
+                            float lo = 1.0f, hi = 0.0f;
+                            for (int i = 0; i < ensPoints; ++i)
+                                lo = std::min (lo, T[i]), hi = std::max (hi, T[i]);
+                            const float k = 1.0f / (hi - lo);
+                            for (int i = 0; i < ensPoints; ++i)
+                                T[i] = (T[i] - lo) * k;
+                        }
+                        else if (motion == 1)
+                        {
+                            const float* before = at (1, v - 1, curve);
+                            for (int i = 0; i < ensPoints; ++i)
+                                T[i] = 1.0f - before[i];
+                        }
+                        else
+                        {
+                            const float ph = (float) (curve * 16 + v) * 0.6180340051651001f;
+                            for (int i = 0; i < ensPoints; ++i)
+                                T[i] = std::sin (((float) i * 0.09765625f + ph) * 6.2831854820251465f) * 0.5f + 0.5f;
+                        }
+                        for (int i = 0; i < 4; ++i)
+                            T[ensPoints + i] = T[i];
+                    }
+            return c;
+        }();
+        return t;
+    }
+    // a curve at position u (in points): Catmull-Rom from point ⌊u⌋, between ⌊u⌋ + 1 and ⌊u⌋ + 2
+    static float ensAt (const float* T, int i, float f) noexcept
+    {
+        const float f2 = f * f;
+        const float* q = T + (i & (ensPoints - 1));
+        const float w0 = (f * -0.5f + 0.0f) + (f * -0.5f + 1.0f) * f2, w1 = (f * 0.0f + 1.0f) + (f * 1.5f - 2.5f) * f2;
+        const float w2 = (f * 0.5f + 0.0f) + (f * -1.5f + 2.0f) * f2, w3 = (f * 0.0f + 0.0f) + (f * 0.5f - 0.5f) * f2;
+        return w0 * q[0] + w1 * q[1] + w2 * q[2] + w3 * q[3];
+    }
+    struct RampD
+    {
+        double start = 0.0, target = 0.0, value = 0.0, inc = 0.0, t = 0.0;
+        bool fresh = true;
+        void set (double v, int steps) noexcept
+        {
+            t = 0.0;
+            if (fresh)
+                start = target = value = v, inc = 0.0, fresh = false;
+            else if (std::abs (v - target) < 1e-15)
+                start = target = value = v, inc = 0.0;
+            else
+                start = value = target, target = v, inc = (double) (1.0f / (float) steps);
+        }
+        double step() noexcept
+        {
+            t += 1.0;
+            value = (target - start) * t * inc + start;
+            return value;
+        }
+    };
+    struct EnsVoice2
+    {
+        std::array<float, 2> gOld {}, gNew {};
+        float gT = 0.0f, gInc = 0.0f;
+        bool gFresh = true;
+        Ramp cut;
+        double s1[2] {}, s2[2] {};
+    };
+    std::array<EnsVoice2, 16> ens2 {};
+    FlUp ensUp2[2] {};
+    Line ensLine2x[2] {};
+    RampD ensSpeed;
+    Ramp ensDry;
+    double ensU = 0.0, ensW = 0.0;
+    int ensVoicesWas = 0;
+    void ens2Reset() noexcept
+    {
+        ensLine2x[0].ring = &line[0], ensLine2x[1].ring = &line[1];
+        ens2 = {};
+        ensUp2[0] = {}, ensUp2[1] = {};
+        ensSpeed = {};
+        ensDry = {};
+        ensU = ensW = 0.0;
+        ensVoicesWas = 0;
+    }
+    void ensemble2 (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        if (! line[0].ready())
+            return;
+        const int voices = std::clamp ((int) std::lround (16.0 * p[valueParam]), 2, 16);
+        const auto detune = (float) std::clamp ((double) p[valueParam + 1], 0.0, 1.0);
+        const auto spread = (float) std::clamp ((double) p[valueParam + 2], 0.0, 1.0);
+        const int motion = std::clamp ((int) std::lround (2.0 * p[valueParam + 3]), 0, 2);
+        const float sr = (float) fs;
+        // HeartCore's sleep: asleep once the input has been silent for 37.5 ms; no advance call (the voices' curves stand
+        // still). [MEASURED] the best single tail on the references (B + D … 2 (B + D) tried: lab/ensvar.sh, REA §4); the
+        // plug-in's own rule after a long silence is not resolved
+        if (sleeping (l, r, n, 0.0375 * fs))
+            return;
+        ensDry.set (1.0f - mix, n);
+        if (ensVoicesWas == 0)
+            ensVoicesWas = voices;
+        const int active = std::max (ensVoicesWas, voices);
+        ensVoicesWas = voices;
+        const auto& curves = ensCurves();
+        const float* delayCurve0 = curves.data() + (std::size_t) motion * 16 * 2 * ensStride;
+        {
+            const double w = ensW * 1024.0;
+            const int wi = (int) std::floor ((float) w);
+            const float wf = (float) w - (float) wi;
+            for (int v = 0; v < 16; ++v)
+            {
+                auto& e = ens2[(std::size_t) v];
+                if (v >= active)
+                {
+                    e.gOld = e.gNew = {}, e.gT = e.gInc = 0.0f, e.gFresh = true;
+                    e.cut = {};
+                    continue;
+                }
+                float g = v < voices ? mix / std::sqrt ((float) voices) : 0.0f;
+                const bool centred = (voices & 1) != 0 && v == 0;
+                if (! centred && (v & 2) != 0)
+                    g = -g;
+                float th = 0.7853981852531433f;
+                if (! centred)
+                    th += spread * ((v & 1) == 0 ? 0.7853981852531433f : -0.7853981852531433f);
+                g *= 1.4142135381698608f;
+                const std::array<float, 2> pair { g * std::cos (th), g * std::sin (th) };
+                if (e.gFresh)
+                    e.gOld = e.gNew = pair, e.gInc = 0.0f, e.gFresh = false;
+                else
+                    e.gOld = e.gNew, e.gNew = pair, e.gInc = 1.0f / (float) n;
+                e.gT = 0.0f;
+                const float c = ensAt (delayCurve0 + ((std::size_t) v * 2 + 1) * ensStride, wi, wf);
+                const double hz = std::min ((double) std::exp (c * 2.995732307434082f + 3.9120230674743652f), (double) sr * 0.4999);
+                e.cut.set ((float) std::tan (hz * pi / (double) sr), n);
+            }
+        }
+        ensSpeed.set ((double) ((detune * detune * 8.0f + 0.4000000059604645f) / (1024.0f * sr)), n);
+        const int B = (int) std::ceil (0.016f * sr);
+        const float D = sr * 0.015f;
+        const auto& taps = flUpTaps();
+        constexpr double sq2 = 1.4142135865763297;
+        for (int i = 0; i < n; ++i)
+        {
+            const double speed = ensSpeed.step();
+            const float dry = ensDry.step();
+            ensU += speed;
+            float* io[2] { l + i, r + i };
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& h = ensUp2[c].x;
+                for (int k = 31; k > 0; --k)
+                    h[(std::size_t) k] = h[(std::size_t) k - 1];
+                h[0] = *io[c];
+                float odd = 0.0f;
+                for (int k = 0; k < 32; ++k)
+                    odd += taps[(std::size_t) k] * h[(std::size_t) k];
+                ensLine2x[c].push (h[16]);
+                ensLine2x[c].push (odd);
+            }
+            float wet[2] { 0.0f, 0.0f };
+            const double u = ensU * 1024.0;
+            const int ui = (int) std::floor ((float) u);
+            const float uf = (float) u - (float) ui;
+            for (int v = 0; v < active; ++v)
+            {
+                auto& e = ens2[(std::size_t) v];
+                e.gT += 1.0f;
+                const float f = e.gT * e.gInc, fo = 1.0f - f;
+                const float gl = f * e.gNew[0] + fo * e.gOld[0], gr = f * e.gNew[1] + fo * e.gOld[1];
+                const double g = (double) e.cut.step();
+                const float m = ensAt (delayCurve0 + (std::size_t) v * 2 * ensStride, ui, uf);
+                float pos = (D + D) * m + ((float) B - D);
+                pos = pos + pos;
+                const int pi0 = (int) std::floor (pos);
+                const float t = pos - (float) pi0, t2 = t * t;
+                const float w0 = (t * -0.5f + 0.0f) + (t * -0.5f + 1.0f) * t2, w1 = (t * 0.0f + 1.0f) + (t * 1.5f - 2.5f) * t2;
+                const float w2 = (t * 0.5f + 0.0f) + (t * -1.5f + 2.0f) * t2, w3 = (t * 0.0f + 0.0f) + (t * 0.5f - 0.5f) * t2;
+                const double A = g + sq2, Dn = 1.0 / (A * g + 1.0), g2 = g + g;
+                for (int c = 0; c < 2; ++c)
+                {
+                    const Ring& rg = *ensLine2x[c].ring;
+                    const auto b = (std::uint32_t) (pi0 - 2);
+                    const double x = (double) ((w0 * rg.back (b) + w1 * rg.back (b + 1)) + (w2 * rg.back (b + 2) + w3 * rg.back (b + 3)));
+                    double& s1 = e.s1[c];
+                    double& s2 = e.s2[c];
+                    const double v1 = g * x + s1;
+                    const double hp = x - (A * v1 + s2) * Dn;
+                    const double bp = hp * g + s1;
+                    const double lp = Dn * g * (v1 - g * s2) + s2;
+                    const double bk = bp * -sq2;
+                    s1 = ((x - lp) + bk) * g2 + s1;
+                    s2 = bp * g2 + s2;
+                    wet[c] += (float) (lp + hp + bk) * (c == 0 ? gl : gr);
+                }
+            }
+            // the dry: 2 B + 1 2× samples back as the plug-in indexes its line, two nearer in LYNX's (16 + B − 1 samples
+            // late; [MEASURED] the mix-0 renders null bit for bit); the voices' reads likewise
+            const auto bd = (std::uint32_t) (std::lround (2.0f * (float) B + 1.0f) - 2);
+            for (int c = 0; c < 2; ++c)
+                *io[c] = dry * ensLine2x[c].ring->back (bd) + wet[c];
+        }
+        ensW += (double) n * (double) (0.0078125f / sr);
+        ensW -= std::floor (ensW);
+        ensU -= std::floor (ensU);
     }
     // ---- Nonlinear Filter (round 190oc) ------------------------------------------------------------------------
     // DirtyFilterDsp read in HeartCore 2.4 (REA_rodada190oc): a state-variable filter of the Chamberlin form at eight
