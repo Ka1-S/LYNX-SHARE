@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![O editor de automação com uma curva que sobe ao longo de seis compassos](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Ligue a gravação com `Automação` marcado no filtro de gravação, aperte pla
 
 - `Vincular ao controlador MIDI (mova um knob no controlador)` está em [Controladores MIDI](/wiki/midi-controllers/).
 - `Vincular a controlador interno` deixa um Envelope, Formula ou Peak Controller do projeto comandar o controle. Adicione um deles antes.
-- `Modular` anexa um modulador, um LFO ou uma fonte aleatória que move um knob do LYNX SHARE em torno do próprio valor. `Ferramentas › Moduladores...` lista os moduladores.
+- `Modular com` anexa um modulador que move o controle em torno do próprio valor: um LFO, um seguidor de envelope, um envelope ADSR, passos, uma fonte aleatória, uma macro, keytrack ou velocity. Funciona nos knobs do LYNX SHARE e nos parâmetros de plugins de terceiros. Você também pode arrastar um modulador até um knob, e um anel no knob mostra o movimento. `Ferramentas › Moduladores...` lista os moduladores.
 
 ## Faixas de automação
 
@@ -88,7 +88,8 @@ As faixas vêm desligadas por padrão. Ligue `Faixas de automação` no menu da 
 - Vários clipes em um mesmo controle tocam cada um no próprio lugar. Antes do primeiro clipe, o controle mantém o próprio valor.
 - No início de um clipe, o controle chega ao novo valor em cerca de 8 ms. O FL Studio chega deslizando, então um projeto importado pode diferir um pouco nesses pontos.
 - Onde clipes do mesmo controle se sobrepõem, o clipe que o LYNX SHARE escolhe pode ser diferente do que o FL Studio escolhe.
-- Os moduladores só funcionam nos knobs do próprio LYNX SHARE e ficam de fora quando você exporta para `.flp`.
+- Em uma exportação `.flp`, os moduladores que seguem a posição da música viram clipes de automação (um LFO sincronizado vira o LFO de clipe do FL Studio). Seguidores, envelopes, keytrack e velocity ficam de fora, e o relatório os lista.
+- Mexeu em um controle durante a reprodução sem gravar? `Capturar automação` nas opções de gravação transforma os últimos movimentos em automação depois.
 
 ## Veja também
 

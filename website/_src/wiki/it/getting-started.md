@@ -1,7 +1,7 @@
 ---
-source: 0101adbb66
+source: f439a070b5
 ---
-LYNX SHARE è una DAW gratuita e open source per Windows, macOS e Linux con tre flussi di lavoro in un solo programma. Quello predefinito è il flusso di FL Studio: programmi i pattern nel Channel Rack e nel Piano Roll, li arrangi nella Playlist e li mixi nel Mixer. Il flusso a lancio di clip lancia clip e scene da una griglia, nello stile di Ableton Live, e il flusso semplice unisce lo stile accessibile a finestra unica di BandLab al modo di lavorare di FL Studio Mobile. `Vista › Stile del layout` passa dall'uno all'altro in qualsiasi momento. Apre i progetti di FL Studio (`.flp`), i set di Ableton Live (`.als`) e i progetti di FL Studio Mobile (`.flm`), e salva nel suo formato `.lynx`.
+LYNX SHARE è una DAW gratuita e open source per Windows, macOS e Linux con tre flussi di lavoro in un solo programma. Quello predefinito è il flusso di FL Studio: programmi i pattern nel Channel Rack e nel Piano Roll, li arrangi nella Playlist e li mixi nel Mixer. Il flusso a lancio di clip lancia clip e scene da una griglia, nello stile di Ableton Live, e il flusso semplice unisce lo stile accessibile a finestra unica di BandLab al modo di lavorare di FL Studio Mobile. `Vista › Stile del layout` passa dall'uno all'altro in qualsiasi momento. Apre i progetti di FL Studio (`.flp`), i set di Ableton Live (`.als`), i progetti di FL Studio Mobile (`.flm`), i file DAWproject, i progetti GarageBand e BandLab e i moduli tracker, esporta `.flp`, `.als`, `.dawproject` e `.flm`, e salva nel suo formato `.lynx`.
 
 È in versione alpha. Aspettati dei bug e salva spesso.
 
@@ -9,7 +9,7 @@ LYNX SHARE è una DAW gratuita e open source per Windows, macOS e Linux con tre 
 
 1. Controlla la tabella qui sotto per vedere che il tuo sistema sia supportato.
 2. Scaricalo e installalo. [Installazione](/wiki/install/) ha i passaggi per ogni sistema.
-3. Avvialo. Una breve configurazione guidata sceglie la lingua, prova l'uscita audio, ti fa scegliere uno dei tre flussi di lavoro ed elenca le cartelle dei plugin, che poi vengono scansionate in background. Puoi saltarla e riaprirla più tardi con `Opzioni › Configurazione guidata (lingua, audio, cartelle dei plugin)...`.
+3. Avvialo. Una scheda di benvenuto chiede da dove vieni e apre con un clic il flusso corrispondente. Imposta anche la lingua, prova il suono e chiede se cercare gli aggiornamenti, mentre le cartelle dei plugin vengono scansionate in background. `Altre impostazioni (driver audio, cartelle dei plugin)...` apre la configurazione guidata completa, disponibile anche in `Opzioni › Configurazione guidata (lingua, audio, cartelle dei plugin)...`.
 4. Se non senti nulla, vai a [Configurazione audio](/wiki/audio-setup/).
 5. Leggi [Un giro della finestra](/wiki/tour/), poi fai [La tua prima canzone](/wiki/first-song/).
 
@@ -19,7 +19,7 @@ LYNX SHARE è una DAW gratuita e open source per Windows, macOS e Linux con tre 
 |---|---|
 | Windows | Windows 10 o 11, 64 bit |
 | macOS | macOS 11 Big Sur o successivo, Intel o Apple silicon |
-| Linux | x86_64 con glibc 2.35 o successiva (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch o Manjaro aggiornati), X11 o XWayland |
+| Linux | x86_64 o arm64 con glibc 2.35 o successiva (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch o Manjaro aggiornati; arm64 anche su un Raspberry Pi 4 o 5 con un sistema a 64 bit), X11 o XWayland |
 
 Non ti serve un'interfaccia audio. LYNX SHARE suona attraverso il dispositivo audio che il tuo sistema usa già. Non ti serve nemmeno FL Studio. Se è installato sullo stesso computer, LYNX SHARE ne trova i sample e usa gli stessi file di plugin per i progetti `.flp`.
 

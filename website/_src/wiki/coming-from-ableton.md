@@ -1,26 +1,41 @@
 ---
 title: Coming from Ableton Live
-summary: The optional Clip-launch layout, opening and exporting .als sets, and warp modes.
+summary: The optional Clip-launch layout, first steps for Live and Bitwig users, opening and exporting .als sets, and warp modes.
 status: full
 ---
 ![The Clip-launch layout: a clip grid with scenes beside the Playlist](/assets/img/cliplaunch.webp)
 
-LYNX SHARE starts in the Pattern workflow: a Channel rack, patterns and a Playlist. The Clip-launch workflow is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes `.als` sets. It is not affiliated with Ableton.
+LYNX SHARE starts in the Pattern layout: a Channel rack, patterns and a Playlist. The Clip-launch layout is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes `.als` sets. It is not affiliated with Ableton.
+
+This page is for Bitwig Studio users too: the clip grid works the same way, and Bitwig's DAWproject files (`.dawproject`) open with `File › Open...` and are written by `File › Export › DAWproject (.dawproject)...`.
+
+## Your first steps
+
+1. **Pick the layout.** The first time LYNX SHARE starts, a welcome card asks where you are coming from. Click `Ableton Live or Bitwig`: the Clip-launch layout opens. Later, `View › Layout style › Clip-launch layout` switches to it at any time.
+2. **Fill a slot.** Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose `Put a pattern here`.
+3. **Launch.** Click the triangle at the left of a clip, or the triangle of a scene in the `Scenes` column to launch the whole row. Or open one of your `.als` sets (below).
+
+What is different from Live:
+
+- The Playlist is the arrangement, and its tracks are the columns of the grid. A track that launched a clip stays on the grid until you press `Back to Playlist`.
+- The keys follow FL Studio outside the grid. `Ctrl+Z` undoes one step, and pressed again redoes it.
+- Only some of Live's own devices are converted (see Good to know). Third-party plugins come over with their state.
+- The Pattern layout, FL Studio's way of working with a Channel rack and patterns, works on the same project.
 
 ## Open a Live set
 
 1. Choose `File › Open...` (`Ctrl+O`) and pick the `.als`. Sets saved by Live 11 and Live 12 are read.
-2. Choose `View › Layout style › Clip-launch workflow` to work with the clip grid, where the set's Session clips and scenes go.
+2. Choose `View › Layout style › Clip-launch layout` to work with the clip grid, where the set's Session clips and scenes go.
 3. Use the `Grid / Both / Song` switch in the Playlist's title bar to show the grid, the Playlist, or both.
 4. Choose `File › Save`. It asks where to write a `.lynx` file. The `.als` is not changed.
 
-`View › Layout style › Pattern workflow (default)` goes back. The same choice is in `Options › General settings...`. Patterns and the Channel rack stay available in both layouts.
+`View › Layout style › Pattern layout (default)` goes back. The same choice is in `Options › General settings...`. Patterns and the Channel rack stay available in both layouts.
 
 ## What maps to what
 
 | In Live | In LYNX SHARE |
 |---|---|
-| Session view | The clip grid of the Clip-launch workflow |
+| Session view | The clip grid of the Clip-launch layout |
 | Arrangement view | The Playlist |
 | Tracks | Playlist tracks, which are the columns of the clip grid |
 | Scenes | Scenes, the rows of the clip grid. A scene can set the tempo when launched |
@@ -61,7 +76,7 @@ Follow actions run after a number of bars or passes of the clip. The actions are
 
 | Written | Not written |
 |---|---|
-| A MIDI track per channel, with its notes as MIDI clips | LYNX SHARE's own instruments and effects. Their tracks and notes are kept |
+| A MIDI track per channel, with its notes as MIDI clips | LYNX SHARE's own instruments and effects, except Helix, which becomes Wavetable. Their tracks and notes are kept |
 | Audio tracks with stretch, transpose, gain, fades and warp mode | Automation of effect parameters |
 | Groups, returns and sends | Insert-to-insert routes |
 | VST2 and VST3 plugins with their state | |
@@ -72,9 +87,11 @@ A report after the export lists what was left out.
 
 ## Good to know
 
-- Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift and Operator (without FM). The others are dropped and listed in the import report.
-- Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's MIDI Effect Racks are not converted yet and are listed in the import report.
+- Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable and Meld. The others are dropped and listed in the import report.
+- Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's Arpeggiator becomes the channel's arpeggiator. Pitch, Velocity, Chord, Note Length and MIDI Effect Racks are written into the notes.
 - The import report lists what was left out.
+- In the Device View a rack shows its chains' devices inline, and Macro Map mode (the rack's `Map` buttons) gives a device parameter to a macro, as in Live.
+- The Session mixer has Live's Solo / Cue switch, with a `Cue Out` for your headphones and a `Cue Volume`.
 - Live trims audio clips that overlap in an exported set.
 - Warp markers from a Live set are kept on import and written back on export.
 
@@ -85,3 +102,4 @@ A report after the export lists what was left out.
 - [Importing projects](/wiki/importing-projects/)
 - [File formats](/wiki/file-formats/)
 - [Two workflows in one program](/why/#workflows)
+- [Learn: tutorials](/learn/)

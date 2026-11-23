@@ -1,6 +1,7 @@
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
+#include "ui/DemoMode.h"
 #include <optional>
 
 namespace lynx::remoteui
@@ -15,6 +16,8 @@ juce::File settingsFile() { return platform::settingsFile ("remote-control.txt")
 }
 bool enabled()
 {
+    if (demo::active()) // (round 190np: --demo drives LYNX through the API)
+        return true;
     if (! requested)
     {
         const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_CONTROL_ENABLED", {}).trim();

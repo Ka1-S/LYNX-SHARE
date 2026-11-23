@@ -38,7 +38,7 @@ void MainComponent::setUpLookParts()
 {
     lookPartsReady = true;
     for (auto* c : std::initializer_list<juce::Component*> { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton,
-                                                             &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton,
+                                                             &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton, &sessionRecordButton, &drawModeButton,
                                                              &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
                                                              &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton })
     {
@@ -59,6 +59,24 @@ void MainComponent::setUpLookParts()
     backToArrangementButton.setTooltip (tr ("Tracks that launched a clip stay silent in the Playlist until this is pressed"));
     ui::setHint (backToArrangementButton, tr ("Back to Playlist") + ": " + tr ("Tracks that launched a clip stay silent in the Playlist until this is pressed"));
     backToArrangementButton.onClick = [this] { engine.launcherCommand ({ launcher::Command::Type::backToArrangement }); };
+
+    // round 190oa (DL-58, capture 190oa L1; Live's Info View texts)
+    const auto armText = tr ("Automation Arm: when on, manual parameter changes can be recorded (the recording filter's Automation)");
+    automationArmButton.setTooltip (armText);
+    ui::setHint (automationArmButton, armText);
+    automationArmButton.onClick = [this] {
+        auto o = engine.getRecordOptions();
+        o.recordAutomation = ! o.recordAutomation;
+        engine.setRecordOptions (o);
+    };
+    // round 190pa (P21, LYNX extra): the automation write mode (Live has none; its Arm writes as Read / Touch)
+    automationArmButton.onRightClick = [this] {
+        makeAutomationModeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&automationArmButton));
+    };
+    const auto reEnableText = tr ("Re-Enable Automation: gives back to their automation the parameters you moved by hand (lit while one is overridden)");
+    reEnableAutomationButton.setTooltip (reEnableText);
+    ui::setHint (reEnableAutomationButton, reEnableText);
+    reEnableAutomationButton.onClick = [this] { engine.reEnableAutomation(); };
 
     captureButton.setTooltip (tr ("Capture MIDI: the notes just played without recording into the pattern"));
     ui::setHint (captureButton, tr ("Capture MIDI: the notes just played without recording into the pattern"));
@@ -354,7 +372,7 @@ void MainComponent::toggleCycle()
 
 std::vector<juce::Component*> MainComponent::lookOnlyParts()
 {
-    std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton,
+    std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton,
                                           &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
                                           &liveLoopButton, &punchOutButton, &nudgeDownButton, &nudgeUpButton };
     if (simpleWorkflow != nullptr)
@@ -510,7 +528,7 @@ void MainComponent::applyToolbarLook()
     for (auto* b : { &liveLoopButton, &punchOutButton })
         b->setLook (BL::liveBox, 14.0f);
     refreshRecordOptionButtons();
-    for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
+    for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &automationArmButton, &reEnableAutomationButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
         b->setLook (BL::liveBox, 13.0f);
     for (auto* b : { &sessionViewButton, &arrangementViewButton })
         b->setLook (BL::liveSelector, 15.0f);
@@ -586,6 +604,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     lookCapsules.clear();
     lookDividers.clear();
     lookMenuRow = lookBand = {};
+    simpleNameArea = {}; // (round 190oo, O-4)
     auto toolbar = bar.reduced (8, toolbarLayout.visible ? 5 : 3);
     const auto h = rowHeight, row1 = toolbar.getY(), row2 = toolbar.getY() + rowHeight + 2;
     auto put = [] (juce::Component& c, juce::Rectangle<int> r) {
@@ -599,6 +618,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         const auto menu = row.withWidth (juce::jmin (menuWidth + 8, row.getWidth()));
         put (menuBar, menu);
         titleArea = {};
+        paletteButton.setVisible (false);
         placeHintBar (row.withTrimmedLeft (menu.getWidth() + 12).withWidth (juce::jmin (900, row.getWidth() - menu.getWidth() - 12)).reduced (0, 1));
         fixedToolbarArea = bar;
         return;
@@ -639,7 +659,9 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         titleArea = column.withY (row1).withHeight (h).withTrimmedLeft (menu.getWidth() + 12).withTrimmedRight (4);
         if (titleArea.getWidth() < 60)
             titleArea = {};
-        placeHintBar (column.withY (row2).withHeight (h).reduced (0, 1));
+        auto hintRow = column.withY (row2).withHeight (h).reduced (0, 1); // (round 190on: the palette's magnifier at its right end)
+        placePaletteButton (hintRow, true);
+        placeHintBar (hintRow);
         fixedToolbarArea = juce::Rectangle<int> (column.getX() - 4, 0, column.getWidth() + 8, toolbarHeight);
     }
 
@@ -718,6 +740,35 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         right.removeFromRight (4);
     }
     put (moreButton, right.removeFromRight (sb::moreWidth).withSizeKeepingCentre (sb::moreWidth, sb::moreWidth));
+
+    // round 190oo (O-4, CS-28; LYNX extra, off by default): the project's name centred at the top, over the capsules, as
+    // BandLab's "New Project" (mockups/O-4-simple-project-name.png). It takes the strip above the capsules, centred on
+    // the window, as wide as the parts that reach into that strip (the menus at the left, the master pitch knob and the
+    // file buttons of the first row) leave free on both sides; with less than 60 px it is not shown.
+    if (ui::simplelook::projectNameShown())
+    {
+        const auto strip = juce::Rectangle<int> (bar.getX(), bar.getY() + 1, bar.getWidth(), capY - bar.getY() - 1);
+        const auto centre = bar.getCentreX();
+        int leftEdge = bar.getX() + 8, rightEdge = bar.getRight() - 8;
+        for (auto* c : getChildren())
+        {
+            const auto b = c->getBounds();
+            if (! c->isVisible() || b.getBottom() > toolbarHeight || ! b.intersects (strip))
+                continue; // (only the toolbar's own parts; a window-wide overlay is not one)
+            if (b.getX() <= centre && b.getRight() >= centre)
+            {
+                leftEdge = rightEdge = centre; // a part over the centre: no room
+                break;
+            }
+            if (b.getRight() < centre)
+                leftEdge = juce::jmax (leftEdge, b.getRight() + 8);
+            else
+                rightEdge = juce::jmin (rightEdge, b.getX() - 8);
+        }
+        const auto half = juce::jmin (centre - leftEdge, rightEdge - centre, 220);
+        if (half >= 30 && strip.getHeight() >= 10)
+            simpleNameArea = { centre - half, strip.getY(), 2 * half, strip.getHeight() };
+    }
 }
 
 // --- Clip-launch: Live's control bar -----------------------------------------------------------------------------------
@@ -732,6 +783,7 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     snapLabelArea = patternLabelArea = transportArea = modeArea = {};
     lookCapsules.clear();
     lookDividers.clear();
+    simpleNameArea = {}; // (round 190oo, O-4: the Simple top bar's only)
     auto put = [] (juce::Component& c, juce::Rectangle<int> r) {
         c.setVisible (true);
         c.setBounds (r);
@@ -744,7 +796,9 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
         auto row = lookMenuRow.reduced (8, 0);
         const auto menu = row.removeFromLeft (juce::jmin (menuWidth + 8, row.getWidth()));
         put (menuBar, menu);
-        row.removeFromLeft (12);
+        row.removeFromLeft (2);
+        placePaletteButton (row); // (round 190on: the palette's magnifier right of the menus)
+        row.removeFromLeft (paletteButton.isVisible() ? 8 : 10);
         titleArea = row.removeFromRight (juce::jmin (320, row.getWidth() / 3));
         if (titleArea.getWidth() < 60)
             titleArea = {};
@@ -783,6 +837,8 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
             case I::stop: return &stopButton;
             case I::record: return &recordButton;
             case I::overdub: return &blendButton;
+            case I::automationArm: return &automationArmButton; // (round 190oa)
+            case I::reEnableAutomation: return &reEnableAutomationButton;
             case I::capture: return &captureButton;
             case I::sessionRecord: return &sessionRecordButton;
             case I::punch: return &punchButton;
@@ -886,6 +942,23 @@ void MainComponent::paintLookToolbar (juce::Graphics& g)
         g.fillRoundedRectangle (hintBar.getBounds().toFloat(), radius::md);
     }
 
+    // round 190oo (O-4, LYNX extra): the Simple top bar's centred project name, as the window title and the other layouts
+    // name it ("Untitled" until it has one), in the primary ink (#eceef2 on bg3: well over 4.5:1), shortened in the middle
+    if (toolbarLook == Look::simple && ! simpleNameArea.isEmpty())
+    {
+        const auto nameFont = font (type::small, true);
+        const auto name = projectName.isNotEmpty() ? projectName : tr ("Untitled");
+        if (name != simpleNameFor || simpleNameArea.getWidth() != simpleNameFitWidth)
+        {
+            simpleNameFor = name;
+            simpleNameFitWidth = simpleNameArea.getWidth();
+            simpleNameFitted = fitMiddle (name, nameFont, (float) simpleNameFitWidth);
+        }
+        g.setFont (nameFont);
+        g.setColour (colour::textPrimary);
+        g.drawText (simpleNameFitted, simpleNameArea, juce::Justification::centred, false);
+    }
+
     if (! titleArea.isEmpty())
     {
         const auto people = live != nullptr ? liveui::paintPresence (g, titleArea, *live) : 0;
@@ -932,6 +1005,10 @@ void MainComponent::updateLookFields()
         liveLoopButton.setToggleState (on, juce::dontSendNotification);
     if (const auto on = engine.isSessionRecording(); sessionRecordButton.getToggleState() != on)
         sessionRecordButton.setToggleState (on, juce::dontSendNotification);
+    if (const auto on = engine.getRecordOptions().recordAutomation; automationArmButton.getToggleState() != on) // (round 190oa, DL-58)
+        automationArmButton.setToggleState (on, juce::dontSendNotification);
+    if (const auto on = engine.automationOverridden(); reEnableAutomationButton.getToggleState() != on)
+        reEnableAutomationButton.setToggleState (on, juce::dontSendNotification);
     const auto view = playlistArea.getGridView();
     const auto session = view != PlaylistArea::GridView::song, arrangement = view != PlaylistArea::GridView::grid;
     if (sessionViewButton.getToggleState() != session)
@@ -973,7 +1050,8 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
         { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton },
-        { "cycle", &cycleButton }, { "metronomeMenu", &metronomeMenuButton }, { "countIn", &countInButton }, { "waitInput", &waitInputButton }, { "midiLight", &midiLight } // (round 190ld)
+        { "cycle", &cycleButton }, { "metronomeMenu", &metronomeMenuButton }, { "countIn", &countInButton }, { "waitInput", &waitInputButton }, { "midiLight", &midiLight }, // (round 190ld)
+        { "automationArm", &automationArmButton }, { "reEnableAutomation", &reEnableAutomationButton } // (round 190oa)
     };
     if (name == "finish")
         return simpleWorkflow != nullptr ? simpleWorkflow->finishComponent() : nullptr;
@@ -1036,6 +1114,8 @@ juce::PopupMenu MainComponent::makeToolbarMoreMenu()
         };
         item (I::tap, tr ("Tap tempo"), false, [this] { tapTempoButton.triggerClick(); });
         item (I::overdub, tr ("Blend recorded notes"), blendButton.getToggleState(), [this] { runAction ("record.blend"); });
+        item (I::automationArm, tr ("Automation Arm"), engine.getRecordOptions().recordAutomation, [this] { automationArmButton.triggerClick(); });
+        item (I::reEnableAutomation, tr ("Re-Enable Automation"), engine.automationOverridden(), [this] { engine.reEnableAutomation(); });
         item (I::capture, tr ("Capture MIDI: the notes just played without recording into the pattern"), false, [this] { runAction ("record.captureMidi"); });
         item (I::punch, tr ("Punch-In"), punchButton.getToggleState(), [this] { runAction ("record.punchIn"); });
         item (I::loopSwitch, tr ("Loop"), liveLoopButton.getToggleState(), [this] { toggleLiveLoop(); });

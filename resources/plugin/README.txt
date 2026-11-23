@@ -1,13 +1,14 @@
 LYNX plugins @LABEL@ (@OS@)
 ==========================
 
-LYNX SHARE's own effects and instruments as plugins for other hosts: FL Studio and any other CLAP or VST3 host. This is an
-optional download: LYNX SHARE itself doesn't need it.
+LYNX SHARE's own effects and instruments as plugins for other hosts: FL Studio and any other CLAP or VST3 host, and on
+Linux any LV2 host. This is an optional download: LYNX SHARE itself doesn't need it.
 
 What's inside
 -------------
   CLAP/LYNX Plugins.clap   every plugin in PLUGINS.txt, in one file
   VST3/*.vst3              the plugins marked "VST3" in PLUGINS.txt, one bundle each
+  LV2/*.lv2                (Linux only) the same plugins as LV2 bundles
   PLUGINS.txt              the list
   LICENSE, THIRD_PARTY.md  licences (AGPL-3.0; the source is at https://github.com/Ka1-S/LYNX-SHARE)
 
@@ -23,7 +24,7 @@ macOS     Open Terminal in this folder and run:  sh install.sh
           It copies them to ~/Library/Audio/Plug-Ins/CLAP and ~/Library/Audio/Plug-Ins/VST3 and clears the download
           quarantine. The bundles are signed ad hoc only (no Apple Developer ID yet).
 Linux     Run:  sh install.sh
-          It copies them to ~/.clap and ~/.vst3.
+          It copies them to ~/.clap, ~/.vst3 and ~/.lv2.
 
 Then rescan the plugins in your host. FL Studio: Options > Manage plugins > Find installed plugins (FL Studio finds
 VST3 only in the system folder above). Uninstall: run the same script with --uninstall (Windows: install.cmd /uninstall).

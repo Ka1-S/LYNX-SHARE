@@ -1702,6 +1702,9 @@ public:
     {
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
+        // round 190om: engine revision 2 plays the note velocity as FL does (ChannelDef::engineRev; a project saved before
+        // keeps its revision and plays every note at full level, as LYNX did)
+        velocityLaw.store (channel.engineRev >= 2);
         if (channel.pluginState == state)
             return;
         // only knobs / switches changed (the editor, round 168o): the playing engine takes them, the notes go on
@@ -1716,6 +1719,32 @@ public:
         // a new state restarts the plugin (its voices go silent, as when FL restores a state); built here, swapped in by
         // the audio thread
         delete incoming.exchange (build (current, rate.load()).release());
+    }
+
+    // FL's slide notes move a sounding note's Final.Pan (issue #236, round 190od; FL's old voice record: integer pan) and,
+    // with the velocity law (round 190om), its Final.Vol: chan.Vol · Init.Vol of the velocity now
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if ((prop != 2 /* pan */ && prop != 0 /* velocity */) || ! std::isfinite (value) || key < 0 || key >= 128 || eng == nullptr)
+            return;
+        take();
+        if (prop == 2)
+        {
+            notePan[key] = std::clamp (value, -1.0f, 1.0f);
+            for (auto& s : eng->slots)
+                if (s.used && s.id == key)
+                    s.pan = (int) std::lround (std::clamp (notePan[key] + (float) channelPan, -1.0f, 1.0f) * 64.0f);
+            return;
+        }
+        if (! velocityLaw.load (std::memory_order_relaxed))
+            return;
+        const auto init = flInitVol (value);
+        for (int i = 0; i < numVoices; ++i)
+            if (auto& s = eng->slots[i]; s.used && s.id == key)
+            {
+                slotInit[i] = init;
+                s.vol = (float) channelVol * init;
+            }
     }
 
     void setNextNoteExpression (float pan, float cents, bool) noexcept override
@@ -1733,7 +1762,7 @@ public:
         eng->hostSet (index, hostRaw (index, value));
     }
 
-    void noteOn (int key, float) noexcept override
+    void noteOn (int key, float velocity) noexcept override
     {
         take();
         const auto k = std::clamp (key, 0, 127);
@@ -1747,13 +1776,17 @@ public:
         const auto knob = pitchCents.load();
         const auto pitch = (float) (100.0 * (k - 60)) + knob + nextCents;
         // FL hands SimSynth the old voice record: integer pan (−64…64) and pitch (cents)
-        const auto sl = eng->trigger (k, (int) std::lround (pan * 64.0f), (float) channelVol, (int) std::lround (pitch), 0.0f, 0.0f);
+        // the velocity reaches SimSynth only through Final.Vol: FL's host hands it chan.Vol · Init.Vol, Init.Vol = (11^(v/100) − 1)
+        // / 10 of FL's velocity v (0…128; unity at 100, −21.7 dB at 25, +6.0 dB at 127; FL 2026 /R renders, round 190om)
+        const auto init = velocityLaw.load (std::memory_order_relaxed) ? flInitVol (velocity) : 1.0f;
+        const auto sl = eng->trigger (k, (int) std::lround (pan * 64.0f), (float) channelVol * init, (int) std::lround (pitch), 0.0f, 0.0f);
         for (auto& h : held)
             if (h == sl)
                 h = -1;
         held[k] = sl;
         if (sl >= 0)
         {
+            slotInit[sl] = init;
             eng->slots[sl].slide.anchor (live.ref (knob));
             slotNote[sl] = note;
             slotOpen[sl] = true;
@@ -1836,9 +1869,9 @@ public:
         if (vol != channelVol || pan != channelPan)
         {
             channelVol = vol, channelPan = pan;
-            for (auto& s : eng->slots)
-                if (s.used && s.id >= 0 && s.id < 128)
-                    s.vol = (float) vol, s.pan = (int) std::lround (std::clamp (notePan[s.id] + (float) pan, -1.0f, 1.0f) * 64.0f);
+            for (int i = 0; i < numVoices; ++i)
+                if (auto& s = eng->slots[i]; s.used && s.id >= 0 && s.id < 128)
+                    s.vol = (float) vol * slotInit[i], s.pan = (int) std::lround (std::clamp (notePan[s.id] + (float) pan, -1.0f, 1.0f) * 64.0f);
         }
         constexpr int chunk = 512;
         for (int c0 = 0; c0 < n; c0 += chunk)
@@ -1923,6 +1956,14 @@ private:
     double channelVol = 1.0, channelPan = 0.0;
     int held[128] {};
     float notePan[128] {};
+    // round 190om: FL's velocity law (engine revision 2) and each voice slot's Init.Vol (1 without the law)
+    std::atomic<bool> velocityLaw { true };
+    float slotInit[numVoices] { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+    static float flInitVol (float velocity) noexcept
+    {
+        const auto v = std::clamp ((double) velocity, 0.0, 1.0) * 128.0; // (LYNX's velocity 0…1 = FL's 0…128; 100 → exactly 1)
+        return (float) ((std::pow (11.0, v / 100.0) - 1.0) / 10.0);
+    }
     // each voice slot's note id and whether its note has not ended yet (round 190ej)
     std::uint32_t slotNote[numVoices] {};
     bool slotOpen[numVoices] {};

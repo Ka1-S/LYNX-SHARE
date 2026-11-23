@@ -8,6 +8,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "core/PluginLayout.h"
 #include "core/Song.h"
 #include "core/WavetableSynth.h"
 #include "engine/AudioEngine.h"
@@ -211,8 +212,9 @@ public:
     Ctl (Page& p, int i, Kind k, juce::String cap = {}, Curve c = Curve::linear) : page (p), index (i), kind (k), curve (c), label (std::move (cap))
     {
         setRepaintsOnMouseActivity (true);
+        setComponentID ("helix." + juce::String (i)); // (round 190pg: --demo, by its engine parameter)
     }
-    void setIndex (int i) { index = i; repaint(); }
+    void setIndex (int i) { index = i; setComponentID ("helix." + juce::String (i)); repaint(); }
     void setLabel (juce::String s) { label = std::move (s); repaint(); }
     const EngineParam& param() const { return paramOf (index); }
     bool liveKnob = false; // (Helix+ 2's card panel: Live's own knob, theme::livelook)
@@ -1606,10 +1608,125 @@ private:
 // --- Helix+ (round 190mi): LYNX's own strip under the device in the channel window --------------------------------------
 // The second warps, the noise oscillator, unison stacking, the extra filter types, the macros (drag their handle onto a
 // knob), the drawn LFOs' switches and the effects rack, in LYNX's look. The Live-look device above stays as it is.
+// --- Helix round 4 (round 190oc): the spectral oscillator's partials at its Position, as it plays them (LYNX's own view):
+// a log-frequency axis (20 Hz … 20 kHz), each partial a line as loud as it plays (0 … −60 dB of the frame's loudest), at the
+// root key + Semi with Stretch, Shift, Tilt and the band applied; the partials Partials keeps lit, the others dim; the band
+// (Band, Width) shaded; with unison, the outer voices' detune as thin lines beside each partial
+class PartialsView final : public juce::Component
+{
+public:
+    explicit PartialsView (Page& p) : page (p) { setInterceptsMouseClicks (false, false); }
+    void paint (juce::Graphics& g) override
+    {
+        const auto l = page.look();
+        const auto r = getLocalBounds().toFloat();
+        g.setColour (l.dark);
+        g.fillRoundedRectangle (r, 3.0f);
+        const auto& d = page.userData();
+        const auto& sp = d.spectral;
+        g.setFont (theme::font (9.5f));
+        const auto plot = r.reduced (4.0f, 3.0f).withTrimmedBottom (11.0f);
+        const auto xOf = [plot] (double hz) { return plot.getX() + (float) (std::log (std::clamp (hz, 20.0, 20000.0) / 20.0) / std::log (1000.0)) * plot.getWidth(); };
+        g.setColour (l.line);
+        for (const double hz : { 100.0, 1000.0, 10000.0 })
+        {
+            const auto x = xOf (hz);
+            g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+            g.setColour (l.dim);
+            g.drawText (hz < 1000.0 ? juce::String ("100") : hz < 10000.0 ? juce::String ("1k") : juce::String ("10k"),
+                        juce::Rectangle<float> (x - 15.0f, plot.getBottom(), 30.0f, 11.0f), juce::Justification::centred, false);
+            g.setColour (l.line);
+        }
+        if (sp.empty())
+        {
+            g.setColour (l.dim);
+            g.drawText (d.sample.frames() <= 0 ? tr ("No sample") : tr ("Partials made when switched on"), plot, juce::Justification::centred, true);
+            return;
+        }
+        const auto Z = [this] (int i) { return page.value (w::ext3Base + i); };
+        const auto frames = sp.frames, K = sp.partials;
+        const auto fpos = std::clamp (Z (w::ext3::specPosition), 0.0, 1.0) * (double) (frames - 1);
+        const auto f0 = std::min ((int) fpos, std::max (0, frames - 2)), f1 = std::min (f0 + 1, frames - 1);
+        const auto wf = (float) (fpos - (double) f0);
+        const auto root = std::clamp (page.value (w::ext2Base + w::ext2::sampleRoot), 0.0, 127.0);
+        const auto rootHz = 440.0 * std::exp2 ((root - 69.0) / 12.0), ratio = std::exp2 (Z (w::ext3::specTranspose) / 12.0);
+        const auto e = w::spectralExponent (Z (w::ext3::specStretch)), add = w::spectralShiftHz (Z (w::ext3::specShift));
+        const auto tilt = std::clamp (Z (w::ext3::specTilt), -1.0, 1.0), band = Z (w::ext3::specBand), width = std::clamp (Z (w::ext3::specWidth), 0.25, 10.0);
+        const auto top = 0.475 * 48000.0, fade = 0.45 * 48000.0;
+        const auto unison = page.value (w::extBase) >= 3.5 ? std::clamp ((int) std::lround (page.value (w::ext4Base + w::ext4::specUnison)), 1, w::maxOscUnison) : 1;
+        const auto kept = std::min ({ K, std::clamp ((int) std::lround (Z (w::ext3::specPartials)), 1, w::maxSpectralPartials),
+                                      unison > 1 ? w::spectralUnisonStride (unison) : w::maxSpectralPartials });
+        const auto cents = unison > 1 ? w::unisonDetuneCents * std::clamp (page.value (w::ext4Base + w::ext4::specDetune), 0.0, 1.0) : 0.0;
+        if (width < 9.99) // the band: flat across Width octaves, its skirts an octave each
+        {
+            const auto lo = band * std::exp2 (-0.5 * width), hi = band * std::exp2 (0.5 * width);
+            g.setColour (l.accent2.withAlpha (0.10f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (lo * 0.5), plot.getY(), xOf (hi * 2.0), plot.getBottom()));
+            g.setColour (l.accent2.withAlpha (0.16f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOf (lo), plot.getY(), xOf (hi), plot.getBottom()));
+        }
+        struct P
+        {
+            double hz;
+            float level;
+        };
+        std::vector<P> parts;
+        parts.reserve ((std::size_t) K);
+        float loudest = 1.0e-9f;
+        for (int i = 0; i < K; ++i)
+        {
+            const auto a0 = sp.amp[(std::size_t) (f0 * K + i)], a1 = sp.amp[(std::size_t) (f1 * K + i)];
+            const auto h0 = (double) sp.hz[(std::size_t) (f0 * K + i)], h1 = (double) sp.hz[(std::size_t) (f1 * K + i)];
+            const auto a = a0 + (a1 - a0) * wf;
+            const auto hz = a0 > 0.0f && a1 > 0.0f ? h0 + (h1 - h0) * (double) wf : a0 > 0.0f ? h0 : h1;
+            auto f = e == 1.0 ? hz * ratio : rootHz * ratio * std::pow (std::max (hz, 1.0) / rootHz, e);
+            f += add;
+            auto gain = 1.0;
+            if (! (f >= 5.0 && f < top))
+                gain = 0.0;
+            else
+            {
+                if (f > fade)
+                    gain = (top - f) / (top - fade);
+                if (tilt != 0.0)
+                    gain *= std::min (16.0, std::pow (f / 1000.0, tilt));
+                if (width < 9.99)
+                {
+                    const auto dd = std::abs (std::log2 (f / band)), half = 0.5 * width;
+                    gain *= dd <= half ? 1.0 : dd < half + 1.0 ? 0.5 + 0.5 * std::cos (3.141592653589793 * (dd - half)) : 0.0;
+                }
+            }
+            parts.push_back ({ f, (float) (a * gain) });
+            loudest = std::max (loudest, a);
+        }
+        for (int i = (int) parts.size() - 1; i >= 0; --i) // (the loudest last, on top)
+        {
+            const auto& q = parts[(std::size_t) i];
+            if (q.level <= 0.0f || q.hz < 20.0 || q.hz > 20000.0)
+                continue;
+            const auto db = std::max (-60.0f, 20.0f * std::log10 (q.level / loudest));
+            const auto y = plot.getY() + (-db / 60.0f) * plot.getHeight();
+            const auto x = xOf (q.hz);
+            const bool lit = i < kept;
+            if (lit && cents > 0.0)
+            {
+                g.setColour (l.accent.withAlpha (0.35f));
+                for (const double c : { -cents, cents })
+                    g.drawVerticalLine ((int) xOf (q.hz * std::exp2 (c / 1200.0)), y, plot.getBottom());
+            }
+            g.setColour (lit ? l.accent : l.dim.withAlpha (0.45f));
+            g.fillRect (juce::Rectangle<float> (x - 0.75f, y, 1.5f, plot.getBottom() - y));
+        }
+    }
+
+private:
+    Page& page;
+};
+
 class HelixPlusStrip final : public juce::Component, public juce::FileDragAndDropTarget, private juce::ChangeListener
 {
 public:
-    static constexpr int stripHeight = 150 + 3 * (72 + 4); // (190ml: two rows more for Helix+ 2; 190mt: one for round 3)
+    static constexpr int stripHeight = 150 + 4 * (72 + 4); // (190ml: two rows more for Helix+ 2; 190mt: one for round 3; 190oc: one for round 4)
     HelixPlusStrip (AudioEngine& e, std::function<ChannelDef* (Song&)> locate, int channel) : page { e, std::move (locate), channel, false }
     {
         page.refresh = [this] { refreshAll(); };
@@ -1804,6 +1921,22 @@ public:
             specKnobs.push_back (knob (Z (specParams[i]), tr (specCaps[i]), i == 4 || i == 5 ? Curve::logRange : i == 8 ? Curve::gain : Curve::linear));
         grainOn->setTooltip (tr ("Granular: grains of the channel's sample (the Sample section's)"));
         specOn->setTooltip (tr ("Spectral: the sample's partials played as sines, stretched, shifted and filtered"));
+        makeRound4();
+    }
+
+    // --- Helix round 4 (round 190oc): unison for the granular and spectral oscillators, reverse grains and the partials'
+    // view (a sixth row)
+    void makeRound4()
+    {
+        const auto V = [] (int i) { return w::ext4Base + i; };
+        static const char* grainCaps[4] { "Voices", "Detune", "Width", "Reverse" };
+        for (int i = 0; i < 4; ++i)
+            grainUnisonKnobs.push_back (knob (V (w::ext4::grainUnison + i), tr (grainCaps[i])));
+        static const char* specCaps[3] { "Voices", "Detune", "Width" };
+        for (int i = 0; i < 3; ++i)
+            specUnisonKnobs.push_back (knob (V (w::ext4::specUnison + i), tr (specCaps[i])));
+        partials = std::make_unique<PartialsView> (page);
+        addAndMakeVisible (*partials);
     }
 
     // an audio file dropped on oscillator 3's section or a user table's row makes that oscillator's table; on the
@@ -1835,10 +1968,10 @@ public:
     {
         const auto l = page.look();
         g.fillAll (l.outer);
-        static const char* names[20] { "Warp 2", "Noise", "Unison+", "Filter+", "Macros", "LFO Draw", "Distortion", "Chorus", "Delay", "Reverb",
+        static const char* names[23] { "Warp 2", "Noise", "Unison+", "Filter+", "Macros", "LFO Draw", "Distortion", "Chorus", "Delay", "Reverb",
                                        "Oscillator 3", "Sample", "User tables", "Macros 5-8", "Chaos", "Shift", "EQ", "Multiband", "Granular",
-                                       "Spectral" };
-        for (int i = 0; i < 20; ++i)
+                                       "Spectral", "Grain Unison", "Spectral Unison", "Partials" };
+        for (int i = 0; i < 23; ++i)
         {
             const auto r = sections[(std::size_t) i];
             g.setColour (l.bg);
@@ -1885,11 +2018,12 @@ public:
     {
         // two rows of sections, left to right
         const int rowH = 72, gap = 4;
-        const int top[5] { 2, 2 + rowH + gap, 2 + 2 * (rowH + gap), 2 + 3 * (rowH + gap), 2 + 4 * (rowH + gap) };
-        const int widths[20] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216, 430, 562 }; // (190mt: the fifth row fits the strip's 1000 px)
-        const int rowOf[20] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4 };
+        const int top[6] { 2, 2 + rowH + gap, 2 + 2 * (rowH + gap), 2 + 3 * (rowH + gap), 2 + 4 * (rowH + gap), 2 + 5 * (rowH + gap) };
+        const int widths[23] { 264, 136, 220, 120, 236, 112, 208, 212, 236, 216, 440, 360, 188, 236, 204, 128, 200, 216, 430, 562, // (190mt: the fifth row fits the strip's 1000 px)
+                               232, 180, 576 }; // (190oc: the sixth row)
+        const int rowOf[23] { 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5 };
         int x = 2;
-        for (int i = 0; i < 20; ++i)
+        for (int i = 0; i < 23; ++i)
         {
             if (i > 0 && rowOf[i] != rowOf[i - 1])
                 x = 2;
@@ -2031,6 +2165,13 @@ public:
             kn (specKnobs[(std::size_t) i], s0, i, 56, 50);
         grainName = { g0.getX() + 80, g0.getY() + 1, g0.getWidth() - 86, 14 };
         specName = { s0.getX() + 80, s0.getY() + 1, s0.getWidth() - 86, 14 };
+        // (190oc) the unison knobs, the partials' view under its caption
+        const auto u0 = sections[20], u1 = sections[21], pv = sections[22];
+        for (int i = 0; i < (int) grainUnisonKnobs.size(); ++i)
+            kn (grainUnisonKnobs[(std::size_t) i], u0, i, 8, 54);
+        for (int i = 0; i < (int) specUnisonKnobs.size(); ++i)
+            kn (specUnisonKnobs[(std::size_t) i], u1, i, 9, 54);
+        partials->setBounds (pv.getX() + 6, pv.getY() + 16, pv.getWidth() - 12, pv.getHeight() - 20);
     }
 
 private:
@@ -2101,7 +2242,7 @@ private:
     std::vector<std::unique_ptr<Ctl>> ctls;
     std::vector<std::unique_ptr<Tab>> tabs;
     std::vector<std::unique_ptr<Menu>> menus;
-    std::array<juce::Rectangle<int>, 20> sections {};
+    std::array<juce::Rectangle<int>, 23> sections {};
     std::array<Menu*, 2> warpMenu {}, filterType {};
     std::array<Ctl*, 2> warpAmt {};
     std::array<Ctl*, 4> macros {};
@@ -2126,6 +2267,9 @@ private:
     Tab *sampleClean = nullptr, *grainOn = nullptr, *grainLoad = nullptr, *specOn = nullptr, *specLoad = nullptr;
     std::vector<Ctl*> grainKnobs, specKnobs;
     juce::Rectangle<int> grainName, specName;
+    // Helix round 4 (round 190oc)
+    std::vector<Ctl*> grainUnisonKnobs, specUnisonKnobs;
+    std::unique_ptr<PartialsView> partials;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
@@ -2812,6 +2956,11 @@ public:
         plus.setVisible (showPlus);
         well.isOn = [] { return showPlus; };
         well.onClick = [this] { setPlus (! showPlus); };
+        // (rollup 0.1.31 step 8: as a plugin in another host, LYNX Wavecoil, the well names the plugin, not the engine)
+        if (plugui::hostedElsewhere)
+            if (const auto* c = locator (channel) (const_cast<Song&> (e.getSong())); c != nullptr && ! c->name.empty())
+                well.setTooltip (tr ("{0}+: LYNX's extra controls beside the device")
+                                     .replace ("{0}", u8 (c->name).fromFirstOccurrenceOf ("LYNX ", false, false)));
     }
     void setPlus (bool shown)
     {

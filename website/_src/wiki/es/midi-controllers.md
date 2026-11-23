@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![La página MIDI de la configuración: dispositivos de entrada, dispositivos de salida con sincronización maestra y sincronización externa](/assets/img/wiki/settings-midi.webp)
 
@@ -100,7 +100,7 @@ MPE está en una primera etapa. Un controlador MPE toca cada nota con su propio 
 
 ## MIDI Map Mode y Key Map Mode
 
-En el [flujo Clip-launch](/wiki/layouts/), los clips, las escenas y los botones se pueden asignar como en Ableton Live. Los botones `MIDI` y `Tonalidad` junto al selector `Ambos`, `Cuadrícula`, `Canción` activan los modos, igual que `Ctrl+M` y `Ctrl+K`.
+En el [diseño Clip-launch](/wiki/layouts/), los clips, las escenas y los botones se pueden asignar como en Ableton Live. Los botones `MIDI` y `Tonalidad` junto al selector `Ambos`, `Cuadrícula`, `Canción` activan los modos, igual que `Ctrl+M` y `Ctrl+K`.
 
 1. Pulsa `Ctrl+M` para el MIDI Map Mode, o `Ctrl+K` para el Key Map Mode. Cada elemento que se puede asignar se tiñe, de azul para MIDI y de naranja para teclas.
 2. Haz clic en un elemento: una ranura de clip, una escena, el botón de parada de una pista, `Detener todos los clips`, reproducir, detener, grabar, `Grabación de sesión`, el metrónomo, o un mando del mixer de Session o de la Device View.
@@ -145,7 +145,7 @@ En el [flujo Clip-launch](/wiki/layouts/), los clips, las escenas y los botones 
 - Una nota mantenida por un pedal se graba hasta el momento en que el pedal se suelta.
 - Un clip de automatización no recupera un control mientras lo mueves desde un controlador. El control vuelve a seguir su automatización la próxima vez que empiece la reproducción.
 - Los vínculos de nota creados en `Configuración de control remoto` no se escriben en una exportación .flp.
-- `Ctrl+M` y `Ctrl+K` inician los modos de asignación solo en el flujo Clip-launch. El Map Mode aún no tiene asignación de macros ni rangos de notas.
+- `Ctrl+M` y `Ctrl+K` inician los modos de asignación solo en el diseño Clip-launch. El Map Mode aún no tiene asignación de macros ni rangos de notas.
 
 ## Relacionado
 

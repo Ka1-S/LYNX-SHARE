@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Główne okno z projektem demo: pasek narzędzi na górze, Browser po lewej, Playlist z tyłu i Channel Rack unoszący się nad nim](/assets/img/wiki/desktop.webp)
 
@@ -79,7 +79,7 @@ Browser jest tłem pulpitu: zostaje zadokowany z boku, a pozostałe okna zawsze 
 - Dopóki niczego nie przesuniesz, nie zmienisz rozmiaru ani nie odłączysz, okna wracają na domyślne miejsca za każdym razem, gdy główne okno zmienia rozmiar. Potem Twój układ jest zapamiętywany i skaluje się razem z oknem.
 - `F12` zamyka okna pluginów, ustawień kanałów i narzędzi. Nie zamyka pięciu głównych okien.
 - Gdy pianino z klawiatury komputera jest włączone (`Ctrl+T`), klawisze liter grają nuty, a większość jednoliterowych skrótów jest wstrzymana.
-- `Widok › Styl układu` przełącza między pracą na wzorcach (domyślną) a pracą z uruchamianiem klipów, która dodaje obok Playlisty siatkę klipów.
+- `Widok › Styl układu` przełącza między układem Pattern (domyślnym) a układem z uruchamianiem klipów, który dodaje obok Playlisty siatkę klipów.
 
 ## Powiązane
 

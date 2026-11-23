@@ -1579,6 +1579,12 @@ public:
             XL = xl.data(), XR = xr.data();
         }
         bool haveSum = false;
+        const auto peakOf = [] (const float* a, const float* b, int count) {
+            float p = 0.0f;
+            for (int i = 0; i < count; ++i)
+                p = std::max ({ p, std::fabs (a[i]), std::fabs (b[i]) });
+            return p;
+        };
         for (int b = 0; b < 3; ++b)
         {
             auto& st = stages[(std::size_t) b];
@@ -1601,7 +1607,11 @@ public:
                 biquadChain (st.data(), (int) st.size(), XL, XR, yl, yr, nb);
             }
             auto& B = band[(std::size_t) b];
+            if (metering) // (round 190oa, DP-27: the band's levels for the Monitor; measured only while it shows)
+                meterPeaks[(std::size_t) (2 * b)] = std::max (meterPeaks[(std::size_t) (2 * b)], peakOf (yl, yr, nb));
             processBand (b, yl, yr, nb);
+            if (metering)
+                meterPeaks[(std::size_t) (2 * b + 1)] = std::max (meterPeaks[(std::size_t) (2 * b + 1)], B.mode < 2 ? peakOf (yl, yr, nb) : 0.0f);
             if (B.mode < 2)
             {
                 if (! haveSum && b == 2)
@@ -1630,8 +1640,15 @@ public:
             down[0].down (sl.data(), sr.data(), L, R, n);
         else
             std::copy (sl.begin(), sl.begin() + n, L), std::copy (sr.begin(), sr.begin() + n, R);
+        if (metering)
+            meterPeaks[6] = std::max (meterPeaks[6], peakOf (L, R, n));
         processBand (3, L, R, n);
+        if (metering)
+            meterPeaks[7] = std::max (meterPeaks[7], peakOf (L, R, n));
     }
+
+    bool metering = false;                 // (round 190oa, DP-27: MaximusProcessor::setMetering)
+    std::array<float, 8> meterPeaks {};    // band b: [2b] into, [2b + 1] out of its compressor; 3 = master
 
 private:
     struct BandState
@@ -2833,6 +2850,9 @@ void MaximusProcessor::process (float* left, float* right, int n) noexcept
 {
     if (engine == nullptr)
         return;
+    engine->metering = metering;
+    if (metering)
+        engine->meterPeaks = {};
     for (int done = 0; done < n; done += Rack::maxBlock)
     {
         const auto len = std::min (Rack::maxBlock, n - done);
@@ -2847,6 +2867,13 @@ void MaximusProcessor::reset() noexcept
 }
 
 int MaximusProcessor::latencySamples() const noexcept { return engine != nullptr ? engine->latency() : 0; }
+
+float MaximusProcessor::bandPeak (int band, bool out) const noexcept
+{
+    if (engine == nullptr || band < 0 || band > 3)
+        return 0.0f;
+    return engine->meterPeaks[(std::size_t) (2 * band + (out ? 1 : 0))];
+}
 
 int maximusMixParameter (const MaximusPreset& preset) noexcept { return preset.p[5]; }
 

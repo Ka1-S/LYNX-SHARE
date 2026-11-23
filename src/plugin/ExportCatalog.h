@@ -6,6 +6,7 @@
 
 #include <array>
 
+#include "core/LynxBanks.h"
 #include "core/Song.h"
 
 namespace lynx::plugexport
@@ -30,4 +31,16 @@ inline constexpr std::array catalog {
 #undef LYNX_PLUGIN_ENTRY_0
 #undef LYNX_PLUGIN_ENTRY_1
 #undef LYNX_PLUGIN_ENTRY_2
+
+// An instrument entry's channel in a new plugin: its engine's first bank preset, or (Tetra and Braid have no bank: rollup
+// 0.1.31 step 6) the engine at its own defaults
+inline ChannelDef instrumentChannel (const Entry& e)
+{
+    if (auto channel = banks::defaultChannel (e.synth, e.name))
+        return *channel;
+    ChannelDef channel;
+    channel.instrument = e.synth;
+    channel.name = e.name;
+    return channel;
+}
 } // namespace lynx::plugexport

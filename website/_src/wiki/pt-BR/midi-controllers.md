@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![A página MIDI das configurações: dispositivos de entrada, dispositivos de saída com sincronização mestre e sincronização externa](/assets/img/wiki/settings-midi.webp)
 
@@ -100,7 +100,7 @@ O MPE está num primeiro estágio. Um controlador MPE toca cada nota com seu pr�
 
 ## MIDI Map Mode e Key Map Mode
 
-No [fluxo por disparo de clipes](/wiki/layouts/), clipes, cenas e botões podem ser mapeados como no Ableton Live. Os botões `MIDI` e `Tom` ao lado do seletor `Ambos`, `Grade`, `Song` ligam os modos, assim como `Ctrl+M` e `Ctrl+K`.
+No [layout de lançamento de clipes](/wiki/layouts/), clipes, cenas e botões podem ser mapeados como no Ableton Live. Os botões `MIDI` e `Tom` ao lado do seletor `Ambos`, `Grade`, `Song` ligam os modos, assim como `Ctrl+M` e `Ctrl+K`.
 
 1. Aperte `Ctrl+M` para o MIDI Map Mode, ou `Ctrl+K` para o Key Map Mode. Todo elemento que pode ser mapeado fica tingido, de azul para MIDI e de laranja para teclas.
 2. Clique em um elemento: um slot de clipe, uma cena, o botão de parar de uma faixa, `Parar todos os clipes`, tocar, parar, gravar, `Gravação de sessão`, o metrônomo, ou um knob do mixer Session ou do Device View.
@@ -145,7 +145,7 @@ No [fluxo por disparo de clipes](/wiki/layouts/), clipes, cenas e botões podem 
 - Uma nota segurada por um pedal é gravada até o momento em que o pedal sobe.
 - Um clipe de automação não retoma um controle enquanto você o move por um controlador. O controle volta a seguir a automação quando a reprodução começa de novo.
 - Vínculos de nota feitos em `Configurações de controle remoto` não são gravados em uma exportação .flp.
-- `Ctrl+M` e `Ctrl+K` iniciam os modos de mapeamento só no fluxo por disparo de clipes. O Map Mode ainda não tem mapeamento de macro nem faixas de notas.
+- `Ctrl+M` e `Ctrl+K` iniciam os modos de mapeamento só no layout de lançamento de clipes. O Map Mode ainda não tem mapeamento de macro nem faixas de notas.
 
 ## Veja também
 

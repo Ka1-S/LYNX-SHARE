@@ -35,6 +35,8 @@ struct WindowLayout
 {
     int style = 0;
     juce::String text;
+    // round 190oa (DF-130): the places of the project's channel / plugin windows (ui/WindowPlaces.h toVar; void = none)
+    juce::var places;
 };
 bool save (const Song& song, const juce::File& file, juce::String& error, const WindowLayout& layout);
 std::optional<Song> load (const juce::File& file, juce::String& error, juce::String* savedBy, WindowLayout* layout);

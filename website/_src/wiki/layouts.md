@@ -1,17 +1,17 @@
 ---
 title: Layouts
-summary: Switch between the three workflows: Pattern (the FL Studio workflow), Clip-launch and Simple.
+summary: Switch between the three layouts: Pattern (the FL Studio workflow), Clip-launch and Simple.
 status: full
 ---
-![The Clip-launch workflow: a grid of clips and scenes on the left, the Picker and the Playlist on the right](/assets/img/cliplaunch.webp)
+![The Clip-launch layout: a grid of clips and scenes on the left, the Picker and the Playlist on the right](/assets/img/cliplaunch.webp)
 
-`View › Layout style` has three entries: `Pattern workflow (default)`, `Clip-launch workflow` and `Simple workflow`. The same choice is in `Options › General settings`, under Workflow. The choice is kept when you close the program.
+`View › Layout style` has three entries: `Pattern layout (default)`, `Clip-launch layout` and `Simple layout`. The same choice is in `Options › General settings`, under Layout. The choice is kept when you close the program. The first time LYNX SHARE starts, a welcome card asks where you are coming from and picks the layout for you.
 
-The Pattern workflow, the default, works the way FL Studio does: the Channel rack, patterns, the Piano roll, the Playlist and the Mixer. The Clip-launch workflow, in the style of Ableton Live, adds a clip grid with scenes beside the Playlist, a Session mixer and the clip and device views; patterns and the Channel rack stay available. The Simple workflow mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording. Switching moves the windows only: the project stays the same.
+The Pattern layout, the default, works the way FL Studio does: the Channel rack, patterns, the Piano roll, the Playlist and the Mixer. The Clip-launch layout, in the style of Ableton Live, adds a clip grid with scenes beside the Playlist, a Session mixer and the clip and device views; patterns and the Channel rack stay available. The Simple layout mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording. Switching moves the windows only: the project stays the same.
 
 ## Launch clips in the grid
 
-1. Choose `View › Layout style › Clip-launch workflow`. The clip grid appears next to the Playlist.
+1. Choose `View › Layout style › Clip-launch layout`. The clip grid appears next to the Playlist.
 2. Right-click an empty slot, choose `Put a pattern here` and pick a pattern. Double-clicking an empty slot puts the current pattern there.
 3. Click the triangle at the left of the clip to launch it. If the transport is stopped, it starts.
 4. Click the triangle of a scene, in the `Scenes` column, to launch every clip in that row.
@@ -62,24 +62,24 @@ The slot menu also has two options for the whole grid: `Give tracks back to the 
 
 When you open a Live set, its Session clips and scenes go into the clip grid, with their launch settings. `File › Export › Ableton Live set (.als)` writes the grid back as Session clips. `Options › General settings` has `Session clips of Live sets`, where `Playlist, after the arrangement` places them on the Playlist instead.
 
-## The Simple workflow
+## The Simple layout
 
-`View › Layout style › Simple workflow` is one window with the tracks and the timeline, in the style of BandLab and FL Studio Mobile, and it suits a first song. `View › Track dock` shows a dock under the timeline for the selected track, with the `Effects`, `Instrument`, `Keyboard` and `Editor` tabs. In this workflow, the `Help` menu has `First-song tour` and `Welcome screen...`, which offers a seven-step first song, a demo song or an empty project. See [Simple layout](/wiki/simple-layout/).
+`View › Layout style › Simple layout` is one window with the tracks and the timeline, in the style of BandLab and FL Studio Mobile, and it suits a first song. `View › Track dock` shows a dock under the timeline for the selected track, with the `Effects`, `Instrument`, `Keyboard` and `Editor` tabs. In this workflow, the `Help` menu has `First-song tour` and `Welcome screen...`, which offers a seven-step first song, a demo song or an empty project. See [Simple layout](/wiki/simple-layout/).
 
-`Lyrics and notes` and `Reference match...` in the `View` menu, and `Clean voice` in a Mixer insert's menu, are there in every layout. In the Simple workflow, `Clean voice` is in a track's menu too.
+`Lyrics and notes` and `Reference match...` in the `View` menu, and `Clean voice` in a Mixer insert's menu, are there in every layout. In the Simple layout, `Clean voice` is in a track's menu too.
 
 ## Switch back
 
-Choose `View › Layout style › Pattern workflow (default)`. The window layout you had in the Pattern workflow comes back, and the automation lanes return to the setting they had before. The clips in the grid stay in the project.
+Choose `View › Layout style › Pattern layout (default)`. The window layout you had in the Pattern layout comes back, and the automation lanes return to the setting they had before. The clips in the grid stay in the project.
 
 ## Good to know
 
 - A track that launched a clip stays silent in the Playlist until you press `Back to Playlist`. The option `Give tracks back to the Playlist when the transport stops` does it for you at every stop.
-- The new keys of the grid (`B`, `Q`, `Ctrl+M`, `Ctrl+K` and others) act this way in the Clip-launch workflow only. In the Pattern workflow they keep FL Studio's meaning.
+- The new keys of the grid (`B`, `Q`, `Ctrl+M`, `Ctrl+K` and others) act this way in the Clip-launch layout only. In the Pattern layout they keep FL Studio's meaning.
 - A scene in 6/8 plays a bar of three beats, because the meter counts quarter notes.
 - Follow actions exist for clips, not for scenes.
-- Automation lanes switched by hand while in the Clip-launch workflow are not kept when you go back.
-- With the Pattern workflow selected, nothing of the grid is loaded.
+- Automation lanes switched by hand while in the Clip-launch layout are not kept when you go back.
+- With the Pattern layout selected, nothing of the grid is loaded.
 
 ## Related
 

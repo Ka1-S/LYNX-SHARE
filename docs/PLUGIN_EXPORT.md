@@ -1,7 +1,8 @@
-# LYNX's own plugins as CLAP and VST3 (rounds 180b, 188b)
+# LYNX's own plugins as CLAP, VST3 and LV2 (rounds 180b, 188b, 190ov, 190pk, 190pq)
 
 Status: **built by the release workflow as a separate, optional download** (the user's option C, 2026-11-08): every LYNX
-effect in one CLAP, a short list also as VST3, for Windows, Linux and macOS. It is never part of the app's installer, and
+effect in one CLAP, a short list also as VST3 (and on Linux as LV2), for Windows, Linux and macOS. The
+user-facing summary is [PLUGINS-PACK.md](PLUGINS-PACK.md). It is never part of the app's installer, and
 the app's own build doesn't change (the option stays off there).
 
 ## What is exported
@@ -40,6 +41,43 @@ there. Plugin names are LYNX names only, never an FL Studio name (a test checks 
 | LYNX Voice Shift | pitch / formant | yes | |
 | LYNX Gemini Doubler | doubler | yes | |
 | LYNX Quell Denoiser | noise reduction | yes | |
+| LYNX Strike Shaper | transient designer (round 190ov) | yes | |
+| LYNX Anvil Bus | drum-bus processor (190ov) | yes | |
+| LYNX Corrode | degrader (190ov) | yes | |
+| LYNX Soundboard | resonant body (190ov) | yes | |
+| LYNX Platter | record-wear effect (190ov) | yes | |
+| LYNX Timeprism | spectral freezer / delay (190ov) | yes | |
+| LYNX Chimefield | spectral resonator (190ov; the Harmonia engine) | yes | |
+| LYNX Model | instrument (physical models, 190ov) | yes | yes |
+| LYNX Fourfold | instrument (4-operator FM: the Tetra engine, 190pq) | yes | yes |
+| LYNX Wavecoil | instrument (wavetable: the Helix engine, 190pq) | yes | yes |
+| LYNX Duoloom | instrument (two-engine macro synth: the Braid engine, 190pq) | yes | yes |
+
+LV2 (Linux; rounds 190ov and 190pk, shipped since 0.1.31): every VST3 of the list is also built as an LV2 bundle on Linux
+(`-DLYNX_PLUGINS_LV2`, on by default; it does nothing elsewhere): JUCE's LV2 wrapper (`src/plugin/Lv2Entry.cpp`, the same
+entry as the VST3's), `<name with dashes>.lv2/` with the library and the `.ttl` files JUCE's `juce_LV2ManifestHelper` writes
+from it after the link; the URI is `https://lynx-share.com/plugins/lv2/<the clap id after "com.ka1-s.lynx.">` and never
+changes. `package-plugins.sh` packs them in `LV2/`, `install.sh` copies them to `~/.lv2`, and `check-plugins.sh` runs
+`plugexporttest` (through JUCE's LV2 host) and `lv2lint` on each. Round 190ov's CI run 44955467954 had them failing in
+`plugexporttest`; round 190pk found two JUCE bugs behind that (`cmake/LynxPatchJuce.cmake`, JUCE fix 50):
+- the effects crashed: JUCE's LV2 wrapper declares the side-chain ports `lv2:connectionOptional` (a host may leave them
+  unconnected) but copied their input from the NULL pointer such a host gives. An unconnected port is silence now.
+- FM10 and LYNX Model ended on an X error (BadAtom, X_ChangeProperty, atom 0): on an X server no window manager ever ran
+  on (CI's Xvfb) the WM_PROTOCOLS atom doesn't exist, and JUCE set it on every new window with atom 0 (and read WM_STATE /
+  _NET_WM_STATE with atom 0). The LYNX app ignores X errors; a plugin's host has Xlib's default handler, which exits.
+
+`plugexporttest`'s "attempt to map invalid URI <bundle path>" line is lilv's: JUCE's host first tries the path as a URI,
+then loads it as a bundle. Harmless. Two things the LV2 host test needs: JUCE's LV2 host lists the plugin's parameters
+in an order of its own (plus a "Bypass" for the `lv2:enabled` port), so `plugexporttest` finds the engine's parameter
+`i` by its id (`...:p<i>`); and JUCE's host tells an instrument by its class only when the LV2 specification bundles are
+in `~/.lv2`, `/usr/lib/lv2` or `/usr/local/lib/lv2` (CI installs `lv2-dev`; every Linux with an LV2 host has them).
+
+`lv2lint` (built from its author's repository at a fixed commit in CI) runs with `-Mpack` and two of its checks skipped,
+both about JUCE's wrapper rather than LYNX: "Plugin Run" fails a `run()` that takes any mutex, and JUCE's takes the
+processor's callback lock (uncontended unless the host is loading a state; JUCE's VST3 wrapper does the same), and "UI
+Resize Interface" fails the `ui:resize` extension data JUCE's editor offers. Its warnings left: the editor uses
+instance-access, the editor lives in the plugin's binary. (Since 0.1.31 each plugin's `.ttl` names its licence,
+`doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>`, JUCE fix 51; JUCE wrote none.)
 
 The last column of the table says what is built: `0` nothing, `1` in the CLAP, `2` in the CLAP and as a VST3 of its own.
 The VST3 short list is the user's call: each VST3 carries the whole runtime (see "Sizes"), the CLAP holds them all at
@@ -47,10 +85,47 @@ the size of one. The CLAP announces each plugin's kind to the host (`clap/plugin
 reverb ...).
 
 The names were checked by a **web search only, with no trademark registry check**. Single words that other plugin makers
-may also use as product names (Nebula, Halo, Horizon, Orbit) always carry the "LYNX" prefix.
+may also use as product names (Nebula, Halo, Horizon, Orbit; round 190ov: Platter, also a Kontakt instrument, and Anvil, a guitar preamp plugin)
+always carry the "LYNX" prefix.
 
-Instruments other than FM10 follow later with their own names (round 188b report: a proposed list for the user). Until
-then they stay at `0`:
+Round 190ov added LYNX Model (LYNX's own physical models) and seven later LYNX-own effects. LYNX's own synths Tetra, Helix
+and Braid export under names of their own (owner decision, rollup 0.1.31 step 6), because their engine names are other
+makers' products (Sequential's Tetra synth, Line 6's Helix / Helix Native, Mutable Instruments' Braids, also a Softube
+plugin): **LYNX Fourfold**, **LYNX Wavecoil** and **LYNX Duoloom**, built as CLAP, VST3 and LV2 since round 190pq
+(0.1.31). Tetra and Braid have no preset bank: their plugin starts from the engine's defaults
+(`plugexport::instrumentChannel`). CI plugins run 44975814572 had held them back (step 6) with two failures, both fixed in
+round 190pq:
+- `plugexporttest` aborted in the CLAP (`std::length_error`, `basic_string::_M_create`; a segmentation fault locally):
+  its reference render (`directInstrument`) dereferenced the empty `banks::defaultChannel` of Tetra / Braid and copied a
+  `ChannelDef` from garbage. A bug in the test tool, not in the plugins: it now starts from `plugexport::instrumentChannel`,
+  as the plugin does.
+- clap-validator's state-reproducibility-binary (save, load into a new instance, save again: the same bytes) failed on
+  Fourfold and Wavecoil: every save wrote each host value back into the channel through the parameter's range
+  (raw -> 0..1 -> raw), which moves some values by a float step, and `modelParams` are written with 7 digits, so the
+  second save differed in a last digit (Fourfold `modelParams` 46 and 138, Wavecoil 46 and 63). A save now writes only
+  the values the host moved. `.lynx` loading is unchanged. `plugexporttest` checks the same thing on every plugin
+  and format (every parameter moved, a third instance loads the state and saves it back byte for byte).
+
+With those fixed, the CLAP test went further and found a crash that every LYNX instrument already had (FM10 and Model
+too): an instrument's editor crashed in a host that had removed every LYNX plugin and then added a LYNX instrument
+again. Each plugin instance holds a JUCE initialiser, and the last one to go shuts JUCE down, which deletes
+`WaveformCache` (a `DeletedAtShutdown` singleton). The library stays loaded, because JUCE's own `thread_local` text
+shaping registers a TLS destructor on the host's main thread, and that pins the library until the thread ends. The cache
+was declared "never create again after deletion", so the next instrument editor's `WaveformDisplay` got a null cache.
+It may be created again now (`src/ui/WaveformView.h`); the app deletes it only at its own shutdown. `plugexporttest`'s
+plain-host CLAP pass, which creates and frees one plugin at a time, covers this case. The instrument check also moves
+the engine's first continuous parameter by id under JUCE's LV2 host (that host lists parameters in its own order, and
+its parameter 1 was a stepped on / off switch on the three synths).
+
+The editor pictures `check-plugins.sh` draws showed two more things, both fixed in round 190pq:
+- LYNX Duoloom opened the Sampler's page (File, Time stretching, "No sample loaded"), not Braid's knob list.
+  `makeChannelSettingsPanel` had its own copy of the model-engine list, and round 190ko added Braid only to
+  `isModelKind`. The copy is gone, so the app's channel window for a Braid channel (Pattern layout) also shows the knob
+  list 190ko described, instead of the Sampler's page.
+- LYNX Fourfold's title strip printed "TETRA". As a plugin it prints the plugin's name (FOURFOLD), as the other
+  editors' name plates do; inside LYNX it stays TETRA. The knob-list page names the plugin as its description too. The Harmonia engine exports as **LYNX
+Chimefield** (Cherry Audio sells a Harmonia synth). Inside LYNX the engines keep their names. Instruments that stand in for FL Studio's follow later with their own names (round 188b report: a
+proposed list for the user). Until then they stay at `0`:
 
 | Exported name | Engine inside LYNX | Kind | Built now |
 |---|---|---|---|
@@ -71,8 +146,8 @@ Each release has, next to the app, one archive per system and a checksum file. L
 | `LYNX-Plugins-<version>-linux-x86_64.tar.xz` | Linux x86_64, glibc 2.35 or later (Ubuntu 22.04 and later) |
 | `LYNX-Plugins-<version>-SHA256SUMS.txt` | the SHA-256 of the three archives |
 
-Inside: `CLAP/LYNX Plugins.clap` (every plugin), `VST3/*.vst3` (the short list), `PLUGINS.txt`, `README.txt`, an install
-script, `LICENSE` and `THIRD_PARTY.md`.
+Inside: `CLAP/LYNX Plugins.clap` (every plugin), `VST3/*.vst3` (the short list), on Linux `LV2/*.lv2` (the same short
+list), `PLUGINS.txt`, `README.txt`, an install script, `LICENSE` and `THIRD_PARTY.md`.
 
 - **Windows:** right-click `install.cmd` > Run as administrator. It copies the CLAP to
   `C:\Program Files\Common Files\CLAP` and the VST3 bundles to `C:\Program Files\Common Files\VST3`. Or copy them there
@@ -80,7 +155,7 @@ script, `LICENSE` and `THIRD_PARTY.md`.
 - **macOS:** in Terminal, in the unpacked folder: `sh install.sh`. It copies them to `~/Library/Audio/Plug-Ins/CLAP` and
   `~/Library/Audio/Plug-Ins/VST3` and clears the download quarantine. The bundles are signed ad hoc only: there is no
   Apple Developer ID yet, so they are not notarized.
-- **Linux:** `sh install.sh` copies them to `~/.clap` and `~/.vst3`. `sh install.sh --uninstall` removes them.
+- **Linux:** `sh install.sh` copies them to `~/.clap`, `~/.vst3` and `~/.lv2`. `sh install.sh --uninstall` removes them.
 - Then rescan in the host. FL Studio: Options > Manage plugins > Find installed plugins. FL Studio finds VST3 only in
   the system folder (its manual: VST3 plugins "must be installed to default system locations").
 - Check a download: `sha256sum <file>` (Linux), `shasum -a 256 <file>` (macOS) or `Get-FileHash <file> -Algorithm
@@ -218,6 +293,23 @@ The download (round 188b, 1 CLAP + 7 VST3):
 | `LYNX-Plugins-<v>-macos-universal.tar.xz` (arm64 + x86_64 in each binary; Archive Utility opens it) | 22.2 MB |
 | `LYNX-Plugins-<v>-win-x64.zip` (zip compresses each file alone; each binary 24.9 MB, with section flags) | 84.6 MB |
 
+Round 190pk's Linux package (1 CLAP with 36 plugins, 8 VST3, 8 LV2) is 26.3 MB from CI (GCC 13), 31.6 MB locally
+(GCC 15): the 256 MiB window holds
+only about five of its 48 MB binaries, so the LV2 bundles, packed after the VST3s, add their own share.
+
+Round 190pq (1 CLAP with 39 plugins, 11 VST3, 11 LV2; CI run 45058238805): the Linux archive is 27.1 MB (CI's
+artifact, xz inside), 31.7 MB locally; the Windows zip is 195.4 MB (8 VST3: 140.8 MB in round 190ov): each Windows
+VST3 is compressed on its own, so each of the three synths adds about 18 MB there; macOS universal 39.0 MB (34.6 MB).
+The Windows build at JOBS=2 took 1 h 10 min (45 min with 8 VST3), macOS universal 2 h 22 min.
+
+Round 190pu (shrinking the Windows pack; audit in lynx-work/packsize_190pu/AUDIT.md): the zip's cost is its method, not the
+binaries: 12 files of 37 MB (the CLAP and 11 VST3, each 16.3 MB deflated, differing from each other by under 0.5 %). The same
+folder as one solid LZMA2 stream (`.7z`, 128 MiB dictionary) is 20 MB, the same files byte for byte (CI diffs the two). So
+the Windows pack is now offered twice: `LYNX-Plugins-<v>-win-x64.zip` (195 MB, opens everywhere) and `...-win-x64.7z` (20 MB,
+Windows 11 Explorer or 7-Zip). Tried and not taken: ICF (zig's linker driver rejects `--icf`), a shared runtime DLL or several
+classes in one VST3 (option B above: it needs a patch of JUCE's VST3 wrapper, whose class ids, bus layout and MIDI mode are
+compile-time macros; the owner chose C in round 188b).
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;
@@ -255,6 +347,18 @@ controls stay hidden in the plugins for now.
   chain takes its output energy to 0.14 of the quiet case). LYNX's own CLAP host has no side buses, so the CLAP's second
   port is checked by clap-validator only, not with audio.
 - Ableton Live has not been tested, at the user's request.
+- LV2, round 190pk: CI run 45010577680 (Plugins workflow, Linux job) passes all 34 checks of the archive, the 8 LV2
+  bundles' `plugexporttest` and `lv2lint` among them. Locally (Linux, WSL, a private Xvfb with no window manager) the 8
+  bundles of the packed archive pass
+  `plugexporttest` (scan, instrument / effect, null test at the defaults and with every parameter moved, side-chain
+  bus, state, editor, 8 more instances) and `lv2lint`; jalv 1.8.0 (JACK's dummy driver) runs each for 10 s and lv2bench
+  (lilv 0.26.2) instantiates, runs 1,024 blocks and frees each. The same run passes every CLAP and VST3 check
+  (`plugexporttest`, pluginval strictness 10, clap-validator). Not tried in Ardour, Carla, Qtractor or Zrythm yet, and
+  the editor only inside JUCE's host (jalv's command-line host shows no X11 editor).
+- Round 190pq: CI run 45058238805 (Plugins workflow): Linux 46 / 46 checks pass (plugexporttest on the CLAP, 11 VST3 and
+  11 LV2; pluginval strictness 10 on 11 VST3; clap-validator; lv2lint on 11 LV2), Windows and macOS universal 24 / 24
+  each (plugexporttest on the CLAP and 11 VST3, pluginval on 11 VST3, clap-validator). The same 46 pass locally. New in plugexporttest: a state saved again after a load is the
+  same bytes with every parameter moved, on every plugin and format.
 - FL Studio 2026 (Windows), round 180b: Facet EQ and FM10, as CLAP (through `CLAP_PATH`) and as VST3 (from
   `Common Files\VST3`): load, play, both editors, a saved project reopens with its state, FL exits in about 1.4 s.
 - FL Studio 2026 (Windows), round 188b, the release download from CI: ADD > Refresh plugin list (fast scan) lists all 27

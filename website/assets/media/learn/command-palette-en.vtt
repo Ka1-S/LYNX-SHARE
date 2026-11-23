@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Looking for a command? Press the question mark key to open the command palette.
+
+00:00:08.800 --> 00:00:14.200
+Type what you want. Every menu item, shortcut and setting is in the list.
+
+00:00:14.400 --> 00:00:19.200
+Press Enter to run it. Here, the Tracker opens.
+
+00:00:19.400 --> 00:00:24.800
+Now the CPU. While the song plays, the toolbar's CPU meter shows the load.
+
+00:00:25.000 --> 00:00:30.400
+Double-click it for the Plugin performance monitor: the CPU of every plugin.
+
+00:00:30.600 --> 00:00:37.200
+To save CPU, Tools, Switch smart disable for all plugins: a plugin rests while it is silent.

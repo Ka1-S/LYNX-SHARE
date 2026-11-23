@@ -1,11 +1,11 @@
 ---
-source: c4e89e7e72
+source: 532b2eee04
 ---
-`檔案 › 開啟...`（`Ctrl+O`）可以開啟 LYNX SHARE 自己的 `.lynx` 專案，也能開啟 `.flp`、`.als`、`.flm` 和 `.mid` 檔案。來自其他程式的專案屬於匯入：它會成為一個新的、尚未儲存的 LYNX SHARE 專案，原始檔案不會被寫入。
+`檔案 › 開啟...`（`Ctrl+O`）可以開啟 LYNX SHARE 自己的 `.lynx` 專案，也能開啟 `.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx` 和 `.mid` 檔案。來自其他程式的專案屬於匯入：它會成為一個新的、尚未儲存的 LYNX SHARE 專案，原始檔案不會被寫入。
 
 ## 開啟來自其他程式的專案
 
-1. 選擇 `檔案 › 開啟...`，選取 `.flp`、`.als`、`.flm` 或 `.mid` 檔案。
+1. 選擇 `檔案 › 開啟...`，選取 `.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx`、`.mid`、`.zip` 或追蹤器模組（`.mod`、`.xm`、`.s3m`、`.it`）檔案。
 2. 等待 LYNX SHARE 尋找專案的外掛和取樣。
 3. 如果有東西找不到，會開啟 `缺失的檔案` 視窗。請指向你的取樣所在位置，或直接關閉它。
 4. 標題列現在會顯示專案的來源，例如「(imported from FL Studio)」。
@@ -16,11 +16,16 @@ source: c4e89e7e72
 | 格式 | 已轉換 | 未轉換 |
 |---|---|---|
 | `.flp`（FL Studio） | 通道、取樣、樣式、滑音和 porta 音符、所有編排、標記、拍號變化、自動化、控制器連結、含路由的混音器、側鏈、軌道 EQ 和原生效果器 | FLEX 包是加密的，不會被開啟。FLEX 通道會得到依預設集名稱選出的合成器音色 |
-| `.als`（Live 11 和 12） | MIDI、音訊、群組和回傳軌道，速度、拍號、定位點、循環，音量、聲像、靜音、獨奏和傳送及其自動化，Session 片段和場景，變速標記，機架和鼓機架，以及 Live 自己的許多裝置（EQ Eight、Compressor、Glue Compressor、Reverb、Delay、Auto Filter、Saturator、Utility、Simpler、Drift 等），會變成 LYNX SHARE 自己的 | Live 中沒有 LYNX SHARE 對應項目的裝置（Hybrid Reverb、Grain Delay、Amp、Roar、FM Operator 音色等）會被捨棄並列出。MIDI Effect Rack 不會轉換 |
+| `.als`（Live 11 和 12） | MIDI、音訊、群組和回傳軌道，速度、拍號、定位點、循環，音量、聲像、靜音、獨奏和傳送及其自動化，Session 片段和場景，變速標記，機架和鼓機架，以及 Live 自己的許多裝置（EQ Eight、Compressor、Glue Compressor、Reverb、Hybrid Reverb、Delay、Grain Delay、Auto Filter、Saturator、Roar、Utility、Simpler、Drift、Operator、Wavetable 等），會變成 LYNX SHARE 自己的 | Live 中沒有 LYNX SHARE 對應項目的裝置（Amp、Cabinet、Beat Repeat、Vocoder 等）會被捨棄並列出 |
 | `.flm`（FL Studio Mobile） | 速度、拍號、每個通道一個混音插入軌、每條 lane 一條播放清單軌道、樣式、帶偏移和音高的音訊片段、鼓組、DW Sampler 取樣和 `.dwp` 程式、Slicer、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw、效果器、自動化和和弦組 | 其他 FLM 產生器會用內建合成器播放 |
+| `.dawproject`（Bitwig Studio、Studio One、Cubase 等程式） | 軌道、資料夾、片段、音符、帶變速標記的音訊、自動化、速度、標記、帶傳送的混音器、放進片段格線的場景，以及帶狀態的 VST3、VST2 和 CLAP 外掛。該格式的 EQ、壓縮器、閘門和限制器會變成 LYNX SHARE 自己的 | 音符效果器、逐音符表情和其他程式自己的裝置會列在匯入報告中 |
+| `.band`（GarageBand 10、GarageBand for iOS） | 軌道、MIDI 和音訊區域、速度、拍號、調性、作為標記的段落、電平、聲像和靜音，作為簡易工作流程的音軌。GarageBand for iOS 中製作的 Sampler 樂器 | 樂器音軌用內建合成器和鼓來播放。Drummer 區域、take 資料夾和速度變化會被列出。GarageBand 11 及更早版本的專案無法讀取 |
+| `.blx`（BandLab） | 軌道、帶循環的 MIDI 和音訊區域、速度、拍號、調性、音量、聲像和靜音、音量和聲像自動化以及常用效果器，作為簡易工作流程的音軌 | 樂器音軌用內建合成器和鼓來播放。其他效果器和 Mastering 預設集會被略過並列出。只在自製的測試專案上測試過 |
 | `.mid` | 音符、拍號和每一次速度變化 | MIDI 檔案不含聲音：通道會得到 LYNX SHARE 合成器或 MIDI Out 通道 |
+| `.mod`、`.xm`、`.s3m`、`.it`（追蹤器模組） | 樂器變成帶取樣的 Sampler 通道、樣式、作為播放清單的順序清單、列速度和節拍速度、音符音量、聲像、延遲和切斷；音量和聲像變化作為通道的事件（MOD 和 XM），滑音、顫音、琶音和音高包絡作為音符的音高曲線 | 其他效果和樂器包絡會計入匯入報告。`檢視 › 追蹤器` 以追蹤器的方式編輯音符 |
+| `.zip` | FL Studio 的壓縮循環包，或連同取樣匯出的專案：解壓縮到它自己的資料夾，然後開啟其中的專案及其取樣 | |
 
-`.flp` 中的第三方 VST2、VST3 和 CLAP 外掛，以及 `.als` 中的 VST2 和 VST3 外掛，只要你的電腦裡裝有同一個外掛，就會連同儲存的狀態一起載入。
+`.flp` 或 `.dawproject` 中的第三方 VST2、VST3 和 CLAP 外掛，以及 `.als` 中的 VST2 和 VST3 外掛，只要你的電腦裡裝有同一個外掛，就會連同儲存的狀態一起載入。
 
 ## FL Studio 自己的外掛
 
@@ -84,9 +89,18 @@ LYNX SHARE 會先依識別碼、再依檔案、最後依名稱來尋找每個第
 
 在[鋼琴捲軸](/wiki/piano-roll/)中按 `Ctrl+M`，可把 MIDI 檔案匯入目前的通道。
 
+## 從另一個專案匯入軌道
+
+`檔案 › 匯入 › 來自另一個專案的軌道...` 會把另一個專案的軌道帶入目前開啟的專案，不必關閉它。它能讀取 `檔案 › 開啟...` 能讀取的所有格式。
+
+1. 選擇專案。一個視窗會列出它的播放清單軌道以及每條軌道裡有什麼。
+2. 勾選你想要的軌道。
+3. 選擇是否帶上 `包含混音器插槽和效果` 和 `包含自動化`，以及 `放置於` 歌曲開頭還是時間選取範圍的開頭。
+4. 按一下匯入。新的軌道、通道、樣式和插入軌作為一個步驟加入，所以一次復原就能全部撤回。
+
 ## 須知
 
-- `說明 › 缺失的檔案...` 可在之後再次開啟該視窗。`說明 › Last FL Studio import report` 會列出被近似處理、被省略或未安裝的內容。
+- `說明 › 缺失的檔案...` 可在之後再次開啟該視窗。`說明 › 上次專案匯入報告` 會列出被近似處理、被省略或未安裝的內容。
 - Live 套裝的 Session 片段會放進片段啟動版面的片段格線。`選項 › 一般設定...` 中的 `Live 專案的工作階段片段` 則會改為把它們放在播放清單上。
 
 ## 相關頁面

@@ -65,8 +65,10 @@ public:
     // (round 190jn: `peak` = Live's peak-level pill above the volume field, Live's look only)
     // (round 190kc: `post` = a return's Pre / Post toggle in the Main strip's Sends section (row = the return's row);
     // `xfadeA` / `xfadeB` = the Crossfade Assign buttons; `crossfader` = the Main strip's crossfader)
+    // (round 190nc, DL-110, Live's look only: the Main strip's `cueOut` / `mainOut` choosers, its Solo/Cue Mode switch
+    // `soloCue` and Cue Volume knob `cueVolume`; a track's `solo` is its Cue switch while Cue mode is in effect)
     enum class Part { none, inType, inChannel, monIn, monAuto, monOff, output, send, delay, volume, fader, pan, activator, solo, arm, peak,
-                      post, xfadeA, xfadeB, crossfader };
+                      post, xfadeA, xfadeB, crossfader, cueOut, mainOut, soloCue, cueVolume };
     struct Hit
     {
         int column = -1; // the grid column; -2 = the Main strip; returnColumn (k) = return strip k (round 190kc)
@@ -87,6 +89,7 @@ public:
     // Round 190kc: the menus a right-click opens on a return's send knob and on the crossfader (--cliplaunch190kcshot)
     juce::PopupMenu sendMenu (const Hit& hit);
     juce::PopupMenu crossfaderMenu();
+    juce::PopupMenu deviceOutputMenu (bool cue); // round 190nc: the Cue Out (true) / Main Out chooser's menu
     int returnColumnCount() const noexcept { return returnColumns; }
     // the loudest peak the pill holds (linear gain, 0 = none)
     float loudestPeak (int insert) const noexcept
@@ -94,6 +97,9 @@ public:
         return insert >= 0 && insert < (int) loudest.size() ? loudest[(std::size_t) insert] : 0.0f;
     }
 
+    // round 190ou (--trackstates190opshot): where a column's strip is
+    int stripXForSnapshot (int column) const noexcept { return stripX (column); }
+    int stripWidthForSnapshot (int column) const noexcept { return stripWidth (column); }
 private:
     bool isAutomated (const AutomationTarget& t) const; // (round 190lx, DL-59)
     void refreshCache() const;
@@ -116,6 +122,7 @@ private:
     // round 190jn (design190ia CL-16): Live 12.4's Session mixer strip, in Live's look only (theme::livelook::active)
     juce::Rectangle<int> livePartBounds (int column, Part part, int row) const;
     void paintStripLive (juce::Graphics& g, int column, int selected);
+    void paintDeactivatedVeil (juce::Graphics& g, int column) const; // (round 190ou)
     void paintMeterLive (juce::Graphics& g, int insert, juce::Rectangle<int> area) const;
     void showInputMenu (int insert, bool channels);
     void showSendMenu (const Hit& hit);   // round 190kc: a return's send knob (Enable Send / Enable All Sends)
@@ -123,6 +130,9 @@ private:
     bool isReturn (int column) const noexcept { return column >= returnBase && column < returnBase + returnColumns; }
     void paintCrossfadeSection (juce::Graphics& g, int column, bool live);
     void showOutputMenu (int insert);
+    // round 190nc (DL-110): the Main strip's Cue Out / Main Out choosers (the device's pairs, then its single outputs)
+    void showDeviceOutputMenu (bool cue);
+    bool cueInEffect() const; // Live's Cue mode in effect (the switch on Cue, the Cue Out separate from Main)
     juce::String tipFor (const Hit& hit) const;
 
     static constexpr int mainColumn = -2;
@@ -145,5 +155,6 @@ private:
     std::uint64_t armsShownState = 0;                 // round 190ge: the arms the last tick saw (tick repaints on a change)
     ui::ValueDrag drag;
     Hit dragging, hover;
+    int cueChannels = 0; // round 190nc: the device's output count, read at each paint (Cue mode needs a separate Cue Out)
 };
 } // namespace lynx

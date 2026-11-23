@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![La page MIDI des réglages : périphériques d'entrée, périphériques de sortie avec synchro maître, et synchro externe](/assets/img/wiki/settings-midi.webp)
 
@@ -100,7 +100,7 @@ Le MPE en est à un premier stade. Un contrôleur MPE joue chaque note avec son 
 
 ## MIDI Map Mode et Key Map Mode
 
-Dans le [flux par lancement de clips](/wiki/layouts/), les clips, les scènes et les boutons peuvent être mappés comme dans Ableton Live. Les boutons `MIDI` et `Tonalité` à côté du sélecteur `Les deux`, `Grille`, `Song` activent les modes, tout comme `Ctrl+M` et `Ctrl+K`.
+Dans le [disposition par lancement de clips](/wiki/layouts/), les clips, les scènes et les boutons peuvent être mappés comme dans Ableton Live. Les boutons `MIDI` et `Tonalité` à côté du sélecteur `Les deux`, `Grille`, `Song` activent les modes, tout comme `Ctrl+M` et `Ctrl+K`.
 
 1. Appuyez sur `Ctrl+M` pour le MIDI Map Mode, ou sur `Ctrl+K` pour le Key Map Mode. Chaque élément qui peut être mappé est teinté, en bleu pour le MIDI et en orange pour les touches.
 2. Cliquez sur un élément : un emplacement de clip, une scène, le bouton d'arrêt d'une piste, `Arrêter tous les clips`, lecture, arrêt, enregistrement, `Enregistrement de session`, le métronome, ou un bouton de la table de mixage de session ou de la Device View.
@@ -145,7 +145,7 @@ Dans le [flux par lancement de clips](/wiki/layouts/), les clips, les scènes et
 - Une note maintenue par une pédale est enregistrée jusqu'au moment où la pédale est relevée.
 - Un clip d'automation ne reprend pas un contrôle tant que vous le déplacez depuis un contrôleur. Le contrôle suit de nouveau son automation au prochain démarrage de la lecture.
 - Les liaisons de note créées dans `Réglages de la télécommande` ne sont pas écrites dans un export .flp.
-- `Ctrl+M` et `Ctrl+K` ne lancent les modes de mappage que dans le flux par lancement de clips. Le Map Mode n'a pas encore de mappage de macros ni de plages de notes.
+- `Ctrl+M` et `Ctrl+K` ne lancent les modes de mappage que dans la disposition par lancement de clips. Le Map Mode n'a pas encore de mappage de macros ni de plages de notes.
 
 ## Voir aussi
 

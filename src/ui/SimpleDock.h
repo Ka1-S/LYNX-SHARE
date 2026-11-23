@@ -55,7 +55,7 @@ public:
         std::function<void()> openPianoRollPanel;
     };
 
-    enum class Tab { instrument, keyboard, editor, effects, pads, controls, steps };
+    enum class Tab { instrument, keyboard, editor, effects, pads, controls, steps, tracker };
 
     SimpleDock (AudioEngine& engine, Hooks hooks);
     ~SimpleDock() override;
@@ -129,6 +129,11 @@ public:
     void addOneKnobForCheck (int goal);
     void setBlendForCheck (float value);
     void setReverbForCheck (float value); // round 190fo: the track's send to the shared reverb
+    // round 190ot (research190oe P5): the shared Echo send, "Duck under..." (−1: None) and its menu / button text
+    void setEchoForCheck (float value);
+    void duckUnderForCheck (int triggerInsert);
+    juce::PopupMenu duckMenuForCheck();
+    juce::String duckButtonTextForCheck() const;
     // round 190dg (--simple190dgshot): where card `card` is in the dock, and a search typed into the sound list
     juce::Rectangle<int> cardBoundsForSnapshot (int card) const;
     void setSearchForSnapshot (const juce::String& text);
@@ -180,6 +185,8 @@ public:
     class EditorPage;
     class ControlsPage; // round 190ke: the Controls tab (GarageBand's Smart Controls, ui/SimpleControlsPage.inc)
     class StepsPage;    // round 190lr: the Drum Machine tab (BandLab's drum machine, ui/SimpleStepsPage.inc)
+    class TrackerPage;  // round 190nw: the Tracker tab (the track's pattern in the tracker editor)
+    juce::Component* trackerForSnapshot(); // round 190nw (--tracker190nwshot): the Tracker tab's editor, or nullptr
 
     // round 190lr (DS-39, tests and --details190lrshot): a Drums track's Drum Machine tab
     bool hasStepsTabForCheck() const noexcept { return stepsTab; }
@@ -190,6 +197,7 @@ public:
     void stepsClickForCheck (int row, int step);
     void stepsLetterForCheck (int letter);
     void stepsAddClipForCheck();
+    int stepsMessagesShownForCheck() const; // round 190nr: visible "Make a beat first..." bubbles
     void stepsLengthForCheck (int bars);
     void stepsSwingForCheck (float v);
     void stepsPreviewForCheck();
@@ -225,6 +233,7 @@ private:
     std::unique_ptr<PadsPage> padsPage;
     std::unique_ptr<ControlsPage> controlsPage; // round 190ke
     std::unique_ptr<StepsPage> stepsPage;       // round 190lr
+    std::unique_ptr<TrackerPage> trackerPage;   // round 190nw
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
     // round 190jc (design190ia SG-7, SG-8): the strip's buttons draw themselves: the tabs with a vector icon before the
     // label (a lone tab as a section title), the hide button as BandLab's round close X at the strip's left
@@ -235,7 +244,7 @@ private:
         bool lone = false; // the only tab: drawn as a section title
         void paintButton (juce::Graphics& g, bool over, bool down) override;
     };
-    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, stepsButton, hideButton;
+    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, stepsButton, trackerButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;

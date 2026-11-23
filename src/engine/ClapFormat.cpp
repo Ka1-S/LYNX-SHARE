@@ -1,4 +1,5 @@
 #include "engine/ClapFormat.h"
+#include "engine/JsfxFormat.h"
 #include "engine/Vst2Format.h"
 
 #include <algorithm>
@@ -1645,17 +1646,12 @@ public:
         : AudioProcessorEditor (p),
           owner (p)
     {
-        const auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
         setSize (480, 320);
 
         if (owner.gui != nullptr && owner.gui->create (owner.plugin, platform::NativeEmbed::clapWindowApi(), false))
         {
             created = true;
-            owner.gui->set_scale (owner.plugin, scale);
-            uint32_t w = 0, h = 0;
-
-            if (owner.gui->get_size (owner.plugin, &w, &h) && w > 0 && h > 0)
-                setSize (juce::roundToInt (w / scale), juce::roundToInt (h / scale));
+            fitToPlugin();
         }
 
         addAndMakeVisible (embed);
@@ -1676,6 +1672,14 @@ public:
 
     void resized() override { embed.setBounds (getLocalBounds()); }
 
+    // round 190oh (P3): FL's wrapper Settings › GUI marked this editor (platform::setEditorScaling): told its scale and
+    // sized again
+    void setScaleFactor (float) override
+    {
+        if (created && ! faulted)
+            fitToPlugin();
+    }
+
     void paint (juce::Graphics& g) override
     {
         if (! created)
@@ -1687,6 +1691,17 @@ public:
     }
 
 private:
+    // the scale the plugin is told and its reported size in this window's units (platform::editorContentScale /
+    // editorSizeScale, round 190oh: the primary display's scale for an editor FL's GUI options did not mark)
+    void fitToPlugin()
+    {
+        owner.gui->set_scale (owner.plugin, platform::editorContentScale (*this));
+        uint32_t w = 0, h = 0;
+        const auto scale = platform::editorSizeScale (*this);
+        if (owner.gui->get_size (owner.plugin, &w, &h) && w > 0 && h > 0)
+            setSize (juce::roundToInt (w / scale), juce::roundToInt (h / scale));
+    }
+
     void timerCallback() override
     {
         // the native view needs a real window as parent: wait until on screen
@@ -1921,6 +1936,7 @@ void addPluginFormats (juce::AudioPluginFormatManager& manager)
     manager.addDefaultFormats();
     manager.addFormat (new ClapPluginFormat());
     manager.addFormat (new Vst2PluginFormat());
+    manager.addFormat (new JsfxPluginFormat()); // (round 190pj, issue #241)
 }
 
 std::string clapPluginId (const juce::PluginDescription& description)

@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Okno Nagrywanie pyta, co nagrywać: audio, nuty i automatykę, wszystko albo audio do edytora audio](/assets/img/wiki/record-dialog.webp)
 
@@ -87,7 +87,7 @@ Opcje są w `Opcje › Nagrywanie` i w menu prawego przycisku przycisku nagrywan
 
 ## Nagrywanie do slotów klipów
 
-W [sposobie pracy Clip-launch](/wiki/layouts/) ujęcia mogą trafiać do siatki klipów zamiast na Playlistę, jak w Ableton Live.
+W [układzie Clip-launch](/wiki/layouts/) ujęcia mogą trafiać do siatki klipów zamiast na Playlistę, jak w Ableton Live.
 
 - Uzbrój ścieżkę jej przyciskiem uzbrojenia w Mikser sesji. Jej puste sloty pokazują wtedy okrągły przycisk nagrywania w miejscu kwadratu stop. Kliknij jeden, aby nagrywać do tego slotu.
 - `Nagrywanie sesji` pod siatką nagrywa uzbrojone ścieżki do wybranej sceny. Gdy ich klipy grają, nowe nuty są do nich dodawane (overdub).

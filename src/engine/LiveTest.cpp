@@ -424,6 +424,47 @@ int run (const juce::StringArray& args)
             if (const auto d = differences (host.engine->getSong(), p->engine->getSong()); d.isNotEmpty())
             {
                 line ("     " + p->name + " differs on " + d.substring (0, 400));
+                // round 190oh: for a channel that differs, which of its parts (the plugin's fields, the stand-ins)
+                if (d.contains ("c:"))
+                {
+                    const auto hs = canonical (host.engine->getSong());
+                    const auto ps = canonical (p->engine->getSong());
+                    for (std::size_t c = 0; c < hs.channels.size() && c < ps.channels.size(); ++c)
+                    {
+                        const auto &x = hs.channels[c], &y = ps.channels[c];
+                        juce::StringArray f;
+                        if (! (x.plugin.state == y.plugin.state))
+                            f.add ("plugin.state (" + juce::String ((int) x.plugin.state.size()) + " / " + juce::String ((int) y.plugin.state.size()) + " chars)");
+                        if (! (x.plugin.values == y.plugin.values))
+                            f.add ("plugin.values");
+                        if (x.plugin.playedBy != y.plugin.playedBy)
+                            f.add ("plugin.playedBy " + juce::String ((int) x.plugin.playedBy) + " / " + juce::String ((int) y.plugin.playedBy));
+                        if (! (x.plugin == y.plugin) && f.isEmpty())
+                            f.add ("plugin (other fields)");
+                        if (! (x.standIns == y.standIns))
+                        {
+                            f.add ("standIns (" + juce::String ((int) x.standIns.size()) + " / " + juce::String ((int) y.standIns.size()) + ")");
+                            for (std::size_t k = 0; k < x.standIns.size() && k < y.standIns.size(); ++k)
+                            {
+                                const auto &a = x.standIns[k], &b = y.standIns[k];
+                                juce::StringArray g;
+                                if (a.pattern != b.pattern) g.add ("pattern");
+                                if (a.loop != b.loop) g.add ("loop");
+                                if (a.path != b.path) g.add ("path " + str (a.path).substring (0, 24) + " / " + str (b.path).substring (0, 24));
+                                if (a.sourceHash != b.sourceHash) g.add ("sourceHash " + str (a.sourceHash).substring (0, 12) + " / " + str (b.sourceHash).substring (0, 12));
+                                if (a.lengthTicks != b.lengthTicks) g.add ("lengthTicks " + juce::String (a.lengthTicks) + " / " + juce::String (b.lengthTicks));
+                                if (a.plugin != b.plugin) g.add ("plugin");
+                                if (a.by != b.by) g.add ("by");
+                                if (! g.isEmpty())
+                                    f.add ("standIn " + juce::String ((int) k) + ": " + g.joinIntoString ("; "));
+                            }
+                        }
+                        if (x.name != y.name)
+                            f.add ("name");
+                        if (! f.isEmpty())
+                            line ("       channel " + str (x.name) + ": " + f.joinIntoString (", "));
+                    }
+                }
                 // the first differing line of the JSON of an insert that differs (what the format and the replica disagree on)
                 for (const auto& key : juce::StringArray::fromTokens (d, ",", ""))
                     if (key.startsWith ("m:"))
@@ -510,6 +551,52 @@ int run (const juce::StringArray& args)
     // (they knock at the same moment: who is let in first, and so gets tag 2, is the network's choice)
     check (anaTag + liaTag == 5 && (anaTag == 2 || anaTag == 3) && host.engine->getSong().session.participants.size() == 3, "participants: host 1, Ana " + juce::String ((int) anaTag) + ", Lia " + juce::String ((int) liaTag));
     check (host.live->getPeople().size() == 3 && ana.live->getPeople().size() == 3, "presence: " + juce::String ((int) ana.live->getPeople().size()) + " people online");
+
+    // round 190on (--remove-only: a relay with POST /v1/rooms/<room>/kick, this branch's server/; the rest of the run is
+    // skipped): the host removes Lia with a new invite code. Lia is out; Ana, still in, goes on with the new code without
+    // typing it; the old code lets nobody in any more; edits keep flowing both ways under the new key.
+    if (args.contains ("--remove-only"))
+    {
+        juce::String endedWhy;
+        lia.live->onEnded = [&endedWhy] (const juce::String& why) { endedWhy = why; };
+        host.live->removeGuest (liaTag, true);
+        const bool out = pumpUntil ([&] { return ! lia.live->isActive() && host.live->getPeople().size() == 2 && host.live->getInviteCode() != code
+                                                 && ana.live->getInviteCode() == host.live->getInviteCode(); },
+                                    20000);
+        check (out && endedWhy.contains ("removed"), "190on: the host removed Lia (\"" + endedWhy + "\"); Ana has the new code without typing it");
+        check (host.live->getInviteCode() != code && livecrypto::parseCode (host.live->getInviteCode().toStdString()).has_value()
+                   && livecrypto::parseCode (host.live->getInviteCode().toStdString())->room == livecrypto::parseCode (code.toStdString())->room,
+               "190on: same room, new code");
+        ana.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Ana after the new code"; });
+        check (pumpUntil ([&] { return converged ({ &ana }) && patternIndex (host.engine->getSong(), "Ana after the new code") >= 0; }, 15000),
+               "190on: Ana's edit reached the host under the new code");
+        host.engine->editSong ([] (Song& s) { s.patterns.emplace_back().name = "Host after the new code"; });
+        check (pumpUntil ([&] { return converged ({ &ana }) && patternIndex (ana.engine->getSong(), "Host after the new code") >= 0; }, 15000),
+               "190on: the host's edit reached Ana");
+        // the old code lets nobody in; the new one does
+        rui.live->join (code, options (rui));
+        pumpUntil ([&] { return ! rui.live->isActive(); }, 15000);
+        check (! rui.live->isActive() && host.live->getPeople().size() == 2, "190on: the old code no longer gets in (" + rui.live->getStatus() + ")");
+        rui.engine = std::make_unique<AudioEngine> (false);
+        rui.live = std::make_unique<LiveSessionManager> (*rui.engine);
+        rui.live->join (host.live->getInviteCode(), options (rui));
+        check (pumpUntil ([&] { return converged ({ &ana, &rui }) && host.live->getPeople().size() == 3; }, 30000),
+               "190on: a newcomer with the new code gets in (" + rui.live->getStatus() + ")");
+        check (host.live->removedGuests() == 1, "190on: one guest removed");
+        // "Keep the same code": Rui removed, the code stays
+        const auto kept = host.live->getInviteCode();
+        host.live->removeGuest (rui.live->myTag(), false);
+        const bool gone = pumpUntil ([&] { return ! rui.live->isActive() && host.live->getPeople().size() == 2; }, 20000);
+        settle (1500);
+        check (gone && host.live->getInviteCode() == kept && ana.live->getInviteCode() == kept, "190on: \"Keep the same code\": Rui removed, the code unchanged");
+        host.live->leave();
+        pumpUntil ([&] { return ! ana.live->isActive(); }, 10000);
+        for (auto& p : peers)
+            p->live.reset();
+        line (ok ? "result=OK" : "result=FAILED");
+        dir.deleteRecursively();
+        return ok ? 0 : 1;
+    }
     {
         const auto& s = ana.engine->getSong();
         const auto k = channelIndex (s, "Host kick");
@@ -747,6 +834,13 @@ int run (const juce::StringArray& args)
         line ("skip live stand-ins (no --plugin <file.vst3>)");
     else
     {
+        // (round 190oh: the stems are media and count against the small guest limit of this test (190ah's 3 MB): the
+        // host raises it when asked, as a user would. Without an answer the stems stayed with their maker and these
+        // checks, which 190ah never ran with --plugin, failed: "sha:missing" on the host)
+        host.live->onMediaLimit = [] (const LiveSessionManager::MediaLimit& l) {
+            if (l.answer)
+                l.answer (true);
+        };
         auto& anaHost = ana.engine->getPluginHost();
         const auto added = anaHost.addPluginFile (juce::File (pluginFile));
         juce::PluginDescription instrument;
@@ -1174,6 +1268,27 @@ int run (const juce::StringArray& args)
         check (! dir.getChildFile ("Ana guest journal.json").existsAsFile(), "the session is over: Ana's journal is gone");
     }
 
+    // P5-A1 (round 190ai) at the end of the session. Round 190oh: checked here, right after the host ends it (they ran
+    // after round 190ah's second session, whose new song had replaced these; and Rui, who did not go back in above, has
+    // a fresh engine by now: his side is covered by remote190ai_the_end_of_the_session_leaves_the_stems_only)
+    if (ruiRemoteUid != 0)
+    {
+        const auto* hostRef = remoteplug::refAt (host.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
+        check (hostRef != nullptr && hostRef->playedBy == 0 && hostRef->values.empty() && ! hostRef->state.empty(),
+               "the host's project keeps the plugin as it sounded (its real state, " + juce::String (hostRef != nullptr ? (int) hostRef->state.size() : 0) + " bytes)");
+        const auto c = channelIndex (rui.engine->getSong(), "Rui remote");
+        if (c < 0)
+            line ("skip Rui's own copy after the end (he left before it; unit test remote190ai_the_end_of_the_session_leaves_the_stems_only)");
+        else
+        {
+            const auto* kept = remoteplug::refAt (rui.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
+            check (kept != nullptr && ! rui.engine->getSong().channels[(std::size_t) c].standIns.empty() && kept->playedBy == 0 && kept->state.empty()
+                       && kept->values.empty(),
+                   "Rui keeps his channel with the audio stand-ins only (no plugin state, no values)");
+        }
+    }
+
+
     // round 190ah: the session's own limit (1 MiB here): the host's 1.9 MB sample is not sent, both sides are told
     {
         const auto bigWav = dir.getChildFile ("host/noise bed.wav");
@@ -1201,20 +1316,9 @@ int run (const juce::StringArray& args)
         }
         host.live->onMediaLimit = nullptr;
     }
-    if (ruiRemoteUid != 0)
-    {
-        // what the guest keeps follows the keep policy: his own part, with the audio stand-ins only
-        const auto* kept = remoteplug::refAt (rui.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
-        const auto c = channelIndex (rui.engine->getSong(), "Rui remote");
-        const auto* hostRef = remoteplug::refAt (host.engine->getSong(), { { live::Kind::channel, ruiRemoteUid, 0 }, -1 });
-        check (kept != nullptr && c >= 0 && ! rui.engine->getSong().channels[(std::size_t) c].standIns.empty() && kept->playedBy == 0 && kept->state.empty()
-                   && kept->values.empty(),
-               "Rui keeps his channel with the audio stand-ins only (no plugin state, no values)");
-        check (hostRef != nullptr && hostRef->playedBy == 0 && hostRef->values.empty() && ! hostRef->state.empty(),
-               "the host's project keeps the plugin as it sounded (its real state, " + juce::String (hostRef != nullptr ? (int) hostRef->state.size() : 0) + " bytes)");
-    }
     line ("     host: " + juce::String (stats.sent) + " frames sent (" + juce::String (stats.bytesSent / 1024) + " KiB), " + juce::String (stats.received) + " received, "
-          + juce::String (stats.commits) + " commits, " + juce::String (stats.rejected) + " refused, " + juce::String (stats.mediaSent) + " media sent");
+          + juce::String (stats.commits) + " commits, " + juce::String (stats.rejected) + " refused, " + juce::String (stats.mediaSent) + " media sent, "
+          + juce::String (stats.mediaResumed + ana.live->getStats().mediaResumed) + " transfers resumed after a drop (host + ana)");
     line ("     ana: " + juce::String (ana.live->getStats().mediaSent) + " media sent, " + juce::String (ana.live->getStats().mediaReceived) + " received, "
           + juce::String (ana.live->getStats().reconnects) + " reconnects, " + juce::String (ana.live->getStats().standInsRendered) + " stand-ins rendered");
     line ("     total " + juce::String ((int) (juce::Time::getMillisecondCounterHiRes() - t0)) + " ms");

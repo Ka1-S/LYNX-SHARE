@@ -113,6 +113,14 @@ public:
     float levelDb (int ch) const noexcept { return level[(std::size_t) ch]; }   // the bar (with the fall)
     float peakDb (int ch) const noexcept { return peak[(std::size_t) ch]; }     // the held marker
     float maxDb() const noexcept { return maximum; }                           // highest since reset
+    // round 190oa (DP-76, FL manual Fruity dB Meter: "Right-click it to reset the peak holds"): the held markers and the
+    // highest value drop to the bars
+    void resetPeaks() noexcept
+    {
+        peak = level;
+        holdLeft = {};
+        maximum = std::max (level[0], level[1]);
+    }
     float loudness() const noexcept { return lufs; }                           // LUFS mode: the momentary loudness
 
 private:

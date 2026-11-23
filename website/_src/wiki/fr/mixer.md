@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
 Chaque canal passe par un insert du Mixer. Chaque insert a un fader, un pan, un bouton Muet et un solo, un vumètre de crête, dix emplacements d'effets avec chacun un taux dry/wet, et un EQ intégré. Tous les inserts finissent dans le Master, sauf si vous les routez ailleurs. Appuyez sur `F9` pour afficher ou masquer le Mixer.
 
-Un projet peut avoir jusqu'à 127 inserts. Le Mixer a une bande d'ajout pour en créer un nouveau. La liste dans la barre de titre du Mixer choisit l'une des huit dispositions de bandes, de `Compacte` à `Très grand`.
+Un projet peut avoir jusqu'à 500 inserts. Le Mixer a une bande d'ajout pour en créer un nouveau. La liste dans la barre de titre du Mixer choisit l'une des huit dispositions de bandes, de `Compacte` à `Très grand`.
 
 ## Mettre un effet sur un canal
 
@@ -115,9 +115,9 @@ Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'
 - Un plugin instrument à plusieurs sorties peut jouer chaque sortie sur son propre insert. Voir [Plugins tiers](/wiki/plugins/).
 - `Ctrl+L` ne fait pas la même chose dans le Channel Rack et dans le Mixer. Dans le Channel Rack, il choisit des inserts libres. Dans le Mixer, il utilise l'insert sélectionné.
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.
-- La limite est de 127 inserts par projet et de dix emplacements d'effets par insert.
+- La limite est de 500 inserts par projet et de dix emplacements d'effets par insert.
 - L'enregistrement d'Edison est conservé sous forme de fichier WAV dans le dossier du projet, et non dans le fichier du projet.
-- La table de mixage de session sous la grille de clips n'appartient qu'au flux par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
+- La table de mixage de session sous la grille de clips n'appartient qu'à la disposition par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
 
 ## Voir aussi
 

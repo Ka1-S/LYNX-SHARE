@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![录制窗口询问要录什么：音频、音符和自动化、全部，或录入音频编辑器的音频](/assets/img/wiki/record-dialog.webp)
 

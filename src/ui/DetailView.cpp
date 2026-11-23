@@ -1,4 +1,5 @@
 #include "ui/TextCache.h"
+#include "ui/ShotShowing.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
 #include "ui/MapMode.h"
@@ -12,6 +13,7 @@
 #include "core/AlsImport.h"
 #include "core/Braid.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipLoopOps.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
 #include "core/RackOps.h"
@@ -99,7 +101,10 @@ juce::String insertName (const Song& song, int insert)
     if (insert < 0 || insert >= (int) song.mixer.size())
         return {};
     const auto own = utf8 (song.mixer[(std::size_t) insert].name);
-    return own.isNotEmpty() ? tr ("Insert {0}", { juce::String (insert) }) + " " + own : tr ("Insert {0}", { juce::String (insert) });
+    const auto number = tr ("Insert {0}", { juce::String (insert) });
+    // (round 190oo CS-13: an insert still called by its default name read "Insert 1 Insert 1")
+    const auto isDefault = own == "Insert " + juce::String (insert) || own == number;
+    return own.isNotEmpty() && ! isDefault ? number + " " + own : number;
 }
 
 juce::String trackName (const Song& song, int track)
@@ -216,10 +221,12 @@ public:
         slotActions.extendSlotMenu = [this] (juce::PopupMenu& menu, int slot) {
             const auto key = tagOf (slot);
             // round 190ce: the reference's device menu starts with Cut / Copy, then Fold [shot d04]; Paste and
-            // Duplicate are its Edit menu's commands on the selected device
+            // Duplicate are its Edit menu's commands on the selected device. Round gap190og (deviceview-0012): "Pasted
+            // devices are inserted in front of the selected device" [DOC Live 12 manual, Working with Instruments and
+            // Effects] (before: after it)
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, slot] { copyDevice (slot, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, slot] { copyDevice (slot, false); });
-            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot + 1); });
+            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot); });
             menu.addItem (tr ("Duplicate") + "\tCtrl+D", effectCount() < maxEffectSlots, false, [this, slot] { duplicateDevice (slot, -1); });
             menu.addSeparator();
             menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
@@ -266,6 +273,14 @@ public:
         return windowBounds (cards[(std::size_t) i]);
     }
     bool isCardFolded (int i) const { return i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].folded; }
+    // (--zorder191test, rollup 0.1.31 step 2: the card's window button pressed when a plugin editor covers it on screen)
+    bool pressWindowButtonForCheck (int i)
+    {
+        if (i < 0 || i >= (int) cards.size())
+            return false;
+        toggleWindow (cards[(std::size_t) i]);
+        return true;
+    }
     void toggleCardFold (int i)
     {
         if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
@@ -305,6 +320,46 @@ public:
         toggleOn (cards[(std::size_t) i]);
         return true;
     }
+    // round gap190og (deviceview-0012): Live's Edit menu on the selected device — Cut, Copy, Paste, Duplicate, Delete
+    // [SHOT live190gu/screens-live/live-edit-menu.png; DOC Live 12 manual: "Edit menu commands such as cut, copy, paste,
+    // and duplicate can be used on devices", "select Delete from the Edit menu"]. Paste goes in front of the selected
+    // device, at the end of the chain with none (or the instrument) selected.
+    enum class EditCommand { cut, copy, paste, duplicate, remove };
+    bool canEdit (EditCommand command) const
+    {
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        switch (command)
+        {
+            case EditCommand::cut:
+            case EditCommand::copy:
+            case EditCommand::remove: return effect;
+            case EditCommand::paste: return insert >= 0 && deviceClipboard().has_value() && effectCount() < maxEffectSlots;
+            case EditCommand::duplicate: return effect && effectCount() < maxEffectSlots;
+        }
+        return false;
+    }
+    bool runEdit (EditCommand command)
+    {
+        if (! canEdit (command))
+            return false;
+        const auto i = selectedCard();
+        const auto effect = i >= 0 && cards[(std::size_t) i].kind == Card::effect;
+        const auto slot = effect ? cards[(std::size_t) i].index : -1;
+        switch (command)
+        {
+            case EditCommand::cut: copyDevice (slot, true); break;
+            case EditCommand::copy: copyDevice (slot, false); break;
+            case EditCommand::paste: pasteDevice (effect ? slot : effectCount()); break;
+            case EditCommand::duplicate: duplicateDevice (slot, -1); break;
+            case EditCommand::remove:
+                slotActions.deleteSlot (slot);
+                refresh();
+                break;
+        }
+        return true;
+    }
+
     bool duplicateCard (int i)
     {
         if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::effect)
@@ -336,7 +391,7 @@ public:
             }
             if (insert < 0 && channel < 0)
             {
-                g.setColour (colour::textDisabled);
+                g.setColour (colour::textSecondary); // (round 190oj CS-15: the hints read 3.0-3.2:1)
                 g.setFont (font (type::small));
                 g.drawText (track < 0 ? tr ("Select a track in the clip grid to see its devices")
                                       : tr ("This track has no clips yet: put a clip on it to see its devices"),
@@ -347,7 +402,7 @@ public:
                 const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + cardGap());
                 if (room.getWidth() > 120)
                 {
-                    g.setColour (colour::textDisabled);
+                    g.setColour (colour::textSecondary);
                     g.setFont (font (type::small));
                     g.drawText (tr ("Drop effects here"), room, juce::Justification::centred, true);
                 }
@@ -588,7 +643,7 @@ public:
             }
             if (! shift && code == 'V')
             {
-                pasteDevice (slot + 1);
+                pasteDevice (slot); // (round gap190og: in front of the selected device, Live's rule)
                 return true;
             }
             if (code == 'G')
@@ -1030,12 +1085,13 @@ private:
             if (c.custom != nullptr)
             {
                 shown.insert (c.custom);
-                c.custom->setBounds (c.bounds.withTrimmedTop (titleHeight + 2).reduced (2, 0).withTrimmedBottom (2) - origin);
+                const auto besideTitle = c.custom->titleBarWidth() > 0; // (round 190nc: Live's inline chain devices)
+                c.custom->setBounds ((besideTitle ? c.bounds : c.bounds.withTrimmedTop (titleHeight + 2)).reduced (2, 0).withTrimmedBottom (2) - origin);
                 c.custom->setVisible (! c.folded);
                 if (auto* extra = c.custom->titleAccessory())
                 {
                     const auto w = c.custom->titleAccessoryWidth();
-                    extra->setBounds (juce::Rectangle<int> (c.bounds.getRight() - 4 - titleButtonsWidth (c) - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
+                    extra->setBounds (juce::Rectangle<int> (barRight (c) - 4 - titleButtonsWidth (c) - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
                     extra->setVisible (! c.folded);
                 }
             }
@@ -1380,16 +1436,16 @@ private:
         if (! (c.kind == Card::effect && canSavePreset (c.index)))
             return {};
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 32, c.bounds.getY() + 2, 13, 13 };
-        return juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14);
+            return { barRight (c) - 32, c.bounds.getY() + 2, 13, 13 };
+        return juce::Rectangle<int> (barRight (c) - 38, c.bounds.getY() + 3, 16, 14);
     }
     juce::Rectangle<int> swapBounds (const Card& c) const
     {
         if (c.kind == Card::add)
             return {};
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
-        return { c.bounds.getRight() - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
+            return { barRight (c) - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
+        return { barRight (c) - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
     }
     void showInsertMenu()
     {
@@ -1557,7 +1613,15 @@ private:
 
     // --- hit testing ---------------------------------------------------------------------------------------------
     juce::Rectangle<int> pickerBounds() const { return { 8, 40, contextWidth - 16, 20 }; }
-    static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight); }
+    // round 190nc (DL-95): a rack with its chain's devices inline has its title bar over its own part only
+    static int barRight (const Card& c)
+    {
+        if (! c.folded && c.custom != nullptr)
+            if (const auto w = c.custom->titleBarWidth(); w > 0)
+                return c.bounds.getX() + std::min (w, c.bounds.getWidth());
+        return c.bounds.getRight();
+    }
+    static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight).withRight (barRight (c)); }
     // Live's look (round 190jn, CL-21): the 13 px power disc 3 px in, 2 px down; the title bar's round 13 px wells on a
     // 16 px pitch, the last 3 px from the right edge (live-session.png Utility: disc x 1078..1090, wells 1166 / 1182 / 1198)
     static juce::Rectangle<int> ledBounds (const Card& c)
@@ -1569,8 +1633,8 @@ private:
     static juce::Rectangle<int> windowBounds (const Card& c)
     {
         if (theme::livelook::active())
-            return { c.bounds.getRight() - 16, c.bounds.getY() + 2, 13, 13 };
-        return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 };
+            return { barRight (c) - 16, c.bounds.getY() + 2, 13, 13 };
+        return { barRight (c) - 20, c.bounds.getY() + 3, 16, 14 };
     }
 
     Hit hitAt (juce::Point<int> p) const
@@ -1658,10 +1722,10 @@ private:
         }
         else if (inserts.size() > 1)
         {
-            g.setColour (colour::textDisabled);
+            g.setColour (colour::textSecondary); // (round 190oj CS-14: 2.4:1, and squeezed into two lines)
             g.setFont (font (type::caption));
-            g.drawFittedText (tr ("This track plays through {0} inserts", { juce::String ((int) inserts.size()) }), r.removeFromTop (30),
-                              juce::Justification::topLeft, 2);
+            g.drawFittedText (tr ("This track plays through {0} inserts", { juce::String ((int) inserts.size()) }), r.removeFromTop (42),
+                              juce::Justification::topLeft, 3, 1.0f);
         }
     }
 
@@ -1762,7 +1826,7 @@ private:
         if (! c.folded)
         {
             juce::Path title;
-            title.addRoundedRectangle (box.getX(), box.getY(), box.getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
+            title.addRoundedRectangle (box.getX(), box.getY(), (float) titleBounds (c).getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
             g.setColour (bar);
             g.fillPath (title);
         }
@@ -2365,6 +2429,12 @@ public:
         addAndMakeVisible (signature);
         loop.setButtonText (tr ("Loop"));
         loop.onClick = [this] { editSlot ([on = loop.getToggleState()] (ClipGridSlot& slot) { slot.loop = on; }); };
+        // round gap190og (detail-019): Live 12's Clip panel "Duplicate" button under Start / End = Duplicate Loop [SHOT
+        // ableton187c/shots/live-01-velocity-lane.png; STR DuplicateLoop in Live's ClipRegionPanel; DOC manual 8.9]
+        duplicateLoop.setButtonText (tr ("Duplicate"));
+        duplicateLoop.setTooltip (tr ("Duplicate Loop: the loop and its notes twice as long; notes after the loop move on with its end"));
+        duplicateLoop.onClick = [this] { duplicateClipLoop(); };
+        addAndMakeVisible (duplicateLoop);
         legato.setButtonText (tr ("Legato"));
         legato.setTooltip (tr ("Legato (keep the position)"));
         legato.onClick = [this] { editSlot ([on = legato.getToggleState()] (ClipGridSlot& slot) { slot.legato = on; }); };
@@ -2782,7 +2852,7 @@ private:
     {
         return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
                  &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &chordHelper, &addInterval, &scaleMode, &groove, &mode,
-                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
+                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &duplicateLoop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
                  &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
     }
     // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
@@ -2803,13 +2873,14 @@ private:
     // the name sits on the title bar in the clip's ink (Live: colour × 0.24)
     void nameColours()
     {
-        const auto ink = liveShade (titleColour, 0.24f).withAlpha (1.0f);
+        const auto ink = liveMarkOn (titleColour, 0.24f, 4.5f, colour::textPrimary); // (round 190oj: readable on dark clip colours too)
         liveclip::swapColour (name, juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack, liveShown);
         liveclip::swapColour (name, juce::TextEditor::outlineColourId, juce::Colours::transparentBlack, liveShown);
         liveclip::swapColour (name, juce::TextEditor::textColourId, ink, liveShown);
         if (liveShown)
             name.setColour (juce::TextEditor::textColourId, ink);
         name.applyColourToAllText (name.findColour (juce::TextEditor::textColourId), true);
+        name.setTextToShowWhenEmpty (nameFallback, name.findColour (juce::TextEditor::textColourId)); // (round 190oj CS-33)
     }
 
     void paintLive (juce::Graphics& g)
@@ -2877,6 +2948,13 @@ private:
             put (start, { x0, y, half, row });
             put (end, { x0 + half + 4, y, half, row });
             y += row + 5;
+            if (hasNotes) // (round gap190og, detail-019: Live's Duplicate button between the Start / End fields and Loop)
+            {
+                put (duplicateLoop, { x0, y, inner, row });
+                y += row + 5;
+            }
+            else
+                duplicateLoop.setBounds ({});
             put (loop, { x0, y, inner, row });
             y += row + 5;
             labelRow (positionLabel, &setPosition, x0, half);
@@ -2900,7 +2978,7 @@ private:
             y += row + 6;
         }
         else
-            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
+            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &duplicateLoop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
                     &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName, &commitGroove });
         // Launch (+ Follow Action)
         headerY[1] = y;
@@ -3084,6 +3162,23 @@ private:
         const auto n = juce::dontSendNotification;
         if (! name.hasKeyboardFocus (false))
             name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
+        // round 190oj (CS-33): a clip without its own name shows the name the grid shows (its pattern's or its sample
+        // channel's) on the title band, as Live does, in the band's ink; typing gives the clip its own name
+        {
+            juce::String shownName;
+            if (slot == nullptr || ! slot->blankName)
+            {
+                if (c->kind == ClipKind::pattern && c->pattern >= 0 && c->pattern < (int) song.patterns.size())
+                    shownName = utf8 (song.patterns[(std::size_t) c->pattern].name);
+                else if (c->kind == ClipKind::audio && c->channel >= 0 && c->channel < (int) song.channels.size())
+                    shownName = utf8 (song.channels[(std::size_t) c->channel].name);
+            }
+            if (shownName != nameFallback)
+            {
+                nameFallback = shownName;
+                name.setTextToShowWhenEmpty (nameFallback, name.findColour (juce::TextEditor::textColourId));
+            }
+        }
         const auto secs = inSeconds (*c);
         const auto marker = slot != nullptr ? (std::int64_t) launcher::startLead (*slot, c->length) : 0;
         if (! start.hasKeyboardFocus (false))
@@ -3182,9 +3277,11 @@ private:
         {
             const juce::ScopedValueSetter<bool> guard (loading, true);
             const auto shown = slot != nullptr ? projectkey::clipScale (*slot, song) : projectkey::get (song);
-            scaleRoot.setSelectedId (shown ? shown->root + 1 : 0, n);
-            scaleName.setSelectedId (shown ? shown->flScale + 1 : 0, n);
-            scaleMode.setToggleState (slot == nullptr || slot->scaleOn, n);
+            // (round 190oj CS-34: with no key, Live's defaults "C" / "Major" with the switch off — before, the switch was lit
+            // over two empty choosers)
+            scaleRoot.setSelectedId (shown ? shown->root + 1 : 1, n);
+            scaleName.setSelectedId (shown ? shown->flScale + 1 : projectkey::commonFirst().front() + 1, n);
+            scaleMode.setToggleState (shown.has_value() && (slot == nullptr || slot->scaleOn), n);
             for (auto* box : { &scaleRoot, &scaleName })
                 box->setEnabled (pattern);
             scaleMode.setEnabled (pattern);
@@ -3342,6 +3439,37 @@ private:
         });
     }
 
+    // round gap190og (detail-019): Live's Duplicate Loop on this MIDI clip (core/ClipLoopOps.h; one undo step)
+    void duplicateClipLoop()
+    {
+        const int t = track, sc = scene;
+        engine.editSong ([t, sc] (Song& song) {
+            if (auto* c = gridClip (song, t, sc))
+                cliploop::duplicateLoop (song, *c);
+        });
+        load();
+    }
+    static Clip* gridClip (Song& song, int t, int sc)
+    {
+        if (! song.clipGrid)
+            return nullptr;
+        for (auto& c : song.clipGrid->clips)
+            if (c.track == t && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
+                && song.clipGrid->slots[(std::size_t) c.gridSlot].scene == sc)
+                return &c;
+        return nullptr;
+    }
+public:
+    bool duplicateLoopForCheck()
+    {
+        if (! ui::showingOrShot (duplicateLoop) || duplicateLoop.getBounds().isEmpty() || ! duplicateLoop.isEnabled())
+            return false;
+        duplicateClipLoop(); // (what its click does; triggerClick would post it)
+        return true;
+    }
+    juce::Rectangle<int> duplicateLoopBoundsForCheck() const { return duplicateLoop.getBounds(); }
+private:
+
     // a note tool on every note of the clip's pattern (one undo step)
     void notes (std::function<void (Pattern&, const std::vector<int>&, const Song&)> fn)
     {
@@ -3403,6 +3531,7 @@ private:
     int transposed = 0, interval = 0;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, position, length;
+    juce::String nameFallback; // (round 190oj CS-33: the name shown while the clip has none of its own)
     juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
     juce::Label positionLabel, grooveLabel;
     juce::ComboBox groove;
@@ -3410,6 +3539,8 @@ private:
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
+    // round gap190og (detail-019): Live's Duplicate Loop button of the Clip panel (its Live column only; MIDI clips)
+    liveclip::PillButton duplicateLoop { "duplicateLoop" };
     // round 190hr: the Follow Action controls
     juce::Label followTitle;
     juce::TextButton followOn, linked;
@@ -3437,6 +3568,7 @@ private:
 class DetailView::ClipPage final : public juce::Component, private juce::ChangeListener
 {
 public:
+    bool duplicateLoopForCheck() { return column.isVisible() && column.duplicateLoopForCheck(); } // (round gap190og)
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
@@ -3522,6 +3654,7 @@ public:
             if (roll->liveNoteColour != colour)
             {
                 roll->liveNoteColour = colour;
+                roll->liveFooterCheck(); // (round gap190og: Live's Velocity footer comes with the Live notes)
                 roll->repaint();
             }
         }
@@ -3558,7 +3691,10 @@ public:
         dropEvents();
         dockedTrack = dockedScene = -1;
         if (auto* roll = dynamic_cast<PianoRollComponent*> (editor)) // (round 190jn: its own colours again at home)
+        {
             roll->liveNoteColour = juce::Colours::transparentBlack;
+            roll->liveFooterCheck(); // (round gap190og: no Live footer outside the dock)
+        }
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
             editor = nullptr;
@@ -3898,6 +4034,7 @@ void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
 void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
 void DetailView::setMpeTab() { clipPage->showTab (false, true); }
+bool DetailView::duplicateLoopForCheck() { return clipPage != nullptr && clipPage->duplicateLoopForCheck(); } // (round gap190og)
 
 void DetailView::showPage()
 {
@@ -4153,6 +4290,19 @@ void DetailView::clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool n
 hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
+// round gap190og (deviceview-0012): the main window's Edit menu (Clip-launch layout) on the Device View
+bool DetailView::devicesHaveFocus (const juce::Component* focused) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && focused != nullptr && (focused == chain.get() || chain->isParentOf (focused));
+}
+bool DetailView::canEditDevice (EditCommand command) const
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->canEdit ((DeviceChain::EditCommand) command);
+}
+bool DetailView::editDevice (EditCommand command)
+{
+    return chain != nullptr && chain->isVisible() && ui::showingOrShot (*chain) && chain->runEdit ((DeviceChain::EditCommand) command);
+}
 bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
 bool DetailView::groupCardForCheck (int card, bool ungroup) { return chain->groupCardForCheck (card, ungroup); }
 juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
@@ -4169,6 +4319,7 @@ juce::Rectangle<int> DetailView::windowButtonForCheck (int card) const
     const auto r = chain->windowButtonOf (card);
     return r.isEmpty() ? r : getLocalArea (chain.get(), r);
 }
+bool DetailView::pressWindowButtonForCheck (int card) { return chain->pressWindowButtonForCheck (card); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }

@@ -1,9 +1,9 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
 ![Alur kerja peluncuran klip: kisi clip dan scene di kiri, Picker dan Playlist di kanan](/assets/img/cliplaunch.webp)
 
-`Tampilan › Gaya tata letak` punya tiga entri: `Alur kerja pattern (bawaan)`, `Alur kerja peluncuran klip`, dan `Alur kerja sederhana`. Pilihan yang sama ada di `Opsi › Pengaturan umum`, di bawah Workflow. Pilihan itu tersimpan saat kamu menutup program.
+`Tampilan › Gaya tata letak` punya tiga entri: `Alur kerja pattern (bawaan)`, `Alur kerja peluncuran klip`, dan `Alur kerja sederhana`. Pilihan yang sama ada di `Opsi › Pengaturan umum`, di bawah Workflow. Pilihan itu tersimpan saat kamu menutup program. Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang dan memilih tata letak yang cocok.
 
 Alur kerja Pattern, yang menjadi bawaan, bekerja seperti FL Studio: Channel Rack, pattern, Piano Roll, Playlist, dan Mixer. Alur kerja peluncuran klip, bergaya Ableton Live, menambahkan kisi clip dengan scene di samping Playlist, mixer Session, serta tampilan clip dan perangkat; pattern dan Channel Rack tetap tersedia. Alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile: track dan timeline, loop, pad, dan perekaman cepat. Beralih hanya memindahkan jendela: proyeknya tetap sama.
 

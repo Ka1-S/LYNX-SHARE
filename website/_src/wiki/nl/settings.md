@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 
@@ -47,7 +47,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 
 | Instelling | Wat het doet |
 |---|---|
-| `Lay-outstijl` | Patternwerkwijze (standaard), Clipstart-werkwijze of Eenvoudige werkwijze |
+| `Lay-outstijl` | Pattern-lay-out (standaard), Clipstart-lay-out of Eenvoudige lay-out |
 | `Standaardsjabloon`, `Project bij het starten` | De template die opent met `Bestand › Nieuw`, en wat opent bij het opstarten: `Leeg project`, `Standaardsjabloon` of `Laatst gebruikt project`. Met `Bestand › Opslaan als sjabloon...` voeg je je eigen toe |
 | `Sessieclips uit Live-sets` | Waar de sessieclips van een geïmporteerde Live-set heen gaan: het clipraster, of de Playlist na het arrangement |
 | `Taal`, `Lettertype van de interface` | Toegepast bij de volgende start |

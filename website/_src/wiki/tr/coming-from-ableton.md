@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
 LYNX SHARE Pattern iş akışıyla açılır: bir Channel Rack, pattern'ler ve bir Playlist. Klip başlatma iş akışı isteğe bağlıdır ve Playlist'in yanına sahneli bir klip ızgarası ekler. LYNX SHARE `.als` set'lerini okur ve yazar. Ableton ile bağlantısı yoktur.
+
+Bu sayfa Bitwig Studio kullanıcıları için de geçerlidir: klip ızgarası aynı şekilde çalışır ve Bitwig'in DAWproject dosyaları (`.dawproject`) `Dosya › Aç...` ile açılır, `Dosya › Dışa aktar › DAWproject (.dawproject)...` ile yazılır.
+
+## İlk adımlarınız
+
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `Ableton Live veya Bitwig` düğmesine tıklayın: Klip başlatma yerleşimi açılır. Daha sonra `Görünüm › Yerleşim stili › Klip başlatma iş akışı` istediğiniz zaman ona geçirir.
+2. **Bir yuvayı doldurun.** Browser'dan bir sample'ı veya pattern'i bir yuvaya sürükleyin ya da boş bir yuvaya sağ tıklayıp `Buraya bir pattern koy` seçeneğini seçin.
+3. **Başlatın.** Bir klibin solundaki üçgene ya da tüm satırı başlatmak için `Sahneler` sütunundaki bir sahnenin üçgenine tıklayın. Ya da `.als` set'lerinizden birini açın (aşağıda).
+
+Live'dan farklı olanlar:
+
+- Playlist aranjmandır ve izleri ızgaranın sütunlarıdır. Bir klip başlatmış iz, `Playlist'e dön` düğmesine basana kadar ızgarada kalır.
+- Izgara dışında tuşlar FL Studio'yu izler. `Ctrl+Z` bir adımı geri alır, tekrar basılırsa yineler.
+- Live'ın kendi cihazlarından yalnızca bazıları dönüştürülür (bkz. Bilmekte fayda var). Üçüncü taraf plugin'ler durumlarıyla birlikte gelir.
+- Pattern yerleşimi, yani FL Studio'nun Channel Rack ve pattern'lerle çalışma biçimi, aynı proje üzerinde çalışır.
 
 ## Bir Live set'i açma
 
@@ -59,7 +74,7 @@ Follow action'lar, klibin belirli sayıda ölçüsünden veya geçişinden sonra
 
 | Yazılanlar | Yazılmayanlar |
 |---|---|
-| Kanal başına bir MIDI izi, notaları MIDI klibi olarak | LYNX SHARE'in kendi enstrümanları ve efektleri. İzleri ve notaları korunur |
+| Kanal başına bir MIDI izi, notaları MIDI klibi olarak | LYNX SHARE'in kendi enstrümanları ve efektleri; Helix ise Wavetable olur. İzleri ve notaları korunur |
 | Stretch, transpoze, gain, fade ve warp moduyla ses izleri | Efekt parametrelerinin otomasyonu |
 | Gruplar, return'ler ve send'ler | Insert'ten insert'e yönlendirmeler |
 | Durumlarıyla VST2 ve VST3 plugin'leri | |
@@ -70,9 +85,11 @@ Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 
 ## Bilmekte fayda var
 
-- Live'ın kendi cihazlarının çoğu LYNX SHARE'in kendi cihazları olarak ayarları ve otomasyonlarıyla gelir: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift ve Operator (FM'siz). Diğerleri atılır ve içe aktarma raporunda listelenir.
-- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir ve bir Drum Rack, LYNX SHARE'in Drum Rack'i olur. Live'ın MIDI Effect Rack'leri henüz dönüştürülmez ve içe aktarma raporunda listelenir.
+- Live'ın kendi cihazlarının çoğu LYNX SHARE'in kendi cihazları olarak ayarları ve otomasyonlarıyla gelir: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable ve Meld. Diğerleri atılır ve içe aktarma raporunda listelenir.
+- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir ve bir Drum Rack, LYNX SHARE'in Drum Rack'i olur. Live'ın Arpeggiator'ı kanalın arpejiatörü olur. Pitch, Velocity, Chord, Note Length ve MIDI Effect Rack'ler notalara yazılır.
 - İçe aktarma raporu dışarıda bırakılanları listeler.
+- Device View'da bir rack, zincirlerinin cihazlarını satır içinde gösterir; Macro Map modu (rack'in `Map` düğmeleri) Live'daki gibi bir cihaz parametresini bir makroya verir.
+- Session mikserinde Live'ın Solo / Cue anahtarı vardır; kulaklığınız için bir `Cue Out` ve bir `Cue ses düzeyi` içerir.
 - Live, dışa aktarılmış bir set'te üst üste binen ses kliplerini kırpar.
 - Bir Live set'indeki warp işaretçileri içe aktarmada korunur ve dışa aktarmada geri yazılır.
 
@@ -83,3 +100,4 @@ Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 - [Proje içe aktarma](/wiki/importing-projects/)
 - [Dosya formatları](/wiki/file-formats/)
 - [Tek programda iki iş akışı](/why/#workflows)
+- [Learn: eğitimler](/learn/)

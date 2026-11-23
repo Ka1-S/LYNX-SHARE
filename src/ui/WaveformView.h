@@ -33,7 +33,10 @@ public:
     WaveformCache();
     ~WaveformCache() override;
 
-    JUCE_DECLARE_SINGLETON_SINGLETHREADED_INLINE (WaveformCache, true)
+    // (may be created again after JUCE's shutdown deleted it, round 190pq: a plugin of the pack shuts JUCE down with its last
+    // instance, but the host keeps the library loaded — JUCE's own thread_local text shaping pins it — so the next
+    // instrument's editor got no cache and crashed in a host that removed every LYNX plugin and added one again)
+    JUCE_DECLARE_SINGLETON_SINGLETHREADED_INLINE (WaveformCache, false)
 
     using Source = std::function<std::shared_ptr<const SampleData>()>;
 
@@ -81,6 +84,9 @@ struct WaveStyle
     // FL's Playlist clips (round 190ig, FM-21): each lane's centre on a whole pixel row and a 1 px line there in this
     // colour (FL's silence line); transparent = none, the centre where it falls (every other view)
     juce::Colour silenceLine { 0x00000000 };
+    // #230 (round 190nq): FL's "Show fade previews" — a gain (0..1) for the column at x (in body coordinates), multiplied
+    // into the shape; empty = none (every view but the Playlist's faded audio clips)
+    std::function<float (float x)> envelope;
 };
 
 // Draws the summary into `body`: pixel column x shows frames [startFrame + x * framesPerPixel, + framesPerPixel)

@@ -12,21 +12,29 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
 | `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation, racks and Drum Racks, and many of Live's own devices as LYNX's; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
 | `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, automation, the effects (as Pocket effects), MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler and Slicer, chord sets and the key; other instruments play a built-in synth for now |
+| `.dawproject` | Bitwig Studio, Studio One, Cubase and other apps | imported: tracks, folders, clips, notes, audio with its warp markers, automation, tempo, markers, the mixer with sends, scenes (into the clip grid) and VST3 / VST2 / CLAP plugins with their state; note effects and per-note expressions are listed in the report |
+| `.band` | GarageBand 10, GarageBand for iOS | imported, partial, as Simple-layout tracks: MIDI and audio regions, tempo, key, sections, levels, pan and mute; instrument tracks play the built-in synth and drums (Sampler instruments made in GarageBand for iOS play their own recordings) |
+| `.blx` | BandLab (a project downloaded by Cakewalk / Sonar) | imported, partial, as Simple-layout tracks: regions with their loops, tempo, key, the mix, volume and pan automation and the common effects; tested on made-up projects only |
+| `.mod`, `.xm`, `.s3m`, `.it` | ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker (tracker modules) | imported, partial: instruments as Sampler channels with their samples (written as WAV files in "<module> samples" beside it), patterns, the order list as Playlist clips, speed and tempo as tempo markers, note volume, pan, delay and cut; volume changes on sounding notes (volume slides and sets, the volume column, tremolo, the volume envelope while a note is held) as Volume multiplier automation of the channel; the other tick effects, pan / pitch envelopes and IT new note actions are listed in the report. View › Tracker (Shift+F7, or "Edit in tracker" in a channel's menu) edits the notes as rows and channels |
 | `.mid` | any app | opened as a project |
+| `.zip` | LYNX SHARE (Export › Project with samples) or FL Studio's zipped loop package | extracted to a folder, then the project inside is opened |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
 **Help › Missing files...** helps find samples that moved. Save the result as a `.lynx` project.
 
-To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip with the samples) and **Ableton Live set
-(.als)...** (Live 12 or Live 11, with the samples collected). Each export shows what did not go over: LYNX-only
-instruments and effects are rendered to audio or replaced in an `.flp`, and are not converted yet in an `.als`.
+To go back, **File › Export** has **FL Studio project...** (`.flp`, or a zip with the samples), **Ableton Live set
+(.als)...** (Live 12 or Live 11, with the samples collected) and **DAWproject (.dawproject)...**; **For other apps...**
+writes one folder with stems, MIDI files, a Live set, an FL Studio project, the mixdown and a README. Each export shows
+what did not go over: LYNX-only instruments and effects are rendered to audio or replaced in an `.flp`, and are not
+converted yet in an `.als` (except Helix, which becomes Live's Wavetable). **File › Save a copy for an older LYNX...**
+writes a `.lynx` that 0.1.27 or 0.1.28 opens, with a list of what that version cannot keep.
 
-**Layout style** (Settings, or View › Layout style): **Pattern workflow** (FL Studio-style, the default),
-**Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist, with a Clip View and a Device
-View) or **Simple workflow** (one window with the tracks and the timeline, for a first song; the setup wizard offers
+**Layout style** (Settings, or View › Layout style): **Pattern layout** (FL Studio-style, the default),
+**Clip-launch layout** (an Ableton Live-style clip grid with scenes beside the Playlist, with a Clip View and a Device
+View) or **Simple layout** (one window with the tracks and the timeline, for a first song; the setup wizard offers
 all three). Switching moves panels only; the project stays the same.
 
-The first time the Simple workflow opens on an empty project it shows a **Welcome** screen: **Make my first song** (a
+The first time the Simple layout opens on an empty project it shows a **Welcome** screen: **Make my first song** (a
 short guided tour), **Open a demo song** or **Start empty**. The **first-song tour** builds one song with you in seven
 steps (a beat, the key, an instrument, chords, a voice or a loop, a one-knob effect, Finish): a ring shows the control
 to use, and the tour moves on when the step is done. **Do it for me** does a step for you, **Next** moves on, **Skip
@@ -34,7 +42,7 @@ tour** ends it, and closing the card pauses it: Help › First-song tour continu
 Help › Welcome screen... shows the Welcome screen again. Three short demo songs made with LYNX's own instruments
 (electronic, hip hop and pop) are in the Start from list; the two newer ones are also in `resources/demos/`.
 
-In the clip grid (Clip-launch workflow):
+In the clip grid (Clip-launch layout):
 
 - **Record into a slot**: arm a track with its Arm button (in the mixer under the slots, or under its slots while the
   mixer's Volume section is hidden; Ctrl-click arms more than one); its empty slots
@@ -116,11 +124,11 @@ In the clip grid (Clip-launch workflow):
   mapping of a knob is the same link as **Link to controller**. In the other layouts
   Ctrl+M stays the metronome.
 
-In the Simple workflow, the **track dock** under the timeline (View › Track dock) has the selected track's
+In the Simple layout, the **track dock** under the timeline (View › Track dock) has the selected track's
 **Instrument** (LYNX's sounds, your plugins and SoundFonts, with a preview), **Keyboard** (Keys, Scale keys or a Chord
 pad, with Lock to key), **Editor** (the Piano roll on the track's pattern) and **Effects** tabs. The Effects tab chains
 one-knob effects (Brighter, Echo, Punch, Room, Bass, Level, Dirty, Warm), loads one of 22 chain presets or your own,
-and has a Blend knob for the whole chain. A loop dropped in the Simple workflow follows the project key (Follow the
+and has a Blend knob for the whole chain. A loop dropped in the Simple layout follows the project key (Follow the
 project key, per clip). In every layout, View › **Lyrics and notes** keeps the song's lyrics beside the Playlist, View ›
 **Reference match...** matches the Master's tone and loudness to a reference track, and **Clean voice** (Mixer and
 track menus) puts a ready voice chain on a track.
@@ -139,6 +147,20 @@ file, as when you drop it from your file manager. This works for plugins inside 
 running in a separate process or in the 32-bit bridge, and on Windows, Linux and macOS. While the mouse is over LYNX
 SHARE's own panels the drag stays LYNX SHARE's, so the Channel rack, the Playlist and the Mixer take it as before. You
 can also drag a sample out to another program.
+
+## Plugin windows that look too big, too small or cut off (Windows)
+
+Open the plugin's window, click the wrapper settings tab (the gear) and look at **Settings › GUI**, as in FL Studio:
+
+- **DPI aware (requires reloading the plugin)**, on by default: the plugin draws itself at your display's scale. Turn
+  it off for an old plugin that looks tiny or blurry-wrong at 125-200 %: Windows then draws its window at 100 % and
+  enlarges it. Such a window always opens as a window of its own (not docked), and it can look a little soft.
+- **Scale editor dimensions**, off by default: turn it on when a plugin's window is cut off on a high-resolution
+  screen (part of the plugin is outside the window). LYNX SHARE then makes the window as large as the plugin draws.
+
+Changing either closes the plugin's window; open it again. Both settings are saved with the project and with FL Studio
+projects you export or import. On Linux and macOS the plugin follows the display's scale by itself ("DPI aware" is
+greyed out).
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 

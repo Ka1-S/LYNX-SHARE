@@ -410,7 +410,7 @@
   "project/synth100/load_norm": 0.41308423298209324,
   "project/synth100/save_norm": 0.6710194582713815
  },
- "note": "The owner's build machine (WSL2, Ryzen 5 3600), build-linux/ app + perfbench, FL=1 OPENTIME=1, private Xvfb (/mnt/e/lynx-work/perfgate190id/localgate.sh). First baseline from run m2 at e42789b63, measured while other jobs kept the load at 15-20: re-measure it on a quiet machine (PROFILE=local scripts/perf-gate.sh update) at the next release.",
+ "note": "The owner's build machine (WSL2, Ryzen 5 3600), build-linux/ app + perfbench, FL=1 OPENTIME=1, private Xvfb (/mnt/e/lynx-work/perfgate190id/localgate.sh). First baseline from run m2 at e42789b63, measured while other jobs kept the load at 15-20: re-measure it on a quiet machine (PROFILE=local scripts/perf-gate.sh update) at the next release. Rollup 0.1.31 step 7 (owner decision, round 190pb): paint/patience/channel_rack measures +33-36 % instructions against main 0.1.30 because the rack now shows Patience's 21 automation clip rows (FL's rows: rounds 190oo / 190ow); at equal visible content (1920x450, the same 11 channel rows) it is -0.3 %. Accepted as content: re-baseline this cell with the 0.1.31 release.",
  "profile": "local",
  "thresholds": {
   "open_norm": [

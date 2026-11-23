@@ -62,6 +62,11 @@ void afterStart();
 // the arguments asked for it (the caller quits).
 bool runApplyHelper (const juce::StringArray& args);
 
+// Round 190nr: after an installer run into `folder`, removes the top-level entries that versions newer than the one
+// installed added (core/UpdateCheck.h entriesNewerThan; the version from the update folder's installing.txt). The
+// --apply-update helper calls it when the installer succeeded; returns the names removed.
+juce::StringArray removeNewerLeftovers (const juce::File& folder, const juce::File& installingTxt);
+
 // The bar under the toolbar. Hidden while there is nothing to say; `onVisibilityChanged` lets the window lay out.
 class UpdateBar final : public juce::Component,
                         private juce::ChangeListener

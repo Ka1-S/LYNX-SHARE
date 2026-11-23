@@ -330,10 +330,11 @@ public:
         area.removeFromTop (6);
         picker.setBounds (area.removeFromTop (picker.preferredHeight()));
         area.removeFromTop (10);
+        // (round 190oo, WG-6: the one button order of LYNX's dialogs: Reset on the left, Cancel, OK in the accent at the far right)
         auto buttons = area.removeFromTop (28);
-        cancel.setBounds (buttons.removeFromRight (90));
-        buttons.removeFromRight (8);
         ok.setBounds (buttons.removeFromRight (90));
+        buttons.removeFromRight (8);
+        cancel.setBounds (buttons.removeFromRight (90));
         reset.setBounds (buttons.removeFromLeft (80));
     }
 

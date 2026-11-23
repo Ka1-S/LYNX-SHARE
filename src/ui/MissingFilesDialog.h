@@ -20,6 +20,7 @@ struct MissingFilesInfo
     std::vector<MissingPlugin> plugins; // plugins not installed here, with what replaced them
     std::vector<std::pair<std::string, std::string>> autoRelocated; // found elsewhere when opening: saved path → used path
     juce::String projectName;
+    bool fromFlStudio = false; // (Discord 11-18, round 190nq: only an FL project "will not sound as in FL Studio")
     juce::StringArray searchFolders; // also searched when the window opens (the project's folder), not remembered
 };
 

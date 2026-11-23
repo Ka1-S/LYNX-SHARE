@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHARE 可以承载其他厂商的乐器和效果器插件。它通过扫描
 3. 按 `F8` 打开插件选择器，输入插件名称的一部分。
 4. 双击它或按 `Enter`。乐器会变成新通道。效果器会进入所选的混音台插入轨。
 
-首次启动时，设置向导会列出插件文件夹，并在后台扫描它们。`选项 › 设置向导（语言、音频、插件文件夹）...` 可再次打开它。每次启动几秒钟后，LYNX SHARE 也会查找新插件。
+首次启动时，LYNX SHARE 会在欢迎卡片打开期间于后台扫描插件文件夹。`选项 › 设置向导（语言、音频、插件文件夹）...` 会再次显示这些文件夹。每次启动几秒钟后，LYNX SHARE 也会查找新插件。
 
 ## 各系统的格式
 
 | 系统 | 承载的格式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOS 上不承载 VST2。在 Linux 上，Windows 插件可通过 [yabridge](https://github.com/robbert-vdh/yabridge) 和 Wine 使用，二者需要你自己安装：把 yabridge 同步到的文件夹添加为插件文件夹。
+
+JSFX 脚本是 REAPER 的效果器和乐器格式，可在所有系统上运行：LYNX SHARE 自带 31 个免费脚本（来自 chokehold，MIT 许可），位于浏览器的 `插件数据库 › 效果器 › JSFX` 和 `插件数据库 › 发生器 › JSFX`，也可在插件选择器中找到。`Documents/LYNX/JSFX` 和 REAPER 的 Effects 文件夹中的脚本也会被找到，`设置 › 文件 › JSFX 文件夹` 可添加更多文件夹。LYNX SHARE 在自己的面板中显示脚本的滑块；自己绘制界面的脚本只显示其滑块。
 
 ## 插件管理器
 
@@ -102,6 +104,18 @@ FL Studio 的原生插件，例如 Sytrus、Harmor 和 Patcher，只能在 FL St
 你在 FL Studio 内部搭建的内容会随 LYNX SHARE 工程一起保存。`FL Studio VSTi (Multi)` 有 16 路立体声输出，可以在各自独立的插入轨上播放（见上一节）。你的 FL Studio 许可证决定哪些 FL 插件能在其中使用。LYNX SHARE 自己不会加载 FL Studio 的插件文件。
 
 如果 FL Studio 插件被列为 `加载失败`，请在 `选项 › 插件管理器...` 中右键点击它，选择 `重试（立即扫描此文件）`。
+
+## 在其他 DAW 中使用 LYNX 自己的插件
+
+LYNX SHARE 自己的效果器和乐器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供给其他 DAW 使用的插件版本。它们是[发布页面](https://github.com/Ka1-S/LYNX-SHARE/releases)上单独的可选下载：适用于 Windows、macOS 和 Linux 的 `LYNX-Plugins-<version>`。
+
+- 所有插件都在一个 CLAP 文件 `LYNX Plugins.clap` 里。其中一小部分也提供 VST3 版本，在 Linux 上还提供 LV2 版本。
+- 包中的乐器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。
+- 在 Windows 上，请选 `LYNX-Plugins-<version>-win-x64.7z`（约 20 MB）。`.zip`（约 195 MB）里的文件完全相同。
+- 运行压缩包里的安装脚本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然后在你的 DAW 里重新扫描插件。
+- 插件打开的编辑器和 LYNX SHARE 里的一样，它的状态可以在 LYNX SHARE 中作为工程打开。
+
+完整列表见 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)。
 
 ## 插件数据库文件夹
 

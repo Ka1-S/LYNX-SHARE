@@ -43,6 +43,7 @@
 #include <ctime>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -79,6 +80,8 @@
 #include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/WorkerPool.h"
+#include "core/TrackStates.h"
+#include <sstream>
 
 // round 190gp: A/B switches of this round's changes, looked up weakly (the same tool links with the objects from before
 // them, which do not have them): LYNX_DECLARED_TAILS=0 (smart disable's fixed hold), LYNX_SYNTH_LANES=0 (the synth's
@@ -272,6 +275,7 @@ int main (int argc, char** argv)
     bool offline = false, meters = true, stopped = scenario == "idle" || scenario == "afterstop", units = false, aheadMode = false, paced = false, appTransport = false,
          aheadAlways = false;
     std::vector<int> liveChannels;
+    std::vector<std::string> deactivateSpecs;
     int loopBars = 0;
     bool gate = false;
     const bool playWarmup = scenario == "afterstop"; // (the warmup plays, the measured part is stopped)
@@ -314,6 +318,8 @@ int main (int argc, char** argv)
             loopBars = std::max (0, std::atoi (next()));
         else if (a == "--gate") // (perfgate190id: one machine-readable GATE line at the end, scripts/perf_gate.py)
             gate = true;
+        else if (a == "--deactivate") // round 190op (P4): "c:1,2" channels / "i:3,4" inserts deactivated (core/TrackStates.h)
+            deactivateSpecs.push_back (next());
     }
 
     constexpr int sampleRate = 44100;
@@ -373,6 +379,60 @@ int main (int argc, char** argv)
     }
 
     const auto importMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - import0).count();
+    // round 190of: LYNX_PB_SMARTALL=1 = FL's Tools > Macros > "Switch smart disable for all plugins" (every slot on), and
+    // LYNX_PB_SLOTS=1 lists how many slots have it on as imported
+    {
+        int on = 0, all = 0;
+        for (auto& track : song.mixer)
+            for (auto& slot : track.effects)
+            {
+                ++all;
+                on += slot.smartDisable ? 1 : 0;
+                if (std::getenv ("LYNX_PB_SMARTALL") != nullptr)
+                    slot.smartDisable = true;
+            }
+        if (std::getenv ("LYNX_PB_SLOTS") != nullptr)
+            std::printf ("slots: %d, smart disable on in %d%s\n", all, on, std::getenv ("LYNX_PB_SMARTALL") != nullptr ? " (now all on)" : "");
+    }
+    // round 190ok: LYNX_PB_REV=n gives every effect slot (inside Patchers and parallel branches too) engine revision n:
+    // LYNX_PB_REV=1 renders as a project saved before round 190ok (the gold renders' check that those are bit for bit)
+    if (const char* rev = std::getenv ("LYNX_PB_REV"))
+    {
+        const auto n = std::atoi (rev);
+        std::function<void (EffectSlot&)> slotRev;
+        std::function<void (PatcherDoc&)> docRev = [&] (PatcherDoc& doc) {
+            for (auto& node : doc.nodes)
+            {
+                slotRev (node.effect);
+                docRev (node.channel.patcher);
+            }
+        };
+        slotRev = [&] (EffectSlot& slot) {
+            slot.engineRev = n;
+            for (auto& b : slot.branches)
+                for (auto& inner : b.chain)
+                    slotRev (inner);
+            docRev (slot.patcher);
+        };
+        for (auto& track : song.mixer)
+            for (auto& slot : track.effects)
+                slotRev (slot);
+        for (auto& c : song.channels)
+            docRev (c.patcher);
+    }
+    // round 190op (P4): deactivated channels / inserts (RackState::build plays the projection: they are not loaded)
+    for (const auto& spec : deactivateSpecs)
+    {
+        if (spec.size() < 3 || spec[1] != ':')
+            continue;
+        std::vector<int> list;
+        std::stringstream ss (spec.substr (2));
+        for (std::string item; std::getline (ss, item, ',');)
+            if (! item.empty())
+                list.push_back (std::atoi (item.c_str()));
+        const auto n = spec[0] == 'c' ? deactivate::setChannels (song, list, true) : deactivate::setInserts (song, list, true);
+        std::printf ("deactivated %d %s (%s)\n", n, spec[0] == 'c' ? "channel(s)" : "insert(s)", spec.c_str());
+    }
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
     const auto tps = ticksPerSample (song.bpm, sampleRate);
@@ -417,6 +477,8 @@ int main (int argc, char** argv)
         renderer->prepare (sampleRate, std::max (2048, blockSize));
         renderer->setProfiling (units);
         auto bank = std::make_unique<MeterBank>();
+        const auto levels = std::getenv ("LYNX_PB_LEVELS") != nullptr; // (round 190of)
+        std::vector<float> trackPeaks (song.mixer.size(), 0.0f);
         auto live = std::make_unique<LiveEventQueue>();
         auto midiLive = std::make_unique<LiveEventQueue>();
         // render-ahead (round 190gq): the controller as ChannelRackProcessor drives it, the snapshot from an exchange
@@ -556,9 +618,17 @@ int main (int argc, char** argv)
                 if ((pos / (std::size_t) blockSize) % std::max<std::size_t> (1, (std::size_t) (sampleRate / 60 / blockSize)) == 0)
                 {
                     counter.pause();
+                    // round 190of: LYNX_PB_LEVELS=1 keeps each insert's highest peak over the last 2 s of rep 0 (what keeps a
+                    // stopped project's chains awake: smart disable needs -96 dB)
+                    const auto lastSeconds = rep == 0 && levels && (double) pos >= (double) totalSamples - 2.0 * sampleRate;
                     for (int t = 0; t < (int) song.mixer.size(); ++t)
                         for (int s = 0; s < 2; ++s)
-                            (void) bank->takePeak (t, s), (void) bank->takeViewPeak (t, s);
+                        {
+                            const auto peak = bank->takePeak (t, s);
+                            (void) bank->takeViewPeak (t, s);
+                            if (lastSeconds && t < (int) trackPeaks.size())
+                                trackPeaks[(std::size_t) t] = std::max (trackPeaks[(std::size_t) t], peak);
+                        }
                     counter.resume();
                 }
         }
@@ -632,6 +702,11 @@ int main (int argc, char** argv)
                 std::fwrite (right.data(), sizeof (float), right.size(), f);
                 std::fclose (f);
             }
+        if (rep == 0 && levels) // (round 190of: the inserts still above -140 dB at the end)
+            for (std::size_t t = 0; t < trackPeaks.size(); ++t)
+                if (trackPeaks[t] > 1.0e-7f)
+                    std::printf ("level insert %d \"%s\": %.1f dBFS%s\n", (int) t, song.mixer[t].name.c_str(), 20.0 * std::log10 (trackPeaks[t]),
+                                 trackPeaks[t] > 1.5849e-5f ? " (above smart disable's -96 dB)" : "");
         if (rep == 0)
             firstHash = h;
         sameHash = sameHash && h == firstHash;
@@ -687,17 +762,23 @@ int main (int argc, char** argv)
     // build from the previous one, as AudioEngine publishes it: unchanged channels and effects are kept.
     const auto firstBuild = buildMs.front();
     const auto rebuild = buildMs.size() > 1 ? median (std::vector<double> (buildMs.begin() + 1, buildMs.end())) : firstBuild;
-    std::vector<double> editMs;
+    // (rollup 0.1.31 step 5, round 190ok's gate proposal: 12 edits, not 5, and the instructions each one retires on this
+    // thread, so the gate can hold the edit to its count while one ~5 ms timing moves +-25 % run to run)
+    std::vector<double> editMs, editInstr;
     {
+        InstructionCounter editCounter;
         auto previous = RackState::build (song, nullptr, sampleRate, provider);
         const auto trace = std::getenv ("PERFBENCH_TRACE_EDIT") != nullptr; // (the phases of the last edit snapshot)
-        for (int k = 0; k < 5; ++k)
+        for (int k = 0; k < 12; ++k)
         {
             if (trace)
                 loadtrace::begin ("edit");
+            editCounter.start();
             const auto t0 = std::chrono::steady_clock::now();
             auto next = RackState::build (song, previous.get(), sampleRate, provider);
             editMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
+            editCounter.pause();
+            editInstr.push_back ((double) editCounter.read());
             previous = std::move (next);
             if (trace)
                 loadtrace::end();
@@ -706,6 +787,7 @@ int main (int argc, char** argv)
             std::printf ("%s", loadtrace::table().c_str());
     }
     const auto edit = median (editMs);
+    const auto editInstructions = median (editInstr); // (-1: no CPU counter)
     std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms, edit snapshot %.1f ms (medians), peak memory %.0f MB; %zu channels, "
                  "%zu inserts, %zu playlist clips, %zu automations\n",
                  importMs, firstBuild, rebuild, edit, peakRssMb(), song.channels.size(), song.mixer.size(), song.playlist.size(), song.automations.size());
@@ -716,6 +798,8 @@ int main (int argc, char** argv)
                      scenario.c_str(), blockSize, threads, audioMs / 1000.0, 100.0 * median (cpu) / audioMs, median (nsPerSample),
                      median (instr) < 0 ? -1.0 : (double) median (instr) / (double) totalSamples, importMs, firstBuild, rebuild, edit, peakRssMb(),
                      (unsigned long long) firstHash, sameHash ? 1 : 0);
+        if (editInstructions > 0)
+            std::printf (" edit_instr=%.0f", editInstructions);
         if (paced)
             std::printf (" dropouts_per_min=%.2f overruns_per_min=%.2f", median (droppedPerMin), median (overPerMin));
         std::printf ("\n");

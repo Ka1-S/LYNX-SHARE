@@ -9,6 +9,7 @@
 // Cost: the tables are rebuilt only when the Song changes (`songStamp`); an update evaluates each automated target once
 // (a few binary-search-free clip walks), and controls look their target up in a small sorted vector.
 
+#include "core/RackAutomation.h" // round 190ow (DE-123)
 #include "core/Song.h"
 
 #include <algorithm>
@@ -113,6 +114,7 @@ private:
 
     void build (const Song& song)
     {
+        anyTriggered = false;
         sources.clear();
         targets.clear();
         patternClips.assign (song.patterns.size(), {});
@@ -134,9 +136,13 @@ private:
         {
             const auto& automation = song.automations[(std::size_t) a];
             auto& list = clips[(std::size_t) a];
-            if (list.empty() || automation.isLive() || automation.target.kind == AutomationTargetKind::none
-                || automation.target.kind == AutomationTargetKind::tempo)
+            // (round 190ow: a muted clip drives nothing; the steps / notes on its rack row start it, DE-123)
+            const auto triggered = rackauto::hasTriggers (song, a);
+            if ((list.empty() && ! triggered) || automation.isLive() || automation.target.kind == AutomationTargetKind::none
+                || automation.target.kind == AutomationTargetKind::tempo || automation.muted)
                 continue;
+            if (triggered)
+                anyTriggered = true;
             // one source per target: its clips play as one (issue #97, the renderer's rule)
             const auto same = std::find_if (sources.begin(), sources.end(), [&] (const Source& s) { return s.target == automation.target; });
             if (same != sources.end())
@@ -175,8 +181,16 @@ private:
         constexpr auto none = std::numeric_limits<float>::quiet_NaN();
         if (s.automation >= 0)
         {
+            // round 190ow (DE-123): the clips the steps / notes start, in Pattern mode too; in Song mode the clip or
+            // trigger that started last wins
+            auto trigger = std::pair<float, double> { none, -1.0 };
+            if (anyTriggered)
+                for (int a = 0; a < (int) song.automations.size(); ++a)
+                    if (song.automations[(std::size_t) a].target == s.target && rackauto::hasTriggers (song, a))
+                        if (const auto t = rackauto::triggeredValue (song, a, tick); t.second > trigger.second)
+                            trigger = t;
             if (song.mode != PlayMode::song)
-                return none; // in pattern mode the Playlist does not play (the renderer keeps the last value)
+                return trigger.first; // in pattern mode the Playlist does not play (the renderer keeps the last value)
             const Clip* playing = nullptr;
             const Clip* ended = nullptr;
             for (const auto i : s.clips)
@@ -196,6 +210,9 @@ private:
                 else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
                     ended = &c;
             }
+            if (trigger.second >= 0.0 && (playing == nullptr || trigger.second > (double) playing->start)
+                && (playing != nullptr || ended == nullptr || trigger.second > (double) ended->start))
+                return trigger.first;
             if (playing != nullptr)
                 return song.automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick);
             if (ended != nullptr)
@@ -235,6 +252,7 @@ private:
     }
 
     std::vector<Source> sources;
+    bool anyTriggered = false; // (round 190ow: some automation has steps / notes on its rack row)
     std::vector<AutomationTarget> targets;
     std::vector<std::vector<int>> patternClips;
     std::vector<Entry> values;

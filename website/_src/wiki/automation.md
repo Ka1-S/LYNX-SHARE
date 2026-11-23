@@ -78,7 +78,7 @@ Turn on recording with `Automation` ticked in the recording filter, press play a
 
 - `Link to MIDI controller (move a knob on the controller)` is covered in [MIDI controllers](/wiki/midi-controllers/).
 - `Link to internal controller` lets an Envelope, Formula or Peak Controller in the project drive the control. Add one of them first.
-- `Modulate` attaches a modulator, an LFO or a random source that moves a LYNX SHARE knob around its own value. `Tools › Modulators...` lists them.
+- `Modulate with` attaches a modulator that moves the control around its own value: an LFO, an envelope follower, an ADSR envelope, steps, a random source, a macro, keytrack or velocity. It works on LYNX SHARE's knobs and on third-party plugins' parameters. You can also drag a modulator onto a knob, and a ring on the knob shows the movement. `Tools › Modulators...` lists them.
 
 ## Automation lanes
 
@@ -90,7 +90,8 @@ Lanes are off by default. Turn on `Automation lanes` in the Playlist's menu. Eac
 - Several clips on one control each play in their own place. Before its first clip, a control keeps its own value.
 - At the start of a clip the control reaches the new value in about 8 ms. FL Studio glides there, so an imported project can differ slightly at those points.
 - Where clips on the same control overlap, the one LYNX SHARE picks can differ from the one FL Studio picks.
-- Modulators only work on LYNX SHARE's own knobs, and they are left out when you export to `.flp`.
+- On a `.flp` export, modulators that follow the song position become automation clips (a synced LFO becomes FL Studio's clip LFO). Followers, envelopes, keytrack and velocity are left out, and the report lists them.
+- Moved a control while playing without recording? `Capture automation` in the recording options turns the last moves into automation afterwards.
 
 ## Related
 

@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <cctype>
 #include <atomic>
 #include <cmath>
@@ -2914,6 +2915,7 @@ struct Voice
     bool isSlave = false;
     double fs = 44100;
     float vel = 0.78125f, relvel = 1.0f, fvol = 1, fpan = 0, notePan = 0, initVol = 1;
+    double fcut = 0.0, fres = 0.0; // FL's Final.FCut / FRes (the note's Mod X / Y, −1…1; round 190pr)
     float pitch = 0, master = 1, base = 0, rampMax = 0, panMax = 0;
     float uvol = 1, upan = 0.5f, uphase = 0, udet = 1, envvar = 1.0f / 128, fxpan = 0, w34 = 1;
     double unisonX = 0.5;
@@ -3043,6 +3045,15 @@ struct BandTable
 struct Engine::Impl
 {
     float nextLiveRef = NAN; // (round 167a)
+    // automated main-page values (round 190pi, Engine::setMainValue): master level / LFO / pitch (main ints 0…2) and
+    // Mod X / Y (190 / 191); INT_MIN = the patch's own
+    int ov[5] { INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN };
+    static int ovSlot (int i) noexcept { return i >= 0 && i <= 2 ? i : i == 190 ? 3 : i == 191 ? 4 : -1; }
+    int mval (int i) const noexcept
+    {
+        const auto k = ovSlot (i);
+        return k >= 0 && ov[k] != INT_MIN ? ov[k] : P->S.mget (i);
+    }
     std::shared_ptr<const Patch> keep;
     const Patch* P = nullptr;
     double fs = 44100.0;
@@ -3274,7 +3285,7 @@ struct Engine::Impl
     void artsInit (Voice& v)
     {
         const auto& S = P->S;
-        const auto ml = gCurve (S.mget (1), 128);
+        const auto ml = gCurve (mval (1), 128);
         for (int i = 0; i < kNumArts; ++i)
         {
             const auto& d = P->arts[(std::size_t) i];
@@ -3312,14 +3323,7 @@ struct Engine::Impl
         if (hasRand && ! d.mapDefault[4])
             a.stat = a.combine (a.stat, m[4].mapValue (rand));
         a.stat = a.combine (a.stat, m[5].mapValue (unisonX));
-        a.ntabs = 0;
-        const int mxy[2] { S.mget (190), S.mget (191) };
-        for (int j = 0; j < 2; ++j)
-            if (! d.mapDefault[(std::size_t) (2 + j)])
-            {
-                const auto ix = std::clamp<long long> (rnd (mxy[j] + 0.0 * 256.0), 0, 512); // Final.FCut/FRes = 0 in LYNX
-                a.tabs[a.ntabs++] = m[(std::size_t) (2 + j)].mapValue ((double) ix / 512.0);
-            }
+        artTabs (a, v.fcut, v.fres);
         auto& e = a.env;
         e.init();
         a.lfo.env.init();
@@ -3360,6 +3364,22 @@ struct Engine::Impl
         noteOnValue (a, on, pre);
         a.first = true;
         (void) v;
+    }
+
+    // the Mod X / Y map values of an articulator (its X / Y tables at the main page's Mod X / Y)
+    void artTabs (ArtSt& a, double fcut, double fres) const noexcept
+    {
+        const auto& d = *a.d;
+        const auto& m = d.maps;
+        a.ntabs = 0;
+        const int mxy[2] { mval (190), mval (191) };
+        const double fl[2] { fcut, fres }; // (round 190pr: the voice's Final.FCut / FRes; 0 before)
+        for (int j = 0; j < 2; ++j)
+            if (! d.mapDefault[(std::size_t) (2 + j)])
+            {
+                const auto ix = std::clamp<long long> (rnd (mxy[j] + fl[j] * 256.0), 0, 512);
+                a.tabs[a.ntabs++] = m[(std::size_t) (2 + j)].mapValue ((double) ix / 512.0);
+            }
     }
 
     // the articulator's value at note-on: base + first envelope level (pre) × depth, LFO, maps
@@ -3566,10 +3586,10 @@ struct Engine::Impl
         v.fs = fsv;
         v.vel = nt.vel, v.relvel = nt.relvel;
         v.fvol = nt.fvol, v.fpan = nt.fpan;
-        v.pitch = F (100.0 * nt.key + nt.cents - 6000.0) + F (S.mget (2) * 100);
+        v.pitch = F (100.0 * nt.key + nt.cents - 6000.0) + F (mval (2) * 100);
         v.notePitch = v.pitch, v.noteFinal = 100.0 * nt.key + nt.cents - 6000.0, v.slide = {};
         v.slide.anchor (nextLiveRef);
-        v.master = gCurve (S.mget (0), 128);
+        v.master = gCurve (mval (0), 128);
         v.tick = tick;
         v.base = F (523.251130601197 / fsv);
         v.rampMax = F (0.01 * 44100 / fsv);
@@ -4532,7 +4552,7 @@ struct Engine::Impl
         if (countFree() < nu)
             return;
         const bool grouped = S.b4f4 != 0 && (S.mget (173) >= 2 || S.mget (177) > 0);
-        const auto curPitch = F (100.0 * note.key + note.cents - 6000.0) + F (S.mget (2) * 100);
+        const auto curPitch = F (100.0 * note.key + note.cents - 6000.0) + F (mval (2) * 100);
         const auto pflag = S.b4f7at (1);
         const bool porta = hasLastPitch && ((pflag != 0) != (note.colour == 14));
         NoteCtx nt { note.key, note.cents, note.velocity, note.releaseVelocity, 1.0f, note.pan,
@@ -4557,6 +4577,7 @@ struct Engine::Impl
             v->key = (int) std::lround (note.key);
             v->isSlave = false;
             v->notePan = note.pan;
+            v->fcut = note.fcut, v->fres = note.fres;
             // FL velocity → Init.Vol = (11^(vel/100) − 1)/10 (REA_rodada28 §4.1, inference), used only with link velocity
             v->initVol = (float) ((std::pow (11.0, 1.28 * std::clamp ((double) note.velocity, 0.0, 1.0)) - 1.0) / 10.0);
             setupVoice (*v, nt, u);
@@ -4942,7 +4963,58 @@ void Engine::slideTo (double toCents, float samples) noexcept
         }
 }
 
+// FL's host moves InitLevels.Vol / Pan of the sounding voices during a slide note (FL 2026 renders of Sytrus, round 190pi):
+// with link velocity Sytrus' Final.Vol = Init.Vol · channel volume follows it at the next block (renderBlock), and
+// Final.Pan always does; the velocity Sytrus read at note on (velocity map, options) stays
+void Engine::setNoteLevels (int key, float velocity, float pan) noexcept
+{
+    const auto vol = velocity >= 0.0f ? (float) ((std::pow (11.0, 1.28 * std::clamp ((double) velocity, 0.0, 1.0)) - 1.0) / 10.0) : -1.0f;
+    for (auto* v : impl->act)
+        if (v->key == key && v->state < 5)
+        {
+            if (vol >= 0.0f)
+                v->initVol = vol;
+            if (! std::isnan (pan))
+                v->notePan = pan;
+        }
+}
+
 void Engine::setNextLiveRef (float ref) noexcept { impl->nextLiveRef = ref; }
+
+// FL's automation of the main page (round 190pi, Overcome's intro: its "Cut" / "Res" / "Vol" clips on Sytrus' parameters 18 /
+// 19 / 0 [EXEC: FL 2026 renders of the intro's Sytrus channels with each clip, within 0.2 dB per 2 s]): the next notes start
+// with it, the sounding voices take the master level, the LFO level and the Mod X / Y map positions at once
+void Engine::setMainValue (int mainIndex, int value) noexcept
+{
+    const auto k = Impl::ovSlot (mainIndex);
+    if (k < 0 || impl->P == nullptr)
+        return;
+    if (impl->ov[k] == value)
+        return;
+    impl->ov[k] = value;
+    for (auto* v : impl->act)
+    {
+        if (mainIndex == 0)
+        {
+            v->master = gCurve (value, 128);
+            for (int s = 0; s < v->nslaves; ++s)
+                v->slaves[s]->master = v->master;
+        }
+        else if (mainIndex == 1)
+            for (auto& a : v->arts)
+                a.lfodepth = (double) gCurve (value, 128);
+        else if (mainIndex == 190 || mainIndex == 191) // (FL's renders of Overcome's intro: the sounding voices follow)
+        {
+            for (auto& a : v->arts)
+                if (a.d != nullptr)
+                    impl->artTabs (a, v->fcut, v->fres);
+            for (int s = 0; s < v->nslaves; ++s)
+                for (auto& a : v->slaves[s]->arts)
+                    if (a.d != nullptr)
+                        impl->artTabs (a, v->slaves[s]->fcut, v->slaves[s]->fres);
+        }
+    }
+}
 
 void Engine::followPitch (float now) noexcept
 {
@@ -5057,6 +5129,7 @@ public:
         tempo.store (bpm > 0 ? bpm : 120.0);
         channelCents.store (channel.sampler.pitch * 100.0f);
         mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
+        engineRev.store (channel.engineRev);
         const bool render = offlineRendering();
         if (channel.pluginState == loadedState && loadedRate == rate.load() && loadedMode == render)
             return;
@@ -5080,6 +5153,14 @@ public:
         nextPorta = porta;
     }
 
+    // the note's Mod X / Y (0…1, 0.5 = none) are FL's Final.FCut / FRes (−1…1) of its voices (round 190pr, engine revision 3
+    // on: Overcome's "Vinyl Click" plays 1111 four-tick notes whose Mod Y sets each click's level)
+    void setNextNoteModulation (float modX, float modY) noexcept override
+    {
+        nextFcut = std::clamp (2.0 * (double) modX - 1.0, -1.0, 1.0);
+        nextFres = std::clamp (2.0 * (double) modY - 1.0, -1.0, 1.0);
+    }
+
     void noteOn (int key, float velocity) noexcept override
     {
         take();
@@ -5094,6 +5175,9 @@ public:
         p.pan = nextPan;
         // LYNX's per-note porta flag inverts the patch's PORTA button, as FL's note colour 14 does (§6.4; inference)
         p.colour = nextPorta ? 14 : 0;
+        if (engineRev.load() >= 3)
+            p.fcut = nextFcut, p.fres = nextFres;
+        nextFcut = 0.0, nextFres = 0.0;
         p.id = ++serial;
         // (round 190ej: a scheduled note's voices carry its note id, so its end releases only them, as FL's Voice_Release)
         if (const auto note = startingNoteId(); note != 0)
@@ -5117,6 +5201,36 @@ public:
         take();
         if (engine != nullptr)
             engine->slideTo (100.0 * std::clamp (key, 0, 127) - 6000.0 + (double) channelCents.load() + (double) cents, samples);
+    }
+
+    // FL's automation clips on Sytrus' own parameters (round 190pi; Overcome's intro "Cut" / "Res" / "Vol" clips): the
+    // main page's master level (0), master LFO (1), master pitch (2), Mod X (18) and Mod Y (19), from 0…1 to the
+    // control's range (sytrus::settings) as FL's host turns a clip's value into the parameter's
+    void setParameter (int index, float value) noexcept override
+    {
+        if (! std::isfinite (value))
+            return;
+        const auto slot = ! sytrus::automatable (index) ? -1 : index <= 2 ? index : index - 15;
+        if (slot < 0)
+            return;
+        static constexpr int mainIndex[5] { 0, 1, 2, 190, 191 }, low[5] { 0, -128, -24, 0, 0 }, high[5] { 160, 128, 24, 512, 512 };
+        const auto v = (double) std::clamp (value, 0.0f, 1.0f);
+        automated[(std::size_t) slot] = low[slot] + (int) std::lround (v * (double) (high[slot] - low[slot]));
+        take();
+        if (engine != nullptr)
+            engine->setMainValue (mainIndex[slot], automated[(std::size_t) slot]);
+    }
+
+    // FL's slide notes move the sounding notes' velocity (as Init.Vol) and pan (issue #236; FL 2026 renders of Sytrus,
+    // round 190pi: Overcome's Flute starts at velocity 0 and its slide notes bring it up)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! std::isfinite (value) || (prop != 0 /* vfx::Prop::velocity */ && prop != 2 /* vfx::Prop::pan */))
+            return;
+        take();
+        if (engine != nullptr)
+            engine->setNoteLevels (key, prop == 0 ? std::clamp (value, 0.0f, 1.0f) : -1.0f,
+                                   prop == 2 ? std::clamp (value, -1.0f, 1.0f) : std::nanf (""));
     }
 
     void noteOff (int key) noexcept override
@@ -5177,6 +5291,10 @@ private:
             delete retired.exchange (engine.release());
             engine.reset (e);
             quiet = 1 << 30;
+            static constexpr int mainIndex[5] { 0, 1, 2, 190, 191 };
+            for (int k = 0; k < 5; ++k) // (automated values outlive a rebuilt engine)
+                if (automated[(std::size_t) k] != INT_MIN)
+                    engine->setMainValue (mainIndex[k], automated[(std::size_t) k]);
         }
     }
 
@@ -5193,8 +5311,11 @@ private:
     std::atomic<bool> mode { false };
     float nextPan = 0.0f, nextCents = 0.0f;
     bool nextPorta = false;
+    double nextFcut = 0.0, nextFres = 0.0;   // (round 190pr: the next note's Final.FCut / FRes)
+    std::atomic<int> engineRev { 2 };       // ChannelDef::engineRev (3: the notes' Mod X / Y reach the voices)
     std::int64_t serial = 0;
     long long quiet = 1 << 30;
+    std::array<int, 5> automated { INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN }; // (round 190pi, audio thread)
 };
 } // namespace
 

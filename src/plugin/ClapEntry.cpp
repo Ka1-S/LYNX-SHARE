@@ -514,6 +514,14 @@ const char* const* featuresOf (const Entry& e)
             case EffectKind::voiceShift: list = make ({ CLAP_PLUGIN_FEATURE_PITCH_SHIFTER }); break;
             case EffectKind::geminiDoubler: list = make ({ CLAP_PLUGIN_FEATURE_CHORUS }); break; // (a doubler: no own feature)
             case EffectKind::quellDenoiser: list = make ({ CLAP_PLUGIN_FEATURE_RESTORATION }); break;
+            // round 190ov
+            case EffectKind::strikeShaper: list = make ({ CLAP_PLUGIN_FEATURE_TRANSIENT_SHAPER }); break;
+            case EffectKind::anvilBus: list = make ({ CLAP_PLUGIN_FEATURE_DISTORTION, CLAP_PLUGIN_FEATURE_COMPRESSOR, CLAP_PLUGIN_FEATURE_MIXING }); break;
+            case EffectKind::corrode: list = make ({ CLAP_PLUGIN_FEATURE_DISTORTION, CLAP_PLUGIN_FEATURE_DELAY }); break;
+            case EffectKind::soundboard: list = make ({ CLAP_PLUGIN_FEATURE_FILTER }); break;
+            case EffectKind::platter: list = make ({ CLAP_PLUGIN_FEATURE_DISTORTION }); break;
+            case EffectKind::timeprism: list = make ({ CLAP_PLUGIN_FEATURE_DELAY, CLAP_PLUGIN_FEATURE_GLITCH }); break;
+            case EffectKind::harmonia: list = make ({ CLAP_PLUGIN_FEATURE_FILTER }); break;
             default: list = make ({}); break;
         }
     lists.push_back (std::move (list));

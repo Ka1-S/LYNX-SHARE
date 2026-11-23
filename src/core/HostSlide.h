@@ -10,6 +10,8 @@
 // slide correctly"): slides are a host feature every native generator follows. LYNX's sampler and synth glide the same way.
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cmath>
 
 namespace lynx
@@ -59,6 +61,27 @@ struct HostSlide
         return steps;
     }
 
+    // FL's slide note over a chord or over notes of other colours (round 190pi, Song::slideNoteProps; FL 2026 /R renders of
+    // Sampler, 3x Osc, DirectWave, SimSynth, Harmless, Harmor, MiniSynth and Sytrus, REA_rodada190pi §2): the host moves the
+    // held notes of the slide note's colour only, each by the same interval — from the highest of them to the slide note's
+    // key —, not every voice to the slide note's key. The rack sets this around Instrument::slideTo when that is not the
+    // plain case (one held key, of the slide's colour); start() then takes `cents` (the move from the voice's own note
+    // pitch) for a voice whose key is in `keys` and leaves the others as they are. The voice's key is read back from the
+    // engine's own `toCents` (the slide note's key minus it, in semitones). Audio thread only, set and cleared by the rack.
+    struct Shift
+    {
+        bool on = false;
+        float cents = 0.0f;
+        int slideKey = 60;
+        std::array<std::uint64_t, 2> keys {};
+        bool moves (int key) const noexcept { return key >= 0 && key < 128 && ((keys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
+    };
+    static Shift& pendingShift() noexcept
+    {
+        static thread_local Shift shift;
+        return shift;
+    }
+
     // the note on: the channel's pitch the voice was started with (knob + fine tune + main pitch, cents); `rate` =
     // the engine's samples per host sample (an engine that runs at its own rate)
     void anchor (float ref, float rate = 1.0f) noexcept
@@ -89,6 +112,12 @@ struct HostSlide
     // (`toCents` already holds the channel's pitch now: a pending live jump moves where the glide starts, not its end)
     void start (float toCents, float samples) noexcept
     {
+        if (const auto& shift = pendingShift(); shift.on) // (a chord, or other colours: round 190pi)
+        {
+            if (! shift.moves (shift.slideKey - (int) std::lround (toCents / 100.0f)))
+                return; // (a note of another colour: it keeps its pitch, and a glide in progress goes on)
+            toCents = shift.cents + (std::isnan (liveRef) ? 0.0f : liveApplied);
+        }
         target = toCents - jump;
         left = std::max (1.0f, samples);
         if (const auto& s = pendingSteps(); s.ticks > 0) // (FL's stepped slide note)

@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Demo projesiyle ana pencere: üstte araç çubuğu, solda Browser, arkada Playlist ve üzerinde yüzen Channel Rack](/assets/img/wiki/desktop.webp)
 

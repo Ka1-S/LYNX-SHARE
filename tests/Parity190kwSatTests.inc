@@ -155,6 +155,7 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
     for (const auto& c : cases)
     {
         auto s = makeEffectSlot (EffectKind::ember);
+        s.engineRev = 1; // (rollup 0.1.31 step 5: a project saved before round 190ok's revision 2: the C library's maths)
         s.params[(std::size_t) em::revision] = 0.0f;
         s.params[(std::size_t) em::drive] = c.drive;
         s.params[(std::size_t) em::quality] = c.quality;

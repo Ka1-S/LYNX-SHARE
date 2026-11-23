@@ -18,6 +18,8 @@
 
 #include "core/MixerOps.h"
 #include "core/NoteEdit.h"
+#include "core/Sections.h"
+#include "core/ChordLane.h"
 #include "core/Song.h"
 
 namespace lynx::arrange
@@ -199,6 +201,7 @@ struct TimeClip
         std::vector<AutomationPoint> points; // from the range's start, with a point on each edge
     };
     std::vector<Lane> lanes;
+    std::vector<SongChord> chords; // round 190pf: the Chord lane's chords of the range, from its start
     std::int64_t length = 0;
     bool empty() const noexcept { return length <= 0; }
 };
@@ -225,6 +228,7 @@ inline TimeClip copyTime (const Song& song, std::int64_t from, std::int64_t to)
     for (const auto a : laneAutomations (song))
         if (auto points = detail::piece (song.automations[(std::size_t) a].points, from, to); ! points.empty())
             out.lanes.push_back ({ a, std::move (points) });
+    out.chords = chordlane::piece (song.chords(), from, to); // (round 190pf: the Chord lane goes with its time)
     return out;
 }
 
@@ -235,6 +239,9 @@ inline void pasteTime (Song& song, std::int64_t at, const TimeClip& time)
         return;
     noteedit::sliceInsertTime (song.playlist, song.markers(), at, time.length);
     insertLaneTime (song, at, time.length);
+    sections::insertTime (song.sections(), at, time.length); // (round 190ol: the Sections lane follows)
+    chordlane::insertTime (song.chords(), at, time.length);   // (round 190pf: the Chord lane too)
+    chordlane::pastePiece (song.chords(), at, time.chords);
     for (auto c : time.clips)
     {
         const auto valid = c.kind == ClipKind::pattern   ? c.pattern >= 0 && c.pattern < (int) song.patterns.size()
@@ -263,6 +270,8 @@ inline void deleteTime (Song& song, std::int64_t from, std::int64_t to)
         return;
     noteedit::deleteTime (song.playlist, song.markers(), from, to);
     deleteLaneTime (song, from, to);
+    sections::deleteTime (song.sections(), from, to); // (round 190ol: the Sections lane follows)
+    chordlane::deleteTime (song.chords(), from, to);  // (round 190pf: the Chord lane too)
 }
 
 // Cut Time: Copy Time, then Delete Time.

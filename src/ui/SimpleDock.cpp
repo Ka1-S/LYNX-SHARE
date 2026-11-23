@@ -1,4 +1,6 @@
 #include "ui/SimpleDock.h"
+#include "ui/TrackerComponent.h"
+#include "ui/DemoMode.h" // (round 190np: the Drum Machine is a demo::CellSource)
 
 #include <algorithm>
 #include <array>
@@ -380,6 +382,25 @@ public:
                 engine.editSong ([t, v] (Song& s) { simpletracks::setReverbSend (s, t, v < 0.005f ? 0.0f : v); });
         };
         addAndMakeVisible (reverb);
+        // round 190ot (research190oe P5): the second shared send, an echo (GarageBand's Echo and Reverb sends)
+        styleCaption (echoCaption, tr ("Echo"));
+        addAndMakeVisible (echoCaption);
+        echo.resetValue = 0.0f;
+        echo.setTooltip (tr ("How much of the track goes to the shared echo (one Echo insert for every track, a dotted quarter note at the song's tempo)"));
+        echo.setTitle (tr ("Echo"));
+        echo.onChange = [this] (float v) {
+            const auto t = insert;
+            if (t > 0)
+                engine.editSong ([t, v] (Song& s) { simpletracks::setEchoSend (s, t, v < 0.005f ? 0.0f : v); });
+        };
+        addAndMakeVisible (echo);
+        // round 190ot: "Duck under..." — the track dips on every hit of the one picked (sidechain pumping in one pick)
+        styleCaption (duckCaption, tr ("Duck under"));
+        addAndMakeVisible (duckCaption);
+        duckButton.setTooltip (tr ("Dips this track on every hit of another track, a kick say (sidechain pumping). The Duck card's knob sets how much"));
+        duckButton.setComponentID ("simple.dock.duck");
+        duckButton.onClick = [this] { duckMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&duckButton)); };
+        addAndMakeVisible (duckButton);
 
         view.setViewedComponent (&strip, false);
         view.setScrollBarsShown (false, true);
@@ -417,8 +438,16 @@ public:
         previousPreset.setEnabled (has);
         nextPreset.setEnabled (has);
         blend.setEnabled (has);
-        reverb.setEnabled (has && insert > 0 && insert != simpletracks::sharedReverb (song));
         reverb.setValue (has ? simpletracks::reverbSend (song, insert) : 0.0f);
+        const auto bus = has && insert > 0 && insert != simpletracks::sharedReverb (song) && insert != simpletracks::sharedEcho (song);
+        reverb.setEnabled (bus);
+        echo.setEnabled (bus);
+        echo.setValue (has ? simpletracks::echoSend (song, insert) : 0.0f);
+        duckButton.setEnabled (bus);
+        {
+            const auto trigger = has ? simpletracks::duckTrigger (song, insert) : -1;
+            duckButton.setButtonText ((trigger > 0 ? insertTitle (trigger) : tr ("None")) + glyph (" \xe2\x96\xbe"));
+        }
         addCard.setEnabled (has);
         if (! has)
         {
@@ -429,6 +458,9 @@ public:
             bypassButton.bypassed = false;
             bypassButton.repaint();
             blend.setValue (1.0f);
+            // (round 190oj CS-26: with no track the knobs looked live next to a greyed Save and preset)
+            blend.setDimmed (true);
+            reverb.setDimmed (true);
             emptyHint.setText (tr ("Select a track to see its effects."), juce::dontSendNotification);
             layoutStrip();
             return;
@@ -464,6 +496,7 @@ public:
         }
         blend.setValue (mixer.chainBlend);
         blend.setDimmed (fx.empty());
+        reverb.setDimmed (! reverb.isEnabled());
         addCard.setEnabled ((int) fx.size() < maxEffectSlots);
         emptyHint.setText (fx.empty() ? tr ("No effects yet. Press + to add one, or pick a preset.") : juce::String(), juce::dontSendNotification);
         layoutStrip();
@@ -480,16 +513,24 @@ public:
         nextPreset.setBounds (row.removeFromRight (22).reduced (0, 2));
         side.removeFromTop (6);
         auto second = side.removeFromTop (26); // BandLab: Save and the chain bypass under the preset
-        saveButton.setBounds (second.removeFromLeft (58));
+        saveButton.setBounds (second.removeFromLeft (theme::buttonWidth (saveButton, 58, 110))); // (round 190oj WG-12: de "Speiche...")
         second.removeFromLeft (8);
         bypassButton.setBounds (second.removeFromLeft (26));
         side.removeFromTop (8);
+        // round 190ot: "Duck under [track ▾]" (a caption, then its picker), then Blend | Reverb | Echo
+        auto duckRow = side.removeFromTop (24);
+        duckCaption.setBounds (duckRow.removeFromLeft (76));
+        duckButton.setBounds (duckRow);
+        side.removeFromTop (8);
         auto captions = side.removeFromTop (16);
         auto knobs = side.removeFromTop (juce::jmin (84, side.getHeight()));
-        blendCaption.setBounds (captions.removeFromLeft (90));
-        blend.setBounds (knobs.removeFromLeft (90).withWidth (72));
-        reverbCaption.setBounds (captions);
-        reverb.setBounds (knobs.withWidth (72));
+        const auto third = side.getWidth() / 3;
+        blendCaption.setBounds (captions.removeFromLeft (third));
+        blend.setBounds (knobs.removeFromLeft (third).withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (blendCaption.getX()));
+        reverbCaption.setBounds (captions.removeFromLeft (third));
+        reverb.setBounds (knobs.removeFromLeft (third).withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (reverbCaption.getX()));
+        echoCaption.setBounds (captions);
+        echo.setBounds (knobs.withSizeKeepingCentre (juce::jmin (third - 4, 64), knobs.getHeight()).withX (echoCaption.getX()));
         r.removeFromLeft (pad);
         view.setBounds (r);
         layoutStrip();
@@ -581,6 +622,71 @@ public:
         menu.addSeparator();
         menu.addItem (tr ("More effects..."), [this] { slotActions.showAddMenuFor (nextFreeRow()); });
         return menu;
+    }
+
+    // round 190ot: "Duck under..." — None, the other tracks of the song (a track this one feeds cannot be picked: the
+    // sidechain would make a loop), then the three styles (the Duck card's knob at Subtle / Pumping / Hard)
+    juce::PopupMenu duckMenu()
+    {
+        juce::PopupMenu menu;
+        const auto& song = engine.getSong();
+        const auto t = insert;
+        if (t <= 0 || t >= (int) song.mixer.size())
+            return menu;
+        const auto trigger = simpletracks::duckTrigger (song, t);
+        menu.addSectionHeader (tr ("Duck under"));
+        menu.addItem (tr ("None"), trigger > 0 || simpletracks::duckSlot (song, t) >= 0, trigger <= 0, [this] { pickDuck (-1); });
+        std::vector<int> seen;
+        for (int track = 0; track < (int) song.playlistTracks.size(); ++track)
+        {
+            if (! simpletracks::kindOf (song, track))
+                continue;
+            const auto from = simpletracks::insertOf (song, track);
+            if (from <= 0 || from == t || std::find (seen.begin(), seen.end(), from) != seen.end())
+                continue;
+            seen.push_back (from);
+            const auto possible = song.routes (from, t) || song.canRoute (from, t);
+            menu.addItem (trackTitle (song, track), possible, from == trigger, [this, from] { pickDuck (from); });
+        }
+        if (seen.empty())
+            menu.addItem (tr ("(no other track yet)"), false, false, nullptr);
+        menu.addSeparator();
+        menu.addSectionHeader (tr ("Style"));
+        const auto slot = simpletracks::duckSlot (song, t);
+        const auto amount = slot >= 0 ? song.mixer[(std::size_t) t].effects[(std::size_t) slot].goalAmount : -1.0f;
+        for (const auto style : { simpletracks::DuckStyle::subtle, simpletracks::DuckStyle::pumping, simpletracks::DuckStyle::hard })
+        {
+            const auto value = simpletracks::duckAmount (style);
+            menu.addItem (duckStyleText (style), slot >= 0, slot >= 0 && std::abs (amount - value) < 0.005f, [this, value] {
+                const auto at = insert;
+                engine.editSong ([at, value] (Song& s) { simpletracks::setDuckAmount (s, at, value); });
+            });
+        }
+        return menu;
+    }
+
+    void pickDuck (int from)
+    {
+        const auto t = insert;
+        if (t <= 0)
+            return;
+        engine.editSongStructural ([t, from] (Song& s) { simpletracks::setDuck (s, t, from); });
+    }
+
+    static juce::String duckStyleText (simpletracks::DuckStyle style)
+    {
+        using S = simpletracks::DuckStyle;
+        return style == S::subtle ? trc ("@duck style: Subtle") : style == S::pumping ? trc ("@duck style: Pumping") : trc ("@duck style: Hard");
+    }
+
+    // a mixer insert as the Simple layout names it: the track that plays through it, else the insert's own name
+    juce::String insertTitle (int at) const
+    {
+        const auto& song = engine.getSong();
+        for (int track = 0; track < (int) song.playlistTracks.size(); ++track)
+            if (simpletracks::kindOf (song, track) && simpletracks::insertOf (song, track) == at)
+                return trackTitle (song, track);
+        return at > 0 && at < (int) song.mixer.size() ? utf8 (song.mixer[(std::size_t) at].name) : juce::String();
     }
 
     // --- edits (each through the Mixer's own paths) -------------------------------------------------------------------
@@ -711,6 +817,10 @@ public:
     }
     void blendForCheck (float v) { blend.turnTo (v); }
     void reverbForCheck (float v) { reverb.turnTo (v); }
+    void echoForCheck (float v) { echo.turnTo (v); }                       // round 190ot
+    void duckForCheck (int from) { pickDuck (from); }
+    juce::PopupMenu duckMenuForCheck() { return duckMenu(); }
+    juce::String duckButtonTextForCheck() const { return duckButton.getButtonText(); }
     void bypassForCheck() { bypassButton.onClick(); }                     // round 190kn
     bool bypassLitForCheck() const noexcept { return bypassButton.bypassed; }
     const juce::Component* cardForSnapshot (int card) const
@@ -777,6 +887,8 @@ private:
             const auto effectName = quickpick::slotName (owner.engine, slot);
             title = goal != 0 ? goalText (goal) : effectName;
             sub = goal != 0 ? effectName : tr ("Mix");
+            if (goal == goals::duck) // round 190ot: the trigger it listens to
+                sub = slot.sidechain > 0 ? tr ("under {0}", { owner.insertTitle (slot.sidechain) }) : tr ("under no track yet");
             knob.resetValue = goal != 0 ? goals::defaultAmount (goal) : 1.0f;
             knob.setValue (goal != 0 ? slot.goalAmount : slot.mix);
             knob.setDimmed (! on);
@@ -946,12 +1058,12 @@ private:
     }
 
     EffectsPanel slotActions;
-    juce::Label presetCaption, blendCaption, reverbCaption, emptyHint;
-    juce::TextButton presetButton, saveButton;
+    juce::Label presetCaption, blendCaption, reverbCaption, echoCaption, duckCaption, emptyHint;
+    juce::TextButton presetButton, saveButton, duckButton;
     ChevronButton previousPreset { false }, nextPreset { true };
     ChainBypassButton bypassButton;
     AddCardButton addCard;
-    DockKnob blend, reverb;
+    DockKnob blend, reverb, echo;
     juce::Viewport view;
     Strip strip { *this };
     std::vector<std::unique_ptr<Card>> cards;
@@ -1324,7 +1436,9 @@ private:
             g.setColour (n == 0 ? colour::textDisabled : selected ? colour::textPrimary : colour::textSecondary);
             g.setFont (font (type::body, selected));
             g.drawText (soundCategoryText ((soundlib::Category) row), 10, 0, width - 50, height, juce::Justification::centredLeft, true);
-            g.setColour (colour::textDisabled);
+            // (round 190oo, CS-31: the counts were textDisabled, 2.95:1 on the list; #8f939b reads >= 4.5:1, the selected row's
+            // textSecondary on accentMuted too; an empty category's 0 stays disabled with its name)
+            g.setColour (n == 0 ? colour::textDisabled : selected ? colour::textSecondary : juce::Colour (0xff8f939b));
             g.setFont (font (type::caption));
             g.drawText (juce::String (n), width - 40, 0, 32, height, juce::Justification::centredRight, false);
         }
@@ -2857,6 +2971,69 @@ private:
 #include "ui/SimpleControlsPage.inc" // round 190ke: the Controls tab
 #include "ui/SimpleStepsPage.inc"    // round 190lr: the Drum Machine tab
 
+// Round 190nw: the Tracker tab, the track's pattern in the tracker editor (ui/TrackerComponent.h, compact: no pattern box
+// or side panel), the track's channel only. A track without a pattern gets the "New pattern" button (as the Editor tab).
+class SimpleDock::TrackerPage final : public juce::Component
+{
+public:
+    explicit TrackerPage (AudioEngine& e) : engine (e)
+    {
+        makePattern.setButtonText (tr ("New pattern"));
+        makePattern.setTooltip (tr ("An empty 4-bar pattern on this track, to write notes into"));
+        makePattern.onClick = [this] {
+            const auto t = track;
+            engine.editSong ([t] (Song& s) { simpletracks::ensurePattern (s, t); });
+            update();
+        };
+        addChildComponent (makePattern);
+    }
+
+    void show (int newTrack, int newChannel)
+    {
+        track = newTrack;
+        channel = newChannel;
+        update();
+    }
+
+    void update()
+    {
+        const auto& song = engine.getSong();
+        const auto pattern = track >= 0 && isVisible() ? simpletracks::patternOf (song, track) : -1;
+        if (pattern >= 0 && editor == nullptr)
+        {
+            editor = makeTracker (engine, true);
+            addAndMakeVisible (*editor);
+            resized();
+        }
+        if (editor != nullptr)
+        {
+            editor->setVisible (pattern >= 0);
+            if (pattern >= 0 && (editor->shownPattern() != pattern || shownChannel != channel))
+            {
+                shownChannel = channel;
+                editor->setOnlyChannels (channel >= 0 ? std::optional<std::vector<int>> (std::vector<int> { channel }) : std::nullopt);
+                editor->showPattern (pattern);
+            }
+        }
+        makePattern.setVisible (pattern < 0 && track >= 0 && isVisible());
+    }
+
+    void visibilityChanged() override { update(); }
+    void resized() override
+    {
+        if (editor != nullptr)
+            editor->setBounds (getLocalBounds());
+        makePattern.setBounds (getLocalBounds().withSizeKeepingCentre (180, 32));
+    }
+    juce::Component* trackerComponent() { return editor.get(); }
+
+private:
+    AudioEngine& engine;
+    std::unique_ptr<TrackerComponent> editor;
+    juce::TextButton makePattern;
+    int track = -1, channel = -1, shownChannel = -2;
+};
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
     controlsPage = std::make_unique<ControlsPage> (e);
@@ -2893,13 +3070,18 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     stepsButton.setButtonText (tr ("Drum Machine"));
     stepsButton.setTooltip (tr ("The drum track's step grid: patterns A to H, length and swing"));
     stepsButton.setComponentID ("simple.dock.steps");
+    trackerButton.setButtonText (tr ("Tracker"));
+    trackerButton.setTooltip (tr ("The track's notes as rows: typed from the keyboard, tracker style"));
+    trackerButton.setComponentID ("simple.dock.tracker");
+    trackerPage = std::make_unique<TrackerPage> (engine);
+    addChildComponent (*trackerPage);
     // round 190dv: what the first-song tour's ring finds
     setComponentID ("simple.dock"); // (round 190jp: the tour keeps its card off the dock)
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
-                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &stepsButton, Tab::steps }, { &controlsButton, Tab::controls },
+                                                     { &editorButton, Tab::editor }, { &trackerButton, Tab::tracker }, { &padsButton, Tab::pads }, { &stepsButton, Tab::steps }, { &controlsButton, Tab::controls },
                                                      { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)
     {
@@ -2926,6 +3108,7 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     padsButton.glyph = (int) ui::simplelook::Glyph::pads;
     controlsButton.glyph = (int) ui::simplelook::Glyph::dials;
     stepsButton.glyph = (int) ui::simplelook::Glyph::drumMachine;
+    trackerButton.glyph = (int) ui::simplelook::Glyph::tracker;
     hideButton.setButtonText (tr ("Hide the track dock"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
@@ -2974,11 +3157,12 @@ void SimpleDock::refresh()
     instrumentButton.setVisible (instrumentTab);
     keyboardButton.setVisible (playTabs);
     editorButton.setVisible (playTabs);
+    trackerButton.setVisible (playTabs);
     padsButton.setVisible (padsTab);
     stepsButton.setVisible (stepsTab);
     controlsTab = track >= 0 && insert > 0 && insert < (int) song.mixer.size();
     controlsButton.setVisible (controlsTab);
-    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab)
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor || tab == Tab::tracker) && ! playTabs) || (tab == Tab::pads && ! padsTab)
         || (tab == Tab::controls && ! controlsTab) || (tab == Tab::steps && ! stepsTab))
         tab = Tab::effects;
     if (! tabChosen && (instrumentTab || playTabs))
@@ -2993,6 +3177,7 @@ void SimpleDock::refresh()
     instrumentPage->show (instrumentTab ? channel : -1);
     showPage();
     editorPage->show (playTabs ? track : -1, channel);
+    trackerPage->show (playTabs ? track : -1, channel);
     padsPage->show (padsTab ? track : -1);
     stepsPage->show (stepsTab ? track : -1);
     controlsPage->show (controlsTab ? track : -1, channel, controlsTab ? insert : -1);
@@ -3004,7 +3189,7 @@ void SimpleDock::refresh()
 void SimpleDock::setTab (Tab t)
 {
     tabChosen = true; // (a refresh keeps a tab that was asked for)
-    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab)
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor || t == Tab::tracker) && ! playTabs) || (t == Tab::pads && ! padsTab)
         || (t == Tab::controls && ! controlsTab) || (t == Tab::steps && ! stepsTab))
         t = Tab::effects;
     const auto padsBefore = tab == Tab::pads;
@@ -3022,7 +3207,7 @@ void SimpleDock::cycleTab()
     if (instrumentTab)
         shown.push_back (Tab::instrument);
     if (playTabs)
-        shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
+        shown.push_back (Tab::keyboard), shown.push_back (Tab::editor), shown.push_back (Tab::tracker);
     if (padsTab)
         shown.push_back (Tab::pads);
     if (stepsTab)
@@ -3037,6 +3222,7 @@ void SimpleDock::cycleTab()
 void SimpleDock::showPage()
 {
     auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton
+                 : tab == Tab::tracker                                      ? trackerButton
                  : tab == Tab::pads                                         ? padsButton
                  : tab == Tab::steps                                        ? stepsButton
                  : tab == Tab::controls                                     ? controlsButton
@@ -3053,6 +3239,7 @@ void SimpleDock::showPage()
     instrumentPage->setVisible (tab == Tab::instrument);
     effectsPage->setVisible (tab == Tab::effects);
     editorPage->setVisible (tab == Tab::editor);
+    trackerPage->setVisible (tab == Tab::tracker);
     padsPage->setVisible (tab == Tab::pads);
     stepsPage->setVisible (tab == Tab::steps);
     controlsPage->setVisible (tab == Tab::controls);
@@ -3067,6 +3254,7 @@ void SimpleDock::showKeyboard()
 }
 
 void SimpleDock::editorTakenBack() { editorPage->takenBackByPanel(); }
+juce::Component* SimpleDock::trackerForSnapshot() { return trackerPage != nullptr ? trackerPage->trackerComponent() : nullptr; }
 void SimpleDock::padsLoadForCheck (int pad, const juce::File& file) { padsPage->loadFileForCheck (pad, file); }
 void SimpleDock::padsSelectForCheck (int pad) { padsPage->select (pad); }
 void SimpleDock::padsModeForCheck (int mode) { padsPage->setModeForCheck (mode); }
@@ -3111,7 +3299,10 @@ bool SimpleDock::inputMeterShown() const
 juce::Rectangle<int> SimpleDock::inputMeterArea() const
 {
     const auto right = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10; // (round 190jj merge: 190jc moved the hide button to the left)
-    return { right - 232, 0, 232, stripHeight() };
+    // the label ("Input Level") takes its text's width, at least 70 px: "Nível de entrada" (pt-BR) was cut to "Nível de en..." (190nx)
+    const auto label = juce::jmax (70, juce::GlyphArrangement::getStringWidthInt (font (type::small, true), tr ("Input Level")) + 6);
+    const auto width = 162 + label;
+    return { right - width, 0, width, stripHeight() };
 }
 
 juce::Rectangle<int> SimpleDock::inputMeterBar() const
@@ -3191,6 +3382,7 @@ int SimpleDock::stepsCountForCheck() const { return stepsPage->stepCountForCheck
 void SimpleDock::stepsClickForCheck (int row, int step) { stepsPage->clickStepForCheck (row, step); }
 void SimpleDock::stepsLetterForCheck (int letter) { stepsPage->pickLetterForCheck (letter); }
 void SimpleDock::stepsAddClipForCheck() { stepsPage->addClipForCheck(); }
+int SimpleDock::stepsMessagesShownForCheck() const { return stepsPage->messagesShownForCheck(); }
 void SimpleDock::stepsLengthForCheck (int bars) { stepsPage->setLengthForCheck (bars); }
 void SimpleDock::stepsSwingForCheck (float v) { stepsPage->setSwingForCheck (v); }
 void SimpleDock::stepsPreviewForCheck() { stepsPage->previewForCheck(); }
@@ -3458,13 +3650,13 @@ void SimpleDock::resized()
     auto strip = stripAll.withSizeKeepingCentre (stripAll.getWidth(), tabHeight);
     followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10).withSizeKeepingCentre (180, juce::jmin (24, tabHeight)));
     // the tabs sit after the track's name, left of the middle
-    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0) + (stepsTab ? 1 : 0) + (controlsTab ? 1 : 0);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 3 : 0) + (padsTab ? 1 : 0) + (stepsTab ? 1 : 0) + (controlsTab ? 1 : 0);
     auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (tabWidth * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
         shown.push_back (&instrumentButton);
     if (playTabs)
-        shown.push_back (&keyboardButton), shown.push_back (&editorButton);
+        shown.push_back (&keyboardButton), shown.push_back (&editorButton), shown.push_back (&trackerButton);
     if (padsTab)
         shown.push_back (&padsButton);
     if (stepsTab)
@@ -3482,6 +3674,7 @@ void SimpleDock::resized()
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
+    trackerPage->setBounds (body);
     padsPage->setBounds (body);
     stepsPage->setBounds (body);
     controlsPage->setBounds (body);
@@ -3614,6 +3807,10 @@ void SimpleDock::removeCardForCheck (int card) { effectsPage->remove (card); }
 void SimpleDock::addOneKnobForCheck (int goal) { effectsPage->addOneKnob (goal); }
 void SimpleDock::setBlendForCheck (float value) { effectsPage->blendForCheck (value); }
 void SimpleDock::setReverbForCheck (float value) { effectsPage->reverbForCheck (value); }
+void SimpleDock::setEchoForCheck (float value) { effectsPage->echoForCheck (value); }
+void SimpleDock::duckUnderForCheck (int triggerInsert) { effectsPage->duckForCheck (triggerInsert); }
+juce::PopupMenu SimpleDock::duckMenuForCheck() { return effectsPage->duckMenuForCheck(); }
+juce::String SimpleDock::duckButtonTextForCheck() const { return effectsPage->duckButtonTextForCheck(); }
 juce::Rectangle<int> SimpleDock::cardBoundsForSnapshot (int card) const
 {
     const auto* c = effectsPage->cardForSnapshot (card);

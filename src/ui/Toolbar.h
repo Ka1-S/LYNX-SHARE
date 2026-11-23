@@ -112,6 +112,9 @@ public:
     // falling in ~0.6 s with no peak hold, a short stub at rest) and the value in dB. Other looks keep the knob.
     void setLook (toolbarlayout::Look l);
     bool isSlider() const noexcept { return look == toolbarlayout::Look::simple && kind == Kind::volume; }
+    // round 190oa (DF-21, owner decision F1): outside Simple the volume knob is FL's main (monitor) volume, the song's
+    // mainVolume on the device output; Simple's BandLab slider stays the Master insert's fader
+    bool monitor() const noexcept { return kind == Kind::volume && ! isSlider(); }
     // one frame of the meter (the main window's 30 Hz timer, Simple only): repaints the rail when a bar moved a pixel
     void tickMeter (double nowMs);
     static constexpr int sliderWidth = 196; // speaker 20 + rail 112 + value 64
@@ -193,6 +196,15 @@ public:
     // Round 190gg (B5): the dropouts since the start, the last one's time and cause (ui/PluginMonitorWindow.h
     // describeDropouts), at the end of the CPU hint
     void setDropouts (const juce::String& text) { dropoutText = text; }
+    // Round 190ok (owner decision D1): an imported FL project with Smart disable off on most of its effects and a heavy
+    // stopped load: the tip that points at Tools › Macros › "Switch smart disable for all plugins" (empty = none)
+    void setSmartDisableTip (const juce::String& text) { smartTipText = text; }
+    const juce::String& smartDisableTip() const noexcept { return smartTipText; }
+    // Round 190of (P24, the split CPU meter): render-ahead's counters (core/RenderAhead.h Stats liveNs / aheadNs /
+    // audioNs, counted up); the hint shows the live part and the part rendered ahead since the last call
+    void setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, std::uint64_t audioNs);
+    double liveShare() const noexcept { return splitLive; }   // (tests / shots: the last figures, 1 = one core)
+    double aheadShare() const noexcept { return splitAhead; }
     // round 190iv: Live's CPU box ("26 %" over an orange load bar, 54 x 17); FL's look is unchanged
     void setLook (toolbarlayout::Look l);
     void paint (juce::Graphics& g) override;
@@ -224,11 +236,13 @@ public:
 private:
     std::uint64_t overDeadline = 0, lateCalls = 0, underruns = 0;
     int deviceUnderruns = -1;
-    juce::String driverTip, dropoutText;
+    juce::String driverTip, dropoutText, smartTipText;
     double peakLoad = 0.0;
     juce::StringArray heaviest;
     juce::uint32 lastGlitchAt = 0; // ms counter of the last new over-deadline callback (0 = none)
     double cpu = 0.0, cpuSmoothed = 0.0;
+    std::uint64_t lastLiveNs = 0, lastAheadNs = 0, lastAudioNs = 0; // (round 190of)
+    double splitLive = 0.0, splitAhead = 0.0;
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     std::int64_t memory = 0;
     int voices = 0, peakVoices = 0, fps = 0;
@@ -272,16 +286,27 @@ public:
     std::function<void()> onClick;
     // round 190iv: BandLab's Key capsule ("D min"; "Key" while none) in Simple, Live's key box in Clip-launch
     void setLook (toolbarlayout::Look l);
+    // Round 190oo (O-5, core/LiveScaleControl.h): Live's three-part scale control, in the Live look while
+    // livescale::shown is on. `on`: a key is set; `root` / `mode`: what the choosers show (the last key while off).
+    void setScaleParts (bool on, const juce::String& root, const juce::String& mode);
+    bool threeParts() const noexcept;
+    // a left click on one of the three parts (0 the switch, 1 the root, 2 the mode); a right click still runs onClick
+    std::function<void (int part)> onPart;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseMove (const juce::MouseEvent&) override; // (round 190oo: the hovered part)
     ui::Hint hintAt (juce::Point<int> position) override;
 
 private:
     juce::String text;
     toolbarlayout::Look look = toolbarlayout::Look::fl;
+    bool scaleOn = false;
+    juce::String rootText { "C" }, modeText { "Major" };
+    int hoveredPart = -1;
+    void paintThreeParts (juce::Graphics& g);
 };
 
 // Ableton Link's switch (round 190gl), as the reference DAW's control bar has it (its manual's "The Link Toggle in the
@@ -439,6 +464,7 @@ public:
     void update();
     juce::String text() const;
     juce::PopupMenu makeMenu();
+    juce::PopupMenu simpleMenu (bool numerator); // round 190ol (P6): the Simple look's two BandLab lists
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }

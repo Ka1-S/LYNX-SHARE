@@ -1,0 +1,319 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 796046,
+   "git_blob_sha1": "b275da060dd37cfc2f2d00c2a86d7f0c3a045ad8",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_soft_01.wav",
+   "sha256": "eadaeb8bd491b3161197478119be60771e0e1d8620d4848e39595976f9c9c998",
+   "sounding_key": 41,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1027292,
+   "git_blob_sha1": "21df93be7915e72dabe9189001262c62b436355f",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_med_01.wav",
+   "sha256": "484de6300831ebb267a867a4c435567bacfb77aed953f317fde5b1c312bafac4",
+   "sounding_key": 41,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 972392,
+   "git_blob_sha1": "cc5b73c4c0b50ca64a0c484f17d37e825957de50",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_loud_01.wav",
+   "sha256": "c5cb5ce59540b0a23628a919e90153a6cee9bb35325b056e0710c12b64f0b193",
+   "sounding_key": 41,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1697402,
+   "git_blob_sha1": "f5411b5221bb5edf59430031c827251b87ff3f5c",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_soft_01.wav",
+   "sha256": "5fd3c75ab7eafebc24a693793e2c4404922dfad37d8dd9bf80e8ca483500ed80",
+   "sounding_key": 48,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1785050,
+   "git_blob_sha1": "8d18c94d5945941574e44563a60908d9f8c11430",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_med_01.wav",
+   "sha256": "fd9c329513ed9d54c36174bbe45add471a80ffad411c686428bbf0bbc0121438",
+   "sounding_key": 48,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 2236004,
+   "git_blob_sha1": "155e036d3aa04fba9d3389e2cdf3accec9842e01",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_loud_01.wav",
+   "sha256": "bfad3b0e57d04c31e6079aba11fb0a6c5c84627fd4bc46e4e0923663586c460c",
+   "sounding_key": 48,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1699184,
+   "git_blob_sha1": "0f80a5f6acd14427015b71b62a6ce9ab9177ddfb",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_soft_01.wav",
+   "sha256": "bb41b6fce6b5cf73086480754f83a4b33ae61a7e6f19c7e7ee3b01d0171e7f63",
+   "sounding_key": 55,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1513244,
+   "git_blob_sha1": "f27193e84ff36d8c16ddc4a59bc89acc79d426ae",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_med_01.wav",
+   "sha256": "e9c2d33b9f50f0689b349dc9aee20a5b621961cf8294abb5ac4ba5a4674bd7c2",
+   "sounding_key": 55,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1855448,
+   "git_blob_sha1": "b73a4b8febfdeb8e86ab13edabd1e663caebd378",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_loud_01.wav",
+   "sha256": "3bd173f56481e537c3489a94d1e4dd59c304f9f98679c7c90890fc9f5795c25d",
+   "sounding_key": 55,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1406594,
+   "git_blob_sha1": "a8d92ac62a6008d29c60d6fb39674f77cfe6ca57",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_soft_01.wav",
+   "sha256": "10e4a47853920c93423fd72f224e46bf1bce60319d5e7ae501d1b8431ec7d78a",
+   "sounding_key": 59,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1495616,
+   "git_blob_sha1": "c936311bb0a094e7a6625f3c8a4914754242583d",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_med_01.wav",
+   "sha256": "4d0ffc47858d0c4545191eef3240d470c40df1c090841c0fb2ae2f47900794ee",
+   "sounding_key": 59,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1585778,
+   "git_blob_sha1": "e3b63f301191c679cea1eaa61a99d3baa9c3fbfe",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_loud_01.wav",
+   "sha256": "a329138008daae1c03652822d7079c0e1e9941071b8c22195e1985f0c685fdeb",
+   "sounding_key": 59,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1455272,
+   "git_blob_sha1": "520e49115bc66a7f3a57a09ba8999abd02e7a7b0",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_soft_01.wav",
+   "sha256": "6eb7ccf5fa10b1bdaf10f0cc7a50d8c42ef086636a9e88c6527fb3af58e5ee1f",
+   "sounding_key": 65,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1382924,
+   "git_blob_sha1": "2c74c56eba169268ec3e74bc2de31fb282716a58",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_med_01.wav",
+   "sha256": "a493b31ac2e588ed961c522a66b790acc584b59a08918bd7193d6e6fa8df4756",
+   "sounding_key": 65,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1589876,
+   "git_blob_sha1": "646d1490ead56eaf0db10c96ac352c80d3275736",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_loud_01.wav",
+   "sha256": "379e749add43b12959fae06cc272f1871899cc05460faf41ead77b93e5d01843",
+   "sounding_key": 65,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 915446,
+   "git_blob_sha1": "6ccd29800db58963dd91136ea426b895d703bb22",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_soft_01.wav",
+   "sha256": "4d03d005166e8b366e6a983b7a4a89e0847e1d58a6d34dda35ddf74289cace94",
+   "sounding_key": 72,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 655244,
+   "git_blob_sha1": "85c657dd0a8f58808efad5e9184d5b9124285512",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_med_01.wav",
+   "sha256": "3e88c006eef05e8f7891f8f6027042006199a4ec3b53a0ad7308f9782a52d4df",
+   "sounding_key": 72,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1016564,
+   "git_blob_sha1": "fe3ec22b99ed4afdd007d0107d925669e7e1d4c9",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_loud_01.wav",
+   "sha256": "4af539d47a452d7fad26e171b1c8adcca272cee97191f040d192680462c880b8",
+   "sounding_key": 72,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 860570,
+   "git_blob_sha1": "2aa39578faced00688851f5705857170aa656055",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_soft_01.wav",
+   "sha256": "d3e23f018b091a60d91c3c93b38b605d02a9e26c7cf5830ffb866cfe84130cd0",
+   "sounding_key": 79,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 580262,
+   "git_blob_sha1": "be84c27de4fea671b78c82591aa6d6f98c06619e",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_med_01.wav",
+   "sha256": "278e738d8214cdc192e63c3350b1e464a72c86dc135ddf0c5ce035569be66c71",
+   "sounding_key": 79,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 800102,
+   "git_blob_sha1": "3c6ea81532f6924112581140e8f530e6cc45739d",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_loud_01.wav",
+   "sha256": "36f39f9f24789001add2b4c440defb7641178b0e8449c5cb7f1960bccaf0aaaf",
+   "sounding_key": 79,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 492602,
+   "git_blob_sha1": "e6935a398d8cec04a8e23c58c78d44a9ac066620",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_soft_01.wav",
+   "sha256": "278f5123442162e7946fa68a48ed650e3838b1ddcd3e2173d3ea69f30079c534",
+   "sounding_key": 83,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 433802,
+   "git_blob_sha1": "9393bece679f9d698a8b8acf81be463c07247576",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_med_01.wav",
+   "sha256": "d676b76e3850d85333c85b1fc77d20f4524ff2e9e6f03551f52c5b22fbe8ab30",
+   "sounding_key": 83,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 694454,
+   "git_blob_sha1": "cf36d9cae6614613c17069accbaa46594846c113",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_loud_01.wav",
+   "sha256": "d04aed26222822d14435fa61b88cdcce95606a5e94bb5e7167d266875343a39c",
+   "sounding_key": 83,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 373694,
+   "git_blob_sha1": "224aabf1687b4eabb9bdd2ddac75683220a901a1",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_soft_01.wav",
+   "sha256": "f98ea1bd715aee0091ec8eaf61c9fc3c96440f403e9d32ec33f194fb70d9938c",
+   "sounding_key": 89,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 566924,
+   "git_blob_sha1": "215d4dfb83636c70a5997ac65cb3acf201c53dc5",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_med_01.wav",
+   "sha256": "430da3d4f0a323838b7495d9cc5a98bc3829e2f11be11335af526a48ea88b8e6",
+   "sounding_key": 89,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 551306,
+   "git_blob_sha1": "fadca10c6d332115fa9f586cc37245a008a8a859",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_loud_01.wav",
+   "sha256": "a434c15978b2ea4b8921feeb3fd1f177447324d06c177801e0e46c12a97abc86",
+   "sounding_key": 89,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 663584,
+   "git_blob_sha1": "87474094e8bb8834cb656645f99bd34eb2f241cb",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_soft_01.wav",
+   "sha256": "55d5793308bb10feaf3c1e341c0e4e4dbf8ce7fbea805e118b55177389ec3a09",
+   "sounding_key": 96,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 451844,
+   "git_blob_sha1": "f5c95434f42f07fecdbd4f3e3a6a737d81cdd45a",
+   "layer": "med",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_med_01.wav",
+   "sha256": "d93fc6f7b399ac28d1ecf91987e9eb55b34024c6033b7f0e3aaf35f49d51a2f2",
+   "sounding_key": 96,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 472142,
+   "git_blob_sha1": "aa3b9670477cf7d6825cb9e6e3c9446acffa95ee",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_loud_01.wav",
+   "sha256": "2e42b1b6f6923f32e3daadc12b063e94d15af20fa410ddcb267eb906fd6e0e89",
+   "sounding_key": 96,
+   "velocity": 1.0
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "marimba",
+ "not_used_extra_takes": [],
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "marimba.lpm",
+ "tool": "tools/physmod/calibrate.py 190ni-1"
+}

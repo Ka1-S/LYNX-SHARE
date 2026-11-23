@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "ui/WindowPlaces.h"
 #include "ui/ProEditors.h"
 #include "ui/PluginEditors.h"
 
@@ -4319,6 +4320,7 @@ void open (AudioEngine& engine, int track, int slot)
     const auto title = utf8 (effectInfo (mixer[(std::size_t) track].effects[(std::size_t) slot].kind).name) + " - "
                        + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " (" + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<ProEditorWindow> (std::move (editor), title, engine, track, slot);
+    windowplaces::tag (*open[key], windowplaces::slotKey (track, slot)); // (round 190oa, DF-130: its place kept with the project)
 }
 
 juce::Image windowContentForSnapshot (AudioEngine& engine, int track, int slot, bool juceAspect)

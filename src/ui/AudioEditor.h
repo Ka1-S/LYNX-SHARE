@@ -43,6 +43,11 @@ void holdAudioEditorWarpDragForSnapshot (juce::Component& panel, int marker, dou
 // --warpshot (round 190db): the beat-time view of a warped clip: -1 as the workflow (beats in the Clip-launch
 // workflow), 0 file time, 1 beats (the Warp markers menu's "Show the audio in beats")
 void setAudioEditorBeatTimeForSnapshot (juce::Component& panel, int choice);
+// Round 190on (research190oe P8, Tab to transient; core/TransientNav.h): the cursor of the audio editor that has the focus
+// (else the one used last, a window or the Clip View, while it is on screen) to the next (direction 1) or previous (-1)
+// transient; `extend`: the selection's edge instead. False when no editor with audio is there.
+bool audioEditorTransient (int direction, bool extend);
+bool audioEditorTransientForSnapshot (juce::Component& editor, int direction, bool extend, std::int64_t& cursor, std::int64_t& selStart, std::int64_t& selEnd);
 // The record button's "Audio, into the audio editor" choice: an empty editor recording the audio input while the
 // song plays (it starts with the playback and stops with it, like FL's Edison record target).
 void openAudioEditorRecording (AudioEngine& engine);

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="lt.song-sections.t" data-desc="lt.song-sections.s" data-wt="zh-Hans zh-Hant nl fr de id it ja ko pl pt-BR ru es tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a song with sections · LYNX SHARE</title>
+<meta name="description" content="Name the parts of your song with the Sections lane, then copy or move a whole part, with everything under it, in one drag.">
+<meta property="og:title" content="Build a song with sections · LYNX SHARE">
+<meta property="og:description" content="Name the parts of your song with the Sections lane, then copy or move a whole part, with everything under it, in one drag.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
+<meta property="og:url" content="https://lynx-share.com/learn/song-sections/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/learn/song-sections/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/learn/song-sections/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/learn/song-sections/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/learn/song-sections/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/learn/song-sections/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/learn/song-sections/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/learn/song-sections/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/learn/song-sections/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/learn/song-sections/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/learn/song-sections/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/learn/song-sections/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/learn/song-sections/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/learn/song-sections/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/learn/song-sections/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/learn/song-sections/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/learn/song-sections/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/learn/song-sections/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="d90fb3e6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v=0.1.26-logo2">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=0.1.26-logo2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=d90fb3e6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" aria-current="page" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.song-sections.t">Build a song with sections</h1><p data-i18n="lt.song-sections.s">Name the parts of your song with the Sections lane, then copy or move a whole part, with everything under it, in one drag.</p><p class="tmeta"><span data-i18n="lr.l.simple">Simple layout</span> · <span>0:44</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="song-sections"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/song-sections-en.webp"><source src="/assets/media/learn/song-sections-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/song-sections-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/song-sections-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/song-sections-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/song-sections-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/song-sections-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/song-sections-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/song-sections-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/song-sections-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/song-sections-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/song-sections-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/song-sections-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/song-sections-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/song-sections-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/song-sections-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/song-sections-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/song-sections-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/song-sections-en-720.mp4" download>720p, 1.2 MB</a> · <a href="/assets/media/learn/song-sections-en-1080.mp4" download>1080p, 1.9 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.song-sections.c0">Add sections</span></button></li><li><button type="button" data-seek="18.8"><b>0:19</b> <span data-i18n="lt.song-sections.c1">Copy a section</span></button></li><li><button type="button" data-seek="30.4"><b>0:30</b> <span data-i18n="lt.song-sections.c2">Section menu</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="add-sections">Add sections</h2>
+<figure><a class="shot" href="/assets/img/learn/song-sections-1.webp"><img src="/assets/img/learn/song-sections-1.webp" alt="The Sections button and the first section" loading="lazy" width="1000" height="193"></a></figure>
+<ol><li>In the Simple layout, click <code>Sections</code> in the title bar. The first section appears, covering the start of the song.</li><li>Click <code>+</code> at the left of the Sections lane to add the next one, eight bars long, after the last.</li><li>Sections take GarageBand's names in order: Intro, Verse, Chorus... Double-click one to rename it.</li></ol>
+<h2 id="move-and-copy-a-whole-part">Move and copy a whole part</h2>
+<figure><a class="shot" href="/assets/img/learn/song-sections-2.webp"><img src="/assets/img/learn/song-sections-2.webp" alt="A section copied with Ctrl+drag" loading="lazy" width="1000" height="193"></a></figure>
+<ol><li>Drag a section to move it with every clip under it. A line shows where it goes.</li><li>Hold <code>Ctrl</code> while you drag to copy it instead. Drop it onto another section to swap the two.</li><li>Drag a section's right edge to change its length; the clips stay where they are.</li></ol>
+<h2 id="the-section-menu">The section menu</h2>
+<figure><a class="shot" href="/assets/img/learn/song-sections-3.webp"><img src="/assets/img/learn/song-sections-3.webp" alt="The menu of a section" loading="lazy" width="1000" height="347"></a></figure>
+<ul><li>Right-click a section for <code>Rename...</code>, <code>Duplicate</code>, <code>Loop this section</code>, <code>Select its clips</code> and the delete commands.</li><li>Right-click the lane for <code>Add a section at the end</code>, <code>Sections from markers</code> and <code>Create scenes from sections</code> (for the Clip-launch layout).</li></ul>
+<p>In the Pattern layout the Sections lane is a LYNX extra: switch it on in <code>Options › LYNX extras...</code>.</p>
+<p>See also <a href="/wiki/simple-layout/">Simple layout</a>.</p></div><nav class="wpn"><a href="/learn/modulators/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.modulators.t">Move any knob with modulators</b></a><a href="/learn/command-palette/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.command-palette.t">Find any command, keep the CPU low</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=d90fb3e6" defer></script>
+<script src="/assets/learn.js?v=d90fb3e6" defer></script>
+<script src="/assets/motion.js?v=d90fb3e6" defer></script>
+</body>
+</html>

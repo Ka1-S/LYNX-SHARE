@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![Altı ölçü boyunca yükselen bir eğriyle Otomasyon düzenleyici](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Kayıt filtresinde `Otomasyon` işaretliyken kaydı açın, çalmaya basın ve k
 
 - `MIDI kontrolcüye bağla (kontrolcüde bir knob oynatın)` [MIDI kontrolcüleri](/wiki/midi-controllers/) sayfasında anlatılır.
 - `Dahili kontrolcüye bağla`, projedeki bir Envelope, Formula ya da Peak Controller'ın kontrolü sürmesini sağlar. Önce bunlardan birini ekleyin.
-- `Modüle et`, bir LYNX SHARE knob'unu kendi değerinin çevresinde hareket ettiren bir modülatör, yani bir LFO veya rastgele bir kaynak bağlar. `Araçlar › Modülatörler...` bunları listeler.
+- `Şununla modüle et`, kontrolü kendi değerinin çevresinde hareket ettiren bir modülatör bağlar: bir LFO, zarf takipçisi, ADSR zarfı, adımlar, rastgele bir kaynak, bir makro, keytrack veya velocity. LYNX SHARE'in knob'larında ve üçüncü taraf plugin'lerin parametrelerinde çalışır. Bir modülatörü knob'un üzerine sürükleyebilirsiniz de; knob üzerindeki bir halka hareketi gösterir. `Araçlar › Modülatörler...` bunları listeler.
 
 ## Otomasyon şeritleri
 
@@ -88,7 +88,8 @@ Kayıt filtresinde `Otomasyon` işaretliyken kaydı açın, çalmaya basın ve k
 - Bir kontrol üzerindeki birden çok klip, her biri kendi yerinde çalar. İlk klibinden önce kontrol kendi değerini korur.
 - Klibin başında kontrol yeni değere yaklaşık 8 ms'de ulaşır. FL Studio oraya kayarak gider, bu yüzden içe aktarılmış bir projede o noktalarda küçük farklar olabilir.
 - Aynı kontrol üzerindeki kliplerin çakıştığı yerde LYNX SHARE'in seçtiği klip, FL Studio'nun seçtiğinden farklı olabilir.
-- Modülatörler yalnızca LYNX SHARE'in kendi knob'larında çalışır ve `.flp` olarak dışa aktarırken dışarıda bırakılır.
+- Bir `.flp` dışa aktarmasında, şarkı konumunu izleyen modülatörler otomasyon klipleri olur (senkronlu bir LFO, FL Studio'nun klip LFO'su olur). Takipçiler, zarflar, keytrack ve velocity dışarıda bırakılır ve rapor bunları listeler.
+- Kaydetmeden oynatırken bir kontrolü mü oynattınız? Kayıt seçeneklerindeki `Otomasyon yakala`, son hareketleri sonradan otomasyona çevirir.
 
 ## İlgili sayfalar
 

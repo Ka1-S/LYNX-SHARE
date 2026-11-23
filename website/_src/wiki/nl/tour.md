@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Het hoofdvenster met het demoproject: werkbalk bovenaan, Browser links, Playlist erachter en het Channel Rack dat erboven zweeft](/assets/img/wiki/desktop.webp)
 
@@ -79,7 +79,7 @@ De Browser vormt de achtergrond van de werkruimte: hij blijft aan de zijkant vas
 - Totdat je iets verplaatst, de grootte wijzigt of losmaakt, nemen de vensters hun standaardplaats weer in wanneer het hoofdvenster van grootte verandert. Daarna wordt je indeling onthouden en schaalt ze met het venster mee.
 - `F12` sluit de plugin-, kanaalinstellings- en toolvensters. Het sluit de vijf hoofdvensters niet.
 - Zolang het pianotoetsenbord van het typtoetsenbord aan staat (`Ctrl+T`), spelen lettertoetsen noten en liggen de meeste sneltoetsen met één letter stil.
-- `Beeld › Lay-outstijl` wisselt tussen de Pattern-werkwijze (de standaard) en de Clipstart-werkwijze, die naast de Playlist een clipraster toevoegt.
+- `Beeld › Lay-outstijl` wisselt tussen de Pattern-lay-out (de standaard) en de Clipstart-lay-out, die naast de Playlist een clipraster toevoegt.
 
 ## Gerelateerd
 

@@ -1,7 +1,7 @@
 ---
-source: 0101adbb66
+source: f439a070b5
 ---
-LYNX SHARE ist eine kostenlose Open-Source-DAW für Windows, macOS und Linux mit drei Arbeitsabläufen in einem Programm. Der Standard ist der FL-Studio-Arbeitsablauf: Du programmierst Patterns im Channel Rack und im Piano Roll, arrangierst sie in der Playlist und mischst sie im Mixer. Der Clip-Start-Arbeitsablauf startet Clips und Szenen aus einem Raster, im Stil von Ableton Live, und der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile. `Ansicht › Layout-Stil` wechselt jederzeit zwischen ihnen. Sie öffnet FL-Studio-Projekte (`.flp`), Ableton-Live-Sets (`.als`) und FL-Studio-Mobile-Projekte (`.flm`) und speichert im eigenen Format `.lynx`.
+LYNX SHARE ist eine kostenlose Open-Source-DAW für Windows, macOS und Linux mit drei Arbeitsabläufen in einem Programm. Der Standard ist der FL-Studio-Arbeitsablauf: Du programmierst Patterns im Channel Rack und im Piano Roll, arrangierst sie in der Playlist und mischst sie im Mixer. Der Clip-Start-Arbeitsablauf startet Clips und Szenen aus einem Raster, im Stil von Ableton Live, und der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile. `Ansicht › Layout-Stil` wechselt jederzeit zwischen ihnen. Sie öffnet FL-Studio-Projekte (`.flp`), Ableton-Live-Sets (`.als`), FL-Studio-Mobile-Projekte (`.flm`), DAWproject-Dateien, GarageBand- und BandLab-Projekte und Tracker-Module, exportiert `.flp`, `.als`, `.dawproject` und `.flm` und speichert im eigenen Format `.lynx`.
 
 Es ist eine Alpha. Rechne mit Fehlern und speichere oft.
 
@@ -9,7 +9,7 @@ Es ist eine Alpha. Rechne mit Fehlern und speichere oft.
 
 1. Prüfe in der Tabelle unten, ob dein System unterstützt wird.
 2. Lade es herunter und installiere es. [Installation](/wiki/install/) hat die Schritte für jedes System.
-3. Starte es. Ein kurzer Einrichtungsassistent wählt die Sprache, testet den Audioausgang, lässt dich einen der drei Arbeitsabläufe wählen und listet die Plugin-Ordner auf, die danach im Hintergrund durchsucht werden. Du kannst ihn überspringen und später über `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...` wieder öffnen.
+3. Starte es. Eine Willkommenskarte fragt, woher du kommst, und öffnet mit einem Klick das passende Layout. Sie stellt auch die Sprache ein, testet den Ton und fragt, ob nach Updates gesucht werden soll, während die Plugin-Ordner im Hintergrund durchsucht werden. `Weitere Einrichtung (Audiotreiber, Plugin-Ordner)...` öffnet den vollständigen Einrichtungsassistenten, auch unter `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...`.
 4. Wenn du nichts hörst, gehe zu [Audio einrichten](/wiki/audio-setup/).
 5. Lies [Rundgang durch das Fenster](/wiki/tour/) und mache dann [Dein erster Song](/wiki/first-song/).
 
@@ -19,7 +19,7 @@ Es ist eine Alpha. Rechne mit Fehlern und speichere oft.
 |---|---|
 | Windows | Windows 10 oder 11, 64 Bit |
 | macOS | macOS 11 Big Sur oder neuer, Intel oder Apple Silicon |
-| Linux | x86_64 mit glibc 2.35 oder neuer (Ubuntu 22.04+, Debian 12+, Fedora 36+, aktuelles Arch oder Manjaro), X11 oder XWayland |
+| Linux | x86_64 oder arm64 mit glibc 2.35 oder neuer (Ubuntu 22.04+, Debian 12+, Fedora 36+, aktuelles Arch oder Manjaro; arm64 auch auf einem Raspberry Pi 4 oder 5 mit einem 64-Bit-System), X11 oder XWayland |
 
 Du brauchst kein Audio-Interface. LYNX SHARE spielt über das Soundgerät, das dein System ohnehin benutzt. FL Studio brauchst du ebenfalls nicht. Ist es auf demselben Computer installiert, findet LYNX SHARE dessen Samples und nutzt für `.flp`-Projekte dieselben Plugin-Dateien.
 

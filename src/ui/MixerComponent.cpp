@@ -6,6 +6,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/AraMenu.h"
 #include "core/SelectionRename.h"
 #include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
@@ -69,6 +70,9 @@
 #include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
 #include "core/StripInserts.h"
+#include "core/LayoutStyle.h"
+#include "core/TrackStates.h" // round 190op (P4)
+#include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 
 namespace lynx
 {
@@ -1905,7 +1909,7 @@ void MixerStrips::paint (juce::Graphics& g)
 
         // FL's header band (round 190io, design190ia FM-30): the top 36 px filled with the insert's colour (FL: #8C1F1C on
         // insert 1), held at a brightness where its marks read; FL's grey for an insert without a colour. Rounded on top.
-        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : juce::Colour (0xff485156), 0.45f, 0.6f)
+        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : theme::colour::defaultTrack, 0.45f, 0.6f)
                               .withMultipliedAlpha (track.muted ? 0.55f : 1.0f);
         const auto bandArea = juce::Rectangle<float> ((float) x, 2.0f, (float) plateWidth, (float) rows().header - 2.0f);
         if (needs (bandArea.getSmallestIntegerContainer()))
@@ -2011,7 +2015,7 @@ void MixerStrips::paint (juce::Graphics& g)
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
         // round 190ap: opened without third-party plugins, a plugin of this insert is still off (a grey power tag)
-        const auto pluginOff = ! standIn && engine.insertPluginOff (t);
+        const auto pluginOff = ! standIn && (engine.insertPluginOff (t) || engine.insertDeactivated (t)); // (round 190op: deactivated too)
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
@@ -2059,8 +2063,13 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto ms = 1000.0 * engine.getLatencySamples() / juce::jmax (1.0, engine.getTransport().sampleRate.load());
             g.setColour (colour::textSecondary);
             g.setFont (font (10.0f));
-            textcache::drawFittedText (g, "PDC " + juce::String (ms, 1) + " ms", soloArea (t).withX (x + 30).withWidth (w - 36),
-                              juce::Justification::centredLeft, 1, 0.8f); // the Master has no solo: use its spot
+            // (round 190oo PAT-11: when "PDC 13.8 ms" does not fit the spot, "13.8 ms" — the hint names it — instead of
+            // a squeezed "PDC 13.8 ..."; the Master has no solo: its spot)
+            const auto spot = soloArea (t).withX (x + 30).withWidth (w - 36);
+            const auto value = juce::String (ms, 1) + " ms";
+            const auto full = "PDC " + value;
+            const auto fits = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), full) <= (float) spot.getWidth();
+            textcache::drawFittedText (g, fits ? full : value, spot, juce::Justification::centredLeft, 1, 0.8f);
         }
 
         // pan and stereo separation
@@ -3231,6 +3240,20 @@ juce::PopupMenu MixerStrips::buildSendMenu (int t)
 
 void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
 {
+    // issue #254 (round 190ou): a notch of the horizontal wheel (a tilt wheel, a second wheel) scrolls the strips one
+    // insert sideways, as in FL 2026 (Thief: three notches, three inserts), wherever the mouse is over them
+    if (! flmods::ctrl (e.mods) && ! e.mods.isAltDown())
+        if (const auto w = flmods::normalisedWheel (wheel); gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, e.mods.isShiftDown()) != 0)
+        {
+            const auto notch = gesture::horizontalWheelNotch (w.deltaX, w.deltaY, w.isSmooth, false);
+            if (auto* view = findParentComponentOfClass<juce::Viewport>())
+            {
+                const auto room = juce::jmax (0, getWidth() - view->getViewWidth());
+                view->setViewPosition (juce::jlimit (0, room, view->getViewPositionX() + notch * spec().stripWidth), view->getViewPositionY());
+            }
+            return;
+        }
+
     if (const auto i = vcaAt (e.x); i >= 0 && ! ui::wheelScrolling() && vcaPartAt (i, e.getPosition()) == Part::fader)
     {
         if (const auto v = ui::wheelValue (engine.getSong().vcas[(std::size_t) i].level, e, wheel, vcaSpec (i)))
@@ -3388,6 +3411,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
             else if (engine.insertPluginOff (t)) // round 190ap
                 h.text = name + " - " + tr ("A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
+            if (engine.insertDeactivated (t)) // round 190op (P4)
+                h.text = name + " - " + tr ("Deactivated: its effects are unloaded and it carries silence (its settings are kept; [RMB] › Reactivate)");
             break;
         case Part::body:
         case Part::none:
@@ -3471,6 +3496,13 @@ void MixerStrips::keepSelectionShown()
                            || (revealed.count (selected) == 0 && isHidden (selected));
     if (wasHidden) // (selected from the Channel Rack, a menu or the keyboard: its strip comes back)
         updateSize();
+}
+
+// #225 (round 190nq): the previous / next shown mixer track (FL's Left / Right), for MixerComponent::selectTrack
+int MixerStrips::neighbourOf (int delta) const
+{
+    const auto count = (int) engine.getSong().mixer.size();
+    return mixerops::neighbourTrack (count, selected, delta, [this] (int t) { return showUsedOnly && revealed.count (t) == 0 && isHidden (t); });
 }
 
 void MixerStrips::selectTrack (int track)
@@ -3818,6 +3850,62 @@ int insertTrack (AudioEngine& engine, int at, const juce::File& file)
 }
 } // namespace mixerpresets
 
+// issue #232 stage 2 (round 190nz): Copy / Paste mixer track state (the File submenu), within one window and between
+// LYNX SHARE windows (ui/WindowClipboard.h); this window's own copy until another window copies something newer
+static std::vector<MixerTrack>& copiedTrackStates()
+{
+    static std::vector<MixerTrack> states;
+    return states;
+}
+
+static void copyTrackStates (AudioEngine& engine, std::vector<int> tracks)
+{
+    std::sort (tracks.begin(), tracks.end());
+    std::vector<MixerTrack> states;
+    const auto& song = engine.getSong();
+    for (const auto t : tracks)
+        if (t >= 0 && t < (int) song.mixer.size())
+        {
+            auto state = song.mixer[(std::size_t) t];
+            windowclip::captureMixerTrack (engine, t, state);
+            states.push_back (std::move (state));
+        }
+    if (states.empty())
+        return;
+    copiedTrackStates() = states;
+    crossclipboard::Payload copy;
+    copy.kind = crossclipboard::Kind::mixerTracks;
+    copy.mixerTracks = std::move (states);
+    windowclip::publish (std::move (copy));
+}
+
+static bool canPasteTrackStates()
+{
+    return ! copiedTrackStates().empty() || windowclip::hasIncoming (crossclipboard::Kind::mixerTracks);
+}
+
+// One state: every target gets it. Several: the first target and the tracks after it get them in order (or the selected
+// tracks, when as many are selected).
+static void pasteTrackStates (AudioEngine& engine, std::vector<int> targets)
+{
+    const auto incoming = windowclip::incoming (crossclipboard::Kind::mixerTracks);
+    const auto& states = incoming ? incoming->mixerTracks : copiedTrackStates();
+    std::sort (targets.begin(), targets.end());
+    if (states.empty() || targets.empty())
+        return;
+    engine.editSong ([&] (Song& s) {
+        const auto count = (int) s.mixer.size();
+        for (std::size_t i = 0; i < (states.size() == 1 ? targets.size() : states.size()); ++i)
+        {
+            const auto t = states.size() == 1 ? targets[i] : targets.size() == states.size() ? targets[i] : targets.front() + (int) i;
+            if (t >= 0 && t < count)
+                ProjectFile::applyMixerTrackState (s.mixer[(std::size_t) t], states[states.size() == 1 ? 0 : i], true);
+        }
+    });
+    if (incoming)
+        ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
+}
+
 bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file)
 {
     if (track < 0 || track >= (int) engine.getSong().mixer.size())
@@ -4062,6 +4150,14 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addItem (tr ("Unassign from Audio track(s)"), anyLinked, false,
                       [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::unassignAudioTracks (s, targets); }); });
     }
+    // round 190op (P4, LYNX extra; owner decision O-3): Deactivate unloads the insert's effects (and what plays only into
+    // it); it carries silence, its routing stays. Every selected track with it; the Master and the Current track never
+    if (const auto off = song.mixer[(std::size_t) t].deactivated;
+        t > 0 && ! isCurrent && (layoutstyle::current() != layoutstyle::Style::pattern || trackstates::patternMenus() || off))
+        menu.addItem (off ? tr ("Reactivate") : (several ? tr ("Deactivate selected tracks") : tr ("Deactivate")), true, off, [this, targets, off] {
+            engine.setDeactivated ({}, targets, ! off);
+            repaint();
+        });
     menu.addSeparator();
 
     // FL's "File" submenu (REA round 167q, TFXForm's FileMenu): open/save a state, Browse states and the "States" list
@@ -4094,6 +4190,13 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                     saveMixerTrackState (safe->engine, t, fc.getResult().withFileExtension (ProjectFile::mixerTrackStateExtension));
             });
         });
+        // issue #232 stage 2 (round 190nz, LYNX extra): a state through the clipboard, also to another LYNX SHARE window
+        // (the effects with their plugins' settings as they are now, level, pan, EQ, name and colour; routing stays)
+        file.addSeparator();
+        file.addItem (targets.size() > 1 ? tr ("Copy {0} mixer track states", { juce::String ((int) targets.size()) }) : tr ("Copy mixer track state"),
+                      [this, targets] { copyTrackStates (engine, targets); });
+        file.addItem (tr ("Paste mixer track state"), canPasteTrackStates(), false, [this, targets] { pasteTrackStates (engine, targets); });
+        file.addSeparator();
         file.addItem (tr ("Browse states"), [] {
             mixerStatesFolder().createDirectory();
             mixerStatesFolder().startAsProcess();
@@ -5296,6 +5399,7 @@ std::optional<EffectSlot> newAddableEffect (EffectKind kind, double bpm)
 EffectsPanel::EffectsPanel (AudioEngine& e)
     : engine (e)
 {
+    setComponentID ("mixer.slots"); // (round 190pl: --demo, its slots as cells)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     engine.addChangeListener (this);
@@ -5747,7 +5851,8 @@ void EffectsPanel::paintEq (juce::Graphics& g)
             else
                 curve.lineTo (inner.getX() + (float) i, y);
         }
-        g.setColour (eq.active() ? colour::accent : colour::textSecondary.withAlpha (0.6f));
+        // (round 190oa, DF-86: FL's curve turns orange, 255,203,106, while a right-drag sets a band's level)
+        g.setColour (eqLevelDrag && isEqPoint (dragParam) ? juce::Colour (0xffffcb6a) : eq.active() ? colour::accent : colour::textSecondary.withAlpha (0.6f));
         g.strokePath (curve, juce::PathStrokeType (1.5f));
 
         for (int b = 0; b < 3; ++b)
@@ -6020,6 +6125,11 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             });
         menu.addSubMenu (tr ("Playlist tracks shown ({0})", { juce::String (d.playlistTracks) }), tracks);
     }
+    // round 190oo (design review CS O-2, a LYNX extra): Live's new set — a strip on every Clip-launch column
+    menu.addItem (tr ("New Clip-launch projects: a mixer track for every track"), true, d.clipLaunchStrips, [] {
+        newProjectDefaults().clipLaunchStrips = ! newProjectDefaults().clipLaunchStrips;
+        notifyChanged();
+    });
 }
 } // namespace mixeroptions
 
@@ -6922,6 +7032,16 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         if (isEqPoint (eqControl))
         {
             dragParam = eqControl;
+            // round 190oa (DF-86, capture 190oa A5): FL's right-drag moves the band's level only (its curve orange while
+            // it does); the left drag sets frequency and level from the mouse
+            eqLevelDrag = e.mods.isRightButtonDown();
+            if (eqLevelDrag)
+            {
+                const auto band = (std::size_t) (eqPointBase - eqControl);
+                eqLevelFrom = { e.position.y, engine.getSong().mixer[(std::size_t) track].eq.gainDb[band] };
+                repaint (eqGraphBounds());
+                return;
+            }
             setEqFromGraph (eqPointBase - eqControl, e.getPosition());
             return;
         }
@@ -6976,6 +7096,13 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
         const auto i = effectIn (row);
         if (i < 0)
         {
+            // issue #206 follow-up (round 190qb, LYNX extra): a middle-click goes straight to the effect search, with no
+            // plugin menu flashing up first (a double-click's first press opens FL's menu)
+            if (e.mods.isMiddleButtonDown() && ! e.mods.isLeftButtonDown() && ! e.mods.isRightButtonDown())
+            {
+                showSlotSearch (row);
+                return;
+            }
             // issue #206: a second press soon after, on the menu, is a double-click: the effect search instead
             if (e.mods.isLeftButtonDown() && ! e.mods.isAnyModifierKeyDown())
                 armSecondClick (e, row);
@@ -7238,7 +7365,21 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     if (auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
-        if (isEqPoint (eqControl)) // the wheel over a handle changes the band's width
+        // round 190oa (DF-86, capture 190oa A5: FL's wheel over a band changes its level, ≈ 0.8 dB a notch); Ctrl+wheel
+        // keeps LYNX's width
+        if (isEqPoint (eqControl) && ! flmods::ctrl (e.mods) && wheel.deltaY != 0.0f)
+        {
+            const auto band = (std::size_t) (eqPointBase - eqControl);
+            const auto now = engine.getSong().mixer[(std::size_t) track].eq.gainDb[band];
+            const auto db = juce::jlimit (-eqRangeDb, eqRangeDb, std::round ((now + (wheel.deltaY > 0.0f ? 0.8f : -0.8f) * (wheel.isReversed ? -1.0f : 1.0f)) * 10.0f) / 10.0f);
+            engine.editSong ([t = track, band, db] (Song& s) {
+                if (t < (int) s.mixer.size())
+                    s.mixer[(std::size_t) t].eq.gainDb[band] = db;
+            });
+            showTip (eqParamBase - (int) band * 3, -1, true);
+            return;
+        }
+        if (isEqPoint (eqControl)) // (Ctrl) the band's width
             eqControl = eqParamBase - (eqPointBase - eqControl) * 3 - 2;
         if (const auto v = ui::wheelValue (valueOf (eqControl, -1), e, wheel, specFor (eqControl, -1)))
         {
@@ -7309,7 +7450,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
             return ui::valueHint (specFor (eqControl, -1), valueOf (eqControl, -1), gesture);
         ui::Hint h;
         const auto band = eqPointBase - eqControl;
-        h.text = tr ("EQ: [LMB] drag the band's frequency and level  [Wheel] width  [2xLMB] back to 0 dB");
+        h.text = tr ("EQ: [LMB] drag the band's frequency and level  [RMB] drag its level  [Wheel] level  [Ctrl][Wheel] width  [2xLMB] back to 0 dB");
         h.value = tr ("Band {0}", { juce::String (band + 1) }) + " - " + tr (eqBandNames[band]);
         return h;
     }
@@ -7393,7 +7534,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
                              : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on).  Shift+click: lock its state")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
-                          : tr ("Empty slot: click to add an effect");
+                          : tr ("Empty slot: click to add an effect, double-click or middle-click to search for one");
             h.hasMenu = used;
         }
 
@@ -7419,6 +7560,17 @@ void EffectsPanel::mouseDrag (const juce::MouseEvent& e)
 
     if (isEqPoint (dragParam))
     {
+        if (eqLevelDrag) // (round 190oa, DF-86: FL's right-drag = the level alone, on the graph's dB scale)
+        {
+            const auto graph = eqGraphBounds().toFloat().reduced (4.0f);
+            const auto db = juce::jlimit (-eqRangeDb, eqRangeDb,
+                                          std::round ((eqLevelFrom.second + (eqLevelFrom.first - e.position.y) / (graph.getHeight() * 0.5f) * eqRangeDb) * 10.0f) / 10.0f);
+            engine.editSong ([t = track, band = eqPointBase - dragParam, db] (Song& s) {
+                if (t < (int) s.mixer.size())
+                    s.mixer[(std::size_t) t].eq.gainDb[(std::size_t) band] = db;
+            });
+            return;
+        }
         setEqFromGraph (eqPointBase - dragParam, e.getPosition());
         return;
     }
@@ -7552,8 +7704,33 @@ void EffectsPanel::mouseExit (const juce::MouseEvent&)
     }
 }
 
+bool EffectsPanel::eqGestureForSnapshot (int band, int dy, int notches)
+{
+    const auto at = eqHandle (band);
+    auto source = juce::Desktop::getInstance().getMainMouseSource();
+    const auto now = juce::Time::getCurrentTime();
+    const auto event = [&] (juce::Point<float> p, juce::ModifierKeys mods) {
+        return juce::MouseEvent (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, now, at, now, 1, p != at);
+    };
+    if (notches != 0)
+    {
+        juce::MouseWheelDetails wheel { 0.0f, notches > 0 ? 0.25f : -0.25f, false, false, false };
+        for (int i = 0; i < std::abs (notches); ++i)
+            mouseWheelMove (event (at, {}), wheel);
+        return false;
+    }
+    const juce::ModifierKeys right (juce::ModifierKeys::rightButtonModifier);
+    mouseDown (event (at, right));
+    mouseDrag (event (at.translated (0.0f, (float) -dy), right));
+    const auto orange = eqLevelDrag;
+    mouseUp (event (at.translated (0.0f, (float) -dy), right));
+    return orange;
+}
+
 void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 {
+    if (std::exchange (eqLevelDrag, false)) // (round 190oa: the curve's own colour again)
+        repaint (eqGraphBounds());
     // a click on the slot's name (not a drag, not the second click of a double-click) shows or hides its window (FL)
     if (dragSlot >= 0 && dropSlot < 0 && ! e.mouseWasDraggedSinceMouseDown() && e.getNumberOfClicks() == 1)
     {
@@ -7871,6 +8048,9 @@ juce::Rectangle<int> EffectsPanel::sidechainButtonBounds() const
 
 void EffectsPanel::openPluginWindow (int slot)
 {
+    // round 190oq (issue #243): an ARA insert opens the plugin's editor with the audio clips routed here
+    if (aramenu::isAraSlot (engine, track, slot) && aramenu::openInsertEditor (engine, track))
+        return;
     // Online Sessions P5-A1: an effect the session's host plays on this insert opens its parameter editor
     if (liveui::showHostedEditor ({ { live::Kind::insert, (std::uint64_t) juce::jmax (0, track), 0 }, slot }))
         return;
@@ -7964,6 +8144,10 @@ void EffectsPanel::showAddMenu (int row)
 
 int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
 {
+    // round 190oq (issue #243): an ARA plugin put on an insert that audio clip channels go to edits their clips (REAPER,
+    // Logic, Studio One); the slot menu switches it off
+    const auto araOn = fx.kind == EffectKind::plugin && ! fx.ara && aramenu::araByDefault (engine, track, fx.plugin);
+    fx.ara = fx.ara || araOn;
     int at = -1;
     engine.editSong ([t = track, row, &fx, &at] (Song& song) {
         if (t < 0 || t >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) t].effects.size() >= maxEffectSlots)
@@ -7978,6 +8162,8 @@ int EffectsPanel::placeEffectAtRow (int row, EffectSlot fx)
     });
     if (at < 0)
         return at;
+    if (araOn)
+        aramenu::hintSlotAra (engine, track, at, true);
     selectedSlot = at;
     if ((*slots())[(std::size_t) at].kind != EffectKind::plugin) // (plugins: their own window, below)
         openEditor (at); // FL opens the effect's window when it is loaded (round 170h, fl-09)
@@ -8181,6 +8367,8 @@ void EffectsPanel::showSlotMenu (int slot)
                 onHotSwapSlot (t, slot);
         });
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
+    // round 190oq (issue #243): an ARA plugin edits the audio clips routed to this mixer track
+    aramenu::addSlotItems (menu, engine, track, slot);
 
     // side inputs: another track's output feeds the compressor's detector, or the vocoder's modulator/carrier. Round
     // 177b: every effect with a side input (plugins with a sidechain bus too) gets the picker, which makes the route
@@ -8735,6 +8923,8 @@ bool MixerComponent::runAction (const std::string& id)
         strips.moveSelected (-1);
     else if (id == "mixer.moveRight")
         strips.moveSelected (1);
+    else if (id == "mixer.selectPrevious" || id == "mixer.selectNext") // #225 (round 190nq): FL's Left / Right
+        selectTrack (strips.neighbourOf (id == "mixer.selectNext" ? 1 : -1));
     else if (id == "mixer.linkChannels")
         strips.linkSelectedChannels (false);
     else if (id == "mixer.linkChannelsFrom")

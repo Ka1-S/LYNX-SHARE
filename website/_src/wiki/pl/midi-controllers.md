@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![Strona MIDI w ustawieniach: urządzenia wejściowe, urządzenia wyjściowe z synchronizacją master i synchronizacja zewnętrzna](/assets/img/wiki/settings-midi.webp)
 
@@ -100,7 +100,7 @@ MPE jest na pierwszym etapie. Kontroler MPE gra każdą nutę z własnym pitch b
 
 ## MIDI Map Mode i Key Map Mode
 
-W [sposobie pracy Clip-launch](/wiki/layouts/) klipy, sceny i przyciski można mapować jak w Ableton Live. Przyciski `MIDI` i `Tonacja` obok przełącznika `Oba`, `Siatka`, `Song` włączają te tryby, tak samo jak `Ctrl+M` i `Ctrl+K`.
+W [układzie Clip-launch](/wiki/layouts/) klipy, sceny i przyciski można mapować jak w Ableton Live. Przyciski `MIDI` i `Tonacja` obok przełącznika `Oba`, `Siatka`, `Song` włączają te tryby, tak samo jak `Ctrl+M` i `Ctrl+K`.
 
 1. Naciśnij `Ctrl+M` dla MIDI Map Mode lub `Ctrl+K` dla Key Map Mode. Każdy element, który można zmapować, jest podświetlony, na niebiesko dla MIDI i na pomarańczowo dla klawiszy.
 2. Kliknij element: slot klipu, scenę, przycisk stop ścieżki, `Zatrzymaj wszystkie klipy`, play, stop, record, `Nagrywanie sesji`, metronom albo pokrętło Mikser sesji lub Device View.
@@ -145,7 +145,7 @@ W [sposobie pracy Clip-launch](/wiki/layouts/) klipy, sceny i przyciski można m
 - Nuta przytrzymana pedałem jest nagrywana do chwili, gdy pedał się podnosi.
 - Klip automatyki nie odbiera kontrolki, gdy poruszasz nią z kontrolera. Kontrolka znów podąża za swoją automatyką, gdy odtwarzanie następnym razem się zaczyna.
 - Powiązania z nutami utworzone w `Ustawienia zdalnego sterowania` nie są zapisywane do eksportu .flp.
-- `Ctrl+M` i `Ctrl+K` uruchamiają tryby mapowania tylko w sposobie pracy Clip-launch. Map Mode nie ma jeszcze mapowania makr ani zakresów nut.
+- `Ctrl+M` i `Ctrl+K` uruchamiają tryby mapowania tylko w układzie Clip-launch. Map Mode nie ma jeszcze mapowania makr ani zakresów nut.
 
 ## Powiązane
 

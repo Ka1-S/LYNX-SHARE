@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Vous cherchez une commande ? Appuyez sur la touche point d'interrogation pour ouvrir la palette de commandes.
+
+00:00:08.800 --> 00:00:14.200
+Tapez ce que vous voulez. Chaque élément de menu, raccourci et réglage est dans la liste.
+
+00:00:14.400 --> 00:00:19.200
+Appuyez sur Entrée pour l'exécuter. Ici, le Tracker s'ouvre.
+
+00:00:19.400 --> 00:00:24.800
+Maintenant le CPU. Pendant la lecture, l'indicateur CPU de la barre d'outils montre la charge.
+
+00:00:25.000 --> 00:00:30.400
+Double-cliquez dessus pour le Moniteur de performances des plugins : le CPU de chaque plugin.
+
+00:00:30.600 --> 00:00:37.200
+Pour économiser du CPU : Outils, Basculer la désactivation intelligente de tous les plugins : un plugin se repose quand il est silencieux.

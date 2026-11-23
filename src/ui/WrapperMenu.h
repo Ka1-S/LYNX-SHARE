@@ -29,6 +29,15 @@ namespace lynx::wrappermenu
 using Action = std::function<void()>;
 using Fill = std::function<void (juce::PopupMenu&)>;
 
+// round 190oa (DF-120, capture 190oa B4): FL's Browse parameters — the Browser goes to Current project › Effects (an
+// effect: mixer track `index`, slot `slot`) or › Generators (a channel: `index`, slot −1) with that entry open on its
+// parameters. The main window sets it.
+inline std::function<void (bool effect, int index, int slot)>& browseParametersHandler()
+{
+    static std::function<void (bool, int, int)> handler;
+    return handler;
+}
+
 struct Spec
 {
     // first block
@@ -55,9 +64,11 @@ struct Spec
     std::optional<bool> detached;
     Action toggleDetached;
     Action help;
+    bool showHelp = true; // (round 190oa, capture 190oa B4: FL's sample channel ▸ menu has no Help item)
     // the Channel column (a channel's window only)
     bool channel = false;
     Action saveChannelState, browseChannelStates, routeToFreeMixerTrack;
+    Fill sample; // (round 190oa, DF-118, capture 190oa B4: a sample channel's Sample ▸, the waveform's menu)
     // LYNX's own items after FL's (Pin on top...)
     Fill extra;
 };
@@ -117,7 +128,8 @@ inline juce::PopupMenu build (const Spec& s)
     m.addSeparator();
     sub (m, tr ("Scaling"), s.scaling);
     item (m, tr ("Detached"), s.toggleDetached, s.detached.value_or (false));
-    item (m, tr ("Help"), s.help);
+    if (s.showHelp)
+        item (m, tr ("Help"), s.help);
 
     if (s.extra != nullptr)
     {
@@ -139,6 +151,8 @@ inline juce::PopupMenu build (const Spec& s)
         item (m, tr ("Browse channel states"), s.browseChannelStates);
         m.addSeparator();
         item (m, tr ("Route to free mixer track"), s.routeToFreeMixerTrack, false, "Ctrl+L");
+        if (s.sample != nullptr) // (FL: last in the Channel column)
+            sub (m, tr ("Sample"), s.sample);
     }
     return m;
 }

@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHARE läuft auch, ohne sein Fenster zu öffnen. Eine Option rendert ein Projekt zu Audio, andere wandeln es in ein FL-Studio-Projekt oder ein Ableton-Live-Set um, und mehrere gibt es zum Testen. Die eigenen Prüfungen des Projekts nutzen dieselben Optionen.
 
@@ -18,7 +18,7 @@ Das Programm heißt `LYNX.exe` unter Windows und `LYNX` unter macOS und Linux. U
 LYNX.exe project.lynx
 ```
 
-Startet LYNX SHARE mit Fenster und öffnet die Datei. Akzeptiert werden `.lynx`, `.flp`, `.als`, `.flm` und `.mid`. Ein relativer Pfad wird vom aktuellen Ordner aus gelesen.
+Startet LYNX SHARE mit Fenster und öffnet die Datei. Akzeptiert werden `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` und `.mid`. Ein relativer Pfad wird vom aktuellen Ordner aus gelesen.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ LYNX.exe --no-plugins project.lynx
 
 | Option | Was sie bewirkt |
 |---|---|
-| `--export <project> <out>` | Rendert den ganzen Song samt Ausklang, wie es das Export-Fenster tut. Die Endung von `<out>` wählt das Format: `.wav` (24 Bit), `.flac`, `.ogg` oder `.mp3` (320 kbps) |
+| `--export <project> <out>` | Rendert den ganzen Song samt Ausklang, wie es das Export-Fenster tut. Die Endung von `<out>` wählt das Format: `.wav` (24 Bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24 Bit) oder `.m4a` (192 kbps, nicht unter Linux) |
 | `--export ... --pattern` | Rendert nur das aktuelle Pattern |
 | `--export ... --insert N` | Rendert nur den Ausgang von Mixer-Insert N |
 | `--export ... --rate N` | Rendert mit einer anderen Samplerate, in Hz |
 | `--stems <project> <base.wav>` | Schreibt eine WAV pro Mixer-Insert, das Kanäle hat: `base - 1.wav`, `base - 2.wav` und so weiter |
 | `--export-flp <project> <out.flp>` | Schreibt ein FL-Studio-Projekt. Mit `out.zip` schreibt es ein gezipptes Loop-Paket |
 | `--export-flp ... --substitute` | Tauscht Plugins, die es nur in LYNX gibt, gegen das nächstliegende FL-Plugin aus, statt sie zu Audio zu rendern |
+| `--export-flm <project> <out.flm>` | Schreibt ein FL-Studio-Mobile-Projekt und kopiert die Samples in einen Ordner `<name> Samples` daneben |
 | `--export-als <project> <folder>` | Schreibt ein Ableton-Live-Set nach `<folder>/<name> Project/<name>.als`, für Live 12 |
 | `--export-als ... --live11` | Schreibt das Set für Live 11 |
 | `--export-bundle <project> <folder>` | Schreibt das Paket von `Datei › Exportieren › Für andere Apps...` in den Ordner |

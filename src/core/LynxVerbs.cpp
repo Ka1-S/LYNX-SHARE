@@ -2622,7 +2622,7 @@ void applyRoomLaw (const EffectParams& p, Settings& s) noexcept
 class AtriumFx final : public VerbEffect
 {
 public:
-    AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05, true) {} // (round 190ls: with the dense tank)
+    explicit AtriumFx (bool dense = true) : VerbEffect (EffectKind::atrium, 0.25, 1.05, dense) {} // (round 190ls: with the dense tank; 190nr: only when used)
 
 protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount) + (p[atrium::engineLaw] >= 0.5f ? 1000 : 0); }
@@ -3911,6 +3911,9 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
         default: return pct (v);
     }
 }
+
+bool atriumDense (const EffectParams& params) noexcept { return params[(std::size_t) atrium::reaLaw] >= 0.5f; }
+std::unique_ptr<Effect> makeAtrium (bool dense) { return std::make_unique<AtriumFx> (dense); }
 
 std::unique_ptr<Effect> make (EffectKind kind)
 {

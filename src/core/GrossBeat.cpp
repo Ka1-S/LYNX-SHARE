@@ -1226,8 +1226,8 @@ double snapStep (int selector) noexcept
 
 namespace
 {
-constexpr std::array<int, paramCount> rawMin { 0, 0, 0, 0, 0, 0, -256, 0 };
-constexpr std::array<int, paramCount> rawMax { 35, 35, 256, 256, 10000, 10000, 256, 1 };
+constexpr std::array<int, paramCount> rawMin { 0, 0, 0, 0, 0, 0, -256, 0, 0 };
+constexpr std::array<int, paramCount> rawMax { 35, 35, 256, 256, 10000, 10000, 256, 1, 65536 };
 } // namespace
 
 float paramFromRaw (int index, int raw) noexcept
@@ -1235,7 +1235,8 @@ float paramFromRaw (int index, int raw) noexcept
     if (index < 0 || index >= paramCount)
         return 0.0f;
     const auto lo = rawMin[(std::size_t) index], hi = rawMax[(std::size_t) index];
-    return (float) (std::clamp (raw, lo, hi) - lo) / (float) (hi - lo);
+    const auto v = (float) (std::clamp (raw, lo, hi) - lo) / (float) (hi - lo);
+    return index == scratchParam ? 1.0f - v : v; // (round 190oa: 0 = FL's neutral 65536)
 }
 
 int rawFromParam (int index, float value) noexcept
@@ -1243,7 +1244,9 @@ int rawFromParam (int index, float value) noexcept
     if (index < 0 || index >= paramCount)
         return 0;
     const auto lo = rawMin[(std::size_t) index], hi = rawMax[(std::size_t) index];
-    const auto v = std::clamp ((double) value, 0.0, 1.0);
+    auto v = std::clamp ((double) value, 0.0, 1.0);
+    if (index == scratchParam)
+        v = 1.0 - v;
     return lo + (int) std::lround (v * (double) (hi - lo));
 }
 
@@ -1333,6 +1336,11 @@ struct Engine::Impl
 
     // scratch
     std::vector<double> pos, frac, posCopy, wide, sines;
+    // round 190oa (DP-8; REA 190oa R5, FL's render FUN_008420f0): the scratch offset s = P[8] / 65536 − 1 through three
+    // one-pole smoothers in series (each with one coefficient per direction, exp (ln 0.01 / T) with T = 0.2 or 0.3 · fs / √3
+    // samples), added to the time envelope's value (clamped at 0) while s ≠ 0 or the smoothers have not settled
+    std::array<double, 3> scratchState {};
+    double scratchUp = 0.0, scratchDown = 0.0;
     std::vector<std::int64_t> ipos;
     std::vector<float> gain, spd, timeL, timeR, oldL, oldR, dryL, dryR;
     std::vector<double> cutoffs, ccs;
@@ -1404,6 +1412,10 @@ struct Engine::Impl
     void prepare (int sampleRate, int block)
     {
         fs = sampleRate;
+        // (which of FL's two times goes with which direction was not resolved: the faster one follows a rising offset)
+        scratchUp = std::exp (std::log (0.01) / (0.2 * (double) fs / std::sqrt (3.0)));
+        scratchDown = std::exp (std::log (0.01) / (0.3 * (double) fs / std::sqrt (3.0)));
+        scratchState = {};
         maxBlock = std::max (block, 16);
         // ring: three bars at 10 BPM plus margins (FL's size, independent of the block)
         const auto d = (double) ((float) (fs * 240) / 10.0f);
@@ -1880,13 +1892,29 @@ struct Engine::Impl
         reader.base = reader.base % L + L;
 
         const auto& tslot = currentSlot (0);
-        const bool timeOn = (! tslot.flat && P[2] != 0) || frozen || clickOffL != 0.0f || clickOffR != 0.0f || holdStart;
+        const auto scratch = (double) P[8] / 65536.0 - 1.0;
+        const auto scratching = scratch != 0.0 || std::any_of (scratchState.begin(), scratchState.end(), [scratch] (double v) {
+                                    return std::abs (v - scratch) > 5.96e-8;
+                                });
+        const bool timeOn = (! tslot.flat && P[2] != 0) || frozen || clickOffL != 0.0f || clickOffR != 0.0f || holdStart || scratching;
         float* outL = dryL.data();
         float* outR = dryR.data();
         if (timeOn)
         {
             auto& K = kinds[0];
             K.player.render (tslot.points, pos.data(), n, step);
+            if (scratching) // (round 190oa, DP-8: the scratch dial's offset, smoothed, on the time envelope)
+                for (int i = 0; i < n; ++i)
+                {
+                    auto x = scratch;
+                    for (auto& stage : scratchState)
+                    {
+                        const auto c = x > stage ? scratchUp : scratchDown;
+                        stage = x + c * (stage - x);
+                        x = stage;
+                    }
+                    pos[(std::size_t) i] = std::max (0.0, pos[(std::size_t) i] + x);
+                }
             const auto fading = fadeLeft > 0;
             if (fading)
                 std::copy (pos.begin(), pos.begin() + n, posCopy.begin());

@@ -2,7 +2,7 @@
 // (second warps, unison stacking, noise, comb / formant / phaser filters, macros, drawn LFOs, the effects rack); round
 // 190ml adds presets for Helix+ 2 (oscillator 3, the sample oscillator with LYNX-made samples, user tables made from
 // formulas and harmonics, macros 5…8, chaos sources, the shifter / EQ / multiband); round 190mt adds presets for the
-// granular and spectral oscillators (Helix round 3).
+// granular and spectral oscillators (Helix round 3); round 190oc two for their unison and reverse grains (Helix round 4).
 // Clean-room: no Serum, Live or other preset was read or converted; LYNX's own tables (core/WavetableTables.cpp).
 // The first preset ("Init") is Helix's own default, so a new Helix channel sounds as before.
 
@@ -33,6 +33,7 @@ struct Patch
     Patch& x (int extIndex, double value) { return set (w::extBase + extIndex, value); }
     Patch& x2 (int ext2Index, double value) { return set (w::ext2Base + ext2Index, value); }
     Patch& x3 (int ext3Index, double value) { return set (w::ext3Base + ext3Index, value); }
+    Patch& x4 (int ext4Index, double value) { return set (w::ext4Base + ext4Index, value); }
     Patch& osc3 (int param, double value) { return x2 (w::ext2::osc3 + param, value); }
     Patch& table3 (const char* name)
     {
@@ -408,6 +409,35 @@ std::vector<Preset> helixBank()
         w::HelixUserData d;
         d.sampleName = "LYNX Vowel (made in Helix)";
         d.sample = vowelSample();
+        d.spectral = w::analyseSpectrum (d.sample);
+        return d;
+    }));
+    // --- Helix round 4 (round 190oc): unison on the granular and spectral oscillators, reverse grains
+    b.push_back (make ("Grain Swarm", "Pad", { "granular", "unison", "reverse", "wide" }, [] (Patch& p) {
+        p.osc (0, osc::on, 0).x2 (ext2::sampleRoot, 45);
+        p.x3 (ext3::grainOn, 1).x3 (ext3::grainPosition, 0.45).x3 (ext3::grainSize, 0.12).x3 (ext3::grainDensity, 14).x3 (ext3::grainSpray, 0.25)
+            .x3 (ext3::grainSpread, 0.3);
+        p.x4 (ext4::grainUnison, 5).x4 (ext4::grainDetune, 0.3).x4 (ext4::grainWidth, 0.9).x4 (ext4::grainReverse, 0.35);
+        p.lfo (0, 1, 0.05).cell (tgt::grainPos, src::lfo1, 0.2).cell (tgt::grainDensity, src::macro1, 0.4);
+        p.env (0, 0.08, 1.0, 1.0, 2.0).set (volume, 0.32).filter (0, flt::freq, 7000);
+        p.x (ext::reverbOn, 1).x (ext::reverbSize, 0.7).x (ext::reverbMix, 0.3);
+    }, [] {
+        w::HelixUserData d;
+        d.sampleName = "LYNX Vowel (made in Helix)";
+        d.sample = vowelSample();
+        return d;
+    }));
+    b.push_back (make ("Spectral Ensemble", "Pad", { "spectral", "unison", "glass", "wide" }, [] (Patch& p) {
+        p.osc (0, osc::on, 0).x2 (ext2::sampleRoot, 69);
+        p.x3 (ext3::specOn, 1).x3 (ext3::specStretch, 0.06).x3 (ext3::specTilt, -0.15).x3 (ext3::specPartials, 24).x3 (ext3::specBand, 1400)
+            .x3 (ext3::specWidth, 5);
+        p.x4 (ext4::specUnison, 4).x4 (ext4::specDetune, 0.25).x4 (ext4::specWidth, 0.8);
+        p.lfo (0, 0, 0.09).cell (tgt::specPos, src::lfo1, 0.25).cell (tgt::specBand, src::macro1, 0.4);
+        p.env (0, 0.4, 1.0, 1.0, 1.8).set (volume, 0.3).x (ext::chorusOn, 1).x (ext::chorusMix, 0.25).x (ext::reverbOn, 1).x (ext::reverbMix, 0.3);
+    }, [] {
+        w::HelixUserData d;
+        d.sampleName = "LYNX Glass (made in Helix)";
+        d.sample = glassSample();
         d.spectral = w::analyseSpectrum (d.sample);
         return d;
     }));

@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![片段啟動版面：播放清單旁邊有帶場景的片段格線](/assets/img/cliplaunch.webp)
 
 LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單。片段啟動工作流程是選用的，會在播放清單旁加上帶場景的片段格線。LYNX SHARE 可讀寫 `.als` 套裝，但與 Ableton 沒有任何隸屬關係。
+
+這一頁也適合 Bitwig Studio 使用者：片段網格的用法相同，Bitwig 的 DAWproject 檔案（`.dawproject`）可用 `檔案 › 開啟...` 開啟，並由 `檔案 › 匯出 › DAWproject (.dawproject)...` 寫出。
+
+## 你的第一步
+
+1. **選擇版面。** 第一次啟動 LYNX SHARE 時，歡迎卡片會問你從哪裡轉過來。點擊 `Ableton Live 或 Bitwig`：片段啟動版面會開啟。之後，`檢視 › 版面樣式 › 片段啟動工作流程` 可隨時切換到它。
+2. **填一個槽位。** 把一個取樣或樣式從瀏覽器拖到槽位裡，或在空槽上按右鍵並選擇 `在此放置模式`。
+3. **啟動。** 點擊片段左側的三角形，或點擊 `場景` 欄中某個場景的三角形來啟動整列。也可以開啟你的某個 `.als` 套裝（見下方）。
+
+與 Live 的不同之處：
+
+- 播放清單就是編排，它的軌道就是網格的各欄。啟動過片段的軌道會一直留在網格上，直到你按 `返回播放清單`。
+- 網格之外的按鍵沿用 FL Studio。`Ctrl+Z` 復原一步，再按一次則是重做。
+- 只有 Live 的部分內建裝置會被轉換（見須知）。第三方外掛會連同狀態一起帶過來。
+- 模式版面，也就是 FL Studio 附通道機架和樣式的工作方式，可以處理同一個專案。
 
 ## 開啟 Live 套裝
 
@@ -59,7 +74,7 @@ LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單
 
 | 會寫出 | 不會寫出 |
 |---|---|
-| 每個通道一條 MIDI 軌道，音符以 MIDI 片段呈現 | LYNX SHARE 自己的樂器和效果器。它們的軌道和音符會保留 |
+| 每個通道一條 MIDI 軌道，音符以 MIDI 片段呈現 | LYNX SHARE 自己的樂器和效果器，但 Helix 會變成 Wavetable。它們的軌道和音符會保留 |
 | 帶有拉伸、移調、增益、淡化和變速模式的音訊軌道 | 效果器參數的自動化 |
 | 群組、回傳和傳送 | 插入軌到插入軌的路由 |
 | VST2 和 VST3 外掛及其狀態 | |
@@ -70,9 +85,11 @@ LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單
 
 ## 須知
 
-- Live 自己的許多裝置會變成 LYNX SHARE 自己的，並保留其設定和自動化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift 和 Operator（不含 FM）。其他的會被捨棄並列在匯入報告中。
-- 樂器機架和音訊效果器機架會連同其鏈、區域和巨集一起匯入，鼓機架會變成 LYNX SHARE 的鼓機架。Live 的 MIDI Effect Rack 還不會轉換，會列在匯入報告中。
+- Live 自己的許多裝置會變成 LYNX SHARE 自己的，並保留其設定和自動化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable 和 Meld。其他的會被捨棄並列在匯入報告中。
+- 樂器機架和音訊效果器機架會連同其鏈、區域和巨集一起匯入，鼓機架會變成 LYNX SHARE 的鼓機架。Live 的 Arpeggiator 會變成通道的琶音器。Pitch、Velocity、Chord、Note Length 和 MIDI Effect Rack 會寫入音符。
 - 匯入報告會列出被省略的內容。
+- 在裝置檢視中，機架會內嵌顯示其鏈中的裝置，巨集映射模式（機架的 `映射` 按鈕）會把裝置參數交給巨集，與 Live 一樣。
+- Session 混音器有 Live 的獨奏 / Cue 開關，附有給耳機用的 `Cue Out` 和 `監聽音量`。
 - 在匯出的套裝中，Live 會修剪彼此重疊的音訊片段。
 - Live 套裝中的變速標記在匯入時會保留，匯出時會寫回去。
 
@@ -83,3 +100,4 @@ LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單
 - [匯入專案](/wiki/importing-projects/)
 - [檔案格式](/wiki/file-formats/)
 - [同一個程式裡的兩種工作流程](/why/#workflows)
+- [學習：教學](/learn/)

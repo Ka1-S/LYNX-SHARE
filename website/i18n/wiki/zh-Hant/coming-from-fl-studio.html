@@ -1,5 +1,9 @@
 <p>LYNX SHARE 保留了你熟悉的工作流程：通道機架、樣式、播放清單和混音器，按鍵也一樣。它可以直接開啟 <code>.flp</code> 專案，也能把專案寫回去。</p>
 <p>LYNX SHARE 是獨立的程式，與 Image-Line 沒有任何隸屬、認可或贊助關係，也不含任何 Image-Line 的程式碼。FL Studio 是 Image-Line Software 的註冊商標。</p>
+<h2 id="your-first-steps">你的第一步</h2>
+<ol><li><strong>選擇版面。</strong> 第一次啟動 LYNX SHARE 時，歡迎卡片會問你從哪裡轉過來。點擊 <code>FL Studio</code>：你會得到預設的模式版面，有通道機架、鋼琴捲軸、播放清單和混音器。卡片上的「略過」效果相同。</li><li><strong>開啟專案。</strong> 開啟你的某個 <code>.flp</code> 專案（見下方），或在通道機架中點擊步進來做一段節拍。</li><li><strong>找到你的外掛。</strong> LYNX SHARE 會在背景掃描常用的外掛資料夾。若有你自己的資料夾，請開啟 <code>選項 › 外掛管理器...</code>，點擊 <code>外掛資料夾...</code>，新增它，然後點擊 <code>尋找新外掛</code>。</li></ol>
+<p>與 FL Studio 的不同之處：</p>
+<ul><li>FL Studio 自己的外掛在 LYNX SHARE 重新製作的引擎上播放，每個引擎都有品質等級（見下方）。開啟 <code>.flp</code> 不需要 FL Studio 本身。</li><li>LYNX SHARE 自己的新增功能預設是關閉的，要在 <code>選項 › LYNX 附加功能...</code> 中開啟。</li><li>另外兩種版面可以處理同一個專案：片段啟動（附場景的片段網格）和簡易（一個視窗裡有音軌、循環和快速錄音）。</li><li><a href="/learn/online-session/">線上工作階段</a>可讓最多 4 個人即時在同一個專案裡工作。</li></ul>
 <h2 id="open-a-flp-project">開啟 .flp 專案</h2>
 <ol><li>選擇 <code>檔案 › 開啟...</code>（<code>Ctrl+O</code>），選取 <code>.flp</code>。</li><li>LYNX SHARE 會解析專案的外掛和取樣，然後開啟它。標題會顯示「(imported from FL Studio)」。</li><li>選擇 <code>說明 › Last FL Studio import report</code>，查看哪些內容被近似處理、略過或找不到。</li><li>選擇 <code>說明 › 缺失的檔案...</code>，查看缺少的取樣和外掛。</li><li>選擇 <code>檔案 › 儲存</code>。它會詢問要把 <code>.lynx</code> 檔案寫到哪裡。<code>.flp</code> 本身絕不會被改寫。</li></ol>
 <h2 id="what-maps-to-what">對應關係</h2>
@@ -22,6 +26,6 @@
 <p><code>檔案 › 開啟...</code> 也能開啟 <code>.flm</code> 專案。匯入是部分的。</p>
 <ul><li>會匯入：速度、拍號、每個 FLM 通道一條混音器插入軌、每條車道一條播放清單軌道、樣式（每次循環作為一個片段）、帶有位移和音高的音訊片段、鼓組、DW Sampler 取樣和 <code>.dwp</code> 程式與 Slicer（用 FLM 自己的引擎）、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw 樂器、FLM 的效果器（作為 Pocket 效果器），以及音量、聲像、靜音、獨奏、彎音、傳送和樂器參數的自動化，還有和弦組和調性鎖定。</li><li>不會匯入：FLM 的其他樂器，它們會改用內建合成器播放。</li><li>取樣會在 <code>.flm</code> 旁邊以及 FL Studio 的 FLM 資源副本中尋找。找不到的 <code>.dwp</code> 會用替身播放。</li></ul>
 <h2 id="good-to-know">須知</h2>
-<ul><li>FLEX 套件是加密的，絕不會被開啟。FLEX 通道會得到依預設集名稱挑選的合成器音色。</li><li>調變器不會出現在 <code>.flp</code> 匯出中，匯出報告會說明這一點。</li><li>匯入報告會列出哪些由內建合成器近似處理、哪些沒有對應物、哪些外掛找到了或沒有安裝、哪些效果器被略過或只重現了一部分，以及缺少多少取樣。</li><li>沒有安裝的第三方效果器，會由角色相同的 LYNX SHARE 效果器取代。原外掛仍保留在專案中。</li></ul>
+<ul><li>FLEX 套件是加密的，絕不會被開啟。FLEX 通道會得到依預設集名稱挑選的合成器音色。</li><li>匯出成 <code>.flp</code> 時，跟隨歌曲位置的調變器會變成自動化片段（同步的 LFO 會變成 FL Studio 的片段 LFO）。跟隨器、包絡、按鍵追蹤和力度會被略過，匯出報告會說明這一點。</li><li>匯入報告會列出哪些由內建合成器近似處理、哪些沒有對應物、哪些外掛找到了或沒有安裝、哪些效果器被略過或只重現了一部分，以及缺少多少取樣。</li><li>沒有安裝的第三方效果器，會由角色相同的 LYNX SHARE 效果器取代。原外掛仍保留在專案中。</li></ul>
 <h2 id="related">相關頁面</h2>
-<ul><li><a href="/wiki/built-in/">內建樂器與效果器</a></li><li><a href="/wiki/plugins/">第三方外掛</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/shortcuts/">快速鍵</a></li><li><a href="/why/#fl-settings">只有 LYNX SHARE 能用 FL 設定做到的事</a></li></ul>
+<ul><li><a href="/wiki/built-in/">內建樂器與效果器</a></li><li><a href="/wiki/plugins/">第三方外掛</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/shortcuts/">快速鍵</a></li><li><a href="/why/#fl-settings">只有 LYNX SHARE 能用 FL 設定做到的事</a></li><li><a href="/learn/">學習：教學</a></li></ul>

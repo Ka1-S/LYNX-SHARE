@@ -1,9 +1,15 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/Vocodex.h"
+#include "core/SytrusEngine.h"
+#include "core/Harmor.h"
+#include "core/TrackStates.h"
+#include "core/LynxVerbs.h"
 #include "core/PolyEdit.h"
 #include "core/Dropouts.h"
 #include "core/HostTimelineScope.h"
 #include "core/Rack.h"
+#include "core/SessionMixer.h"
 #include "core/MixerOps.h"
 #include "core/FlSettings.h"
 
@@ -64,6 +70,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <tuple>
 #include <mutex>
 #include <thread>
 
@@ -89,7 +96,7 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
            && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
            && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
            && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition
-           && a.mpe == b.mpe;
+           && a.mpe == b.mpe && a.dpiAware == b.dpiAware; // (FL: "DPI aware (requires reloading the plugin)", round 190oh)
 }
 
 // A hosted plugin's settings live in its running instance: the song only holds what was saved, and the instance is
@@ -941,6 +948,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                                                    const Factories& factories)
 {
     const auto& samples = factories.samples;
+    // round 190op (P4): deactivated channels and inserts are never built (the app's engine passes its projection
+    // already; the export plugin and the tools come through here). Nothing changes for a song without any.
+    if (deactivate::anyMarked (song))
+        deactivate::project (song, deactivate::effective (song));
 
     auto state = std::make_unique<RackState>();
     state->live = std::make_shared<LiveLevels> (song);
@@ -1187,6 +1198,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 && (kind != EffectKind::facetEq
                     || facet::resolution (previous->song.mixer[pt].effects[pi].params[(std::size_t) facet::resolutionParam])
                            == facet::resolution (slots[i].params[(std::size_t) facet::resolutionParam]))
+                // round 190nr: Atrium's dense late tank is allocated only for the slots that run it: a new instance when that differs
+                && (kind != EffectKind::atrium || verbs::atriumDense (previous->song.mixer[pt].effects[pi].params) == verbs::atriumDense (slots[i].params))
                 && (kind != EffectKind::plugin
                     || (previous->song.mixer[pt].effects[pi].plugin.id == slots[i].plugin.id && previous->sampleRate == sampleRate
                         && samePluginProcessing (previous->song.mixer[pt].effects[pi].plugin, slots[i].plugin) && ! rebuilds (factories, slots[i].plugin)
@@ -1603,34 +1616,62 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
     graphOk = true;
 }
 
+namespace
+{
+// Every unit's latency in the order of RackState::latencies (instruments, then each insert's slots); `take (value)`
+// returns false to stop early (round 190of: shared by currentLatencies and latenciesDiffer)
+template <typename Take>
+void eachLatency (const RackState& state, Take&& take)
+{
+    // a hosted plugin's latency set by hand in its wrapper settings (round 149) replaces what it reports
+    auto manual = [&state] (const PluginRef& ref, int reported) {
+        return ref.latencyOverrideMs >= 0.0f ? (int) std::lround (ref.latencyOverrideMs * 0.001 * state.sampleRate) : reported;
+    };
+    const auto& song = state.song;
+    for (std::size_t c = 0; c < state.instruments.size(); ++c)
+    {
+        const auto reported = state.instruments[c]->latencySamples();
+        if (! take (c < song.channels.size() && song.channels[c].instrument == InstrumentKind::plugin ? manual (song.channels[c].plugin, reported) : reported))
+            return;
+    }
+
+    for (std::size_t t = 0; t < state.effects.size(); ++t)
+        for (std::size_t s = 0; s < state.effects[t].size(); ++s)
+        {
+            if (lowlatency::bypassed (state.lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
+            {
+                if (! take (0))
+                    return;
+                continue;
+            }
+            const auto reported = state.effects[t][s]->latencySamples();
+            const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
+            if (! take (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported))
+                return;
+        }
+}
+} // namespace
+
 std::vector<int> RackState::currentLatencies() const
 {
     std::vector<int> out;
-
-    // a hosted plugin's latency set by hand in its wrapper settings (round 149) replaces what it reports
-    auto manual = [this] (const PluginRef& ref, int reported) {
-        return ref.latencyOverrideMs >= 0.0f ? (int) std::lround (ref.latencyOverrideMs * 0.001 * sampleRate) : reported;
-    };
-    for (std::size_t c = 0; c < instruments.size(); ++c)
-    {
-        const auto reported = instruments[c]->latencySamples();
-        out.push_back (c < song.channels.size() && song.channels[c].instrument == InstrumentKind::plugin ? manual (song.channels[c].plugin, reported) : reported);
-    }
-
-    for (std::size_t t = 0; t < effects.size(); ++t)
-        for (std::size_t s = 0; s < effects[t].size(); ++s)
-        {
-            if (lowlatency::bypassed (lowLatencySlots, (int) t, (int) s)) // (round 190aq: bypassed, nothing to compensate)
-            {
-                out.push_back (0);
-                continue;
-            }
-            const auto reported = effects[t][s]->latencySamples();
-            const auto* slot = t < song.mixer.size() && s < song.mixer[t].effects.size() ? &song.mixer[t].effects[s] : nullptr;
-            out.push_back (slot != nullptr && slot->kind == EffectKind::plugin ? manual (slot->plugin, reported) : reported);
-        }
-
+    eachLatency (*this, [&out] (int latency) {
+        out.push_back (latency);
+        return true;
+    });
     return out;
+}
+
+bool RackState::latenciesDiffer (const std::vector<int>& known) const
+{
+    std::size_t at = 0;
+    auto differ = false;
+    eachLatency (*this, [&] (int latency) {
+        differ = at >= known.size() || known[at] != latency;
+        ++at;
+        return ! differ;
+    });
+    return differ || at != known.size();
 }
 
 void RackState::buildPdc (const RackState* previous)
@@ -1789,6 +1830,24 @@ void RackState::buildPdc (const RackState* previous)
                 if (r.track == (int) t)
                     old = &r.delay;
         hwRoutes.push_back ({ (int) t, track.outputChannel, track.outputMode, line (length, old) });
+    }
+    // round 190nc (DL-110, Live's Cue mode): each cued track's output also to the Cue Out, lined up with Main (the routes
+    // exist only while the Cue Out is separate from the Main Out; channels the device lacks are dropped by the callback)
+    if (sessionmixer::cueActive (song, HardwareOutput::maxChannels))
+    {
+        const auto& cue = sessionmixer::cueOf (song);
+        for (std::size_t t = 1; t < song.mixer.size() && t < (std::size_t) maxMixerTracks; ++t)
+        {
+            if (! song.mixer[t].cue)
+                continue;
+            const auto length = t < pdc.outLat.size() ? std::max (0, pdc.total - pdc.outLat[t]) : 0;
+            const std::shared_ptr<DelayLine>* old = nullptr;
+            if (previous != nullptr)
+                for (const auto& r : previous->hwRoutes)
+                    if (r.track == (int) t && r.cue)
+                        old = &r.delay;
+            hwRoutes.push_back ({ (int) t, cue.out, cue.outMode, line (length, old), true });
+        }
     }
 
     bypassWhenIdle.assign (song.mixer.size(), 0);
@@ -1964,6 +2023,63 @@ void RackState::buildMidiRoutes()
     }
 }
 
+// round 190ow (details DE-123, core/RackAutomation.h): FL's triggered automation clips. A step / note on an automation
+// clip row starts the clip from its beginning and plays it while the note is held (FL's manual: "Triggering"); the clip
+// then holds the value it reached. In Song mode each pattern clip of the Playlist plays its pattern's steps / notes
+// where its notes play (the clip's offset and its passes when it loops); a note the clip's end cuts plays on to its own
+// end, as FL does (round 190ow's FL /R probes p13_cut, p15_cutnote).
+static std::int64_t triggerLength (const Automation& a, const Note& n) noexcept
+{
+    return n.length > 0 ? n.length : a.length(); // (FL's step of no length: the clip once, to its last point)
+}
+
+void RackState::buildTriggerClips (int count)
+{
+    triggerClips.clear();
+    triggered.clear();
+    patternTriggers = false;
+    for (const auto& p : song.patterns)
+        patternTriggers = patternTriggers || ! p.autoNotes.empty();
+    if (! patternTriggers)
+        return;
+    triggerClips.assign ((std::size_t) count, {});
+    triggered.assign ((std::size_t) count, 0);
+    for (const auto& p : song.patterns)
+        for (const auto& n : p.autoNotes)
+            if (n.channel >= 0 && n.channel < count && ! n.muted)
+                triggered[(std::size_t) n.channel] = 1;
+    const auto meter = song.meter();
+    const auto zoneEnd = song.performanceZoneEnd();
+    for (const auto& c : song.playlist)
+    {
+        if (c.kind != ClipKind::pattern || c.pattern < 0 || c.pattern >= (int) song.patterns.size() || c.length <= 0 || c.muted
+            || song.isTrackMuted (c.track) || c.start < zoneEnd)
+            continue;
+        const auto& pattern = song.patterns[(std::size_t) c.pattern];
+        if (pattern.autoNotes.empty())
+            continue;
+        const auto passes = clipPasses (c, pattern.effectiveLength (meter));
+        for (auto k = passes.first; k <= passes.last; ++k)
+            for (const auto& n : pattern.autoNotes)
+            {
+                if (n.muted || n.channel < 0 || n.channel >= count || (passes.loops && n.start >= passes.length))
+                    continue;
+                const auto at = c.start - c.offset + (passes.loops ? k * passes.length : 0) + n.start;
+                if (at < c.start || at >= c.end())
+                    continue;
+                Clip t;
+                t.kind = ClipKind::automation;
+                t.automation = n.channel;
+                t.start = at;
+                // (not cut at the pattern clip's end: FL plays the note on, FL 2026 /R probes p13_cut / p15_cutnote)
+                t.length = std::max<std::int64_t> (1, triggerLength (song.automations[(std::size_t) n.channel], n));
+                triggerClips[(std::size_t) n.channel].push_back (t);
+            }
+    }
+    for (auto& clips : triggerClips)
+        std::stable_sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+}
+
 void RackState::buildAutomationTables()
 {
     const auto& automations = song.automations;
@@ -1990,6 +2106,18 @@ void RackState::buildAutomationTables()
         std::sort (clips.begin(), clips.end(),
                    [this] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
 
+    // round 190ow (DE-123): the clips the automation clip rows' steps / notes start, and FL's mute light of a clip
+    buildTriggerClips (count);
+    for (int a = 0; a < count; ++a)
+        if (automations[(std::size_t) a].muted)
+        {
+            automationClips[(std::size_t) a].clear();
+            if ((std::size_t) a < triggerClips.size())
+                triggerClips[(std::size_t) a].clear();
+            if ((std::size_t) a < triggered.size())
+                triggered[(std::size_t) a] = 0;
+        }
+
     // round 177b: the lanes of unmuted tracks; a lane automation's own clips (if any) don't play as clips
     laneAutomations.clear();
     for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
@@ -1998,6 +2126,8 @@ void RackState::buildAutomationTables()
                 && ! automations[(std::size_t) lane.automation].points.empty())
             {
                 automationClips[(std::size_t) lane.automation].clear();
+                if ((std::size_t) lane.automation < triggerClips.size()) // (round 190ow)
+                    triggerClips[(std::size_t) lane.automation].clear(), triggered[(std::size_t) lane.automation] = 0;
                 laneAutomations.push_back ({ lane.automation, {} });
             }
     for (auto& lane : laneAutomations)
@@ -2030,6 +2160,9 @@ void RackState::buildAutomationTables()
 
     pluginParams.clear();
     routeAutos.clear();
+    modFeeds.assign (song.modulators.size(), {}); // (round 190ox: before the binds, which note a Macro's automation)
+    followedTracks.clear();
+    modStateful = false;
     hasAutomation = false;
     tempoAutomation = -1;
     crossfaderAutomation = -1;
@@ -2076,6 +2209,11 @@ void RackState::buildAutomationTables()
                                       && t.param < samplerparam::count)
                                   // the knobs of an FL engine kept in the channel's state (round 168n)
                                   || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
+                                  // Sytrus' main page (round 190pi: master level / LFO / pitch, Mod X / Y)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::sytrus && sytrus::automatable (t.param))
+                                  // Harmor's filter frequencies and Mod X / Y / Z (round 190pr; engine revision 3 on)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::harmor
+                                      && song.channels[(std::size_t) t.index].engineRev >= 3 && harmor::automatable (t.param))
                                   // LYNX Synth's knobs (issue #152, round 190he)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
                                   // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)
@@ -2122,6 +2260,12 @@ void RackState::buildAutomationTables()
 
             case AutomationTargetKind::tempo: tempoAutomation = a; break;
             case AutomationTargetKind::crossfader: crossfaderAutomation = a; break; // (round 190kc)
+            case AutomationTargetKind::modulatorMacro: // (round 190ox: a Macro modulator's knob, read by updateModulators)
+                if (t.index >= 0 && t.index < (int) modFeeds.size() && song.modulators[(std::size_t) t.index].kind == ModKind::macro)
+                    modFeeds[(std::size_t) t.index].macroSlot = a;
+                else
+                    used = false;
+                break;
             case AutomationTargetKind::vcaLevel:
                 if (t.index >= 0 && t.index < (int) song.vcas.size())
                     vcaLevelAuto[(std::size_t) t.index] = a;
@@ -2153,7 +2297,7 @@ void RackState::buildAutomationTables()
     automationFollowers.assign ((std::size_t) count, 0);
     const auto playsClips = [&] (int a) {
         const auto& automation = automations[(std::size_t) a];
-        return ! automationClips[(std::size_t) a].empty() && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
+        return driven (a) && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
                && automation.target.kind != AutomationTargetKind::none && automation.links.empty(); // (190gw: links bind below)
     };
     for (int a = count - 1; a > 0; --a)
@@ -2171,6 +2315,22 @@ void RackState::buildAutomationTables()
             group.push_back (a);
     }
 
+    // round 190ow: where a triggered automation's value goes (Pattern mode writes it there; Song mode scans the group)
+    triggerSlot.assign ((std::size_t) count, -1);
+    if (! triggerClips.empty() || patternTriggers)
+        for (int a = 0; a < count; ++a)
+        {
+            triggerSlot[(std::size_t) a] = a;
+            if (automationFollowers[(std::size_t) a] != 0)
+                for (int holder = a + 1; holder < count; ++holder)
+                    if (std::find (automationGroups[(std::size_t) holder].begin(), automationGroups[(std::size_t) holder].end(), a)
+                        != automationGroups[(std::size_t) holder].end())
+                    {
+                        triggerSlot[(std::size_t) a] = holder;
+                        break;
+                    }
+        }
+
     // a lane takes the value of its peers' group: a follower computes none, the automation that holds the slot does
     for (auto& lane : laneAutomations)
         for (auto& peer : lane.clipPeers)
@@ -2182,11 +2342,44 @@ void RackState::buildAutomationTables()
                         lane.clipSlots.push_back ({ peer, a });
                         break;
                     }
+    // round 190ov: the targets of target links (FL's clips linked to several controls), each with every clip that drives
+    // it — the links on it and the automations of that one target. A target with more than one plays as one slot (below);
+    // those automations of one target bind nothing themselves.
+    struct SharedTarget
+    {
+        AutomationTarget target;
+        std::vector<std::pair<int, int>> members; // (automation, link; −1 = the automation's own target)
+    };
+    std::vector<SharedTarget> linkTargets;
+    for (int a = 0; a < count; ++a)
+        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
+            for (int l = 0; l < (int) automation.links.size(); ++l)
+            {
+                const auto& t = automation.links[(std::size_t) l].target;
+                auto it = std::find_if (linkTargets.begin(), linkTargets.end(), [&t] (const SharedTarget& s) { return s.target == t; });
+                if (it == linkTargets.end())
+                    it = linkTargets.insert (linkTargets.end(), SharedTarget { t, {} });
+                it->members.push_back ({ a, l });
+            }
+    for (auto& shared : linkTargets)
+    {
+        if (shared.target.kind == AutomationTargetKind::none)
+            continue;
+        for (int b = 0; b < count; ++b)
+            if (playsClips (b) && automations[(std::size_t) b].target == shared.target)
+            {
+                shared.members.push_back ({ b, -1 });
+                automationFollowers[(std::size_t) b] = 1;
+                automationGroups[(std::size_t) b].clear();
+            }
+        std::sort (shared.members.begin(), shared.members.end()); // (ascending: the lowest automation keeps a tie)
+    }
+
     // otherwise the last automation of the same target wins (a live controller link, Performance mode clips)
     for (int a = 0; a < count; ++a)
     {
         if (automationFollowers[(std::size_t) a] != 0
-            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
+            || (! driven (a) && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
             || ! automations[(std::size_t) a].links.empty()) // (round 190gw: through its link slots, below)
             continue;
 
@@ -2223,21 +2416,65 @@ void RackState::buildAutomationTables()
             if (lane.events.empty() || lane.target.kind == AutomationTargetKind::tempo || slot >= maxAutomations)
                 continue;
 
-            eventLanes.push_back ({ p, l, slot });
+            eventLanes.push_back ({ p, l, slot, -1 });
             bind (slot++, lane.target);
         }
+    // round 190om: lanes of several patterns on one target (the last one is bound to it): grouped, the bound slot first
+    sharedLanes.clear();
+    {
+        std::map<std::tuple<int, int, int, int>, std::vector<int>> byTarget;
+        for (int i = (int) eventLanes.size() - 1; i >= 0; --i)
+        {
+            const auto& t = song.patterns[(std::size_t) eventLanes[(std::size_t) i].pattern].events[(std::size_t) eventLanes[(std::size_t) i].lane].target;
+            byTarget[{ (int) t.kind, t.index, t.slot, t.param }].push_back (i);
+        }
+        for (auto& [target, group] : byTarget)
+        {
+            if (group.size() < 2)
+                continue;
+            for (const auto k : group)
+                eventLanes[(std::size_t) k].shared = eventLanes[(std::size_t) group.front()].slot;
+            sharedLanes.push_back (std::move (group));
+        }
+    }
 
-    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each
+    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each;
+    // round 190ov: one per target, shared with the other clips that drive it (linkTargets above)
     linkSlots.clear();
-    for (int a = 0; a < count; ++a)
-        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
-            for (const auto& link : automation.links)
+    for (const auto& shared : linkTargets)
+    {
+        if (slot >= maxAutomations)
+            break;
+        const auto& [first, firstLink] = shared.members.front();
+        LinkSlot made;
+        made.slot = slot;
+        if (shared.members.size() == 1)
+        {
+            const auto& link = automations[(std::size_t) first].links[(std::size_t) firstLink];
+            made.automation = first;
+            made.formula = linkformula::Formula::compile (link.formula);
+            made.scale = link.scale;
+        }
+        else
+        {
+            made.automation = -1;
+            for (const auto& [a, l] : shared.members)
             {
-                if (slot >= maxAutomations)
-                    break;
-                linkSlots.push_back ({ a, slot, linkformula::Formula::compile (link.formula) });
-                bind (slot++, link.target);
+                LinkMember member;
+                member.automation = a;
+                member.link = l;
+                if (l >= 0)
+                {
+                    const auto& link = automations[(std::size_t) a].links[(std::size_t) l];
+                    member.formula = linkformula::Formula::compile (link.formula);
+                    member.scale = link.scale;
+                }
+                made.members.push_back (std::move (member));
             }
+        }
+        linkSlots.push_back (std::move (made));
+        bind (slot++, shared.target);
+    }
 
     // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
     modRoutes.clear();
@@ -2275,19 +2512,89 @@ void RackState::buildAutomationTables()
             }
             case AutomationTargetKind::tempo:
             case AutomationTargetKind::crossfader:
+            case AutomationTargetKind::modulatorMacro:
             case AutomationTargetKind::none: break;
         }
         return -1;
+    };
+    // round 190ox: a hosted plugin's parameter is bound in pluginParams (an effect slot's too)
+    const auto hostedSlot = [this] (const AutomationTarget& t) {
+        auto found = -1;
+        for (const auto& p : pluginParams)
+            if (t.kind == AutomationTargetKind::channelParam ? (p.channel == t.index && p.param == t.param)
+                                                             : (p.channel < 0 && p.track == t.index && p.slot == t.slot && p.param == t.param))
+                found = p.automation;
+        return found;
     };
     for (int m = 0; m < (int) song.modulators.size(); ++m)
         for (const auto& route : song.modulators[(std::size_t) m].routes)
         {
             if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
                 continue;
-            const auto source = boundSlot (route.target);
-            modRoutes.push_back ({ slot, source, std::clamp (song.modulationBase (route.target), 0.0f, 1.0f), m, route.depth });
+            const auto hosted = Modulator::isHostedTarget (song, route.target);
+            const auto source = hosted ? hostedSlot (route.target) : boundSlot (route.target);
+            if (hosted)
+            {
+                if (source < 0 && route.base < 0.0f)
+                    continue; // (no base known: the plugin keeps its own value)
+                // the modulated value is the one the plugin gets: the automation's own binding sends nothing any more
+                // (its slot still computes the base), so the two never take turns within a block
+                const auto& t = route.target;
+                pluginParams.erase (std::remove_if (pluginParams.begin(), pluginParams.end(),
+                                                    [&t] (const PluginParamBinding& p) {
+                                                        return t.kind == AutomationTargetKind::channelParam
+                                                                   ? (p.channel == t.index && p.param == t.param)
+                                                                   : (p.channel < 0 && p.track == t.index && p.slot == t.slot && p.param == t.param);
+                                                    }),
+                                    pluginParams.end());
+            }
+            const auto base = hosted ? std::clamp (route.base, 0.0f, 1.0f) : std::clamp (song.modulationBase (route.target), 0.0f, 1.0f);
+            modRoutes.push_back ({ slot, source, base, m, route.depth, hosted });
             bind (slot++, route.target);
         }
+    // round 190ox: what feeds each routed modulator (resolved here, so the audio thread only reads)
+    for (const auto& r : modRoutes)
+    {
+        const auto& mod = song.modulators[(std::size_t) r.modulator];
+        auto& feed = modFeeds[(std::size_t) r.modulator];
+        const auto hostChannel = mod.host.kind == AutomationTargetKind::channelVolume && mod.host.index >= 0 && mod.host.index < (int) song.channels.size()
+                                     ? mod.host.index : -1;
+        switch (mod.kind)
+        {
+            case ModKind::follower:
+            {
+                auto t = -1;
+                if (mod.input.kind == AutomationTargetKind::mixerVolume)
+                    t = mod.input.index;
+                else if (mod.host.kind == AutomationTargetKind::mixerVolume)
+                    t = mod.host.index;
+                else if (hostChannel >= 0)
+                    t = song.channels[(std::size_t) hostChannel].mixerTrack;
+                if (t >= 0 && t < (int) song.mixer.size() && t < maxMixerTracks)
+                {
+                    feed.track = t;
+                    if (followedTracks.size() < song.mixer.size())
+                        followedTracks.assign (song.mixer.size(), 0);
+                    followedTracks[(std::size_t) t] = 1;
+                }
+                modStateful = true;
+                break;
+            }
+            case ModKind::envelope:
+            case ModKind::keytrack:
+            case ModKind::velocity:
+            {
+                const auto c = mod.input.kind == AutomationTargetKind::channelVolume ? mod.input.index : hostChannel;
+                feed.channel = c >= 0 && c < (int) song.channels.size() ? c : -1;
+                modStateful = true;
+                break;
+            }
+            case ModKind::lfo:
+            case ModKind::steps:
+            case ModKind::random:
+            case ModKind::macro: break;
+        }
+    }
 
     // the tempo can move while playing: tempo automation or FL's pattern Tempo events (issue #86)
     tempoMap = tempoAutomation >= 0 || tempomap::hasTempoEvents (song);
@@ -2751,6 +3058,8 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     heldScratch.assign ((std::size_t) maxChannels, {});
     polyLayers.assign ((std::size_t) maxChannels, {});
     polyScratch.assign ((std::size_t) maxChannels, {});
+    noteProps.assign ((std::size_t) maxChannels * 128, {}); // (issue #236)
+    propSlides.assign ((std::size_t) maxChannels, {});
 
     if (lastState != nullptr)
     {
@@ -2871,6 +3180,51 @@ namespace
 // of the target play, the one that started last (same start: the lowest automation); between clips, the end of the clip
 // that ended last, whichever automation it belongs to; before the first clip, NaN: the control's own value. Depends only
 // on position, so playing from any point (or exporting) gives the same result.
+// round 190ov: a link's value through its scale (Automation::Link::scaled)
+float linkScaled (const std::vector<float>& scale, float v) noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (scale.size() < 2)
+        return v;
+    const auto x = v * (float) (scale.size() - 1);
+    const auto i = std::min ((std::size_t) x, scale.size() - 2);
+    const auto f = x - (float) i;
+    return std::clamp (scale[i] + (scale[i + 1] - scale[i]) * f, 0.0f, 1.0f);
+}
+
+// round 190ov: the value of a target several clips drive (RackState::LinkSlot::members), as automationValueAt picks the
+// clip of a group, then through that clip's link (1:1 for an automation of that one target)
+float linkGroupValueAt (const RackState& state, const RackState::LinkSlot& link, double tick) noexcept
+{
+    const auto& song = state.song;
+    const Clip* playing = nullptr;
+    const Clip* ended = nullptr;
+    const RackState::LinkMember* playingMember = nullptr;
+    const RackState::LinkMember* endedMember = nullptr;
+    for (const auto& member : link.members)
+        for (const auto i : state.automationClips[(std::size_t) member.automation]) // sorted by start
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            if (tick < (double) c.start)
+                break;
+            if (tick < (double) c.end())
+            {
+                if (playing == nullptr || c.start > playing->start)
+                    playing = &c, playingMember = &member;
+            }
+            else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+                ended = &c, endedMember = &member;
+        }
+    const auto through = [] (const RackState::LinkMember& m, float v) noexcept {
+        return m.link < 0 ? v : linkScaled (m.scale, m.formula.map (v));
+    };
+    if (playing != nullptr)
+        return through (*playingMember, song.automations[(std::size_t) playingMember->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick));
+    if (ended != nullptr)
+        return through (*endedMember, song.automations[(std::size_t) endedMember->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end()));
+    return std::numeric_limits<float>::quiet_NaN();
+}
+
 float automationValueAt (const RackState& state, int slot, double tick) noexcept
 {
     const auto& song = state.song;
@@ -2879,20 +3233,31 @@ float automationValueAt (const RackState& state, int slot, double tick) noexcept
     const Clip* ended = nullptr;
     int playingAutomation = -1, endedAutomation = -1;
 
+    const auto visit = [&] (const Clip& c, int a) {
+        if (tick < (double) c.end())
+        {
+            if (playing == nullptr || c.start > playing->start)
+                playing = &c, playingAutomation = a;
+        }
+        else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
+            ended = &c, endedAutomation = a;
+    };
     const auto scan = [&] (int a) {
         for (const auto i : state.automationClips[(std::size_t) a]) // sorted by start
         {
             const auto& c = song.playlist[(std::size_t) i];
             if (tick < (double) c.start)
                 break;
-            if (tick < (double) c.end())
-            {
-                if (playing == nullptr || c.start > playing->start)
-                    playing = &c, playingAutomation = a;
-            }
-            else if (ended == nullptr || c.end() > ended->end() || (c.end() == ended->end() && c.start > ended->start))
-                ended = &c, endedAutomation = a;
+            visit (c, a);
         }
+        // round 190ow (DE-123): the clips its steps / notes start play by the same rule (the one started last wins)
+        if ((std::size_t) a < state.triggerClips.size())
+            for (const auto& c : state.triggerClips[(std::size_t) a]) // sorted by start
+            {
+                if (tick < (double) c.start)
+                    break;
+                visit (c, a);
+            }
     };
 
     if (group.empty())
@@ -3002,7 +3367,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
                 for (const auto& lane : state.eventLanes)
                     if (lane.pattern == current)
-                        automationValues[(std::size_t) lane.slot] = pattern.events[(std::size_t) lane.lane].valueAt (t);
+                        automationValues[(std::size_t) (lane.shared >= 0 ? lane.shared : lane.slot)] = pattern.events[(std::size_t) lane.lane].valueAt (t);
             }
         }
         else
@@ -3012,10 +3377,11 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
             // inside a clip of the pattern: its events; after one: the value it ended with; before the first:
             // no value (the target's own). Depends only on the position, like automation clips.
-            for (const auto& lane : state.eventLanes)
-            {
+            // (the lane's value and the start of its pattern's clip that gave it; −∞ before the first)
+            const auto laneValue = [&] (const RackState::EventLane& lane, double& from) noexcept {
                 const auto& events = song.patterns[(std::size_t) lane.pattern].events[(std::size_t) lane.lane];
                 auto value = std::numeric_limits<float>::quiet_NaN();
+                from = -std::numeric_limits<double>::infinity();
 
                 for (auto i : state.patternClips[(std::size_t) lane.pattern]) // sorted by start
                 {
@@ -3027,9 +3393,29 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     // a stretched clip loops its pattern (LYNX extra stretchedClipsLoop, issue #25), its events too
                     const auto period = (std::size_t) lane.pattern < state.schedule.patternLength.size() ? state.schedule.patternLength[(std::size_t) lane.pattern] : 0;
                     value = events.valueAt (patternTickInClip (c, tick < (double) c.end() ? tick : (double) c.end() - 1.0, period));
+                    from = (double) c.start;
                 }
-
-                automationValues[(std::size_t) lane.slot] = value;
+                return value;
+            };
+            for (const auto& lane : state.eventLanes)
+                if (lane.shared < 0)
+                {
+                    double from = 0.0;
+                    automationValues[(std::size_t) lane.slot] = laneValue (lane, from);
+                }
+            // round 190om: a target several patterns' lanes drive takes the value of the pattern whose clip started last
+            for (const auto& group : state.sharedLanes)
+            {
+                auto best = -std::numeric_limits<double>::infinity();
+                auto value = std::numeric_limits<float>::quiet_NaN();
+                for (const auto k : group) // (the bound lane first: it wins a tie, as it did alone)
+                {
+                    double from = 0.0;
+                    const auto v = laneValue (state.eventLanes[(std::size_t) k], from);
+                    if (from > best)
+                        best = from, value = v;
+                }
+                automationValues[(std::size_t) state.eventLanes[(std::size_t) group.front()].shared] = value;
             }
 
             // round 190mx (GitHub #198, Live's clip envelopes): a pattern clip the clip grid plays drives its pattern's
@@ -3054,7 +3440,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                     const auto local = (double) c.offset + at;
                     for (const auto& lane : state.eventLanes)
                         if (lane.pattern == c.pattern)
-                            automationValues[(std::size_t) lane.slot] = song.patterns[(std::size_t) c.pattern].events[(std::size_t) lane.lane].valueAt (local);
+                            automationValues[(std::size_t) (lane.shared >= 0 ? lane.shared : lane.slot)] = song.patterns[(std::size_t) c.pattern].events[(std::size_t) lane.lane].valueAt (local);
                 }
             }
         }
@@ -3063,8 +3449,16 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     // in pattern mode the Playlist does not play: values stay as they were
     if (song.mode != PlayMode::song)
     {
+        // round 190ow (DE-123): except the automation clips the current pattern's steps / notes start (FL plays them in
+        // Pattern mode as in Song mode)
+        const auto triggered = state.patternTriggers && updatePatternTriggers (state, startTick);
         compensateTick = -1.0;
         clearOverriddenValues();
+        if (triggered)
+        {
+            applyOrDeferParams (state, 0, true);
+            return;
+        }
         // only the plugin parameters driven by pattern events and by live controllers (links: FL's work in any mode,
         // round 165)
         if (! state.eventLanes.empty() || ! state.liveAutomations.empty())
@@ -3076,13 +3470,19 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     const auto tick = linearSongTick (liveInput, startTick, length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
-        if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
+        if (state.positional ((int) a) && state.automationFollowers[a] == 0) // (round 190ow: triggered clips too)
             automationValues[a] = automationValueAt (state, (int) a, tick);
-    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values)
+    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values);
+    // round 190ov: then their scales, and a target several clips drive takes the one that plays
     for (const auto& link : state.linkSlots)
     {
+        if (! link.members.empty())
+        {
+            automationValues[(std::size_t) link.slot] = linkGroupValueAt (state, link, tick);
+            continue;
+        }
         const auto v = automationValues[(std::size_t) link.automation];
-        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : link.formula.map (v);
+        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : linkScaled (link.scale, link.formula.map (v));
     }
 
     // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays
@@ -3125,6 +3525,61 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
 
 // Round 190kz: in a batched block's serial part (processBatched) the bindings are applied later, by each unit for its
 // piece; elsewhere now, as before
+// Round 190ow (DE-123): Pattern mode plays the current pattern in a loop, and its steps / notes on the automation clip rows
+// start their clips as in Song mode: at position t of the pass, the note started last at or before t (else the last one
+// of the pass before, from the second pass on) plays its clip from its start; before the first one the target keeps its
+// own value. False when the current pattern has none (the values stay as they were).
+bool RackRenderer::updatePatternTriggers (const RackState& state, double startTick) noexcept
+{
+    const auto& song = state.song;
+    const auto current = song.currentPattern;
+    if (current < 0 || current >= (int) song.patterns.size() || song.patterns[(std::size_t) current].autoNotes.empty())
+        return false;
+    const auto& pattern = song.patterns[(std::size_t) current];
+    const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
+    const auto position = std::max (0.0, startTick);
+    const auto t = std::fmod (position, length);
+    const auto count = std::min<int> ((int) song.automations.size(), RackState::maxAutomations);
+    bool any = false;
+    for (int a = 0; a < count; ++a)
+    {
+        const auto slot = (std::size_t) a < state.triggerSlot.size() ? state.triggerSlot[(std::size_t) a] : -1;
+        const auto& automation = song.automations[(std::size_t) a];
+        if (slot < 0 || automation.muted)
+            continue;
+        const Note* last = nullptr;     // started last at or before t
+        const Note* previous = nullptr; // the pass's last one (for the start of the next pass)
+        for (const auto& n : pattern.autoNotes)
+        {
+            if (n.channel != a || n.muted)
+                continue;
+            if ((double) n.start <= t)
+                last = &n;
+            previous = &n;
+        }
+        if (last == nullptr && previous == nullptr)
+            continue;
+        any = true;
+        double since = 0.0;
+        const Note* playing = last;
+        if (playing != nullptr)
+            since = t - (double) playing->start;
+        else if (position >= length) // (the first pass has nothing before its first note)
+        {
+            playing = previous;
+            since = t + length - (double) playing->start;
+        }
+        if (playing == nullptr)
+        {
+            automationValues[(std::size_t) slot] = std::numeric_limits<float>::quiet_NaN();
+            continue;
+        }
+        const auto held = (double) std::max<std::int64_t> (1, triggerLength (automation, *playing));
+        automationValues[(std::size_t) slot] = automation.playAt (std::min (since, held), position);
+    }
+    return any;
+}
+
 void RackRenderer::applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept
 {
     if (! deferParams)
@@ -3142,15 +3597,123 @@ void RackRenderer::updateModulators (const RackState& state, double tick, int nu
 {
     const auto& song = state.song;
     const auto beats = std::max (0.0, tick) / (double) ppq;
+    const auto seconds = sampleRate > 0.0 ? numSamples / sampleRate : 0.0;
+
+    // round 190ox: the stateful sources move once per chunk (control rate), each modulator once however many targets
+    // it drives; a source with jumps (steps, random, macro, the last note) is smoothed over ~5 ms so nothing clicks
+    if (state.modStateful)
+    {
+        int last = -1;
+        for (const auto& r : state.modRoutes)
+        {
+            if (r.modulator == last || r.modulator < 0 || r.modulator >= (int) song.modulators.size() || r.modulator >= maxStatefulModulators)
+                continue;
+            last = r.modulator;
+            const auto& m = song.modulators[(std::size_t) r.modulator];
+            const auto& feed = state.modFeeds[(std::size_t) r.modulator];
+            auto& st = modStates[(std::size_t) r.modulator];
+            switch (m.kind)
+            {
+                case ModKind::follower:
+                    modenv::follow (m, st, feed.track >= 0 ? followPeak[(std::size_t) feed.track] : 0.0f, seconds);
+                    break;
+                case ModKind::envelope:
+                {
+                    const auto c = feed.channel;
+                    const auto struck = c >= 0 && c < maxChannels ? notesStruck[(std::size_t) c] : st.notesSeen;
+                    auto gate = false;
+                    if (c >= 0 && c < maxChannels)
+                        for (const auto word : heldNotes[(std::size_t) c])
+                            gate = gate || word != 0;
+                    const auto trigger = st.primed && struck != st.notesSeen;
+                    st.notesSeen = struck;
+                    st.primed = true;
+                    modenv::envelope (m, st, gate || trigger, trigger, seconds);
+                    break;
+                }
+                case ModKind::keytrack:
+                case ModKind::velocity:
+                    if (feed.channel >= 0 && feed.channel < maxChannels && notesStruck[(std::size_t) feed.channel] != 0)
+                    {
+                        st.lastKey = (float) lastNoteKey[(std::size_t) feed.channel];
+                        st.lastVelocity = lastNoteVelocity[(std::size_t) feed.channel];
+                    }
+                    break;
+                case ModKind::lfo:
+                case ModKind::steps:
+                case ModKind::random:
+                case ModKind::macro: break;
+            }
+        }
+    }
+
+    int lastMod = -1;
+    float value = 0.0f;
     for (const auto& r : state.modRoutes)
     {
         if (r.modulator < 0 || r.modulator >= (int) song.modulators.size())
             continue;
         const auto& m = song.modulators[(std::size_t) r.modulator];
-        const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+        if (r.modulator != lastMod) // (a modulator's routes are next to each other: its output once)
+        {
+            lastMod = r.modulator;
+            const auto cycles = m.sync ? beats / std::max (1.0e-3, m.beats) : modSeconds * std::max (0.0, m.hz);
+            if (m.kind == ModKind::lfo)
+                value = m.output (cycles); // (stage 1's modulators exactly as before)
+            else
+            {
+                auto* st = r.modulator < maxStatefulModulators ? &modStates[(std::size_t) r.modulator] : nullptr;
+                auto y = 0.0f;
+                auto smoothed = false;
+                switch (m.kind)
+                {
+                    case ModKind::steps:
+                    case ModKind::random: y = m.stepOutput (cycles); smoothed = m.kind == ModKind::random ? m.smooth <= 0.0f : m.glide <= 0.0f; break;
+                    case ModKind::macro:
+                    {
+                        const auto slot = (std::size_t) r.modulator < state.modFeeds.size() ? state.modFeeds[(std::size_t) r.modulator].macroSlot : -1;
+                        const auto automated = slot >= 0 ? automationValues[(std::size_t) slot] : std::numeric_limits<float>::quiet_NaN();
+                        const auto v = std::isnan (automated) ? m.macro : automated;
+                        y = m.unipolar ? v : v * 2.0f - 1.0f;
+                        smoothed = true;
+                        break;
+                    }
+                    case ModKind::follower:
+                    case ModKind::envelope:
+                    {
+                        const auto level = st != nullptr ? st->level : 0.0f; // 0..1
+                        y = m.unipolar ? level : level * 2.0f - 1.0f;
+                        break;
+                    }
+                    case ModKind::keytrack:
+                        y = st != nullptr ? std::clamp ((st->lastKey - 60.0f) / 60.0f, -1.0f, 1.0f) : 0.0f; // (C5 = 0, ±5 octaves)
+                        if (m.unipolar)
+                            y = (y + 1.0f) * 0.5f;
+                        smoothed = true;
+                        break;
+                    case ModKind::velocity:
+                    {
+                        const auto v = st != nullptr ? std::clamp (st->lastVelocity, 0.0f, 1.0f) : 0.0f;
+                        y = m.unipolar ? v : v * 2.0f - 1.0f;
+                        smoothed = true;
+                        break;
+                    }
+                    case ModKind::lfo: break;
+                }
+                if (smoothed && st != nullptr)
+                {
+                    constexpr double tauMs = 5.0;
+                    const auto a = (float) (1.0 - std::exp (-seconds * 1000.0 / tauMs));
+                    st->smoothed = std::isnan (st->smoothed) || ! st->primedSmooth ? y : st->smoothed + (y - st->smoothed) * a;
+                    st->primedSmooth = true;
+                    y = st->smoothed;
+                }
+                value = y;
+            }
+        }
         const auto source = r.source >= 0 ? automationValues[(std::size_t) r.source] : std::numeric_limits<float>::quiet_NaN();
         const auto base = std::isnan (source) ? r.base : source;
-        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * m.output (cycles), 0.0f, 1.0f);
+        automationValues[(std::size_t) r.slot] = std::clamp (base + r.depth * value, 0.0f, 1.0f);
     }
     if (sampleRate > 0.0)
         modSeconds += numSamples / sampleRate;
@@ -3160,7 +3723,7 @@ float RackRenderer::compensatedAutomation (const RackState& state, int automatio
 {
     if (compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0 || std::isnan (current)
         || (std::size_t) track >= state.pdc.slotInput.size() || (std::size_t) slot >= state.pdc.slotInput[(std::size_t) track].size()
-        || (std::size_t) automation >= state.automationClips.size() || state.automationClips[(std::size_t) automation].empty()
+        || ! state.positional (automation)
         || automation >= RackState::maxAutomations || std::isnan (automationValues[(std::size_t) automation]))
         return current;
     const auto lag = state.pdc.slotInput[(std::size_t) track][(std::size_t) slot];
@@ -3174,8 +3737,7 @@ float RackRenderer::automatedLevel (const RackState& state, int automation, floa
 {
     const auto current = automated (automation, base);
     if (! state.song.compensateMixerLevels || compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0
-        || automation >= RackState::maxAutomations || (std::size_t) automation >= state.automationClips.size()
-        || state.automationClips[(std::size_t) automation].empty() || std::isnan (automationValues[(std::size_t) automation])
+        || automation >= RackState::maxAutomations || ! state.positional (automation) || std::isnan (automationValues[(std::size_t) automation])
         || (std::size_t) track >= state.pdc.levelLag.size())
         return current;
     const auto lag = state.pdc.levelLag[(std::size_t) track];
@@ -3259,8 +3821,7 @@ void RackRenderer::queueTimedPluginParams (const RackState& state, double startT
         if (a < 0 || a >= RackState::maxAutomations || midictl::isMidiParam (b.param) || std::isnan (automationValues[(std::size_t) a]))
             continue;
         // the sources whose value follows the song position: an automation clip, or a lane without clips over it
-        const auto clip = (std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty()
-                          && state.automationFollowers[(std::size_t) a] == 0;
+        const auto clip = state.positional (a) && state.automationFollowers[(std::size_t) a] == 0;
         const RackState::LanePlay* lane = nullptr;
         if (! clip)
             for (const auto& l : state.laneAutomations)
@@ -3467,10 +4028,84 @@ bool RackRenderer::stepsSlides (InstrumentKind k) noexcept
     }
 }
 
+// Issue #236 (round 190od, Song::slideNoteProps): FL's slide note moves every sounding note of its channel toward its own
+// velocity, pan and Mod X / Y (FL manual: "During slides all note properties move toward those set in the slide note";
+// FL 2026's renders, docs/analise/REA_rodada190od.md): from where each note is now to the slide note's values in n + 1
+// equal steps, one per FL tick, the first a sample after the slide's start and the last at its end — the law round
+// 190hg measured for the pitch. The voices take the steps as voice properties (Instrument::voiceProperty); an engine
+// without them keeps its level, as before.
+void RackRenderer::startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw, const NoteMask* only) noexcept
+{
+    if ((std::size_t) channel >= propSlides.size() || (std::size_t) channel * 128 + 128 > noteProps.size())
+        return;
+    auto& p = propSlides[(std::size_t) channel];
+    p.count = 0;
+    p.steps = std::max (0, flTicks);
+    p.flLaw = flLaw;
+    p.to = { std::clamp (slide.velocity, 0.0f, 1.0f), std::clamp (slide.pan, -1.0f, 1.0f), std::clamp (slide.modX, 0.0f, 1.0f),
+             std::clamp (slide.modY, 0.0f, 1.0f) };
+    const auto& held = only != nullptr ? *only : heldNotes[(std::size_t) channel];
+    const auto* props = noteProps.data() + (std::size_t) channel * 128;
+    bool moves = false;
+    for (int key = 0; key < 128 && p.count < PropSlide::maxKeys; ++key)
+        if ((held[(std::size_t) (key >> 6)] >> (key & 63)) & 1u)
+        {
+            const auto& now = props[key];
+            p.keys[(std::size_t) p.count] = (std::uint8_t) key;
+            p.from[(std::size_t) p.count] = now;
+            ++p.count;
+            moves = moves || now.velocity != p.to.velocity || now.pan != p.to.pan || now.modX != p.to.modX || now.modY != p.to.modY;
+        }
+    if (! moves) // (nothing differs: the slide moves the pitch only, as before)
+        p.count = 0;
+}
+
+void RackRenderer::stepPropSlide (Instrument& instrument, int channel, int step) noexcept
+{
+    if ((std::size_t) channel >= propSlides.size())
+        return;
+    auto& p = propSlides[(std::size_t) channel];
+    if (p.count <= 0 || step < 0)
+        return;
+    const auto last = step >= p.steps;
+    const auto f = last ? 1.0f : (float) (step + 1) / (float) (p.steps + 1);
+    auto* props = noteProps.data() + (std::size_t) channel * 128;
+    for (int k = 0; k < p.count; ++k)
+    {
+        const auto key = (int) p.keys[(std::size_t) k];
+        const auto& a = p.from[(std::size_t) k];
+        const auto& b = p.to;
+        const auto at = [f] (float x, float y) { return x + (y - x) * f; };
+        NoteProps now { at (a.velocity, b.velocity), at (a.pan, b.pan), at (a.modX, b.modX), at (a.modY, b.modY) };
+        if (p.flLaw && a.velocity != b.velocity)
+        {
+            // FL's host moves Final.Vol in a straight line (FL 2026's renders: half way through a fade the level is
+            // the mean of the two levels), i.e. linear in FL's volume law (11^(1.28·v) − 1) / 10, not in velocity
+            const auto vol = [] (float v) { return (std::pow (11.0f, 1.28f * std::clamp (v, 0.0f, 1.0f)) - 1.0f) * 0.1f; };
+            const auto g = at (vol (a.velocity), vol (b.velocity));
+            now.velocity = last ? b.velocity : std::clamp (std::log (10.0f * g + 1.0f) / (1.28f * std::log (11.0f)), 0.0f, 1.0f);
+        }
+        auto& was = props[key];
+        now.cents = was.cents, now.colour = was.colour;
+        if (now.velocity != was.velocity)
+            instrument.voiceProperty (key, (int) vfx::Prop::velocity, now.velocity);
+        if (now.pan != was.pan)
+            instrument.voiceProperty (key, (int) vfx::Prop::pan, now.pan);
+        if (now.modX != was.modX)
+            instrument.voiceProperty (key, (int) vfx::Prop::modX, now.modX);
+        if (now.modY != was.modY)
+            instrument.voiceProperty (key, (int) vfx::Prop::modY, now.modY);
+        was = now;
+    }
+    if (last)
+        p.count = 0;
+}
+
 void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     if (foreignChannel (i)) // (render-ahead: the other renderer renders it; the boundary brings it here)
     {
+        releasingVoices[(std::size_t) i] = 0; // (round 190oa: its tail isn't heard here)
         importChannel (i, n);
         return;
     }
@@ -3536,6 +4171,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         && std::none_of (events.begin(), events.end(), [&] (const NoteEvent& e) { return e.channel == i || routed (e.channel); }))
     {
         channelSilent[(std::size_t) i] = 1;
+        releasingVoices[(std::size_t) i] = 0; // (round 190oa: no tail left)
         return;
     }
     channelSilent[(std::size_t) i] = 0;
@@ -3547,20 +4183,31 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     // the render calls up to `end`, split on the ticks of a stepped slide note (round 190jv): an engine moves a voice's
     // pitch between two calls, so each step lands on its tick, and the first one a sample after the slide's start
     auto& ticks = slideTicks[(std::size_t) i];
+    auto* props = (std::size_t) i < propSlides.size() ? &propSlides[(std::size_t) i] : nullptr;
     const auto renderUntil = [&] (int end) noexcept {
-        while (ticks.k <= ticks.n && ticks.n > 0)
+        while (true)
         {
-            const auto at = ticks.k == 0 ? (ticks.start - chunkStartTick) / chunkTps + 1.0
-                                         : (ticks.start + ticks.k * flTickTicks - chunkStartTick) / chunkTps;
+            // the next tick of the pitch slide and of the note properties' slide (issue #236; round 190pi: each on its
+            // own schedule — the same ticks when one slide note moves both)
+            const auto tickAt = [&] (double start, int k) {
+                return k == 0 ? (start - chunkStartTick) / chunkTps + 1.0 : (start + k * flTickTicks - chunkStartTick) / chunkTps;
+            };
+            const auto pitchAt = ticks.k <= ticks.n && ticks.n > 0 ? tickAt (ticks.start, ticks.k) : HUGE_VAL;
+            const auto propAt = props != nullptr && props->count > 0 && props->k <= props->steps && props->steps > 0
+                                    ? tickAt (props->start, props->k) : HUGE_VAL;
+            const auto at = std::min (pitchAt, propAt);
             if (! std::isfinite (at) || at >= (double) end)
                 break;
-            ++ticks.k;
             const auto split = (int) std::lround (at);
             if (split > position && split < end)
             {
                 instrument.render (l + position, r + position, split - position, gl, gr);
                 position = split;
             }
+            if (pitchAt == at)
+                ++ticks.k;
+            if (propAt == at)
+                stepPropSlide (instrument, i, props->k++);
         }
         if (end > position)
         {
@@ -3583,6 +4230,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 arp.input[(std::size_t) inCount++] = e;
 
         int outCount = 0;
+        arp.flSlideLaw = state.song.slideNoteProps; // (round 190pi)
         arp.process (i, arp.input.data(), inCount, chunkStartTick, chunkTps, n, c.arp, arp.output.data(), outCount);
         for (int k = 0; k < outCount; ++k) // (the arpeggio's notes are its own: no scheduled note's identity, round 190ej)
             arp.output[(std::size_t) k].noteId = 0;
@@ -3702,6 +4350,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             {
                 held[(std::size_t) (e.key >> 6)] |= bit;
                 struckNotes[(std::size_t) i][(std::size_t) (e.key >> 6)] |= bit;
+                if (state.modStateful) // (round 190ox: an envelope / keytrack / velocity modulator's notes)
+                    noteStruck (i, e.key, e.velocity);
             }
             // FL's key region (round 164): the channel plays only the notes inside it (audio clips: the key is the clip)
             const auto inRegion = c.instrument == InstrumentKind::audioClip || c.inKeyRegion (list[index].key);
@@ -3758,6 +4408,12 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                     velocity *= gain;
                 instrument.setNextNoteFinePitch (e.cents); // (issue #63: a hosted plugin's key and VST3 tuning)
                 instrument.setNextNoteId (e.noteId);     // (round 190ej: the voice is this note's)
+                if (e.key >= 0 && e.key < 128 && (std::size_t) i * 128 + 128 <= noteProps.size()) // (issue #236: what a slide moves from)
+                {
+                    const auto [modX, modY] = modTracking ? channelmisc::trackedModulation (c.misc, e.key, e.velocity, e.modX, e.modY)
+                                                          : std::pair<float, float> { e.modX, e.modY };
+                    noteProps[(std::size_t) i * 128 + (std::size_t) e.key] = { velocity, pan, modX, modY, noteCents, e.colour };
+                }
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
                 instrument.setNextNoteId (0);
                 HostSlide::pendingGlide() = {};
@@ -3767,17 +4423,67 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         {
             // FL's native generators: the slide moves in steps on FL's ticks (round 190jv, core/HostSlide.h Steps)
             const auto flTicks = stepsSlides (c.instrument) ? (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks) : 0;
+            const auto ticksBefore = ticks; // (round 190pi: a slide that moves nothing leaves them)
             if (flTicks > 0)
             {
                 HostSlide::pendingSteps() = { flTicks, (float) (flTickTicks / chunkTps / std::max (1.0, (double) e.slideSamples)) };
                 ticks = { chunkStartTick + (double) e.sampleOffset * chunkTps, 0, flTicks };
             }
-            instrument.slideTo (e.key, e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f), e.slideSamples);
+            const auto slideCents = e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f);
+            // FL's slide note (round 190pi, REA_rodada190pi §2): it moves the held notes of its own colour only, each by the
+            // interval from the highest of them to its key (HostSlide::pendingShift) — not every voice to its key; with
+            // none of its colour held it moves nothing. One held key of its colour and nothing else: the plain slide
+            NoteMask group {};
+            bool plain = true, none = false;
+            if (state.song.slideNoteProps && ! e.arpGlide && ! channelMono (c) && (std::size_t) i * 128 + 128 <= noteProps.size())
+            {
+                const auto& keys = heldNotes[(std::size_t) i];
+                const auto* props = noteProps.data() + (std::size_t) i * 128;
+                int top = -1, inGroup = 0, all = 0;
+                for (int k = 0; k < 128; ++k)
+                    if ((keys[(std::size_t) (k >> 6)] >> (k & 63)) & 1u)
+                    {
+                        ++all;
+                        if (props[k].colour == e.colour)
+                            group[(std::size_t) (k >> 6)] |= std::uint64_t { 1 } << (k & 63), ++inGroup, top = k;
+                    }
+                none = all > 0 && inGroup == 0;
+                plain = all == 0 || (inGroup == 1 && all == 1);
+                if (! plain && ! none)
+                {
+                    auto& shift = HostSlide::pendingShift();
+                    shift = { true, 100.0f * (float) (e.key - top) + slideCents - props[top].cents, e.key, group };
+                }
+            }
+            if (! none)
+                instrument.slideTo (e.key, slideCents, e.slideSamples);
+            HostSlide::pendingShift() = {};
             HostSlide::pendingSteps() = {};
+            if (none)
+            {
+                ticks = ticksBefore; // (FL 2026 [EXEC]: a slide note of a colour no held note has moves nothing)
+                continue;
+            }
+            // issue #236 (round 190od): FL's slide note moves the sounding notes' velocity, pan and Mod X / Y to its own
+            // as well, in the same n + 1 steps on FL's ticks (every engine: the property steps are the host's)
+            // (an arpeggiator's own Slide step glides the pitch only, round 190pi)
+            if (state.song.slideNoteProps && ! c.muted && ! e.arpGlide)
+            {
+                const auto n = std::max (0, (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks));
+                startPropSlide (i, e, n, stepsSlides (c.instrument), plain ? nullptr : &group);
+                if (auto& p = propSlides[(std::size_t) i]; p.count > 0)
+                {
+                    p.start = chunkStartTick + (double) e.sampleOffset * chunkTps; // (its own ticks, round 190pi)
+                    p.k = 0;
+                    if (n == 0) // (shorter than a tick: at once)
+                        stepPropSlide (instrument, i, 0);
+                }
+            }
         }
         else if (e.type == NoteEvent::Type::choke)
         {
             instrument.cut(); // short fade, like FL's "cut"
+            propSlides[(std::size_t) i].count = 0; // (issue #236)
             held = {};
             voiceOrders[(std::size_t) i].clear();
             polyLayers[(std::size_t) i].clear();
@@ -3807,6 +4513,20 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     if (sourceSet)
         instrument.setNoteSource (0);
     renderUntil (n);
+
+    // round 190oa (DF-29): released voices count until the channel's tail has died away (−100 dB); looked at only
+    // while there are some
+    if (auto& releasing = releasingVoices[(std::size_t) i]; releasing != 0)
+    {
+        const auto quiet = [n] (const float* x) {
+            float peak = 0.0f;
+            for (int k = 0; k < n; ++k)
+                peak = std::max (peak, std::abs (x[k]));
+            return peak < 1.0e-5f;
+        };
+        if (instrument.idle() || (quiet (l) && quiet (r)))
+            releasing = 0;
+    }
 
     // PDC: this channel arrives before the track's others; delay until aligned
     if ((std::size_t) i < state.channelDelays.size() && state.channelDelays[(std::size_t) i] != nullptr)
@@ -3865,7 +4585,9 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::peakController // issue #66: its display's Peak + LFO, Peak and LFO lines
            || kind == EffectKind::grossBeat // round 190ih: its playback locator and the playing / queued slots
            || kind == EffectKind::vocoder // round 190ld: Fruity Vocoder's live band levels (only while its editor shows them)
-           || kind == EffectKind::fruityMultiband; // round 190mf: Fruity Multiband Compressor's band meters (the same)
+           || kind == EffectKind::fruityMultiband // round 190mf: Fruity Multiband Compressor's band meters (the same)
+           || kind == EffectKind::maximus // round 190oa: Maximus' Monitor band levels (the same)
+           || kind == EffectKind::pitchCorrect; // round 190oa: Pitcher's input / output pitch strips
 }
 
 RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept
@@ -3912,6 +4634,9 @@ RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std:
     // (round 190jg: a hosted plugin too, when it declares its tail — CLAP's clap.tail, PluginEffect::tailSamples)
     p.tailHold = (! p.longHold || p.isPlugin) && slot.sidechain < 0 && slot.sidechain2 < 0;
     p.used = (int) std::min (slot.params.size(), effectInfo (slot.kind).params.size());
+    // round 190pt: a Vocodex with liveControls has FL's 20 controls as hidden parameters that automation moves
+    if (slot.kind == EffectKind::vocodex && slot.params[(std::size_t) vocodex::liveControls] >= 0.5f)
+        p.used = vocodex::paramCount;
     p.firstAutomated = p.used;
     if ((std::size_t) track < state.effectParamAuto.size() && i < state.effectParamAuto[(std::size_t) track].size())
     {
@@ -4061,7 +4786,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         std::memcpy (blend->dry.data() + RackState::ChainBlendStage::capacity, r, sizeof (float) * (std::size_t) n);
     }
     const auto timing = times->enabled.load (std::memory_order_relaxed);
-    auto timed = [this, timing] (std::size_t key, auto&& run) {
+    auto timed = [this, timing, n] (std::size_t key, auto&& run) {
         if (! timing || key >= times->effectNs.size())
         {
             run();
@@ -4069,7 +4794,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
         const auto before = ProcessTimes::now();
         run();
-        times->effectNs[key].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
+        times->addCall (false, key, ProcessTimes::now() - before, audioNsOf (n)); // (round 190of: + longest call, spikes)
     };
 
     // round 190gp: the slots' plan (RackState::SlotPlan), made with the snapshot; worked out here only for a state that
@@ -4443,6 +5168,8 @@ void RackRenderer::process (const RackState* state,
                 polyLayers[c] = from >= 0 && (std::size_t) from < polyScratch.size() ? polyScratch[(std::size_t) from] : channelpoly::Layer {};
         }
         scheduledNotes->moveChannels (state->channelFrom); // (round 169d)
+        for (auto& slide : propSlides) // (issue #236: a slide in progress stops where channels moved)
+            slide.count = 0;
     }
     lastState = state; // so prepare() knows which instruments to reconfigure
     lastSerial = state->serial;
@@ -4677,6 +5404,8 @@ void RackRenderer::process (const RackState* state,
                 {
                     held[(std::size_t) (e.key >> 6)] |= bit;
                     struckNotes[(std::size_t) std::min (e.channel, maxChannels - 1)][(std::size_t) (e.key >> 6)] |= bit;
+                    if (state->modStateful) // (round 190ox)
+                        noteStruck (e.channel, e.key, e.velocity);
                 }
                 if ((std::size_t) e.channel >= def.size())
                 {
@@ -4715,6 +5444,8 @@ void RackRenderer::process (const RackState* state,
                     instrument.setNextNoteModulation (e.modX, e.modY);
                     instrument.setNextNoteFinePitch (e.cents);
                 }
+                if (const auto ch = (std::size_t) e.channel; e.key >= 0 && e.key < 128 && ch * 128 + 128 <= noteProps.size()) // (issue #236)
+                    noteProps[ch * 128 + (std::size_t) e.key] = { e.velocity, 0.0f, e.expression ? e.modX : 0.5f, e.expression ? e.modY : 0.5f };
                 instrument.noteOn (e.key, e.velocity);
                 HostSlide::pendingGlide() = {};
             }
@@ -4997,6 +5728,8 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
     channels = std::clamp (channels, 0, maxChannels);
     const auto top = std::max (channels, publishedTop);
     publishedTop = 0;
+    const auto bits = [] (const NoteMask& m) { return std::popcount (m[0]) + std::popcount (m[1]); };
+    int voices = 0; // (round 190oa, DF-29)
     for (int i = 0; i < top; ++i)
     {
         auto& was = publishedNotes[(std::size_t) i];
@@ -5010,7 +5743,13 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
                 strikes[(std::size_t) i].store (strikes[(std::size_t) i].load (std::memory_order_relaxed) + 1u, std::memory_order_relaxed);
             struck = {};
         }
-        if (now[0] != 0 || now[1] != 0)
+        auto& releasing = releasingVoices[(std::size_t) i];
+        if (now != was) // the keys let go of this block start releasing
+            releasing = (std::uint16_t) std::min (999, (int) releasing + bits ({ was[0] & ~now[0], was[1] & ~now[1] }));
+        if (i >= channels)
+            releasing = 0;
+        voices += bits (now) + releasing;
+        if (now[0] != 0 || now[1] != 0 || releasing != 0)
             publishedTop = i + 1;
         if (now == was)
             continue;
@@ -5018,6 +5757,7 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
         sounding[(std::size_t) i][0].store (now[0], std::memory_order_relaxed);
         sounding[(std::size_t) i][1].store (now[1], std::memory_order_relaxed);
     }
+    voicesNow.store (voices, std::memory_order_relaxed);
 }
 
 double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noexcept
@@ -5353,7 +6093,7 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
-    if (playing && ! releaseWasPlaying && anyReleased.load (std::memory_order_relaxed))
+    if (playing && ! releaseWasPlaying && anyReleased.load (std::memory_order_relaxed) && ! keepReleasedOnPlay.load (std::memory_order_relaxed))
     {
         for (auto& w : released)
             w.store (0, std::memory_order_relaxed);
@@ -5383,6 +6123,9 @@ void RackRenderer::chunkPrelude (const RackState& state, bool playing, double st
     {
         auto& timeline = hostTimeline();
         timeline.tick.store (hostPositionTick (song, startTick, state.schedule.songLength), std::memory_order_relaxed);
+        const auto wrap = playing ? hostPositionWrap (song, state.schedule.songLength) : HostPositionWrap {}; // (issue #199)
+        timeline.wrapAt.store (wrap.at, std::memory_order_relaxed);
+        timeline.wrapTo.store (wrap.to, std::memory_order_relaxed);
         timeline.bpm.store (bpm, std::memory_order_relaxed);
         timeline.sampleRate.store (sampleRate, std::memory_order_relaxed);
         timeline.beatsPerBar.store (std::max (1, song.beatsPerBar), std::memory_order_relaxed);
@@ -5708,7 +6451,7 @@ void RackRenderer::chunkUnits (const RackState& state, bool playing, int numSamp
         renderChannel (state, c, numSamples);
         const auto spent = ProcessTimes::now() - before;
         if (timed)
-            times->channelNs[(std::size_t) c].fetch_add (spent, std::memory_order_relaxed);
+            times->addCall (true, (std::size_t) c, spent, audioNsOf (numSamples));
         if (measureUnits)
             channelCostNs[(std::size_t) c] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
     };
@@ -5969,6 +6712,17 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
 
         if (l == nullptr)
             continue;
+        if (route.cue) // round 190nc: the Cue Volume
+            if (const auto g = hwOut->cueGain.load (std::memory_order_relaxed); g != 1.0f)
+            {
+                for (int i = 0; i < n; ++i) // (in place when the delay already wrote them)
+                {
+                    sl[i] = l[i] * g;
+                    sr[i] = r[i] * g;
+                }
+                l = sl;
+                r = sr;
+            }
 
         const auto [first, count] = outputChannelsOf (route.channel, route.mode);
         auto* a = hwOut->bus (first, liveInputOffset, n);
@@ -6174,7 +6928,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             renderChannel (state, at, n);
             const auto spent = ProcessTimes::now() - before;
             if (timing && at < ProcessTimes::channels)
-                times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
+                times->addCall (true, (std::size_t) at, spent, audioNsOf (n));
             if (measureUnits)
                 channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
         }
@@ -6265,6 +7019,8 @@ void copyTimeline (const HostTimeline& from, HostTimeline& to) noexcept
     to.beatsPerBar.store (from.beatsPerBar.load (r), r);
     to.beatUnit.store (from.beatUnit.load (r), r);
     to.ticksPerSample.store (from.ticksPerSample.load (r), r);
+    to.wrapAt.store (from.wrapAt.load (r), r);
+    to.wrapTo.store (from.wrapTo.load (r), r);
     to.chunk.store (from.chunk.load (r), r);
 }
 } // namespace
@@ -6391,7 +7147,7 @@ bool RackRenderer::buildLivePlan (const RackState& state) noexcept
     // modulators, pattern events; the tempo, VCAs, the crossfader (their readers are not one unit)
     for (const auto a : state.liveAutomations)
     {
-        if (((std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty())
+        if (state.positional (a)
             || ((std::size_t) a < state.zoneAutomations.size() && state.zoneAutomations[(std::size_t) a] != 0)
             || a == state.tempoAutomation || a == state.crossfaderAutomation)
             return no ("clips, zone, tempo or crossfader on a live automation");
@@ -6887,6 +7643,9 @@ bool RackRenderer::runGraphRound (const RackState& state, bool playing, int chan
     const auto waitMode = WorkerPool::tuning().waitMode.load (std::memory_order_relaxed);
     const auto handOffSpin = std::chrono::microseconds (WorkerPool::tuning().waitSpinMicros.load (std::memory_order_relaxed));
     const auto count = (std::uint64_t) pieceCount;
+    auto roundSamples = 0; // (round 190of: the audio all the pieces of a unit cover, for the monitor's spikes)
+    for (int k = 0; k < pieceCount; ++k)
+        roundSamples += pieces[(std::size_t) k].samples;
     auto task = [&] (int position) {
         int id = 0;
         auto& slot = graphSlots[(std::size_t) position];
@@ -6960,7 +7719,7 @@ bool RackRenderer::runGraphRound (const RackState& state, bool playing, int chan
                 if (at < channels)
                 {
                     if (timing && at < ProcessTimes::channels)
-                        times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
+                        times->addCall (true, (std::size_t) at, spent, audioNsOf (roundSamples));
                     if (measureUnits)
                         channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent / count, 0xffffffffu);
                 }
@@ -7176,6 +7935,10 @@ void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
 {
+    // round 190ox: an envelope follower's insert: its level after the fader (silence unless set below)
+    const auto followed = (std::size_t) t < state.followedTracks.size() && state.followedTracks[(std::size_t) t] != 0 && t < maxMixerTracks;
+    if (followed)
+        followPeak[(std::size_t) t] = 0.0f;
     if (foreignTrack (t)) // (render-ahead: the other renderer runs it, and its inputs; the boundary brings its output here)
     {
         importTrack (state, t, n);
@@ -7340,6 +8103,8 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         last = applyMatrix (l, r, l, r, n, from, target);
     }
     tap (RecordSource::postTrack, l, r);
+    if (followed && ! trackZeros (t))
+        followPeak[(std::size_t) t] = std::max (peakOf (l, n), peakOf (r, n));
 
     trackActive[(std::size_t) t] = silentOut ? 2 : 1;
     // round 190gj: the single-pass stems' tap (what this insert sends on). Rollup 0.1.28: through trackInput, as 190gp's
@@ -7550,6 +8315,7 @@ void RackRenderer::adoptGlobals (const RackRenderer& from) noexcept
     }
     anyOverridden.store (from.anyOverridden.load (std::memory_order_relaxed), std::memory_order_relaxed);
     anyReleased.store (from.anyReleased.load (std::memory_order_relaxed), std::memory_order_relaxed);
+    keepReleasedOnPlay.store (from.keepReleasedOnPlay.load (std::memory_order_relaxed), std::memory_order_relaxed);
     releaseWasPlaying = from.releaseWasPlaying;
     modSeconds = from.modSeconds;
     compensateTick = from.compensateTick;
@@ -7600,6 +8366,12 @@ void RackRenderer::adoptUnits (const RackRenderer& from, const char* channels, c
             layerTurn[c] = from.layerTurn[c];
             if (c < polyLayers.size() && c < from.polyLayers.size())
                 polyLayers[c] = from.polyLayers[c];
+            slideTicks[c] = from.slideTicks[c]; // (issue #236: a slide in progress goes on where the channel renders now)
+            if (c < propSlides.size() && c < from.propSlides.size())
+                propSlides[c] = from.propSlides[c];
+            if ((c + 1) * 128 <= noteProps.size() && (c + 1) * 128 <= from.noteProps.size())
+                std::copy (from.noteProps.begin() + (std::ptrdiff_t) (c * 128), from.noteProps.begin() + (std::ptrdiff_t) ((c + 1) * 128),
+                           noteProps.begin() + (std::ptrdiff_t) (c * 128));
             if ((c + 1) * 128 <= layerPick.size() && (c + 1) * 128 <= from.layerPick.size())
                 std::copy (from.layerPick.begin() + (std::ptrdiff_t) (c * 128), from.layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128),
                            layerPick.begin() + (std::ptrdiff_t) (c * 128));
@@ -7643,6 +8415,8 @@ void RackRenderer::silenceChannels (const RackState& state, const char* channels
         voiceOrders[c].clear();
         if (c < polyLayers.size())
             polyLayers[c].clear();
+        if (c < propSlides.size())
+            propSlides[c].count = 0; // (issue #236)
         if ((c + 1) * 128 <= layerPick.size())
             std::fill (layerPick.begin() + (std::ptrdiff_t) (c * 128), layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128), (std::int16_t) -1);
         if (c < state.arpeggiators.size() && state.arpeggiators[c] != nullptr)

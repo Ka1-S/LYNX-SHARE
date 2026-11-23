@@ -62,6 +62,9 @@ struct State
 std::optional<State> parse (const std::vector<std::uint8_t>& data);
 std::vector<std::uint8_t> serialise (const State& s);
 bool validBands (int n) noexcept;
+// round 190oa (DP-33, capture 190oa C7: FL's band hint "Band 2 - 92Hz  100%"): analysis band `band`'s centre (Hz), as the
+// engine's bank places it from FreqMin / FreqMax / FreqScale
+float bandHz (const State& s, int band) noexcept;
 
 // Frequency (Hz) of FreqMin / FreqMax for a raw control value, as the plugin computes it.
 float edgeHz (int raw) noexcept;

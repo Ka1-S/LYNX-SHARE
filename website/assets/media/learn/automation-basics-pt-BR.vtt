@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+A automação move um botão ao longo do tempo, sozinha, toda vez que a música toca.
+
+00:00:09.000 --> 00:00:14.600
+Clique com o direito em qualquer botão, aqui o Cutoff do synth, e escolha Criar clipe de automação.
+
+00:00:15.000 --> 00:00:20.600
+O clipe vai para a Playlist, e o editor abre com a curva.
+
+00:00:21.000 --> 00:00:26.600
+Arraste os pontos: o Cutoff começa alto e desce ao longo do compasso.
+
+00:00:27.000 --> 00:00:33.000
+Aperte Play no modo Song: o botão segue a curva.
+
+00:00:33.400 --> 00:00:39.800
+No layout Simple, o botão Automação mostra uma faixa embaixo de cada trilha.

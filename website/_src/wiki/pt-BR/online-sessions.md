@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Há duas formas de trabalhar em um projeto com outras pessoas, e as duas estão em `Arquivo › Sessão online`. Um pacote é um arquivo que você manda a um amigo, que devolve uma parte. Não precisa de rede, conta nem servidor. Uma sessão ao vivo conecta todo mundo pela internet por meio do relay do LYNX SHARE, e cada alteração chega a todos. Até 4 pessoas participam de um projeto, você incluído.
 
@@ -65,11 +65,11 @@ O menu `Arquivo › Sessão online` tem estes comandos enquanto uma sessão est�
 | `Seguir o transporte de quem criou a sessão` | Para convidados: tocar, parar e a posição seguem os de quem criou a sessão |
 | `Pessoas e permissões...` | Para quem criou a sessão: o que cada pessoa pode alterar e com o que cada uma fica no fim |
 | `Compartilhar plugins com quem entrar...` | Para o host: quais dos seus plugins os convidados podem usar. O item do menu mostra quantos estão compartilhados |
-| `Mostrar código de convite...` | Para quem criou a sessão: mostra o código de novo, com um botão `Copia` |
+| `Mostrar código de convite...` | Para quem criou a sessão: mostra o código de novo, com um botão `Copiar` |
 | `Encerrar sessão ao vivo` | Para quem criou a sessão. Todos saem e o código deixa de funcionar |
 | `Sair da sessão ao vivo` | Para um convidado. Sua parte do projeto fica com você |
 
-Em `Pessoas e permissões...`, cada pessoa recebe um de quatro papéis: `Os próprios canais, patterns, inserts e linhas`, `As próprias partes + tempo e configurações do projeto`, `Tudo` ou `Só ouvir (sem edições)`. Desligar uma permissão nunca apaga nada.
+Em `Pessoas e permissões...`, cada pessoa recebe um de quatro papéis: `Os próprios canais, patterns, inserts e linhas`, `As próprias partes + tempo e configurações do projeto`, `Tudo` ou `Só ouvir (sem edições)`. Desligar uma permissão nunca apaga nada. A quinta escolha, `Remover da sessão`, tira a pessoa da sessão. Por padrão, a sessão então ganha um novo código de convite para novas entradas, e quem continua nela segue em frente; `Manter o mesmo código` mantém o código antigo.
 
 ## Plugins que os outros não têm
 

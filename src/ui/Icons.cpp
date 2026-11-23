@@ -605,6 +605,19 @@ Shape make (Icon icon)
         case Icon::punchIn:
             polyline (st, { { 1.5f, 7.5f }, { 9.5f, 7.5f }, { 14.5f, 16.5f }, { 22.5f, 16.5f } });
             break;
+        case Icon::automationArm:
+            st.addEllipse (5.0f, 13.5f, 5.5f, 5.5f);
+            st.addEllipse (13.5f, 5.0f, 5.5f, 5.5f);
+            line (st, 9.5f, 14.5f, 14.5f, 9.5f);
+            break;
+        case Icon::reEnableAutomation:
+            fi.addTriangle (4.0f, 12.0f, 11.0f, 7.0f, 11.0f, 17.0f);
+            fi.addRectangle (10.0f, 10.8f, 9.0f, 2.4f);
+            break;
+        case Icon::search: // round 190on: a lens and its handle
+            st.addEllipse (4.0f, 4.0f, 12.0f, 12.0f);
+            line (st, 14.3f, 14.3f, 20.0f, 20.0f);
+            break;
         case Icon::punchOut:
             polyline (st, { { 1.5f, 16.5f }, { 9.5f, 16.5f }, { 14.5f, 7.5f }, { 22.5f, 7.5f } });
             break;
@@ -1228,10 +1241,14 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     else if (look == Look::liveBox)
     {
         // Live 12.4 (CL-2, ref/live-session.png): #363636 boxes, hover #464646, pressed #1e1e1e, lit #ffad56
-        const juce::Colour rest { 0xff363636 }, over { 0xff464646 }, pressed { 0xff1e1e1e }, lit { 0xffffad56 };
+        // (round 190oa, capture 190oa L1: Re-Enable Automation lights red-orange #e76942; idle, its arrow is #696969)
+        const auto reEnable = icon == Icon::reEnableAutomation;
+        const juce::Colour rest { 0xff363636 }, over { 0xff464646 }, pressed { 0xff1e1e1e }, lit { reEnable ? 0xffe76942u : 0xffffad56u };
         g.setColour (down ? pressed : on ? lit : rest.interpolatedWith (over, h));
         g.fillRect (area);
-        fg = on && ! down ? juce::Colour (0xff070707) : juce::Colour (0xffb5b5b5).interpolatedWith (juce::Colours::white, h * 0.35f);
+        fg = on && ! down ? juce::Colour (0xff070707)
+             : reEnable   ? juce::Colour (0xff696969).interpolatedWith (juce::Colours::white, h * 0.35f)
+                          : juce::Colour (0xffb5b5b5).interpolatedWith (juce::Colours::white, h * 0.35f);
     }
     else if (look == Look::liveSelector)
     {
@@ -1559,6 +1576,39 @@ bool IconButton::tileCacheUsable (juce::Graphics& g, int& scale) const
 }
 
 void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    paintButtonBody (g, highlighted, down);
+    if (badge.isNotEmpty()) // (round 190pa)
+        paintBadge (g);
+}
+
+void IconButton::setBadge (const juce::String& newBadge, juce::Colour colour)
+{
+    if (newBadge == badge && colour == badgeColour)
+        return;
+    badge = newBadge;
+    badgeColour = colour;
+    repaint();
+}
+
+void IconButton::paintBadge (juce::Graphics& g)
+{
+    // a pill in the top-right corner: 10 px high at 100 %, the text in the band's darkest colour on the badge colour. A
+    // small box (Live's 17 px control-bar boxes) gets a smaller pill in its bottom-right corner, off the glyph's centre
+    const auto small = getHeight() < 22;
+    const auto font = theme::font (small ? 7.0f : 8.5f, true);
+    const auto h = small ? 8.0f : juce::jmin (10.0f, (float) getHeight() * 0.42f);
+    const auto w = juce::jmax (h, juce::GlyphArrangement::getStringWidth (font, badge) + (small ? 2.0f : 4.0f));
+    const auto r = small ? juce::Rectangle<float> ((float) getWidth() - w, (float) getHeight() - h, w, h)
+                         : juce::Rectangle<float> ((float) getWidth() - w - 1.0f, 1.0f, w, h);
+    g.setColour (badgeColour);
+    g.fillRoundedRectangle (r, h * 0.5f);
+    g.setColour (theme::colour::bg0);
+    g.setFont (font);
+    g.drawText (badge, r, juce::Justification::centred, false);
+}
+
+void IconButton::paintButtonBody (juce::Graphics& g, bool highlighted, bool down)
 {
     using namespace theme;
     if (look == Look::flTile)

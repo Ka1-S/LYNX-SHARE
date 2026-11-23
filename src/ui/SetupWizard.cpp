@@ -13,6 +13,7 @@
 #include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/Updater.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
 
@@ -127,6 +128,16 @@ public:
         body.addChildComponent (menuEntry);
         menuEntry.setVisible (runningAsAppImage());
         menuEntry.setToggleState (true, juce::dontSendNotification);
+        // issue #233 (round 190ns): the one connection LYNX makes by itself, chosen here before it ever runs (the
+        // automatic check waits for this wizard: updater::startAutomaticCheck)
+        for (auto* c : std::initializer_list<juce::Component*> { &updatesLabel, &checkUpdates, &updatesNote })
+            body.addChildComponent (c);
+        for (auto* c : std::initializer_list<juce::Component*> { &updatesLabel, &checkUpdates, &updatesNote })
+            c->setVisible (updater::offered()); // (not the Store build: the Store updates it)
+        checkUpdates.setToggleState (updater::automatic(), juce::dontSendNotification);
+        updatesNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        updatesNote.setJustificationType (juce::Justification::topLeft);
+        updatesNote.setMinimumHorizontalScale (1.0f);
         viewport.setViewedComponent (&body, false);
         viewport.setScrollBarsShown (true, false);
         viewport.setScrollBarThickness (10);
@@ -358,6 +369,14 @@ private:
         scanAtStart.setBounds (r.removeFromTop (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.removeFromTop (24));
+        if (checkUpdates.isVisible()) // (round 190ns, issue #233)
+        {
+            r.removeFromTop (20);
+            updatesLabel.setBounds (r.removeFromTop (24));
+            r.removeFromTop (4);
+            checkUpdates.setBounds (r.removeFromTop (24));
+            updatesNote.setBounds (r.removeFromTop (textHeight (updatesNote, w, 22)));
+        }
         r.removeFromTop (12);
         return r.getY();
     }
@@ -425,6 +444,12 @@ private:
         if (const auto style = chosenStyle(); style != initialStyle && onLayoutStyle) // (before close() deletes this)
             onLayoutStyle (style);
         markSetupWizardDone();
+        if (updater::offered()) // (round 190ns, issue #233: the choice made here; ticked, the first check runs now)
+        {
+            updater::setAutomatic (checkUpdates.getToggleState());
+            if (checkUpdates.getToggleState())
+                updater::startAutomaticCheck();
+        }
         if (runningAsAppImage())
             setAppImageMenuEntry (menuEntry.getToggleState());
         // (keeps going after the window closes) only when asked for: with "every start" unticked, nothing scans here
@@ -493,6 +518,11 @@ private:
     juce::ProgressBar progressBar { progress };
     juce::ToggleButton scanAtStart { tr ("Look for new plugins in the background at every start") };
     juce::ToggleButton menuEntry { tr ("Show LYNX SHARE in the applications menu and open .lynx files with it") };
+    // round 190ns (issue #233): the automatic update check, the only connection LYNX SHARE makes by itself
+    SectionLabel updatesLabel { tr ("Updates") };
+    juce::ToggleButton checkUpdates { tr ("Check for updates automatically") };
+    juce::Label updatesNote { {}, tr ("A few seconds after start-up LYNX SHARE asks GitHub for the newest version number; nothing about you is sent. "
+                                      "It is the only connection LYNX SHARE makes by itself: plugin scans and everything else stay on this computer.") };
     std::unique_ptr<juce::FileChooser> chooser;
     bool scanStarted = false;
 };

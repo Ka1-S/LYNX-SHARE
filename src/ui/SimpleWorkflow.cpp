@@ -1,4 +1,5 @@
 #include "ui/SimpleWorkflow.h"
+#include "ui/DemoMode.h"
 
 #include <algorithm>
 
@@ -551,15 +552,18 @@ public:
 class SimpleTitleTools final : public juce::Component
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& c, juce::Component& d, juce::Component& e) : add (a), lyrics (c), automation (d), loops (e)
+    SimpleTitleTools (juce::Component& a, juce::Component& c, juce::Component& d, juce::Component& e, juce::Component& f)
+        : add (a), lyrics (c), automation (d), loops (e), sections (f)
     {
         addAndMakeVisible (add);
         addAndMakeVisible (automation);
         addAndMakeVisible (lyrics);
+        addAndMakeVisible (sections);
         addAndMakeVisible (loops);
     }
-    static constexpr int automationWidth = 96;
-    static constexpr int width = 110 + 6 + automationWidth + 6 + 80 + 6 + 80 + 10; // (round 190jr: + Automation; round 190lx: + Loops)
+    static constexpr int automationWidth = 96, sectionsWidth = 86;
+    // (round 190jr: + Automation; round 190lx: + Loops; round 190ol: + Sections)
+    static constexpr int width = 110 + 6 + automationWidth + 6 + 80 + 6 + sectionsWidth + 6 + 80 + 10;
     void resized() override
     {
         auto r = getLocalBounds();
@@ -569,6 +573,8 @@ public:
         r.removeFromLeft (6);
         lyrics.setBounds (r.removeFromLeft (80));
         r.removeFromLeft (6);
+        sections.setBounds (r.removeFromLeft (sectionsWidth)); // (round 190ol: GarageBand's Arrangement track, research190oe P1)
+        r.removeFromLeft (6);
         loops.setBounds (r.removeFromLeft (80)); // (round 190lx, DS-42: BandLab's Sounds button beside Lyrics / Notes)
     }
 
@@ -577,6 +583,7 @@ private:
     juce::Component& lyrics;
     juce::Component& automation;
     juce::Component& loops;
+    juce::Component& sections;
 };
 
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
@@ -629,7 +636,17 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             host.setAutomation (b->getToggleState());
     };
     automationButton = std::move (automation);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton, *automationButton, *loopsButton);
+    // round 190ol (research190oe P1, owner decision O-1): the Sections lane — the first press adds the first section (the
+    // lane appears with it), later presses hide and show the lane
+    auto sectionsTool = std::make_unique<juce::TextButton> (tr ("Sections"));
+    sectionsTool->setComponentID ("simple.sections");
+    sectionsTool->setTooltip (tr ("Sections: name the parts of the song (Intro, Verse, Chorus...) and move or copy each with everything under it"));
+    sectionsTool->onClick = [this] {
+        if (host.toggleSections)
+            host.toggleSections();
+    };
+    sectionsButton = std::move (sectionsTool);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton, *automationButton, *loopsButton, *sectionsButton);
 
     // round 190dv: the Welcome screen and the first-song tour
     FirstSongTour::Host t;
@@ -1473,7 +1490,9 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
     if (sources.config == nullptr)
         return;
     const auto id = genre.empty() ? sources.config->defaultGenre : genre;
-    const auto plan = loopstarter::generate (sources, id, (std::uint64_t) juce::Random::getSystemRandom().nextInt64());
+    // (round 190np: LYNX --demo records tutorials in several languages: the same starter beat in every take)
+    const auto seed = demo::active() ? (std::uint64_t) 190 : (std::uint64_t) juce::Random::getSystemRandom().nextInt64();
+    const auto plan = loopstarter::generate (sources, id, seed);
     simpletracks::Request q;
     q.kind = Kind::drums;
     q.name = trackNameFor (Kind::drums);

@@ -89,7 +89,7 @@ The options are in `Options › Recording` and in the record button's right-clic
 
 ## Recording into clip slots
 
-In the [Clip-launch workflow](/wiki/layouts/), takes can go into the clip grid instead of the Playlist, as in Ableton Live.
+In the [Clip-launch layout](/wiki/layouts/), takes can go into the clip grid instead of the Playlist, as in Ableton Live.
 
 - Arm a track with its arm button in the Session mixer. Its empty slots then show a round record button in place of the stop square. Click one to record into that slot.
 - `Session Record`, under the grid, records the armed tracks into the selected scene. While their clips play, new notes are added to them (overdub).

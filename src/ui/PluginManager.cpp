@@ -8,6 +8,7 @@
 #include "engine/PluginHost.h"
 #include "engine/PluginSandbox.h"
 #include "platform/Paths.h"
+#include "ui/DemoMode.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/PluginWindow.h"
@@ -62,6 +63,7 @@ std::vector<prefs::PluginRow> sampleRows()
 }
 
 class PluginManagerPanel final : public juce::Component,
+                                 public demo::CellSource,
                                  private juce::TableListBoxModel,
                                  private juce::Timer
 {
@@ -70,6 +72,7 @@ public:
         : engine (e), host (e.getPluginHost()), persistent (keep), onFolders (std::move (folders))
     {
         search.setTextToShowWhenEmpty (tr ("Search name, vendor, format or file"), theme::colour::textDisabled);
+        focusOnOpen (search); // (issue #244)
         search.setFont (theme::font (theme::type::body));
         search.setIndents (8, 6);
         search.onTextChange = [this] { refilter(); };
@@ -157,12 +160,40 @@ public:
         scanNew.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
         scanNew.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
 
+        // round 190pl: by component ID for --demo (docs/DEMO_MODE.md); the table's rows are its cells (row = the row shown)
+        setComponentID ("pluginManager");
+        search.setComponentID ("pluginManager.search");
+        table.setComponentID ("pluginManager.list");
+        scanNew.setComponentID ("pluginManager.scanNew");
+        rescanAll.setComponentID ("pluginManager.rescanAll");
+        stop.setComponentID ("pluginManager.stop");
+        foldersButton.setComponentID ("pluginManager.folders");
+        addFile.setComponentID ("pluginManager.addFile");
+        scanStatus.setComponentID ("pluginManager.status");
+        static const char* filterIds[] { "all", "instruments", "effects", "favourites", "failed" };
+        for (int i = 0; i < 5; ++i)
+            filterButtons[(std::size_t) i].setComponentID (juce::String ("pluginManager.filter.") + filterIds[i]);
+
         lastFinished = host.backgroundScan().finished;
         reload();
         updateScan();
         if (persistent)
             startTimerHz (4);
         setSize (980, 600);
+    }
+
+    juce::Rectangle<int> demoCellBounds (int row, int) const override
+    {
+        if (row < 0 || row >= (int) visible.size())
+            return {};
+        return getLocalArea (&table, table.getRowPosition (row, true));
+    }
+    juce::Rectangle<int> demoCellNamed (int, const juce::String& name) const override
+    {
+        for (int i = 0; i < (int) visible.size(); ++i)
+            if (juce::String::fromUTF8 (rows[(std::size_t) visible[(std::size_t) i]].name.c_str()) == name)
+                return demoCellBounds (i, 0);
+        return {};
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }

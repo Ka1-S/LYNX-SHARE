@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "engine/AudioEngine.h"
+#include "ui/ValueControl.h"
 
 namespace lynx
 {
@@ -43,9 +44,16 @@ namespace rackcards
 // The Rack card of the Detail View's Device View (round 183c-card, on round 183a's DetailCard hook): a rack in a mixer
 // slot or a Channel Rack channel shows as the rack's own view, its Rand / Map in the card's title bar. Call once at start-up.
 void install();
+// Round 190nc (DL-95): where Live's Macro Mappings list shows while a Device View rack is in Map mode in the Live look —
+// the component it covers (Live: the Browser), or nullptr (then it opens beside the rack). Set once by the main window.
+void setMappingsHost (std::function<juce::Component*()> host);
 } // namespace rackcards
 
-class RackView final : public juce::Component, public juce::FileDragAndDropTarget, public juce::DragAndDropTarget, private juce::Timer
+class RackView final : public juce::Component,
+                       public juce::FileDragAndDropTarget,
+                       public juce::DragAndDropTarget,
+                       public ui::HintSource,
+                       private juce::Timer
 {
 public:
     // `automation`: the automation target of the rack's published parameter 0 (its kind / index / slot; param = macro)
@@ -61,6 +69,20 @@ public:
     std::function<void()> onPreferredWidthChanged;
     // The Rand and Map buttons for a title bar that isn't the rack's own (the Device View card)
     std::unique_ptr<juce::Component> makeTitleAccessory();
+    // Round 190nc (DL-95, Live's look in the Device View): the selected chain's devices are shown inline (Live's rack),
+    // and the Device View's title bar then spans only the rack's own part: its width (0 = the whole card)
+    bool showsDevicesInline() const;
+    int titleBarWidth() const;
+    bool hitTest (int x, int y) override; // (the title strip over the rack's own part is the Device View's)
+    ui::Hint hintAt (juce::Point<int> p) override;
+    // (tests and shots) inline devices: how many, where device i and its knob k are, fold device i, pick a knob in Map
+    // mode (as a click), press macro m's Map button, the Macro Mappings list's bounds now (empty: not shown)
+    int inlineDeviceCountForCheck() const;
+    juce::Rectangle<int> inlineDeviceBoundsForCheck (int device) const;
+    juce::Rectangle<int> inlineKnobBoundsForCheck (int device, int knob) const;
+    void toggleInlineFoldForCheck (int device);
+    juce::Rectangle<int> mapButtonBoundsForCheck (int macro) const;
+    juce::Component* mappingsListForCheck() const;
     static constexpr int titleAccessoryWidth = 66;
 
     void paint (juce::Graphics& g) override;

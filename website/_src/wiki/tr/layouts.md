@@ -1,9 +1,9 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
 ![Klip başlatma iş akışı: solda klip ve sahne gridi, sağda Picker ve Playlist](/assets/img/cliplaunch.webp)
 
-`Görünüm › Yerleşim stili` menüsünde üç giriş vardır: `Pattern iş akışı (varsayılan)`, `Klip başlatma iş akışı` ve `Basit iş akışı`. Aynı seçim `Seçenekler › Genel ayarlar` içinde, Workflow başlığı altında da bulunur. Seçim programı kapattığınızda korunur.
+`Görünüm › Yerleşim stili` menüsünde üç giriş vardır: `Pattern iş akışı (varsayılan)`, `Klip başlatma iş akışı` ve `Basit iş akışı`. Aynı seçim `Seçenekler › Genel ayarlar` içinde, Workflow başlığı altında da bulunur. Seçim programı kapattığınızda korunur. LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar ve size uyan yerleşimi seçer.
 
 Varsayılan olan Pattern iş akışı FL Studio gibi çalışır: Channel Rack, pattern'ler, Piano Roll, Playlist ve Mixer. Ableton Live tarzındaki Klip başlatma iş akışı, Playlist'in yanına sahneli bir klip gridi, bir Session mikseri ve klip ile cihaz görünümleri ekler; pattern'ler ve Channel Rack kullanılabilir kalır. Basit iş akışı, BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir: izler ve zaman çizelgesi, loop'lar, pad'ler ve hızlı kayıt. Geçiş yapmak yalnızca pencereleri değiştirir: proje aynı kalır.
 

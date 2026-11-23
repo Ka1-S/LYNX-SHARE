@@ -12,6 +12,7 @@
 
 #include "core/MeterBallistics.h"
 #include "core/MixerLayout.h"
+#include "ui/DemoMode.h"
 #include "core/MixerOps.h"
 #include "core/StripInserts.h"
 #include "engine/AudioEngine.h"
@@ -154,6 +155,7 @@ public:
         return track >= 0 && (side == 0 || side == 1) && i < levels.size() ? levels[i].level : 0.0f;
     }
     void selectTrack (int track);
+    int neighbourOf (int delta) const; // #225 (round 190nq): FL's Left / Right
     std::function<void (int)> onSelectionChanged;
 
     // An effect dragged from the Browser's Plugin database onto a strip (round 162): it goes into that insert.
@@ -242,6 +244,11 @@ public:
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
     juce::Rectangle<int> muteAreaForSnapshot (int track) const { return muteArea (track); }   // round 190kn
     juce::Rectangle<int> meterAreaForSnapshot (int track) const { return meterArea (track); } // round 190kn
+    // round 190pl (--demo cells of mixer.strips): the fader's cap where it is now, the pan knob, the solo switch
+    juce::Rectangle<int> faderCapForSnapshot (int track) const { return tipArea (Part::fader, track); }
+    juce::Rectangle<int> panAreaForSnapshot (int track) const { return panArea (track); }
+    juce::Rectangle<int> soloAreaForSnapshot (int track) const { return soloArea (track); }
+    juce::Rectangle<int> headerAreaForSnapshot (int track) const { return headerArea (track); }
     // round 190lr (--details190lrshot): one display frame at `nowMs` (the Waveforms view's rows, the meters), the
     // polarity / swap icons and the strip part under a point
     bool frameForSnapshot (double nowMs) { return liveFrame (nowMs); }
@@ -511,6 +518,7 @@ private:
 //    (frequency, width)
 class EffectsPanel final : public juce::Component,
                            public ui::HintSource,
+                           public demo::CellSource,
                            public juce::DragAndDropTarget,
                            public juce::FileDragAndDropTarget,
                            private juce::ChangeListener,
@@ -535,6 +543,11 @@ public:
     void setTrack (int track);
     int getSelectedSlot() const noexcept { return selectedSlot; }
     juce::Rectangle<int> slotBoundsForCheck (int row) const { return slotBounds (row); } // --selftest (ui/MixerBasicsCheck.h)
+    // round 190pl (--demo, ID mixer.slots): column = an insert slot's row (row ignored)
+    juce::Rectangle<int> demoCellBounds (int, int column) const override { return column >= 0 && column < maxEffectSlots ? slotBounds (column) : juce::Rectangle<int>(); }
+    // round 190oa (DF-86, --details190oashot): FL's EQ gestures on band `band`'s handle — a right-drag of `dy` px up,
+    // or `notches` wheel notches; true while the right-drag paints the curve orange (between press and release)
+    bool eqGestureForSnapshot (int band, int dy, int notches);
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
     void groupIntoRack (int slot, bool all); // round 183c: Live's Group, the slot (or the chain) into an Audio Effect Rack
     void selectSlot (int slot)
@@ -557,6 +570,9 @@ public:
     // palette with the effects alone, its search box focused); the chosen effect lands in that slot. FL's single click
     // (the plugin menu at once) stays: the menu is closed when the second click comes.
     void showSlotSearch (int row);
+    // issue #206 follow-up (round 190qb): the Playlist header's "+ Add" (its insert effects column) opens this insert's
+    // add menu on a click; a second press on that menu soon after is a double-click: the effect search for `row`
+    void armSlotSearchOnSecondClick (const juce::MouseEvent& e, int row) { armSecondClick (e, row); }
     std::unique_ptr<juce::Component> makeSlotSearch (int row); // (the shot route shows it in a window of its own)
     std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
     static inline juce::PopupMenu* slotMenuForSnapshot = nullptr;    // the shot routes: the next slot menu goes here instead of opening
@@ -693,6 +709,8 @@ private:
     int track = 0;
     int selectedSlot = -1;
     int dragParam = -1;
+    bool eqLevelDrag = false;                    // (round 190oa, DF-86: FL's right-drag on an EQ band = its level)
+    std::pair<float, float> eqLevelFrom { 0.0f, 0.0f }; // (the press: mouse y, the band's level in dB)
     float dragStart = 0.0f;
     ui::ValueDrag drag;
 
@@ -738,6 +756,7 @@ public:
         return menu;
     }
     int getSelectedTrack() const noexcept { return strips.getSelectedTrack(); }
+    EffectsPanel& getEffectsForSnapshot() noexcept { return effects; } // (round 190oa)
     // Round 183a: the strips' meters run (they are on screen), and the level one shows.
     bool metersShowing() const { return strips.isShowing(); }
     float shownLevel (int track, int side) const noexcept { return strips.shownLevel (track, side); }

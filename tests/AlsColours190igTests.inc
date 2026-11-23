@@ -41,7 +41,7 @@ TEST (als190ig_import_colours_follow_the_layout)
     CHECK (pattern.has_value() && live.has_value());
     if (! pattern || ! live)
         return;
-    CHECK (colourOf (*pattern, "Keys") == alsColour (3)); // (Pattern layout: as before)
+    CHECK (colourOf (*pattern, "Keys") == alsLiveColour (3)); // (round 190oo CS O-1: Live's colours in every layout)
     CHECK (colourOf (*live, "Keys") == alsLiveColour (3)); // (Clip-launch layout: Live's #F7F47C)
     CHECK (colourOf (*live, "Keys") == 0xfff7f47cu);
 }

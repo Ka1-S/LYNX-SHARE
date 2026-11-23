@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![Editor otomasi dengan kurva yang naik selama enam bar](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Nyalakan perekaman dengan `Otomasi` dicentang di filter rekaman, tekan play, lal
 
 - `Tautkan ke kontroler MIDI (gerakkan knob pada kontroler)` dibahas di [Controller MIDI](/wiki/midi-controllers/).
 - `Tautkan ke kontroler internal` membuat Envelope, Formula, atau Peak Controller di proyek menggerakkan kontrol itu. Tambahkan salah satunya lebih dulu.
-- `Modulasikan` memasang modulator, yaitu LFO atau sumber acak yang menggerakkan knob LYNX SHARE di sekitar nilainya sendiri. `Alat › Modulator...` mencantumkannya.
+- `Modulasikan dengan` memasang modulator yang menggerakkan kontrol di sekitar nilainya sendiri: LFO, envelope follower, envelope ADSR, step, sumber acak, makro, keytrack, atau velocity. Ini bekerja pada knob LYNX SHARE dan pada parameter plugin pihak ketiga. Kamu juga bisa menyeret modulator ke sebuah knob, dan cincin pada knob menunjukkan gerakannya. `Alat › Modulator...` mencantumkannya.
 
 ## Jalur otomasi
 
@@ -88,7 +88,8 @@ Jalur mati secara bawaan. Aktifkan `Jalur otomasi` di menu Playlist. Setiap head
 - Beberapa clip pada satu kontrol masing-masing diputar di tempatnya sendiri. Sebelum clip pertamanya, kontrol mempertahankan nilainya sendiri.
 - Di awal sebuah clip, kontrol mencapai nilai baru dalam sekitar 8 ms. FL Studio meluncur ke sana, jadi proyek hasil impor bisa sedikit berbeda di titik-titik itu.
 - Di tempat clip pada kontrol yang sama bertumpuk, clip yang dipilih LYNX SHARE bisa berbeda dari yang dipilih FL Studio.
-- Modulator hanya bekerja pada knob LYNX SHARE sendiri, dan tidak ikut saat kamu mengekspor ke `.flp`.
+- Pada ekspor `.flp`, modulator yang mengikuti posisi lagu menjadi clip otomasi (LFO yang tersinkron menjadi LFO clip milik FL Studio). Follower, envelope, keytrack, dan velocity dilewati, dan laporan mencantumkannya.
+- Menggerakkan kontrol saat memutar tanpa merekam? `Tangkap otomasi` di opsi rekaman mengubah gerakan terakhir menjadi otomasi setelahnya.
 
 ## Terkait
 

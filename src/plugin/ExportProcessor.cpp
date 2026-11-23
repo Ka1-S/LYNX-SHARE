@@ -58,11 +58,9 @@ Song makeSong (const Entry& entry)
     song.playlist.clear();
     if (entry.instrument)
     {
-        if (auto channel = banks::defaultChannel (entry.synth, entry.name))
-        {
-            channel->mixerTrack = 0;
-            song.channels.push_back (std::move (*channel));
-        }
+        auto channel = plugexport::instrumentChannel (entry); // (Tetra and Braid: the engine's defaults, no bank)
+        channel.mixerTrack = 0;
+        song.channels.push_back (std::move (channel));
     }
     else
     {
@@ -300,9 +298,14 @@ public:
     {
         if (entry.instrument)
         {
+            // only the values the host moved: one the channel already holds (a loaded state, the engine's defaults) stays
+            // as it is. Written back through the parameter's range (raw -> 0..1 -> raw) it can move by a float step, so a
+            // state saved again after a load differed in a last digit (clap-validator's state-reproducibility-binary on
+            // Fourfold and Wavecoil, round 190pq)
             if (! song.channels.empty())
                 for (auto* p : params)
-                    modelparams::setValue01 (song.channels[0], p->engineIndex, p->getValue());
+                    if (const auto v = p->getValue(); modelparams::value01 (song.channels[0], p->engineIndex) != v)
+                        modelparams::setValue01 (song.channels[0], p->engineIndex, v);
         }
         else
             for (auto* p : params)

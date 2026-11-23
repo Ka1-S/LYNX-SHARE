@@ -5,9 +5,12 @@
 #include <mutex>
 #include <optional>
 
+#include "core/Offline.h"
 #include "platform/Package.h"
 #include "platform/Paths.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
+#include "ui/SetupWizard.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
 
@@ -38,6 +41,9 @@ juce::File updateFolder()
     const auto base = profile != juce::File() ? profile.getChildFile ("Temp") : juce::File::getSpecialLocation (juce::File::tempDirectory);
     return base.getChildFile ("LYNX-update");
 }
+
+// round 190nx: LYNX_OFFLINE=1 / --offline: no update check, download or going back (PRIVACY.md)
+juce::String offlineText() { return tr ("LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline), so it does not connect to the internet: no update check and no update download."); }
 
 juce::File downloadsFolder()
 {
@@ -183,6 +189,11 @@ public:
     // release list). False with `error` on failure or Cancel.
     bool download (const juce::String& url, const juce::File& dest, std::int64_t expected, bool quick, juce::String& failure)
     {
+        if (offline::enabled())
+        {
+            failure = offlineText();
+            return false;
+        }
         dest.getParentDirectory().createDirectory();
         dest.deleteFile();
        #if JUCE_LINUX || JUCE_BSD
@@ -700,6 +711,11 @@ void appImageUpdate()
 
 void startUpdate()
 {
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, tr ("Update"), offlineText());
+        return;
+    }
     auto& c = controller();
     switch (update::methodFor (flavour()))
     {
@@ -791,6 +807,8 @@ static bool justUpdated = false;
 
 void startAutomaticCheck()
 {
+    if (offline::enabled()) // no network at all, not even the quiet check
+        return;
     // round 190gh (B2), tests: LYNX_TEST_MODE + LYNX_UPDATE_URL + LYNX_UPDATE_GO_BACK=1 go back at start, without asking
     if (offered() && platform::testMode() && overrideUrl().isNotEmpty() && env ("LYNX_UPDATE_GO_BACK") == "1")
     {
@@ -798,6 +816,10 @@ void startAutomaticCheck()
         return;
     }
     if (! offered() || ! automatic() || justUpdated)
+        return;
+    // issue #233 (round 190ns): never before the first start's welcome wizard was answered (it shows this choice; its
+    // Finish starts the check when it is ticked)
+    if (! setupWizardDone())
         return;
     // LYNX_TEST_MODE: no network, unless a test fixture is named
     if (platform::testMode() && overrideUrl().isEmpty())
@@ -809,6 +831,11 @@ void checkNow()
 {
     if (! offered())
         return;
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, tr ("Check for updates"), offlineText());
+        return;
+    }
     if (platform::testMode() && overrideUrl().isEmpty())
     {
         message (juce::MessageBoxIconType::InfoIcon, tr ("Check for updates"), "LYNX_TEST_MODE: no network (set LYNX_UPDATE_URL)");
@@ -852,6 +879,11 @@ void goBack()
     if (! offered())
         return;
     const auto title = tr ("Go back to an earlier version");
+    if (offline::enabled())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, title, offlineText());
+        return;
+    }
     if (platform::testMode() && overrideUrl().isEmpty())
     {
         message (juce::MessageBoxIconType::InfoIcon, title, "LYNX_TEST_MODE: no network (set LYNX_UPDATE_URL)");
@@ -987,6 +1019,25 @@ void afterStart()
     });
 }
 
+juce::StringArray removeNewerLeftovers (const juce::File& folder, const juce::File& installingTxt)
+{
+    juce::StringArray removed;
+    if (! installingTxt.existsAsFile() || ! folder.isDirectory())
+        return removed;
+    const auto note = update::parseInstalling (utf8 (installingTxt.loadFileAsString()));
+    for (const auto& name : update::entriesNewerThan (update::parseVersion (note.version)))
+    {
+        const auto entry = folder.getChildFile (fromUtf8 (name));
+        if (! entry.exists())
+            continue;
+        const auto ok = entry.isDirectory() ? entry.deleteRecursively() : entry.deleteFile();
+        log ("helper: " + juce::String (ok ? "removed " : "could not remove ") + entry.getFullPathName() + " (newer than " + fromUtf8 (note.version) + ")");
+        if (ok)
+            removed.add (fromUtf8 (name));
+    }
+    return removed;
+}
+
 bool runApplyHelper (const juce::StringArray& args)
 {
     const auto at = args.indexOf ("--apply-update");
@@ -1053,7 +1104,12 @@ bool runApplyHelper (const juce::StringArray& args)
     if (waited == WAIT_TIMEOUT)
         finish (false, "the installer did not finish");
     else
+    {
+        // round 190nr: an older version's installer leaves what newer versions added (0.1.29 kept 0.1.30's licenses\)
+        if (code == 0)
+            removeNewerLeftovers (folder, setup.getSiblingFile ("installing.txt"));
         finish (code == 0, code == 0 ? juce::String() : "installer exit code " + juce::String ((int) code));
+    }
    #else
     juce::ignoreUnused (at);
    #endif
@@ -1327,8 +1383,7 @@ public:
     explicit NotesPanel (const update::Release& r) : notes (update::releaseNotes (r.body))
     {
         title.setText (r.name.empty() ? "LYNX SHARE " + versionText (r) : fromUtf8 (r.name), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title + 3.0f, true));
-        title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
 
         viewport.setViewedComponent (&notes, false);
@@ -1346,8 +1401,7 @@ public:
         };
         const auto canUpdate = controller().phase == Phase::available && update::methodFor (flavour()) != update::Method::none;
         updateButton.setButtonText (update::methodFor (flavour()) == update::Method::openPage ? tr ("Download...") : tr ("Update"));
-        updateButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-        updateButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
+        ui::dialog::styleButton (updateButton, true);
         updateButton.onClick = [this] {
             startUpdate();
             closeButton.triggerClick();
@@ -1361,7 +1415,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); // (round 190oo, WG-6)
         g.setColour (theme::colour::bg1);
         g.fillRect (viewport.getBounds());
         g.setColour (theme::colour::border);
@@ -1370,20 +1424,20 @@ public:
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (16);
-        title.setBounds (r.removeFromTop (30));
-        r.removeFromTop (8);
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto r = ui::dialog::bodyOf (getLocalBounds()).reduced (16);
         auto buttons = r.removeFromBottom (30);
         r.removeFromBottom (12);
         viewport.setBounds (r.reduced (1));
         notes.fitWidth (viewport.getMaximumVisibleWidth());
-        closeButton.setBounds (buttons.removeFromRight (100));
-        buttons.removeFromRight (8);
+        // (WG-6: LYNX's one order: Open on GitHub on the left; Close, then Update in the accent at the far right)
         if (updateButton.isVisible())
         {
             updateButton.setBounds (buttons.removeFromRight (120));
             buttons.removeFromRight (8);
         }
+        closeButton.setBounds (buttons.removeFromRight (100));
+        buttons.removeFromRight (8);
         githubButton.setBounds (buttons.removeFromLeft (150));
     }
 

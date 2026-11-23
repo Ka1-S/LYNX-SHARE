@@ -11,6 +11,7 @@
 #include "ui/Workspace.h"
 
 #include <set>
+#include <typeinfo>
 
 #if JUCE_WINDOWS
  #ifndef NOMINMAX
@@ -67,21 +68,67 @@ struct ZOrderTest final : juce::Timer
     DetailView* detail() const { return ui != nullptr ? ui->getDetailViewForSnapshot() : nullptr; }
     juce::Component& playlistFrame() const { return ui->workspaceForTest().getFrame (workspace::Panel::playlist); }
 
-    // A press (and its release) at `local` in `c`, through the peer that holds `c`, as the system delivers a click
-    bool click (juce::Component& c, juce::Point<int> local)
+    // The native window on screen at `local` in `c` (Windows: WindowFromPoint), for the report
+    juce::String windowAt (juce::Component& c, juce::Point<int> local) const
+    {
+#if JUCE_WINDOWS
+        const auto screen = c.localPointToGlobal (local).toFloat() * juce::Desktop::getInstance().getGlobalScaleFactor();
+        auto* h = WindowFromPoint ({ (LONG) screen.x, (LONG) screen.y });
+        juce::String what = h == nullptr ? "none" : h == (HWND) window->getWindowHandle() ? "main" : h == (HWND) playlistHandle() ? "playlist" : "other";
+        if (h != nullptr && what == "other")
+        {
+            wchar_t name[64] {};
+            GetClassNameW (h, name, 63);
+            RECT r {};
+            GetWindowRect (h, &r);
+            what << "(" << juce::String (name) << " " << (int) r.left << "," << (int) r.top << "-" << (int) r.right << "," << (int) r.bottom << ")";
+        }
+        return what + "@" + juce::String ((int) screen.x) + "," + juce::String ((int) screen.y);
+#else
+        juce::ignoreUnused (c, local);
+        return "-";
+#endif
+    }
+
+    // A press (and its release) at `local` in `c`, through the peer that holds `c`, as the system delivers a click.
+    // Rollup 0.1.31 step 2 (190nr item 4): the press goes where JUCE finds `c` under the mouse. A peer's positions carry the
+    // Desktop's global scale (LYNX_ZTEST_SCALE runs); the first move that finds `c` (or a child) decides the factor. When a
+    // native window covers `local` on screen (at 150 % the docked Surge XT editor nearly fills the 1240 x 648 window),
+    // `scanRow` tries the rest of that row of `c`, as a user clicks the part they see. Returns whether `c` took the press.
+    bool click (juce::Component& c, juce::Point<int> local, bool scanRow = false)
     {
         auto* peer = c.getPeer();
         if (peer == nullptr)
             return false;
-        // (a peer's positions are not divided by the Desktop's global scale: LYNX_ZTEST_SCALE runs)
-        const auto at = peer->getComponent().getLocalPoint (&c, local).toFloat() * juce::Desktop::getInstance().getGlobalScaleFactor();
         using MIS = juce::MouseInputSource;
-        const auto now = juce::Time::currentTimeMillis();
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now);
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), MIS::defaultPressure,
-                                MIS::defaultOrientation, now + 1);
-        peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now + 60);
-        return true;
+        const auto global = juce::Desktop::getInstance().getGlobalScaleFactor();
+        const auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto name = c.getName().isNotEmpty() ? c.getName() : juce::String (typeid (c).name());
+        const auto hits = [&] (juce::Point<int> p, float factor) {
+            const auto at = peer->getComponent().getLocalPoint (&c, p).toFloat() * factor;
+            peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, juce::Time::currentTimeMillis());
+            auto* under = source.getComponentUnderMouse();
+            return under == &c || (under != nullptr && c.isParentOf (under));
+        };
+        std::vector<juce::Point<int>> points { local };
+        if (scanRow)
+            for (int x = 8; x < c.getWidth() - 8; x += 16)
+                points.push_back ({ x, local.y });
+        line ("click_" + name + "_screen=" + windowAt (c, local));
+        for (const auto& p : points)
+            for (const auto factor : { global, 1.0f })
+                if (hits (p, factor))
+                {
+                    const auto at = peer->getComponent().getLocalPoint (&c, p).toFloat() * factor;
+                    line ("click_" + name + "=hit at " + p.toString() + " factor " + juce::String (factor, 2));
+                    const auto now = juce::Time::currentTimeMillis();
+                    peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), MIS::defaultPressure,
+                                            MIS::defaultOrientation, now + 1);
+                    peer->handleMouseEvent (MIS::InputSourceType::mouse, at, juce::ModifierKeys(), MIS::defaultPressure, MIS::defaultOrientation, now + 60);
+                    return true;
+                }
+        line ("click_" + name + "=covered (no visible point)");
+        return false;
     }
 
     bool clickWindowButton (int card)
@@ -91,7 +138,13 @@ struct ZOrderTest final : juce::Timer
             return false;
         const auto r = dv->windowButtonForCheck (card);
         line ("window_button_" + juce::String (card) + "=" + r.toString());
-        return ! r.isEmpty() && click (*dv, r.getCentre());
+        if (r.isEmpty())
+            return false;
+        if (click (*dv, r.getCentre()))
+            return true;
+        // covered on screen by a plugin editor (a user would move it first): the button's own action, logged
+        line ("window_button_" + juce::String (card) + "_pressed_directly=1");
+        return dv->pressWindowButtonForCheck (card);
     }
 
     void snapshotDesktop()
@@ -154,7 +207,16 @@ struct ZOrderTest final : juce::Timer
         ui = new MainComponent (*engine, false);
         window->setUsingNativeTitleBar (true);
         window->setContentOwned (ui, false);
-        window->setBounds (20, 20, 1500, 900);
+        // round 190nr: on the screen at every scale (1500 x 900 logical was 2250 x 1350 px at 1.5, larger than a 1920 x 1080
+        // screen, and the clicks the test sends off the screen were dropped: 0.1.30 release QA). 1500 / scale x 900 / scale
+        // was too small at 1.5 (the docked editor then covered the Playlist's title bar and the window button), so the
+        // window takes what the primary display's work area has room for (logical px), up to 1500 x 900
+        const auto scale = juce::Desktop::getInstance().getGlobalScaleFactor();
+        auto room = juce::Rectangle<int> (0, 0, 1500, 900);
+        if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+            room = display->userArea;
+        window->setBounds (room.getX() + 20, room.getY() + 20, juce::jmin (1500, room.getWidth() - 40), juce::jmin (900, room.getHeight() - 40));
+        line ("window=" + window->getBounds().toString() + " scale=" + juce::String (scale, 2) + " work_area=" + room.toString());
         window->setVisible (true);
         setMainWindowForOwnership (window.get());
         line ("docking=" + juce::String ((int) nativechild::dockingEnabled()));
@@ -248,7 +310,7 @@ struct ZOrderTest final : juce::Timer
                 startTimer (700);
                 // a click on the Playlist's title bar: the Playlist comes in front (FL's / issue #116's rule stays)
                 auto& frame = playlistFrame();
-                click (frame, { frame.getWidth() / 2, 8 });
+                expect ("playlist_title_bar_clicked_" + name, click (frame, { frame.getWidth() / 2, 8 }, true));
                 return 3;
             }
             case 3:

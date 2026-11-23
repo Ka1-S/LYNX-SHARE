@@ -26,6 +26,7 @@
 #include "core/Mpe.h"
 #include "core/Vfx.h"
 #include "core/ModuleWarmup.h"
+#include "core/GeneratorSmartDisable.h"
 
 namespace lynx
 {
@@ -84,6 +85,9 @@ public:
     bool takePending() noexcept { return pending.exchange (false, std::memory_order_acq_rel); }
     bool take (int index, float& value) noexcept;
     int size() const noexcept { return count; }
+    // Round 190ox: while a state is captured with the modulated parameters at their base, the audio thread's values wait
+    void hold (bool on) noexcept { holding.store (on, std::memory_order_release); }
+    bool held() const noexcept { return holding.load (std::memory_order_acquire); }
 
 private:
     struct Value
@@ -95,6 +99,7 @@ private:
     std::unique_ptr<Value[]> values;
     std::atomic<bool> pending { false };
     std::atomic<std::uint32_t> restoreEpoch { 1 };
+    std::atomic<bool> holding { false };
 };
 
 // A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
@@ -198,6 +203,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Round 190ox: the same with these parameters at the values given (the modulated ones at their base: the saved state
+    // holds the user's value, not a moment of the modulation); the audio thread's changes wait meanwhile.
+    std::optional<std::string> captureState (const std::vector<std::pair<int, float>>& bases);
     // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
     // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);
@@ -238,11 +246,22 @@ public:
     const std::vector<PluginOutputInfo>& outputs() const noexcept { return outs; }
     void configure (const ChannelDef& channel, double bpm) noexcept override;
     void beginChunk (int n) noexcept override;
-    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_relaxed) ? (int) outs.size() : 0; }
+    int auxOutputCount() const noexcept override { return anyAux.load (std::memory_order_acquire) ? (int) outs.size() : 0; }
     int auxOutputTrack (int k) const noexcept override;
     const float* auxOutputData (int k, int side) const noexcept override;
+    // Round 190ok (owner decision D2): FL's generator smart disable (core/GeneratorSmartDisable.h). With the channel's
+    // "Smart disable" on (ChannelDef::smartDisable, taken by configure), the wrapper's "Allow smart disable" and the
+    // global switch, the plugin sleeps after 4 s of silent output with nothing sent to it: idle() then tells the rack not
+    // to call it until a note or MIDI message comes.
+    bool idle() const noexcept override;
+    bool smartDisableActive() const noexcept { return smartOn.load (std::memory_order_relaxed); } // (tests)
+    bool sleeping() const noexcept { return idle(); }                                                // (tests)
 
 private:
+    std::atomic<bool> smartOn { false };
+    std::atomic<std::int64_t> smartHold { gensmart::holdSamples (44100.0) };
+    gensmart::State smart; // audio thread
+    void noteSmartBlock (int n, bool events, const float* const* channels, int numChannels) noexcept;
     void mixOutputs (const float* const* channels, int numChannels, int at, int count, float gl, float gr, float* left, float* right) noexcept;
     friend juce::String pluginStateContentionSelfTest();
     std::vector<PluginOutputInfo> outs;
@@ -354,6 +373,9 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
+    // Round 190ox: the same with these parameters at the values given (the modulated ones at their base: the saved state
+    // holds the user's value, not a moment of the modulation); the audio thread's changes wait meanwhile.
+    std::optional<std::string> captureState (const std::vector<std::pair<int, float>>& bases);
     // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
     // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);
@@ -446,6 +468,8 @@ bool hasSideBus (const juce::AudioPluginInstance& plugin);
 // with fixed blocks: the slot's sidechain reaches the bus, and silence once the slot has none. "OK" or what failed.
 juce::String pluginSidechainSelfTest();
 juce::String pluginStateContentionSelfTest();
+// round 190ok (D2): FL's generator smart disable through PluginInstrument ("OK …" or "ERROR …")
+juce::String generatorSmartDisableSelfTest();
 
 // Plugin formats, known-plugin list (saved in AppData) and instance creation.
 // UI thread, except the scan functions (any thread; one scan at a time) and the background scan.
@@ -483,6 +507,10 @@ public:
     int scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress);
     // The same for a given list of plugin files (targeted scan).
     int scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress);
+    // JSFX scripts (round 190pj, issue #241): writes the bundled pack when this build's is newer, then lists the scripts
+    // of the JSFX roots (Settings › File › JSFX folders) in this process — a header is read, nothing runs — and drops
+    // the listed scripts that are gone. Returns how many were added. Any thread (as the scans).
+    int scanJsfx();
 
     // Background scan of pluginFolders() (or `paths`): never blocks the caller; poll backgroundScan() for progress.
     struct ScanState

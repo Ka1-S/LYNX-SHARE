@@ -3405,6 +3405,49 @@ std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<st
     return out;
 }
 
+std::vector<Note> transistorBassSequenceNotes (const std::vector<std::uint8_t>& state, double songTempo, std::int64_t* lengthTicks)
+{
+    std::vector<Note> out;
+    const auto st = parseState (state);
+    if (! st.usable)
+        return out;
+    const auto& pr = st.programs[(std::size_t) st.editProgram];
+    const auto& q = st.sequences[(std::size_t) pr.sequence];
+    const auto length = std::clamp (q.length, 1, (int) q.steps.size());
+    // ticks per step: 16th notes at the tempo the sequencer runs at (its own BPM makes it faster or slower than the song)
+    const auto tempo = songTempo > 0.0 ? songTempo : 120.0;
+    const auto perStep = (double) ticksPerStep * (q.internalBpm && q.bpm > 0.0 ? tempo / q.bpm : 1.0);
+    // clockSequencer's shuffle: in each pair of steps the second starts late (or early) by the swing law
+    const auto sw = -q.shuffle * 0.5 + 1.0;
+    const auto oddStart = sw >= 1.0 ? 1.0 / sw : 1.0 + (1.0 - sw) / (2.0 - sw);
+    auto startOf = [&] (int step) { return (double) (step & ~1) + ((step & 1) != 0 ? oddStart : 0.0); };
+    auto ticks = [&] (double steps) { return (std::int64_t) std::llround (steps * perStep); };
+    for (int i = 0; i < length; ++i)
+    {
+        const auto& s = q.steps[(std::size_t) i];
+        if (! s.gate)
+            continue;
+        Note n;
+        n.channel = 0;
+        n.key = std::clamp (s.note + pr.transpose, 0, 127);
+        n.start = ticks (startOf (i));
+        auto end = startOf (i) + q.gateLength;
+        if (s.slide)
+        {
+            int next = i + 1;
+            while (next < length && ! q.steps[(std::size_t) next].gate)
+                ++next;
+            end = next < length ? startOf (next) + 0.125 : (double) length;
+        }
+        n.length = std::max<std::int64_t> (1, ticks (end) - n.start);
+        n.velocity = s.accent ? 1.0f : 0.78f;
+        out.push_back (n);
+    }
+    if (lengthTicks != nullptr)
+        *lengthTicks = ticks ((double) length);
+    return out;
+}
+
 const std::vector<EngineParam>& transistorBassParams()
 {
     // parameters 0…41 of a patch (REA_rodada57 §2.2), named after the controls of FL's panel (0…1 each)

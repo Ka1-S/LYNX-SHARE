@@ -34,6 +34,24 @@ LYNX_PLUGIN ("LYNX Tune", 0, lynxTune, dx10, "com.ka1-s.lynx.tune", 0x4c6e7855, 
 LYNX_PLUGIN ("LYNX Voice Shift", 0, voiceShift, dx10, "com.ka1-s.lynx.voice-shift", 0x4c6e784a, "Fx|Pitch Shift", 1)
 LYNX_PLUGIN ("LYNX Gemini Doubler", 0, geminiDoubler, dx10, "com.ka1-s.lynx.gemini-doubler", 0x4c6e7844, "Fx|Spatial", 1)
 LYNX_PLUGIN ("LYNX Quell Denoiser", 0, quellDenoiser, dx10, "com.ka1-s.lynx.quell-denoiser", 0x4c6e7851, "Fx|Restoration", 1)
+// round 190ov: LYNX's later own engines (the effects Live's Drum Buss, Erosion, Corpus, Vinyl Distortion, Spectral Time and
+// Spectral Resonator import onto, the transient designer, LYNX Model). Names: a web search only (docs/PLUGINS-PACK.md).
+// Rollup 0.1.31 step 6 (owner decision): Tetra, Helix and Braid export as LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom
+// (Sequential's Tetra, Line 6's Helix Native and Mutable Instruments' Braids are other makers' products), and Harmonia as
+// LYNX Chimefield (Cherry Audio's Harmonia synth); inside LYNX the engines keep their names. Web search only, 2026-11-21.
+// Held back at 0 in step 6 (CI plugins run 44975814572: a crash in plugexporttest's reference render, a state that didn't
+// save back byte for byte); round 190pq fixed both and builds the three synths as CLAP, VST3 and LV2 (docs/PLUGIN_EXPORT.md).
+LYNX_PLUGIN ("LYNX Strike Shaper", 0, strikeShaper, dx10, "com.ka1-s.lynx.strike-shaper", 0x4c6e7873, "Fx|Dynamics", 1)
+LYNX_PLUGIN ("LYNX Anvil Bus", 0, anvilBus, dx10, "com.ka1-s.lynx.anvil-bus", 0x4c6e7862, "Fx|Distortion|Dynamics", 1)
+LYNX_PLUGIN ("LYNX Corrode", 0, corrode, dx10, "com.ka1-s.lynx.corrode", 0x4c6e7872, "Fx|Distortion|Modulation", 1)
+LYNX_PLUGIN ("LYNX Soundboard", 0, soundboard, dx10, "com.ka1-s.lynx.soundboard", 0x4c6e7864, "Fx|Filter", 1)
+LYNX_PLUGIN ("LYNX Platter", 0, platter, dx10, "com.ka1-s.lynx.platter", 0x4c6e7870, "Fx|Distortion", 1)
+LYNX_PLUGIN ("LYNX Timeprism", 0, timeprism, dx10, "com.ka1-s.lynx.timeprism", 0x4c6e7874, "Fx|Delay", 1)
+LYNX_PLUGIN ("LYNX Chimefield", 0, harmonia, dx10, "com.ka1-s.lynx.chimefield", 0x4c6e7868, "Fx|Filter", 1)
+LYNX_PLUGIN ("LYNX Model", 1, eq, lynxModel, "com.ka1-s.lynx.model", 0x4c6e7837, "Instrument|Synth", 2)
+LYNX_PLUGIN ("LYNX Fourfold", 1, eq, tetra, "com.ka1-s.lynx.fourfold", 0x4c6e7838, "Instrument|Synth", 2)
+LYNX_PLUGIN ("LYNX Wavecoil", 1, eq, helix, "com.ka1-s.lynx.wavecoil", 0x4c6e7839, "Instrument|Synth", 2)
+LYNX_PLUGIN ("LYNX Duoloom", 1, eq, braid, "com.ka1-s.lynx.duoloom", 0x4c6e7830, "Instrument|Synth", 2)
 LYNX_PLUGIN ("LYNX Osc Trio", 1, eq, threeosc, "com.ka1-s.lynx.osc-trio", 0x4c6e7832, "Instrument|Synth", 0)
 LYNX_PLUGIN ("LYNX SimOsc", 1, eq, simsynth, "com.ka1-s.lynx.simosc", 0x4c6e7833, "Instrument|Synth", 0)
 LYNX_PLUGIN ("LYNX Harmlite", 1, eq, harmless, "com.ka1-s.lynx.harmlite", 0x4c6e7834, "Instrument|Synth", 0)

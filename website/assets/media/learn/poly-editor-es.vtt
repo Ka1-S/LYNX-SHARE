@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Estos acordes son una grabación de audio: un clip, todas las notas mezcladas.
+
+00:00:08.800 --> 00:00:13.800
+Haz clic derecho en el clip y elige Editar notas (polifónico).
+
+00:00:14.000 --> 00:00:19.600
+LYNX SHARE encuentra cada nota de los acordes y dibuja cada una por separado.
+
+00:00:19.800 --> 00:00:25.400
+Arrastra la nota superior un semitono hacia abajo: sol mayor pasa a sol menor. Las demás notas no cambian.
+
+00:00:25.600 --> 00:00:30.800
+Pulsa Play en el editor para oír el acorde con la nueva nota.
+
+00:00:31.000 --> 00:00:36.600
+Cada edición es un paso de deshacer, y la canción reproduce el audio editado.

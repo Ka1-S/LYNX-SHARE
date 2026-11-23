@@ -843,7 +843,9 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
     // (core/KiloheartsDsp.h; structures read statically in HeartCore 2.4, measured on kHs Essentials): the visible Type
     // names the nearest Effector algorithm, Wet is the snapin's mix, the law and its values sit in the hidden [12 …]
     if (kind == EffectKind::effector
-        && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"))
+        && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"
+            || type == "comb_filter" || type == "chorus" || type == "trance_gate" || type == "phaser" || type == "distortion" || type == "bitcrush" || type == "frequency_shifter" || type == "unison"
+            || type == "dirty_filter"))
     {
         namespace k = khsdsp;
         auto hidden = [&] (int index, double v) { slot.params[(std::size_t) index] = (float) std::clamp (v, 0.0, 1.0); ++n; };
@@ -895,6 +897,132 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
             hidden (k::valueParam + 2, m.num ("normalize", 0.5));
             hidden (k::valueParam + 3, k::enc::toneValue (m.num ("tone", 640.0)));
             hidden (k::valueParam + 4, std::clamp (m.num ("bias", 0.0), -0.5, 0.5) + 0.5);
+        }
+        else if (type == "comb_filter")
+        {
+            // round 190nh: CombFilterDsp read in HeartCore (REA_rodada190nh)
+            typeIs (5); // Delay (a feed-forward echo)
+            hidden (k::lawParam, k::lawValue (k::Law::comb));
+            hidden (k::valueParam, k::enc::logValue (m.num ("cutoff", 440.0), k::enc::combLo, k::enc::combHi));
+            hidden (k::valueParam + 1, m.flag ("polarity", false) ? 1.0 : 0.0);
+            hidden (k::valueParam + 2, m.flag ("stereo", false) ? 1.0 : 0.0);
+        }
+        else if (type == "chorus")
+        {
+            typeIs (2); // Flanger (the nearest modulated delay)
+            hidden (k::lawParam, k::lawValue (k::Law::chorus));
+            hidden (k::valueParam, k::enc::timeValue (m.num ("delay", 0.004)));
+            hidden (k::valueParam + 1, k::enc::logValue (m.num ("rate", 0.6), k::enc::rateLo, k::enc::rateHi));
+            hidden (k::valueParam + 2, k::enc::timeValue (m.num ("depth", 0.004)));
+            hidden (k::valueParam + 3, m.num ("spread", 1.0));
+            hidden (k::valueParam + 4, m.flag ("multiTap", false) ? 1.0 : 0.0);
+        }
+        else if (type == "unison")
+        {
+            typeIs (2); // Flanger (the nearest modulated delay)
+            hidden (k::lawParam, k::lawValue (k::Law::ensemble));
+            hidden (k::valueParam, std::clamp (m.num ("voices", 6.0), 2.0, 16.0) / 16.0);
+            hidden (k::valueParam + 1, m.num ("detune", 0.25));
+            hidden (k::valueParam + 2, m.num ("spread", 0.5));
+            const auto mo = m.str ("motion");
+            hidden (k::valueParam + 3, mo == "symmetric" ? 0.5 : mo == "sine" ? 1.0 : 0.0);
+        }
+        else if (type == "frequency_shifter")
+        {
+            typeIs (11); // Ring (the nearest frequency effect)
+            hidden (k::lawParam, k::lawValue (k::Law::freqShift));
+            raw ("Wet", 1.0);
+            hidden (k::valueParam, std::clamp (m.num ("shift", 0.0), -5000.0, 5000.0) / 10000.0 + 0.5);
+        }
+        else if (type == "bitcrush")
+        {
+            typeIs (1); // Lo-fi
+            hidden (k::lawParam, k::lawValue (k::Law::bitcrush));
+            raw ("Wet", std::clamp (m.num ("mix2", mix), 0.0, 1.0));
+            hidden (k::valueParam, k::enc::logValue (m.num ("sample_rate", 6000.0), k::enc::crushLo, k::enc::crushHi));
+            hidden (k::valueParam + 1, std::clamp (m.num ("bit_depth", 16.0), 1.0, 16.0) / 16.0);
+            hidden (k::valueParam + 2, m.num ("adc_quality", 1.0));
+            hidden (k::valueParam + 3, m.num ("dac_quality", 0.0));
+            hidden (k::valueParam + 4, m.num ("dither_amount", 0.0));
+            hidden (k::valueParam + 5, m.num ("quantize", 1.0));
+        }
+        else if (type == "distortion")
+        {
+            typeIs (0); // Distort
+            hidden (k::lawParam, k::lawValue (k::Law::distortion));
+            hidden (k::valueParam, k::enc::logValue (m.num ("drive", 2.0), k::enc::driveLo, k::enc::driveHi));
+            hidden (k::valueParam + 1, 0.5 * (std::clamp (m.num ("bias", 0.0), -1.0, 1.0) + 1.0));
+            hidden (k::valueParam + 2, m.num ("spread", 0.0));
+            static constexpr const char* types[6] { "overdrive", "saturate", "foldback", "sine", "hardclip", "quantize" };
+            int t = 0;
+            for (int i = 0; i < 6; ++i)
+                if (m.str ("type") == types[i])
+                    t = i;
+            hidden (k::valueParam + 3, t / 5.0);
+            hidden (k::valueParam + 4, m.num ("dynamics", 0.0));
+            hidden (k::valueParam + 5, m.flag ("dc_filter", true) ? 1.0 : 0.0);
+        }
+        else if (type == "dirty_filter")
+        {
+            // round 190oc: DirtyFilterDsp read in HeartCore (REA_rodada190oc); the type and mode by their saved names
+            typeIs (4); // Filter
+            hidden (k::lawParam, k::lawValue (k::Law::nonlinearFilter));
+            static constexpr const char* types[5] { "low_pass", "band_pass", "high_pass", "notch", "all_pass" };
+            static constexpr const char* modes[9] { "clean", "saturated", "tubular", "clipped", "warm", "biased", "fuzzy", "metallic", "digital" };
+            int t = 0, d = 1;
+            for (int i = 0; i < 5; ++i)
+                if (m.str ("filter_type") == types[i])
+                    t = i;
+            for (int i = 0; i < 9; ++i)
+                if (m.str ("dirt_type") == modes[i])
+                    d = i;
+            hidden (k::valueParam, t / 4.0);
+            hidden (k::valueParam + 1, d / 8.0);
+            hidden (k::valueParam + 2, k::enc::logValue (m.num ("cutoff", 440.0), k::enc::nlfCutLo, k::enc::nlfCutHi));
+            hidden (k::valueParam + 3, k::enc::logValue (m.num ("q", 0.707), k::enc::nlfQLo, k::enc::nlfQHi));
+            hidden (k::valueParam + 4, m.num ("drive", 0.25));
+        }
+        else if (type == "phaser")
+        {
+            typeIs (3); // Phaser
+            hidden (k::lawParam, k::lawValue (k::Law::phaser));
+            hidden (k::valueParam, std::clamp (m.num ("order", 3.0), 1.0, 7.0) / 7.0);
+            hidden (k::valueParam + 1, std::log (std::clamp (m.num ("cutoff", 500.0), 40.0, 10000.0) / 40.0) / std::log (250.0));
+            hidden (k::valueParam + 2, m.num ("depth", 0.5));
+            hidden (k::valueParam + 3, k::enc::logValue (m.num ("rate", 0.6), k::enc::rateLo, k::enc::rateHi));
+            hidden (k::valueParam + 4, m.num ("spread", 0.5));
+        }
+        else if (type == "trance_gate")
+        {
+            typeIs (8); // Trance
+            hidden (k::lawParam, k::lawValue (k::Law::tranceGate));
+            raw ("Wet", std::clamp (m.num ("depth", 1.0), 0.0, 1.0)); // the Mix knob is the gate's depth
+            hidden (k::valueParam, k::enc::timeValue (m.num ("attack", 0.02)));
+            hidden (k::valueParam + 1, k::enc::timeValue (m.num ("decay", 0.1)));
+            hidden (k::valueParam + 2, m.num ("sustain", 0.5));
+            hidden (k::valueParam + 3, k::enc::timeValue (m.num ("release", 0.02)));
+            static constexpr const char* rates[7] { "one_8th", "one_8th_t", "one_16th", "one_16th_t", "one_32th", "one_32th_t", "one_64th" };
+            int ri = 4;
+            for (int i = 0; i < 7; ++i)
+                if (m.str ("rate") == rates[i])
+                    ri = i;
+            hidden (k::valueParam + 4, ri / 6.0);
+            hidden (k::valueParam + 5, m.num ("swing", 0.5));
+            const auto* pats = m.m.get ("patterns");
+            const int sel = std::max (0, (int) std::lround (m.num ("pattern", 1.0)) - 1);
+            int len = 16;
+            if (pats != nullptr && pats->type == Json::Type::array && ! pats->items.empty())
+            {
+                const auto& pat = pats->items[(std::size_t) std::min<int> (sel, (int) pats->items.size() - 1)];
+                len = std::clamp ((int) std::lround (Model { pat }.num ("length", 16.0)), 1, k::maxGateSteps);
+                const auto* steps = pat.get ("steps");
+                for (int i = 0; steps != nullptr && steps->type == Json::Type::array && i < k::maxGateSteps && i < (int) steps->items.size(); ++i)
+                {
+                    const Model st { steps->items[(std::size_t) i] };
+                    hidden (k::gateStepParam + i, ((st.flag ("on", false) ? 1 : 0) + (st.flag ("tie", false) ? 2 : 0)) / 3.0);
+                }
+            }
+            hidden (k::valueParam + 6, len / 64.0);
         }
         else // shaper
         {

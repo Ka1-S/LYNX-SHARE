@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![단축키 관리 창: 검색할 수 있는 동작 목록과 각 동작의 키](/assets/img/wiki/shortcuts.webp)
 
@@ -79,7 +79,7 @@ source: 98cfcfdbfe
 
 ## Clip View와 Device View
 
-이 키들은 클립 실행 워크플로에서만 작동합니다.
+이 키들은 클립 실행 레이아웃에서만 작동합니다.
 
 | 키 | 하는 일 |
 |---|---|

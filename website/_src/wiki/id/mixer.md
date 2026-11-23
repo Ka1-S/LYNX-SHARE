@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![Mixer](/assets/img/mixer.webp)
 
 Setiap channel diputar lewat sebuah insert Mixer. Setiap insert punya fader, pan, mute dan solo, meter puncak, sepuluh slot efek dengan jumlah dry/wet masing-masing, dan EQ bawaan. Semua insert berakhir di Master kecuali kamu mengarahkannya ke tempat lain. Tekan `F9` untuk menampilkan atau menyembunyikan Mixer.
 
-Satu proyek bisa punya hingga 127 insert. Mixer punya strip tambah untuk insert baru. Kotak di bilah judul Mixer memilih satu dari delapan tata letak strip, dari `Ringkas` sampai `Ekstra besar`.
+Satu proyek bisa punya hingga 500 insert. Mixer punya strip tambah untuk insert baru. Kotak di bilah judul Mixer memilih satu dari delapan tata letak strip, dari `Ringkas` sampai `Ekstra besar`.
 
 ## Memasang efek pada channel
 
@@ -115,7 +115,7 @@ Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYN
 - Plugin instrumen dengan beberapa output bisa memutar tiap output di insert-nya sendiri. Lihat [Plugin pihak ketiga](/wiki/plugins/).
 - `Ctrl+L` melakukan hal berbeda di Channel Rack dan di Mixer. Di rack ia memilih insert kosong. Di Mixer ia memakai insert terpilih.
 - Sakelar rute muncul di strip lain, bukan di strip yang terpilih.
-- Batasnya 127 insert per proyek dan sepuluh slot efek per insert.
+- Batasnya 500 insert per proyek dan sepuluh slot efek per insert.
 - Rekaman Edison disimpan sebagai file WAV di folder proyek, bukan di dalam file proyek.
 - Mixer Session di bawah grid clip hanya milik alur kerja Clip-launch. Ia menampilkan insert yang sama dengan Mixer ini. Lihat [Layout](/wiki/layouts/).
 

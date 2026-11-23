@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![Der Mixer](/assets/img/mixer.webp)
 
 Jeder Kanal spielt über ein Mixer-Insert. Jedes Insert hat einen Fader, Pan, Stumm und Solo, eine Spitzenpegelanzeige, zehn Effekt-Slots mit je einem Dry/Wet-Anteil und einen eingebauten EQ. Alle Inserts enden im Master, solange du sie nicht anders routest. Mit `F9` zeigst du den Mixer an oder blendest ihn aus.
 
-Ein Projekt kann bis zu 127 Inserts haben. Der Mixer hat eine Leiste zum Hinzufügen eines neuen. Das Feld in der Titelleiste des Mixers wählt eines von acht Streifenlayouts, von `Kompakt` bis `Extra groß`.
+Ein Projekt kann bis zu 500 Inserts haben. Der Mixer hat eine Leiste zum Hinzufügen eines neuen. Das Feld in der Titelleiste des Mixers wählt eines von acht Streifenlayouts, von `Kompakt` bis `Extra groß`.
 
 ## Einen Effekt auf einen Kanal legen
 
@@ -115,7 +115,7 @@ Wählst du für einen Insert einen externen Eingang, der auch anderes Audio aufn
 - Ein Instrument-Plugin mit mehreren Ausgängen kann jeden Ausgang auf einem eigenen Insert spielen. Siehe [Plugins von Drittanbietern](/wiki/plugins/).
 - `Ctrl+L` macht im Channel Rack und im Mixer Unterschiedliches. Im Rack wählt es freie Inserts. Im Mixer nutzt es das gewählte Insert.
 - Die Routing-Schalter erscheinen auf den anderen Streifen, nicht auf dem gewählten.
-- Das Limit sind 127 Inserts pro Projekt und zehn Effekt-Slots pro Insert.
+- Das Limit sind 500 Inserts pro Projekt und zehn Effekt-Slots pro Insert.
 - Die Aufnahme von Edison wird als WAV-Datei im Ordner des Projekts gespeichert, nicht in der Projektdatei.
 - Der Session-Mixer unter dem Clip-Raster gehört nur zum Clip-Start-Arbeitsablauf. Er zeigt dieselben Inserts wie dieser Mixer. Siehe [Layouts](/wiki/layouts/).
 

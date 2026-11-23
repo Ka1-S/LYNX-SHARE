@@ -102,7 +102,8 @@ TEST (evpane190fz_piano_roll_wiring)
     // remembered for the Piano roll in the settings folder (FL: per window kind, not in the project)
     CHECK (source.find ("platform::settingsFile (\"piano-roll-event-pane.txt\")") != std::string::npos);
     // the grid and the lane leave room for the bar; the lane's height comes from the divider in resized()
-    CHECK (source.find (".withTrimmedBottom (velocityHeight + eventPaneBarArea().getHeight())") != std::string::npos);
+    // (round gap190og: + Live's Velocity footer in the docked Live look, 0 elsewhere)
+    CHECK (source.find (".withTrimmedBottom (velocityHeight + eventPaneBarArea().getHeight() + liveFooterHeight())") != std::string::npos);
     CHECK (source.find ("layoutEventPane(); // (round 190fz") != std::string::npos);
     // the gestures: drag, right-click on release, double-click, middle-click, the target panel's double-click
     CHECK (source.find ("drag = Drag::eventPaneAlternate;") != std::string::npos);

@@ -27,6 +27,74 @@ int curveModeOf (float value) noexcept
     return std::clamp ((int) std::lround (std::isfinite (value) ? value * 12.0f : 0.0f), 0, flcurve::modeCount - 1);
 }
 
+std::vector<std::array<std::vector<CurvePoint>, 2>> flCurves (const std::vector<std::uint8_t>& d)
+{
+    std::vector<std::array<std::vector<CurvePoint>, 2>> axes;
+    if (d.size() < 56)
+        return axes;
+    std::size_t pos = 56;
+    for (int a = 0; a < 3; ++a)
+    {
+        std::array<std::vector<CurvePoint>, 2> curves;
+        pos += 8; // (the axis' joystick assignment and flags)
+        for (auto& curve : curves)
+        {
+            if (pos + 12 > d.size())
+                return {};
+            std::int32_t points = 0, kind = 0, version = 0;
+            std::memcpy (&kind, d.data() + pos, 4);
+            std::memcpy (&version, d.data() + pos + 4, 4);
+            std::memcpy (&points, d.data() + pos + 8, 4);
+            if (kind != 3 || version != 3) // (FL's envelope record header, i32 3, i32 3, in every state seen)
+                return {};
+            pos += 12;
+            if (points < 0 || points > 1024 || pos + 24 * (std::size_t) points + 20 > d.size())
+                return {};
+            for (int k = 0; k < points; ++k, pos += 24)
+            {
+                CurvePoint p;
+                std::memcpy (&p.x, d.data() + pos, 8);
+                std::memcpy (&p.y, d.data() + pos + 8, 8);
+                std::memcpy (&p.tension, d.data() + pos + 16, 4);
+                p.mode = d[pos + 20];
+                if (! std::isfinite (p.x) || ! std::isfinite (p.y) || ! std::isfinite (p.tension))
+                    return {};
+                curve.push_back (p);
+            }
+            pos += 20; // (the curve's tail)
+        }
+        axes.push_back (std::move (curves));
+    }
+    return axes;
+}
+
+double evaluate (const std::vector<CurvePoint>& curve, double x) noexcept
+{
+    if (curve.empty())
+        return x;
+    auto left = x - curve.front().x;
+    if (left <= 0.0)
+        return curve.front().y;
+    for (std::size_t i = 1; i < curve.size(); ++i)
+    {
+        const auto& a = curve[i - 1];
+        const auto& b = curve[i];
+        const auto dx = b.x - a.x;
+        if (dx <= 0.0) // (a jump: passed at once)
+            continue;
+        if (left < dx)
+            return a.y + (b.y - a.y) * flcurve::shape (std::clamp (b.mode, 0, flcurve::modeCount - 1), std::clamp (b.tension, -1.0f, 1.0f), left / dx);
+        left -= dx;
+    }
+    return curve.back().y;
+}
+
+bool isIdentity (const std::vector<CurvePoint>& c) noexcept
+{
+    return c.size() == 2 && c[0].x == 0.0 && c[0].y == 0.0 && c[1].x == 1.0 && c[1].y == 1.0 && c[1].tension == 0.0f
+           && (c[1].mode == flcurve::singleCurve || c[1].mode == flcurve::singleCurve2 || c[1].mode == flcurve::singleCurve3);
+}
+
 EffectParams defaults (EffectKind kind) noexcept
 {
     EffectParams p {};
@@ -164,11 +232,29 @@ class XyEffect final : public Effect
 {
 public:
     explicit XyEffect (EffectKind k) : kind (k) {}
+    // round 190pt: the axes' FL input curves (empty = straight: the level is the target)
+    XyEffect (EffectKind k, std::array<std::vector<CurvePoint>, 3> in) : kind (k), input (std::move (in)) {}
 
     void prepare (double sr) noexcept override { rate = sr; }
     void reset() noexcept override { mover.started = false; }
 
     void process (float*, float*, int n, const EffectParams& params, double bpm) noexcept override
+    {
+        if (kind == EffectKind::xyzController && params[(std::size_t) flInputCurves] >= 0.5f
+            && std::any_of (input.begin(), input.end(), [] (const auto& c) { return ! c.empty(); }))
+        {
+            // FL: the target of axis a is inCurve (level), stored as a float; the smoother and the output curve follow
+            targets = params;
+            for (int a = 0; a < 3; ++a)
+                if (! input[(std::size_t) a].empty())
+                    targets[(std::size_t) level (a)] = (float) evaluate (input[(std::size_t) a], (double) params[(std::size_t) level (a)]);
+            step (targets, n, bpm);
+            return;
+        }
+        step (params, n, bpm);
+    }
+
+    void step (const EffectParams& params, int n, double bpm) noexcept
     {
         mover.step (params, kind, (double) n / rate, bpm);
         for (int a = 0; a < axesOf (kind); ++a)
@@ -192,6 +278,8 @@ private:
     double rate = 44100.0;
     Mover mover;
     std::array<std::atomic<float>, 3> outputs {}, positions {};
+    std::array<std::vector<CurvePoint>, 3> input;
+    EffectParams targets {};
 };
 
 std::int32_t i32At (const std::vector<std::uint8_t>& d, std::size_t at) noexcept
@@ -206,6 +294,18 @@ std::int32_t i32At (const std::vector<std::uint8_t>& d, std::size_t at) noexcept
 std::unique_ptr<Effect> makeEffect (EffectKind kind)
 {
     return std::make_unique<XyEffect> (kind);
+}
+
+std::unique_ptr<Effect> makeEffectWithCurves (const EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::xyzController || slot.params[(std::size_t) flInputCurves] < 0.5f)
+        return xy::makeEffect (slot.kind);
+    std::array<std::vector<CurvePoint>, 3> in;
+    const auto curves = flCurves (slot.state);
+    for (std::size_t a = 0; a < curves.size() && a < 3; ++a)
+        if (! isIdentity (curves[a][0]) && ! curves[a][0].empty())
+            in[a] = curves[a][0];
+    return std::make_unique<XyEffect> (slot.kind, std::move (in));
 }
 
 std::optional<EffectSlot> fromFl (const std::string& pluginName, const std::vector<std::uint8_t>& d)
@@ -246,10 +346,28 @@ std::optional<EffectSlot> fromFl (const std::string& pluginName, const std::vect
             slot.params[(std::size_t) level (a)] = std::clamp (raw (a) / 65536.0f, 0.0f, 1.0f);
         slot.params[(std::size_t) speed (slot.kind)] = std::clamp (1.0f - raw (9) / 4096.0f, 0.0f, 1.0f);
         slot.params[(std::size_t) acceleration (slot.kind)] = std::clamp ((raw (6) / 1024.0f - 1.0f) / 4.0f, 0.0f, 1.0f);
-        // each axis' output curve (2 points: f64 x, f64 y, f32 tension, u8 mode, 2 bytes, i8 sign): its ends become
-        // Min / Max, the second point's mode and tension the axis' curve (FL's point law, core/FlCurve.h). The input
-        // curves are identity in every FL file seen [DATA]: not mapped.
-        for (int a = 0; a < 3; ++a)
+        // each axis' output curve: its ends become Min / Max, its last point's mode and tension the axis' curve (FL's point
+        // law, core/FlCurve.h). Round 190pt: the curves are read in order (a 3-point curve moves the ones after it; the
+        // fixed places read before took other bytes for them), and an input curve that is not straight sets
+        // flInputCurves: the effect then takes the input curves from the state.
+        const auto curves = flCurves (d);
+        for (std::size_t a = 0; a < curves.size() && a < 3; ++a)
+        {
+            const auto& out = curves[a][1];
+            if (out.size() >= 2)
+            {
+                slot.params[(std::size_t) minimum ((int) a)] = (float) std::clamp (out.front().y, 0.0, 1.0);
+                slot.params[(std::size_t) maximum ((int) a)] = (float) std::clamp (out.back().y, 0.0, 1.0);
+                if (out.back().mode < flcurve::modeCount)
+                {
+                    slot.params[(std::size_t) xy::tension ((int) a)] = std::clamp (out.back().tension, -1.0f, 1.0f) * 0.5f + 0.5f;
+                    slot.params[(std::size_t) curveMode ((int) a)] = curveModeValue (out.back().mode);
+                }
+            }
+            if (! curves[a][0].empty() && ! isIdentity (curves[a][0]))
+                slot.params[(std::size_t) flInputCurves] = 1.0f;
+        }
+        for (int a = 0; curves.empty() && a < 3; ++a) // (a state whose curves are not FL's records: the fixed places, as before)
         {
             const auto curve = (std::size_t) 56 + (std::size_t) a * (8 + 160) + 8 + 80;
             if (curve + 80 > d.size() || i32At (d, curve + 8) < 2)

@@ -1,5 +1,5 @@
 ---
-source: d2bebc77b1
+source: cbd205f138
 ---
 ![De MIDI-pagina van de instellingen: ingangsapparaten, uitgangsapparaten met master sync, en externe sync](/assets/img/wiki/settings-midi.webp)
 
@@ -100,7 +100,7 @@ MPE zit in een eerste fase. Een MPE-controller speelt elke noot met zijn eigen p
 
 ## MIDI Map Mode en Key Map Mode
 
-In de [Clip-launch-werkwijze](/wiki/layouts/) kunnen clips, scenes en knoppen worden gekoppeld zoals in Ableton Live. De knoppen `MIDI` en `Toonsoort` naast de schakelaar `Beide`, `Raster`, `Song` zetten de modi aan, net als `Ctrl+M` en `Ctrl+K`.
+In de [Clipstart-lay-out](/wiki/layouts/) kunnen clips, scenes en knoppen worden gekoppeld zoals in Ableton Live. De knoppen `MIDI` en `Toonsoort` naast de schakelaar `Beide`, `Raster`, `Song` zetten de modi aan, net als `Ctrl+M` en `Ctrl+K`.
 
 1. Druk op `Ctrl+M` voor MIDI Map Mode, of op `Ctrl+K` voor Key Map Mode. Elk element dat kan worden gekoppeld krijgt een kleur, blauw voor MIDI en oranje voor toetsen.
 2. Klik op een element: een clipslot, een scene, de stopknop van een track, `Alle clips stoppen`, play, stop, record, `Sessie-opname`, het metronoom, of een knop van de Sessiemixer of de Device View.
@@ -145,7 +145,7 @@ In de [Clip-launch-werkwijze](/wiki/layouts/) kunnen clips, scenes en knoppen wo
 - Een noot die door een pedaal wordt vastgehouden, wordt opgenomen tot het moment dat het pedaal omhoogkomt.
 - Een automation clip neemt een regelaar niet terug terwijl je hem vanaf een controller beweegt. De regelaar volgt zijn automatisering weer als het afspelen de volgende keer start.
 - Notenkoppelingen die in `Instellingen voor afstandsbediening` zijn gemaakt, worden niet naar een .flp-export geschreven.
-- `Ctrl+M` en `Ctrl+K` starten de map-modi alleen in de Clip-launch-werkwijze. Map Mode heeft nog geen macrokoppeling of notenbereiken.
+- `Ctrl+M` en `Ctrl+K` starten de map-modi alleen in de Clipstart-lay-out. Map Mode heeft nog geen macrokoppeling of notenbereiken.
 
 ## Gerelateerd
 

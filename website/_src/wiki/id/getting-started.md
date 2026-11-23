@@ -1,7 +1,7 @@
 ---
-source: 0101adbb66
+source: f439a070b5
 ---
-LYNX SHARE adalah DAW gratis dan open-source untuk Windows, macOS, dan Linux dengan tiga alur kerja dalam satu program. Bawaannya adalah alur kerja FL Studio: kamu memprogram pattern di Channel Rack dan Piano Roll, menyusunnya di Playlist, dan memixnya di Mixer. Alur kerja peluncuran klip meluncurkan clip dan scene dari kisi, bergaya Ableton Live, dan alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile. `Tampilan › Gaya tata letak` beralih di antaranya kapan saja. Program ini membuka proyek FL Studio (`.flp`), set Ableton Live (`.als`), dan proyek FL Studio Mobile (`.flm`), dan menyimpan format `.lynx` miliknya sendiri.
+LYNX SHARE adalah DAW gratis dan open-source untuk Windows, macOS, dan Linux dengan tiga alur kerja dalam satu program. Bawaannya adalah alur kerja FL Studio: kamu memprogram pattern di Channel Rack dan Piano Roll, menyusunnya di Playlist, dan memixnya di Mixer. Alur kerja peluncuran klip meluncurkan clip dan scene dari kisi, bergaya Ableton Live, dan alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile. `Tampilan › Gaya tata letak` beralih di antaranya kapan saja. Program ini membuka proyek FL Studio (`.flp`), set Ableton Live (`.als`), proyek FL Studio Mobile (`.flm`), file DAWproject, proyek GarageBand dan BandLab, serta modul tracker, mengekspor `.flp`, `.als`, `.dawproject`, dan `.flm`, dan menyimpan format `.lynx` miliknya sendiri.
 
 Ini masih alpha. Harap maklum jika ada bug, dan simpan sesering mungkin.
 
@@ -9,7 +9,7 @@ Ini masih alpha. Harap maklum jika ada bug, dan simpan sesering mungkin.
 
 1. Periksa tabel di bawah untuk memastikan sistemmu didukung.
 2. Unduh dan instal. [Instalasi](/wiki/install/) berisi langkah untuk tiap sistem.
-3. Jalankan. Wizard pengaturan singkat memilih bahasa, menguji output audio, memungkinkan kamu memilih salah satu dari tiga alur kerja, dan mencantumkan folder plugin, yang lalu dipindai di latar belakang. Kamu bisa melewatinya dan membukanya lagi nanti lewat `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...`.
+3. Jalankan. Kartu selamat datang menanyakan dari mana kamu berasal dan membuka tata letak yang sesuai dalam satu klik. Kartu ini juga mengatur bahasa, menguji suara, dan menanyakan apakah perlu memeriksa pembaruan, sementara folder plugin dipindai di latar belakang. `Pengaturan lainnya (driver audio, folder plugin)...` membuka wizard pengaturan lengkap, juga lewat `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...`.
 4. Jika kamu tidak mendengar apa-apa, buka [Pengaturan audio](/wiki/audio-setup/).
 5. Baca [Tur jendela](/wiki/tour/), lalu buat [Lagu pertamamu](/wiki/first-song/).
 
@@ -19,7 +19,7 @@ Ini masih alpha. Harap maklum jika ada bug, dan simpan sesering mungkin.
 |---|---|
 | Windows | Windows 10 atau 11, 64-bit |
 | macOS | macOS 11 Big Sur atau lebih baru, Intel atau Apple silicon |
-| Linux | x86_64 dengan glibc 2.35 atau lebih baru (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch atau Manjaro terbaru), X11 atau XWayland |
+| Linux | x86_64 atau arm64 dengan glibc 2.35 atau lebih baru (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch atau Manjaro terbaru; arm64 juga di Raspberry Pi 4 atau 5 dengan OS 64-bit), X11 atau XWayland |
 
 Kamu tidak perlu audio interface. LYNX SHARE memutar lewat perangkat suara yang sudah dipakai sistemmu. Kamu juga tidak perlu FL Studio. Jika FL Studio terinstal di komputer yang sama, LYNX SHARE menemukan sample-nya dan memakai file plugin yang sama untuk proyek `.flp`.
 

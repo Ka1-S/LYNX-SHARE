@@ -2,10 +2,11 @@
 <p>LYNX SHARE 可以承载其他厂商的乐器和效果器插件。它通过扫描插件文件夹来找到它们，<code>选项 › 插件管理器...</code> 会显示它找到了什么。LYNX SHARE 自己的乐器和效果器在<a href="/wiki/built-in/">内置乐器和效果器</a>中介绍。</p>
 <h2 id="scan-and-add-a-plugin">扫描并添加插件</h2>
 <ol><li>选择 <code>选项 › 扫描插件</code>。进度显示在提示栏中，你可以继续工作。</li><li>如果插件在它自己的文件夹中，请打开 <code>选项 › 插件管理器...</code>，单击 <code>插件文件夹...</code>，添加该文件夹，然后单击 <code>查找新插件</code>。</li><li>按 <code>F8</code> 打开插件选择器，输入插件名称的一部分。</li><li>双击它或按 <code>Enter</code>。乐器会变成新通道。效果器会进入所选的混音台插入轨。</li></ol>
-<p>首次启动时，设置向导会列出插件文件夹，并在后台扫描它们。<code>选项 › 设置向导（语言、音频、插件文件夹）...</code> 可再次打开它。每次启动几秒钟后，LYNX SHARE 也会查找新插件。</p>
+<p>首次启动时，LYNX SHARE 会在欢迎卡片打开期间于后台扫描插件文件夹。<code>选项 › 设置向导（语言、音频、插件文件夹）...</code> 会再次显示这些文件夹。每次启动几秒钟后，LYNX SHARE 也会查找新插件。</p>
 <h2 id="formats-per-system">各系统的格式</h2>
-<div class="tablewrap"><table><thead><tr><th>系统</th><th>承载的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>系统</th><th>承载的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2、JSFX</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units、JSFX</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2、JSFX</td></tr></tbody></table></div>
 <p>macOS 上不承载 VST2。在 Linux 上，Windows 插件可通过 <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> 和 Wine 使用，二者需要你自己安装：把 yabridge 同步到的文件夹添加为插件文件夹。</p>
+<p>JSFX 脚本是 REAPER 的效果器和乐器格式，可在所有系统上运行：LYNX SHARE 自带 31 个免费脚本（来自 chokehold，MIT 许可），位于浏览器的 <code>插件数据库 › 效果器 › JSFX</code> 和 <code>插件数据库 › 发生器 › JSFX</code>，也可在插件选择器中找到。<code>Documents/LYNX/JSFX</code> 和 REAPER 的 Effects 文件夹中的脚本也会被找到，<code>设置 › 文件 › JSFX 文件夹</code> 可添加更多文件夹。LYNX SHARE 在自己的面板中显示脚本的滑块；自己绘制界面的脚本只显示其滑块。</p>
 <h2 id="the-plugin-manager">插件管理器</h2>
 <div class="tablewrap"><table><thead><tr><th>控件</th><th>作用</th></tr></thead><tbody><tr><td>搜索框</td><td>按名称、厂商、格式或文件筛选</td></tr><tr><td><code>全部</code>、<code>乐器</code>、<code>效果器</code>、<code>收藏</code>、<code>失败</code></td><td>选择列出哪些插件</td></tr><tr><td>星标列</td><td>标记收藏</td></tr><tr><td><code>位数</code> 列</td><td>32、64 或 32+64（Windows）</td></tr><tr><td><code>状态</code> 列</td><td><code>确定</code>、<code>未找到文件</code> 或 <code>加载失败</code></td></tr><tr><td><code>查找新插件</code></td><td>扫描列表中还没有的文件</td></tr><tr><td><code>全部重新扫描...</code></td><td>忘掉失败的文件，并重新检查每一个文件</td></tr><tr><td><code>插件文件夹...</code></td><td>编辑被扫描的文件夹</td></tr><tr><td><code>添加插件文件...</code></td><td>添加单个插件文件</td></tr></tbody></table></div>
 <p>每个插件文件都在独立进程中检查。崩溃或卡住 30 秒的文件会被标记为失败，之后会被跳过。在 Windows 上，失败的文件及原因列在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</p>
@@ -24,7 +25,7 @@
 <h2 id="32-bit-plugins-windows-only">32 位插件（仅限 Windows）</h2>
 <p>在 Windows 上，32 位的 VST2 和 VST3 插件通过桥接程序（<code>LYNX-bridge32.exe</code>）运行。桥接不会增加延迟。在其中崩溃的插件会自行停止，而 LYNX SHARE 继续播放。桥接插件的编辑器在它自己的窗口中打开，不能停靠或固定。当一个插件同时安装了 32 位和 64 位版本时，插件窗口 <code>封装器设置</code> 中的 <code>位数</code> 决定加载哪一个。</p>
 <h2 id="plugin-performance-monitor">插件性能监视器</h2>
-<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="插件性能监视器：每个乐器和效果器占一行，显示其占用的处理时间份额" loading="lazy" width="720" height="380"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="插件性能监视器：每个乐器和效果器占一行，显示其占用的处理时间份额" loading="lazy" width="840" height="380"></a></figure>
 <p><code>工具 › 插件性能监视器...</code> 列出每个乐器和效果器所占用的处理时间：当前值、平均值和峰值。100% 表示在音频持续的整段时间里，一个处理器核心一直处于忙碌状态。</p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>查找</code></td><td>按插件、通道或插入轨筛选</td></tr><tr><td><code>仅插件</code></td><td>隐藏 LYNX SHARE 自己的乐器和效果器</td></tr><tr><td><code>冻结</code></td><td>停止更新数字</td></tr><tr><td><code>播放时重置</code></td><td>每次开始播放时重新计算平均值和峰值</td></tr><tr><td><code>重置</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
 <h2 id="send-an-instrument-s-outputs-to-separate-inserts">把乐器的输出送到不同的插入轨</h2>
@@ -34,6 +35,10 @@
 <ol><li>扫描插件。两者都会作为乐器出现，厂商是 Image-Line。第一次扫描可能要一些时间，因为整个 FL Studio 都会在插件内启动。</li><li>把 <code>FL Studio VSTi</code> 添加到一个通道并打开它的窗口。点击 FL Studio 标志可打开 FL Studio 自己的窗口，里面有它的通道机架、混音台和浏览器。</li><li>在 FL Studio 的通道机架中添加一个乐器。新的 FL Studio 插件开始时只有一个空的采样器，在你添加乐器之前不会发声。来自 LYNX SHARE 的音符会播放 FL Studio 通道机架中选中的通道。</li><li>LYNX SHARE 播放时，FL Studio 自己的样式也会播放，速度跟随 LYNX SHARE 的速度。</li></ol>
 <p>你在 FL Studio 内部搭建的内容会随 LYNX SHARE 工程一起保存。<code>FL Studio VSTi (Multi)</code> 有 16 路立体声输出，可以在各自独立的插入轨上播放（见上一节）。你的 FL Studio 许可证决定哪些 FL 插件能在其中使用。LYNX SHARE 自己不会加载 FL Studio 的插件文件。</p>
 <p>如果 FL Studio 插件被列为 <code>加载失败</code>，请在 <code>选项 › 插件管理器...</code> 中右键点击它，选择 <code>重试（立即扫描此文件）</code>。</p>
+<h2 id="lynx-s-own-plugins-in-other-daws">在其他 DAW 中使用 LYNX 自己的插件</h2>
+<p>LYNX SHARE 自己的效果器和乐器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供给其他 DAW 使用的插件版本。它们是<a href="https://github.com/Ka1-S/LYNX-SHARE/releases">发布页面</a>上单独的可选下载：适用于 Windows、macOS 和 Linux 的 <code>LYNX-Plugins-&lt;version&gt;</code>。</p>
+<ul><li>所有插件都在一个 CLAP 文件 <code>LYNX Plugins.clap</code> 里。其中一小部分也提供 VST3 版本，在 Linux 上还提供 LV2 版本。</li><li>包中的乐器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。</li><li>在 Windows 上，请选 <code>LYNX-Plugins-&lt;version&gt;-win-x64.7z</code>（约 20 MB）。<code>.zip</code>（约 195 MB）里的文件完全相同。</li><li>运行压缩包里的安装脚本（Windows 用 <code>install.cmd</code>，macOS 和 Linux 用 <code>install.sh</code>），然后在你的 DAW 里重新扫描插件。</li><li>插件打开的编辑器和 LYNX SHARE 里的一样，它的状态可以在 LYNX SHARE 中作为工程打开。</li></ul>
+<p>完整列表见 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md">PLUGINS-PACK.md</a>。</p>
 <h2 id="the-plugin-database-folder">插件数据库文件夹</h2>
 <p><a href="/wiki/browser/">浏览器</a>的插件数据库、插件选择器和插件菜单中的文件夹，都对应磁盘上的一个文件夹：文档文件夹中的 <code>LYNX/Plugin database</code>。要打开它，请在浏览器中右键单击 <code>插件数据库</code>，然后选择 <code>打开</code>。</p>
 <ul><li><code>效果器</code> 和 <code>发生器</code> 里每个插件有一个 <code>.lynxplugin</code> 文件。可以新建文件夹和子文件夹（最多 4 层），再把文件移进去。</li><li>重命名文件即可在菜单中重命名插件。删除文件即可把插件从菜单中去掉，但不会卸载它。</li><li><code>已安装</code> 里有每个插件的条目。把其中一个复制到 <code>效果器</code> 或 <code>发生器</code>，即可找回该插件。</li></ul>

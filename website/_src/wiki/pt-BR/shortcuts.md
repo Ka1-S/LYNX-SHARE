@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![A janela Manage shortcuts: uma lista pesquisável de ações com as teclas de cada uma](/assets/img/wiki/shortcuts.webp)
 
@@ -79,7 +79,7 @@ Algumas dessas teclas fazem outra coisa dentro de um editor que tem o foco. No P
 
 ## Clip View e Device View
 
-Estas teclas funcionam só no fluxo por disparo de clipes.
+Estas teclas funcionam só no layout de lançamento de clipes.
 
 | Tecla | O que faz |
 |---|---|

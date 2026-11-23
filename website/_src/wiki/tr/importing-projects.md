@@ -1,11 +1,11 @@
 ---
-source: c4e89e7e72
+source: 532b2eee04
 ---
-`Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
+`Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 
 ## Başka bir programdan proje açma
 
-1. `Dosya › Aç...` komutunu seçin ve `.flp`, `.als`, `.flm` veya `.mid` dosyasını seçin.
+1. `Dosya › Aç...` komutunu seçin ve `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid`, `.zip` veya tracker modülü (`.mod`, `.xm`, `.s3m`, `.it`) dosyasını seçin.
 2. LYNX SHARE projenin plugin'lerini ve sample'larını ararken bekleyin.
 3. Bir şey bulunamadıysa `Eksik dosyalar` penceresi (Eksik dosyalar) açılır. Onu sample'larınıza yönlendirin ya da kapatın.
 4. Başlık çubuğu artık projenin nereden geldiğini gösterir, örneğin "(imported from FL Studio)".
@@ -16,11 +16,16 @@ source: c4e89e7e72
 | Format | Dönüştürülenler | Dönüştürülmeyenler |
 |---|---|---|
 | `.flp` (FL Studio) | Kanallar, sample'lar, pattern'ler, slide ve porta notaları, tüm aranjmanlar, işaretçiler, ölçü işareti değişiklikleri, otomasyon, kontrolcü bağlantıları, yönlendirmeli Mixer, sidechain'ler, kanal EQ'su ve yerel efektler | FLEX paketleri şifrelidir ve asla açılmaz. Bir FLEX kanalı, preset adına göre seçilen bir synth patch'i alır |
-| `.als` (Live 11 ve 12) | MIDI, ses, grup ve return track'leri, tempo, ölçü işareti, locator'lar, döngü, ses, pan, mute, solo ve otomasyonlarıyla send'ler, Session klipleri ve sahneler, warp işaretçileri, rack'ler ve Drum Rack'ler ve Live'ın kendi cihazlarının çoğu (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift ve daha fazlası) LYNX SHARE'in kendi cihazları olarak | Live'ın LYNX SHARE karşılığı olmayan cihazları (Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator patch'leri ve diğerleri) atılır ve listelenir. MIDI Effect Rack'ler dönüştürülmez |
+| `.als` (Live 11 ve 12) | MIDI, ses, grup ve return track'leri, tempo, ölçü işareti, locator'lar, döngü, ses, pan, mute, solo ve otomasyonlarıyla send'ler, Session klipleri ve sahneler, warp işaretçileri, rack'ler ve Drum Rack'ler ve Live'ın kendi cihazlarının çoğu (EQ Eight, Compressor, Glue Compressor, Reverb, Hybrid Reverb, Delay, Grain Delay, Auto Filter, Saturator, Roar, Utility, Simpler, Drift, Operator, Wavetable ve daha fazlası) LYNX SHARE'in kendi cihazları olarak | Live'ın LYNX SHARE karşılığı olmayan cihazları (Amp, Cabinet, Beat Repeat, Vocoder ve diğerleri) atılır ve listelenir |
 | `.flm` (FL Studio Mobile) | Tempo, ölçü işareti, kanal başına bir mixer insert'i, şerit başına bir Playlist izi, pattern'ler, ofset ve pitch'li ses klipleri, davul kit'leri, DW Sampler ve `.dwp` programları, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth ve SuperSaw, efektler, otomasyon ve akor setleri | Diğer FLM generator'ları dahili synth ile çalar |
+| `.dawproject` (Bitwig Studio, Studio One, Cubase ve diğer uygulamalar) | Track'ler, klasörler, klipler, notalar, warp işaretçileriyle ses, otomasyon, tempo, işaretçiler, send'li mixer, klip ızgarasına giden sahneler ve durumlarıyla VST3, VST2 ve CLAP plugin'leri. Formatın EQ, compressor, gate ve limiter'ı LYNX SHARE'in kendi cihazları olur | Nota efektleri, nota başına ifadeler ve diğer uygulamanın kendi cihazları içe aktarma raporunda listelenir |
+| `.band` (GarageBand 10, iOS için GarageBand) | Track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, işaretçi olarak bölümler, seviye, pan ve mute, Basit iş akışı track'leri olarak. iOS için GarageBand'de yapılan Sampler enstrümanları | Enstrüman track'leri dahili synth'i ve davulları çalar. Drummer region'ları, take klasörleri ve tempo değişiklikleri listelenir. GarageBand 11 ve öncesinin projeleri okunamaz |
+| `.blx` (BandLab) | Loop'larıyla track'ler, MIDI ve ses region'ları, tempo, ölçü işareti, tonalite, ses seviyesi, pan ve mute, ses seviyesi ve pan otomasyonu ve yaygın efektler, Basit iş akışı track'leri olarak | Enstrüman track'leri dahili synth'i ve davulları çalar. Diğer efektler ve Mastering preset'i dışarıda bırakılır ve listelenir. Yalnızca uydurma projelerde test edildi |
 | `.mid` | Notalar, ölçü işaretleri ve her tempo değişikliği | Bir MIDI dosyası ses taşımaz: kanallar LYNX SHARE synth'ini ya da bir MIDI Out kanalı alır |
+| `.mod`, `.xm`, `.s3m`, `.it` (tracker modülleri) | Sample'larıyla Sampler kanalları olarak enstrümanlar, pattern'ler, Playlist olarak sıra listesi, hız ve tempo, nota ses düzeyi, pan, gecikme ve kesme; kanalın olayları olarak ses düzeyi ve pan değişiklikleri (MOD ve XM), notaların perde eğrileri olarak kayma, vibrato, arpej ve perde zarfları | Diğer efektler ve enstrüman zarfları içe aktarma raporunda sayılır. `Görünüm › Tracker` notaları tracker usulüyle düzenler |
+| `.zip` | FL Studio'nun sıkıştırılmış loop paketi veya sample'larıyla dışa aktarılmış bir proje: kendi klasörüne çıkarılır, sonra içindeki proje sample'larıyla açılır | |
 
-Bir `.flp` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.als` içindeki VST2 ve VST3 plugin'leri, aynı plugin bilgisayarınızda kuruluysa kaydedilmiş durumlarıyla yüklenir.
+Bir `.flp` veya `.dawproject` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.als` içindeki VST2 ve VST3 plugin'leri, aynı plugin bilgisayarınızda kuruluysa kaydedilmiş durumlarıyla yüklenir.
 
 ## FL Studio'nun kendi plugin'leri
 
@@ -84,9 +89,18 @@ Gerçek plugin'i geri almak için onu kurun, `Seçenekler › Plugin tara` seçe
 
 [Piano Roll](/wiki/piano-roll/)'daki `Ctrl+M`, bir MIDI dosyasını geçerli kanala içe aktarır.
 
+## Başka bir projeden izleri içe aktarma
+
+`Dosya › İçe aktar › Başka bir projeden parçalar...` başka bir projenin izlerini, açık projeyi kapatmadan içine getirir. `Dosya › Aç...` komutunun okuduğu her formatı okur.
+
+1. Projeyi seçin. Bir pencere onun Playlist izlerini ve her birinin içerdiklerini listeler.
+2. İstediğiniz izleri işaretleyin.
+3. `Mikser insert'leri ve efektlerle` ve `Otomasyonla` seçeneklerinin de gelip gelmeyeceğini ve `Şuraya yerleştir` şarkı başına mı yoksa zaman seçiminin başına mı konulacağını seçin.
+4. İçe aktarmak için tıklayın. Yeni izler, kanallar, pattern'ler ve insert'ler tek adım olarak gelir; yani tek bir geri alma hepsini geri götürür.
+
 ## Bilmekte fayda var
 
-- `Yardım › Eksik dosyalar...` pencereyi sonradan yeniden açar. `Yardım › Last FL Studio import report` neyin yaklaşık karşılandığını, dışarıda bırakıldığını veya kurulu olmadığını listeler.
+- `Yardım › Eksik dosyalar...` pencereyi sonradan yeniden açar. `Yardım › Son proje içe aktarma raporu` neyin yaklaşık karşılandığını, dışarıda bırakıldığını veya kurulu olmadığını listeler.
 - Bir Live set'inin Session klipleri, Klip başlatma yerleşiminin klip ızgarasına gider. `Seçenekler › Genel ayarlar...` içindeki `Live setlerinin oturum klipleri` onları bunun yerine Playlist'e yerleştirir.
 
 ## İlgili sayfalar

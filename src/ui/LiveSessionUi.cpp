@@ -3,11 +3,13 @@
 #include <memory>
 
 #include "engine/AudioEngine.h"
+#include "core/Offline.h"
 #include "engine/LiveSessions.h"
 #include "platform/Paths.h"
 #include "ui/LiveChat.h"
 #include "ui/LiveRemoteUi.h"
 #include "ui/PluginWindow.h"
+#include "ui/DialogFrame.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -24,6 +26,12 @@ void rememberName (const juce::String& name)
 {
     nameFile().getParentDirectory().createDirectory();
     nameFile().replaceWithText (name.trim());
+}
+
+juce::String offlineText()
+{
+    return tr ("LYNX SHARE is in offline mode (LYNX_OFFLINE or --offline) and opens no network connection, so live sessions are off. "
+               "Send project... and Merge a part... still work: they use files you send yourself.");
 }
 
 void warn (const juce::String& title, const juce::String& text)
@@ -63,8 +71,11 @@ juce::String myName()
 void addMenuItems (juce::PopupMenu& menu, Context c)
 {
     const bool active = c.live.isActive();
-    menu.addItem (tr ("Start live session..."), ! active, false, [c] { start (c); });
-    menu.addItem (tr ("Join live session..."), ! active, false, [c] { join (c); });
+    const bool offline = lynx::offline::enabled(); // LYNX_OFFLINE=1 / --offline: no network, so no live sessions (a note says why)
+    menu.addItem (tr ("Start live session..."), ! active && ! offline, false, [c] { start (c); });
+    menu.addItem (tr ("Join live session..."), ! active && ! offline, false, [c] { join (c); });
+    if (offline)
+        menu.addItem (tr ("Live sessions are off: offline mode"), true, false, [] { warn (tr ("Live session"), offlineText()); });
     menu.addItem (tr ("Show invite code..."), active && c.live.isHost() && c.live.getInviteCode().isNotEmpty(), false, [c] { showInvite (c); });
     // round 169j: chat, following the host, permissions during the session
     const auto unread = c.live.unreadChat();
@@ -84,6 +95,8 @@ void addMenuItems (juce::PopupMenu& menu, Context c)
 
 void start (Context c)
 {
+    if (lynx::offline::enabled())
+        return warn (tr ("Start live session"), offlineText());
     auto* w = new juce::AlertWindow (tr ("Start live session"),
                                      tr ("Up to {0} people join you and edit this project together over the internet, each on their own computer. "
                                          "Everything is end-to-end encrypted with the invite code: the LYNX SHARE relay only passes it on.",
@@ -92,7 +105,7 @@ void start (Context c)
     w->addTextEditor ("me", myName(), tr ("Your name"));
     w->addComboBox ("edit", { tr ("Only their own channels, patterns, inserts and rows (recommended)"), tr ("Everything") }, tr ("Guests may edit"));
     w->addComboBox ("keep", { tr ("Only their own part (recommended)"), tr ("A full copy of the project") }, tr ("When the session ends, guests keep"));
-    w->addButton (tr ("Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton (trc ("@action button: Start"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([c, w] (int result) {
                             if (result != 1)
@@ -116,6 +129,8 @@ void start (Context c)
 
 void join (Context c)
 {
+    if (lynx::offline::enabled())
+        return warn (tr ("Join live session"), offlineText());
     auto* w = new juce::AlertWindow (tr ("Join live session"),
                                      tr ("Type or paste the invite code the host sent you. The host's project opens here and every change "
                                          "anyone makes reaches everyone."),
@@ -189,9 +204,11 @@ void leave (Context c)
                                         }));
 }
 
+// (round 190oo, WG-6: both on the one dialog frame, ui::dialog::Alert: the leave / keep answer left, the Return one in
+// the accent at the far right)
 std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostName, const juce::String& when)
 {
-    auto w = std::make_unique<juce::AlertWindow> (
+    auto w = std::make_unique<ui::dialog::Alert> (
         tr ("Go back into the live session"),
         (hostName.isNotEmpty() ? tr ("LYNX SHARE closed while you were in {0}'s live session ({1}).", { hostName, when })
                                : tr ("LYNX SHARE closed while you were in a live session ({0}).", { when }))
@@ -205,7 +222,7 @@ std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostNam
 std::unique_ptr<juce::AlertWindow> makeMediaLimitDialog (const juce::String& name, juce::int64 used, juce::int64 limit)
 {
     auto size = [] (juce::int64 bytes) { return juce::String::fromUTF8 (lynx::live::mediaSize (bytes).c_str()); };
-    auto w = std::make_unique<juce::AlertWindow> (
+    auto w = std::make_unique<ui::dialog::Alert> (
         tr ("Live session"),
         tr ("{0} has sent {1} of audio files into this session; the limit for one guest is {2}. Their newest files are waiting on their computer.",
             { name, size (used), size (limit) })
@@ -218,6 +235,8 @@ std::unique_ptr<juce::AlertWindow> makeMediaLimitDialog (const juce::String& nam
 
 void offerResume (Context c)
 {
+    if (lynx::offline::enabled()) // (the journal stays for the next start without offline mode)
+        return;
     const auto journal = LiveSessionManager::defaultJournal();
     const auto info = LiveSessionManager::readJournal (journal);
     if (! info)

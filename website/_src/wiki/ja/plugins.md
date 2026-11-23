@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHAREは、ほかのメーカーのインストゥルメントとエフェ�
 3. `F8` を押してプラグインピッカーを開き、プラグイン名の一部を入力します。
 4. ダブルクリックするか、`Enter` を押します。インストゥルメントは新しいチャンネルになります。エフェクトは、選択中のミキサーのインサートに入ります。
 
-初回起動時には、セットアップウィザードがプラグインフォルダーを一覧にして、バックグラウンドでスキャンします。`オプション › セットアップウィザード (言語、オーディオ、プラグインフォルダー)...` で、もう一度開けます。LYNX SHAREは、起動のたびに数秒後、新しいプラグインも探します。
+初回起動時には、ウェルカムカードが開いている間に、LYNX SHAREがプラグインフォルダーをバックグラウンドでスキャンします。`オプション › セットアップウィザード (言語、オーディオ、プラグインフォルダー)...` で、フォルダーをもう一度表示できます。LYNX SHAREは、起動のたびに数秒後、新しいプラグインも探します。
 
 ## システム別の形式
 
 | システム | ホストできる形式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOSでは、VST2はホストできません。Linuxでは、ご自身でインストールした[yabridge](https://github.com/robbert-vdh/yabridge)とWineを通して、Windowsのプラグインが動きます。yabridgeが同期するフォルダーを、プラグインフォルダーとして追加してください。
+
+REAPERのエフェクトとインストゥルメントの形式であるJSFXスクリプトは、どのシステムでも動きます。LYNX SHAREには無料のスクリプト31本(chokeholdのもの、MITライセンス)が付属し、ブラウザーの`プラグインデータベース › エフェクト › JSFX`と`プラグインデータベース › ジェネレーター › JSFX`、プラグインの選択から使えます。`Documents/LYNX/JSFX`とREAPERのEffectsフォルダーのスクリプトも見つかり、`設定 › ファイル › JSFX フォルダー`でフォルダーを追加できます。LYNX SHAREはスクリプトのスライダーを専用のパネルに表示します。独自の画面を描くスクリプトでは、スライダーだけが表示されます。
 
 ## プラグインマネージャー
 
@@ -102,6 +104,18 @@ Sytrus、Harmor、PatcherなどFL Studioのネイティブプラグインは、F
 FL Studioの中で作ったものは、LYNX SHAREのプロジェクトと一緒に保存されます。`FL Studio VSTi (Multi)`には16のステレオ出力があり、別々のインサートで鳴らせます (前のセクションを参照)。FL Studioの中でどのFLプラグインが動くかは、お使いのFL Studioのライセンスで決まります。LYNX SHAREがFL Studioのプラグインファイルを単独で読み込むことはありません。
 
 FL Studioプラグインが`読み込み失敗`と表示されている場合は、`オプション › プラグインマネージャー...`で右クリックして、`再試行 (今すぐこのファイルをスキャン)`を選びます。
+
+## LYNXの独自プラグインをほかのDAWで
+
+Facet EQ、Apex Limiter、LYNX Tune、LYNX ModelなどLYNX SHARE独自のエフェクトとインストゥルメントは、ほかのDAW用のプラグインとしても提供されています。[リリースページ](https://github.com/Ka1-S/LYNX-SHARE/releases)にある別の任意のダウンロードで、Windows、macOS、Linux用の`LYNX-Plugins-<version>`です。
+
+- すべてのプラグインが1つのCLAPファイル`LYNX Plugins.clap`に入っています。一部はVST3としても、LinuxではLV2としても提供されます。
+- パックの音源: LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil、LYNX Duoloom。
+- Windowsでは`LYNX-Plugins-<version>-win-x64.7z`（約20 MB）をダウンロードしてください。`.zip`（約195 MB）にも同じファイルが入っています。
+- アーカイブ内のインストールスクリプト（Windowsは`install.cmd`、macOSとLinuxは`install.sh`）を実行し、DAWでプラグインを再スキャンしてください。
+- プラグインはLYNX SHARE内と同じエディターを開き、その状態はLYNX SHAREでプロジェクトとして開けます。
+
+一覧は[PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)にあります。
 
 ## Plugin databaseフォルダー
 

@@ -71,9 +71,14 @@ enum class Icon
     // round 190lx (DL-61, capture190ji live-loop-punch-z3): Live's Punch-In, Loop and Punch-Out switch glyphs
     punchIn,           // a high run, a slope down, a low run
     liveLoop,          // an open box with an arrow head pointing left in its bottom gap
-    punchOut           // a low run, a slope up, a high run
+    punchOut,          // a low run, a slope up, a high run
+    // round 190oa (DL-58, capture 190oa L1 live-auto-arm / live-reenable-lit): Live's Automation Arm and Re-Enable
+    // Automation glyphs
+    automationArm,     // two small rings joined by a rising line
+    reEnableAutomation, // an arrow pointing left
+    search             // round 190on (P2): the command palette, a magnifier (no plus: Icon::zoom is the zoom tool's)
 };
-constexpr int iconCount = (int) Icon::punchOut + 1;
+constexpr int iconCount = (int) Icon::search + 1;
 
 namespace icons
 {
@@ -166,8 +171,17 @@ public:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override;
 
+    // Round 190pa (P21): a short tag in the button's top-right corner, e.g. the armed automation write mode ("L" for
+    // Latch) on the Record / Automation Arm button; empty = none (nothing is drawn, as before)
+    void setBadge (const juce::String& newBadge, juce::Colour colour);
+    const juce::String& getBadge() const noexcept { return badge; }
+
 private:
     void timerCallback() override;
+    void paintButtonBody (juce::Graphics&, bool highlighted, bool down);
+    void paintBadge (juce::Graphics&);
+    juce::String badge;
+    juce::Colour badgeColour;
     void paintLook (juce::Graphics&, bool highlighted, bool down);
     void paintFlTile (juce::Graphics&, bool highlighted, bool down);
     bool tileCacheUsable (juce::Graphics&, int& scale) const;

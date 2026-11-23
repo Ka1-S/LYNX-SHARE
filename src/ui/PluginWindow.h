@@ -114,6 +114,9 @@ bool saveSettingsPageShot (juce::Component& window, const juce::File& png);
 // Tests / shots (round 190ao): runs the open window's periodic check now (the crash notice follows the plugin) and
 // writes a PNG of its content: the editor page (or the crash notice in its place), or the Wrapper settings page.
 bool saveWindowShot (const juce::AudioPluginInstance& plugin, const juce::File& png, bool settingsPage);
+// Round 190pw (PR #259, tests): the open window shows the plugin's editor (`page` 0) or the Wrapper settings (1), as its
+// tabs do (-1: as it is); returns the window's bounds and its content's size (nullopt: no window)
+std::optional<std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> showWindowPage (const juce::AudioPluginInstance& plugin, int page);
 // Opens the open window's preset menu (FL's plugin menu), as a click on the preset name does.
 bool showPresetMenu (const juce::AudioPluginInstance& plugin);
 } // namespace PluginWindows

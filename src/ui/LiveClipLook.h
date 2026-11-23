@@ -22,6 +22,28 @@ inline const juce::Colour rim { 0xff111111 };    // a field's / pill's 1 px rim
 inline const juce::Colour header { 0xff464646 }; // a section header; the editor's shown tab
 constexpr int row = 13, headerHeight = 17, columnWidth = 170;
 
+// Round gap190og: Live's capsule push button — the Clip panel's Duplicate (Loop) and the Velocity footer's Randomize: 13 px
+// high, a 1 px #111111 rim around #1E1E1E, both ends fully round, the label in Live's text grey [SHOT
+// ableton187c/shots/live-01-velocity-lane.png: Duplicate x 259…408 y 406…418, Randomize x 500…559 y 980…992]. Its hover
+// and pressed looks were not captured: it keeps one look (dimmed while disabled).
+class PillButton final : public juce::Button
+{
+public:
+    explicit PillButton (const juce::String& name) : juce::Button (name) {}
+    void paintButton (juce::Graphics& g, bool, bool) override
+    {
+        const auto r = getLocalBounds().toFloat();
+        const auto radius = r.getHeight() * 0.5f;
+        g.setColour (rim);
+        g.fillRoundedRectangle (r, radius);
+        g.setColour (juce::Colour (0xff1e1e1e));
+        g.fillRoundedRectangle (r.reduced (1.0f), juce::jmax (0.0f, radius - 1.0f));
+        g.setColour (ll::text.withMultipliedAlpha (isEnabled() ? 1.0f : 0.45f));
+        g.setFont (theme::font (theme::type::small));
+        g.drawText (getButtonText(), getLocalBounds(), juce::Justification::centred, false);
+    }
+};
+
 // Live's toggles (Loop, Legato: an orange pill while on), sliders (the Gain scale with its ▶ handle, the Pitch knob, the
 // st / ct number fields) and their value texts
 struct Laf final : juce::LookAndFeel_V4

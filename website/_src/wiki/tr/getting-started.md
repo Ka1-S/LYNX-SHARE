@@ -1,7 +1,7 @@
 ---
-source: 0101adbb66
+source: f439a070b5
 ---
-LYNX SHARE; Windows, macOS ve Linux için tek programda üç iş akışı sunan, ücretsiz ve açık kaynaklı bir DAW'dır. Varsayılan, FL Studio iş akışıdır: pattern'leri Channel Rack ve Piano Roll'da programlar, Playlist'te aranje eder ve Mixer'de mixlersiniz. Klip başlatma iş akışı, Ableton Live tarzında klipleri ve sahneleri bir gridden başlatır; Basit iş akışı ise BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir. `Görünüm › Yerleşim stili` aralarında istediğiniz zaman geçiş yapar. FL Studio projelerini (`.flp`), Ableton Live set'lerini (`.als`) ve FL Studio Mobile projelerini (`.flm`) açar, kendi `.lynx` formatında kaydeder.
+LYNX SHARE; Windows, macOS ve Linux için tek programda üç iş akışı sunan, ücretsiz ve açık kaynaklı bir DAW'dır. Varsayılan, FL Studio iş akışıdır: pattern'leri Channel Rack ve Piano Roll'da programlar, Playlist'te aranje eder ve Mixer'de mixlersiniz. Klip başlatma iş akışı, Ableton Live tarzında klipleri ve sahneleri bir gridden başlatır; Basit iş akışı ise BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir. `Görünüm › Yerleşim stili` aralarında istediğiniz zaman geçiş yapar. FL Studio projelerini (`.flp`), Ableton Live set'lerini (`.als`), FL Studio Mobile projelerini (`.flm`), DAWproject dosyalarını, GarageBand ve BandLab projelerini ve tracker modüllerini açar; `.flp`, `.als`, `.dawproject` ve `.flm` olarak dışa aktarır ve kendi `.lynx` formatında kaydeder.
 
 Alfa sürümdedir. Hatalar olabilir, sık sık kaydedin.
 
@@ -9,7 +9,7 @@ Alfa sürümdedir. Hatalar olabilir, sık sık kaydedin.
 
 1. Sisteminizin desteklenip desteklenmediğini aşağıdaki tablodan kontrol edin.
 2. İndirin ve kurun. [Kurulum](/wiki/install/) sayfasında her sistem için adımlar var.
-3. Başlatın. Kısa bir kurulum sihirbazı dili seçer, ses çıkışını dener, üç iş akışından birini seçmenizi sağlar ve arka planda taranacak plugin klasörlerini listeler. Sihirbazı atlayabilir, sonra `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` ile yeniden açabilirsiniz.
+3. Başlatın. Bir karşılama kartı nereden geldiğinizi sorar ve tek tıkla uygun yerleşimi açar. Ayrıca dili ayarlar, sesi dener ve güncellemelerin denetlenip denetlenmeyeceğini sorar; bu sırada plugin klasörleri arka planda taranır. `Daha fazla kurulum (ses sürücüsü, plugin klasörleri)...` tam kurulum sihirbazını açar; sihirbaz `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` içinde de vardır.
 4. Hiçbir şey duymuyorsanız [Ses ayarı](/wiki/audio-setup/) sayfasına gidin.
 5. [Pencerenin turu](/wiki/tour/) sayfasını okuyun, sonra [İlk şarkınızı](/wiki/first-song/) yapın.
 
@@ -19,7 +19,7 @@ Alfa sürümdedir. Hatalar olabilir, sık sık kaydedin.
 |---|---|
 | Windows | Windows 10 veya 11, 64 bit |
 | macOS | macOS 11 Big Sur veya daha yenisi, Intel ya da Apple silicon |
-| Linux | glibc 2.35 veya daha yenisiyle x86_64 (Ubuntu 22.04+, Debian 12+, Fedora 36+, güncel Arch veya Manjaro), X11 veya XWayland |
+| Linux | glibc 2.35 veya daha yenisiyle x86_64 ya da arm64 (Ubuntu 22.04+, Debian 12+, Fedora 36+, güncel Arch veya Manjaro; arm64 ayrıca 64 bit işletim sistemli bir Raspberry Pi 4 veya 5'te), X11 veya XWayland |
 
 Bir ses arayüzüne ihtiyacınız yok. LYNX SHARE, sisteminizin zaten kullandığı ses aygıtı üzerinden çalar. FL Studio'ya da ihtiyacınız yok. Aynı bilgisayarda kuruluysa LYNX SHARE onun sample'larını bulur ve `.flp` projeleri için aynı plugin dosyalarını kullanır.
 

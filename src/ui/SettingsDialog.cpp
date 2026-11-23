@@ -7,7 +7,9 @@
 #include "core/ClipOps.h"
 #include "core/MissingFiles.h"
 #include "core/PlaylistOps.h"
+#include "core/SearchQuery.h"
 #include "engine/PluginHost.h"
+#include "engine/JsfxFormat.h"
 #include "ui/I18n.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/Theme.h"
@@ -676,6 +678,19 @@ public:
                     PluginHost::settingsFolder().getChildFile ("flm-resources.txt").replaceWithText (list.joinIntoString ("\n"));
             }, persistent);
 
+        // Round 190pj (issue #241): JSFX scripts. Documents/LYNX/JSFX, the bundled pack and REAPER's Effects folder are
+        // always searched; these are the user's other folders
+        jsfxFolders = std::make_unique<FolderList> (
+            tr ("JSFX folders"), tr ("JSFX scripts are also found in Documents/LYNX/JSFX, the bundled pack and REAPER's Effects folder."),
+            [persistent, sample] { return sample (persistent ? jsfx::userFolders() : juce::StringArray(), { "D:\\JSFX\\Saike" }); },
+            [persistent, &host] (const juce::StringArray& list) {
+                if (! persistent)
+                    return;
+                jsfx::setUserFolders (list);
+                // (the scripts there listed by the host's own scan thread: headers only, quick)
+                host.startBackgroundScanOfFiles (JsfxPluginFormat().searchPathsForPlugins (jsfx::roots(), true, false));
+            }, persistent);
+
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
@@ -683,17 +698,18 @@ public:
         add (*searchFolders);
         add (*browserFolders);
         add (*pluginFolders);
+        add (*jsfxFolders);
         add (*flmResources);
     }
 
 protected:
-    // The four lists share the window's height; none gets less than its heading, two rows and its buttons (below that
+    // The five lists share the window's height; none gets less than its heading, two rows and its buttons (below that
     // the page scrolls)
     int layout (int width) override
     {
         constexpr int padX = 20, padY = 14, gap = 12;
-        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), flmResources.get() };
-        const auto share = (getHeight() - 2 * padY - 3 * gap) / 4;
+        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), jsfxFolders.get(), flmResources.get() };
+        const auto share = (getHeight() - 2 * padY - 4 * gap) / 5;
         auto y = padY;
         for (auto* list : lists)
         {
@@ -706,7 +722,7 @@ protected:
     int minimumWidth() const override { return 300; }
 
 private:
-    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
+    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, jsfxFolders, flmResources;
 };
 
 // Round 190jp (design190ia FW-19): FL's Settings tabs, their captions a step larger (type::title, was 7 px caps at
@@ -716,6 +732,9 @@ class SettingsTab final : public juce::TabBarButton
 {
 public:
     SettingsTab (const juce::String& name, juce::TabbedButtonBar& bar, bool gapBefore) : juce::TabBarButton (name, bar), gap (gapBefore ? groupGap : 0) {}
+
+    // issue #247 (round 190oq): while Settings' search has text, a tab without a match is drawn dimmed (−1: no search)
+    int matches = -1;
 
     static constexpr int groupGap = 12;
     static juce::Font captionFont() { return theme::font (theme::type::title); }
@@ -741,7 +760,7 @@ public:
             g.setColour (accent);
             g.fillRoundedRectangle (area.withTop (area.getBottom() - 2.0f).reduced (10.0f, 0.0f), 1.0f);
         }
-        g.setColour (front ? textPrimary : over ? textPrimary.withAlpha (0.85f) : textSecondary);
+        g.setColour ((front ? textPrimary : over ? textPrimary.withAlpha (0.85f) : textSecondary).withMultipliedAlpha (matches == 0 ? 0.35f : 1.0f));
         g.setFont (captionFont());
         g.drawFittedText (getButtonText(), area.toNearestInt().reduced (4, 0), juce::Justification::centred, 1, 0.8f);
     }
@@ -760,6 +779,279 @@ public:
     {
         return new SettingsTab (name, getTabbedButtonBar(), index == firstOwnTab);
     }
+};
+
+// Issue #247 (round 190oq), a LYNX extra (FL 2026's Settings have no search): "Find a setting" along the bottom of the
+// Settings window, as a browser's find bar — type and it jumps to the first setting whose caption, note, section title,
+// list item or tooltip holds the words (any order; the Browser's search syntax: OR, -word, "a phrase"), on whichever page;
+// Enter / F3 and the arrows step through the matches (Shift: back), "3 of 12" counts them, pages without a match dim
+// their tab, the match is outlined in the accent. Ctrl+F puts the caret in the box; Esc empties it (then closes the
+// window). No timer: the outline is drawn only while there is a match.
+class SettingsFind final : public juce::Component
+{
+public:
+    struct Match
+    {
+        int page = 0;
+        juce::Component::SafePointer<juce::Component> target;
+        juce::String text;
+    };
+
+    std::function<juce::TabbedComponent&()> tabsOf;
+    std::function<void (const std::vector<int>&)> onCounts; // matches per page (empty: no search)
+
+    SettingsFind()
+    {
+        box.setTextToShowWhenEmpty (tr ("Find a setting (Ctrl+F)"), theme::colour::textDisabled);
+        box.setFont (theme::font (theme::type::body));
+        box.setIndents (26, 5);
+        box.setComponentID ("settings.find");
+        focusOnOpen (box); // (issue #247: the window opens ready to type, as #244's search windows)
+        box.onTextChange = [this] { search (true); };
+        box.onReturnKey = [this] { step (juce::ModifierKeys::currentModifiers.isShiftDown() ? -1 : 1); };
+        box.onEscapeKey = [this] {
+            if (box.getText().isNotEmpty())
+                box.clear();
+            else
+                closeToolWindowOf (*this);
+        };
+        addAndMakeVisible (box);
+        for (auto* b : { &prev, &next })
+        {
+            b->setColour (juce::TextButton::buttonColourId, theme::colour::bg3);
+            addAndMakeVisible (*b);
+        }
+        prev.setTooltip (tr ("Previous match (Shift+Enter, Shift+F3)"));
+        next.setTooltip (tr ("Next match (Enter, F3)"));
+        prev.onClick = [this] { step (-1); };
+        next.onClick = [this] { step (1); };
+        count.setFont (theme::font (theme::type::small));
+        count.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        addAndMakeVisible (count);
+        ring.setInterceptsMouseClicks (false, false);
+        updateButtons();
+    }
+
+    ~SettingsFind() override { removeRing(); }
+
+    void focus() { box.grabKeyboardFocus(); box.selectAll(); }
+    juce::TextEditor& field() noexcept { return box; }
+    int matchCount() const noexcept { return (int) matches.size(); }
+    int currentIndex() const noexcept { return current; }
+    const std::vector<Match>& allMatches() const noexcept { return matches; }
+    juce::Component* ringForTests() noexcept { return ring.getParentComponent() != nullptr ? &ring : nullptr; }
+
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (key.getKeyCode() == juce::KeyPress::F3Key)
+        {
+            step (key.getModifiers().isShiftDown() ? -1 : 1);
+            return true;
+        }
+        return false;
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg1);
+        g.setColour (theme::colour::border);
+        g.fillRect (0, 0, getWidth(), 1);
+    }
+
+    void paintOverChildren (juce::Graphics& g) override
+    {
+        // a magnifier in the box and the two arrows (LYNX vectors)
+        const auto b = box.getBounds().toFloat();
+        const auto c = juce::Point<float> (b.getX() + 13.0f, b.getCentreY() - 1.0f);
+        g.setColour (theme::colour::textSecondary);
+        g.drawEllipse (c.x - 5.0f, c.y - 5.0f, 10.0f, 10.0f, 1.5f);
+        g.drawLine (c.x + 3.6f, c.y + 3.6f, c.x + 7.0f, c.y + 7.0f, 1.8f);
+        for (auto* button : { &prev, &next })
+        {
+            const auto r = button->getBounds().toFloat().withSizeKeepingCentre (9.0f, 5.0f);
+            juce::Path p;
+            if (button == &prev)
+                p.addTriangle (r.getX(), r.getBottom(), r.getRight(), r.getBottom(), r.getCentreX(), r.getY());
+            else
+                p.addTriangle (r.getX(), r.getY(), r.getRight(), r.getY(), r.getCentreX(), r.getBottom());
+            g.setColour (button->isEnabled() ? theme::colour::textPrimary : theme::colour::textDisabled);
+            g.fillPath (p);
+        }
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (10, 5).withTrimmedTop (1);
+        count.setBounds (r.removeFromRight (110));
+        next.setBounds (r.removeFromRight (28).reduced (2, 0));
+        prev.setBounds (r.removeFromRight (28).reduced (2, 0));
+        r.removeFromRight (4);
+        box.setBounds (r.removeFromLeft (juce::jmin (360, r.getWidth())));
+    }
+
+    // what every page holds, in page order and top to bottom
+    void search (bool jump)
+    {
+        matches.clear();
+        current = -1;
+        const auto query = box.getText().trim();
+        std::vector<int> perPage;
+        if (query.isNotEmpty() && tabsOf)
+        {
+            auto& tabs = tabsOf();
+            perPage.assign ((std::size_t) tabs.getNumTabs(), 0);
+            // (lowered for other scripts too; the query language's OR / AND / NOT stay as they are)
+            juce::StringArray words;
+            words.addTokens (query, " ", {});
+            for (auto& w : words)
+                if (w != "OR" && w != "AND" && w != "NOT")
+                    w = w.toLowerCase();
+            const auto q = words.joinIntoString (" ").toStdString();
+            for (int p = 0; p < tabs.getNumTabs(); ++p)
+                if (auto* page = tabs.getTabContentComponent (p))
+                {
+                    std::vector<std::pair<int, Match>> found;
+                    collect (*page, *page, p, q, found);
+                    std::stable_sort (found.begin(), found.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+                    for (auto& f : found)
+                        matches.push_back (std::move (f.second));
+                    perPage[(std::size_t) p] = (int) found.size();
+                }
+        }
+        if (onCounts)
+            onCounts (perPage);
+        if (matches.empty())
+            removeRing();
+        else if (jump && tabsOf)
+        {
+            // the first match on the page shown, else the first one
+            const auto shown = tabsOf().getCurrentTabIndex();
+            current = 0;
+            for (int i = 0; i < (int) matches.size(); ++i)
+                if (matches[(std::size_t) i].page == shown)
+                {
+                    current = i;
+                    break;
+                }
+            show();
+        }
+        updateButtons();
+    }
+
+    void step (int direction)
+    {
+        if (matches.empty())
+            return;
+        const auto n = (int) matches.size();
+        current = current < 0 ? (direction > 0 ? 0 : n - 1) : ((current + direction) % n + n) % n;
+        show();
+        updateButtons();
+    }
+
+private:
+    static juce::String textOf (juce::Component& c)
+    {
+        juce::String t;
+        if (auto* label = dynamic_cast<juce::Label*> (&c))
+            t = label->getText();
+        else if (auto* button = dynamic_cast<juce::Button*> (&c))
+            t = button->getButtonText();
+        else if (auto* title = dynamic_cast<SectionTitle*> (&c))
+            t = title->getText();
+        else if (auto* combo = dynamic_cast<juce::ComboBox*> (&c))
+            for (int i = 0; i < combo->getNumItems(); ++i)
+                t << combo->getItemText (i) << "\n";
+        if (auto* tip = dynamic_cast<juce::SettableTooltipClient*> (&c))
+            t << "\n" << tip->getTooltip();
+        if (const auto& own = c.getProperties()["lynxSearchText"]; own.isString())
+            t << "\n" << own.toString();
+        return t;
+    }
+
+    void collect (juce::Component& page, juce::Component& c, int pageIndex, const std::string& query, std::vector<std::pair<int, Match>>& out)
+    {
+        if (&c != &page && ! c.isVisible())
+            return;
+        if (dynamic_cast<juce::TextEditor*> (&c) == nullptr && dynamic_cast<juce::ScrollBar*> (&c) == nullptr)
+            if (const auto text = textOf (c).trim(); text.isNotEmpty())
+                if (search::matches (query, text.toLowerCase().toStdString()))
+                {
+                    out.push_back ({ page.getLocalPoint (&c, juce::Point<int>()).y, { pageIndex, &c, text.upToFirstOccurrenceOf ("\n", false, false) } });
+                    return; // (a match's children are not listed again)
+                }
+        for (auto* child : c.getChildren())
+            collect (page, *child, pageIndex, query, out);
+    }
+
+    void removeRing()
+    {
+        if (auto* parent = ring.getParentComponent())
+            parent->removeChildComponent (&ring);
+    }
+
+    void show()
+    {
+        if (current < 0 || current >= (int) matches.size() || ! tabsOf)
+            return;
+        auto& m = matches[(std::size_t) current];
+        auto* target = m.target.getComponent();
+        if (target == nullptr)
+            return;
+        auto& tabs = tabsOf();
+        if (tabs.getCurrentTabIndex() != m.page)
+            tabs.setCurrentTabIndex (m.page);
+        // scroll the page's viewport to it (a third from the top)
+        if (auto* viewport = target->findParentComponentOfClass<juce::Viewport>())
+            if (auto* content = viewport->getViewedComponent())
+            {
+                const auto y = content->getLocalPoint (target, juce::Point<int>()).y;
+                const auto h = viewport->getViewHeight();
+                if (y < viewport->getViewPositionY() || y + target->getHeight() > viewport->getViewPositionY() + h)
+                    viewport->setViewPosition (viewport->getViewPositionX(), juce::jmax (0, y - h / 3));
+            }
+        // the outline goes into the match's own parent, so it scrolls with it
+        if (auto* parent = target->getParentComponent())
+        {
+            removeRing();
+            parent->addAndMakeVisible (ring);
+            ring.setBounds (target->getBounds().expanded (3, 2));
+            ring.toFront (false);
+        }
+    }
+
+    void updateButtons()
+    {
+        const auto n = (int) matches.size();
+        prev.setEnabled (n > 0);
+        next.setEnabled (n > 0);
+        if (box.getText().trim().isEmpty())
+            count.setText ({}, juce::dontSendNotification);
+        else if (n == 0)
+            count.setText (tr ("No match"), juce::dontSendNotification);
+        else
+            count.setText (tr ("{0} of {1}", { juce::String (juce::jmax (1, current + 1)), juce::String (n) }), juce::dontSendNotification);
+        repaint();
+    }
+
+    class Ring final : public juce::Component
+    {
+    public:
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (1.0f);
+            g.setColour (theme::colour::accent.withAlpha (0.12f));
+            g.fillRoundedRectangle (r, theme::radius::md);
+            g.setColour (theme::colour::accent);
+            g.drawRoundedRectangle (r, theme::radius::md, 1.5f);
+        }
+    };
+
+    juce::TextEditor box;
+    juce::TextButton prev, next;
+    juce::Label count;
+    Ring ring;
+    std::vector<Match> matches;
+    int current = -1;
 };
 
 class SettingsPanel final : public juce::Component
@@ -798,11 +1090,45 @@ public:
                 tabs.setCurrentTabIndex (tabs.getNumTabs() - 1, false);
         }
         addAndMakeVisible (tabs);
-        setSize (680, 620);
+        // issue #247 (round 190oq): the find bar along the bottom
+        find.tabsOf = [this]() -> juce::TabbedComponent& { return tabs; };
+        find.onCounts = [this] (const std::vector<int>& counts) {
+            auto& bar = tabs.getTabbedButtonBar();
+            for (int i = 0; i < bar.getNumTabs(); ++i)
+                if (auto* tab = dynamic_cast<SettingsTab*> (bar.getTabButton (i)))
+                {
+                    tab->matches = counts.empty() ? -1 : counts[(std::size_t) i];
+                    tab->repaint();
+                }
+        };
+        addAndMakeVisible (find);
+        setWantsKeyboardFocus (false);
+        setSize (680, 620 + findHeight);
+    }
+
+    static constexpr int findHeight = 36;
+    SettingsFind& finder() noexcept { return find; }
+
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress ('f', juce::ModifierKeys::commandModifier, 0) || key.getKeyCode() == juce::KeyPress::F3Key)
+        {
+            if (key.getKeyCode() == juce::KeyPress::F3Key)
+                find.step (key.getModifiers().isShiftDown() ? -1 : 1);
+            else
+                find.focus();
+            return true;
+        }
+        return false;
     }
 
     void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
-    void resized() override { tabs.setBounds (getLocalBounds()); }
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        find.setBounds (r.removeFromBottom (findHeight));
+        tabs.setBounds (r);
+    }
 
     SettingsPage currentPage() const
     {
@@ -819,6 +1145,7 @@ public:
 
 private:
     SettingsTabs tabs;
+    SettingsFind find;
     std::vector<SettingsPage> pages; // in tab order
 };
 
@@ -867,6 +1194,31 @@ void showSettings (AudioEngine& engine, SettingsPage page, SettingsHooks hooks)
 {
     // one Settings window: opening it again shows the asked page
     openToolWindow (std::make_unique<SettingsPanel> (engine, page, true, std::move (hooks)), tr ("Settings"), "settings");
+}
+
+SettingsFindState settingsFindForSnapshot (juce::Component& panel, const juce::String& query, int steps)
+{
+    SettingsFindState out;
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    if (p == nullptr)
+        return out;
+    auto& find = p->finder();
+    find.field().setText (query, juce::dontSendNotification); // (a TextEditor posts its change: searched here at once)
+    find.search (true);
+    for (int i = 0; i < std::abs (steps); ++i)
+        find.step (steps > 0 ? 1 : -1);
+    out.matches = find.matchCount();
+    out.current = find.currentIndex();
+    out.page = (int) p->currentPage();
+    if (out.current >= 0)
+    {
+        const auto& m = find.allMatches()[(std::size_t) out.current];
+        out.text = m.text;
+        out.target = m.target.getComponent();
+    }
+    out.ring = find.ringForTests();
+    out.field = &find.field();
+    return out;
 }
 
 std::unique_ptr<juce::Component> makeSettingsPanel (AudioEngine& engine, SettingsPage page, bool persistent, SettingsHooks hooks)

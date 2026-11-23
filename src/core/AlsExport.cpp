@@ -1,4 +1,6 @@
+#include "core/Sections.h"
 #include "core/AlsExport.h"
+#include "core/TrackVersions.h"
 #include "core/ClipEnvelope.h"
 
 #include <algorithm>
@@ -1985,6 +1987,16 @@ struct Exporter
             if (perInsert.count ((int) m) == 0 && ! returnOf.count ((int) m) && ! buses.count ((int) m) && ! song.mixer[m].effects.empty())
                 note ("Mixer insert with effects but no channel not exported: " + song.mixer[m].name);
 
+        // round 190op (P4): Live has no deactivated tracks (its Track Activator is a mute): a deactivated unit is written with
+        // its Activator off, so the set sounds as LYNX plays it, its devices and their states kept
+        for (auto& t : ordered)
+            if ((t.insert > 0 && t.insert < (int) song.mixer.size() && song.mixer[(std::size_t) t.insert].deactivated)
+                || (t.channel >= 0 && t.channel < (int) song.channels.size() && song.channels[(std::size_t) t.channel].deactivated))
+            {
+                t.muted = true;
+                note ("Deactivated tracks written with their Track Activator off (Live has no deactivated tracks; the devices are kept)");
+            }
+
         // nodes
         const auto returns = (int) returnInsert.size();
         exportReturns = returnInsert;
@@ -2245,7 +2257,8 @@ struct Exporter
         {
             locs->kids.clear();
             int id = 0;
-            for (const auto& m : song.markers())
+            // (round 190ol: Live has no Sections lane: a locator at each section's start, named after it)
+            for (const auto& m : sections::markersWithSections (song.markers(), song.sections()))
             {
                 if (m.action != Marker::none || m.numerator > 0)
                     continue;
@@ -2467,7 +2480,7 @@ struct Exporter
 };
 } // namespace
 
-AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
+AlsExportResult exportAls (const Song& input, const AlsExportOptions& options)
 {
     AlsExportResult result;
     const auto& sk = skeletons (options.version);
@@ -2476,6 +2489,15 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
         result.notes.push_back ("internal error: the set skeletons could not be read");
         return result;
     }
+    // track versions (round 190pe, a LYNX extra): Live has none; each track goes over as the version it plays
+    std::optional<Song> stripped;
+    if (trackversions::any (input))
+    {
+        stripped = input;
+        const auto n = trackversions::keepActiveOnly (*stripped);
+        result.notes.push_back ("Track versions: " + std::to_string (n) + " version(s) that are not active left out (each track is written as the version it plays)");
+    }
+    const auto& song = stripped ? *stripped : input;
     Exporter e { song, options, sk, result, false, {} };
     e.run();
     return result;

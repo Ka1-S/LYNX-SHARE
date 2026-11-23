@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![La ventana Grabación pregunta qué grabar: audio, notas y automatización, todo, o audio en el editor de audio](/assets/img/wiki/record-dialog.webp)
 
@@ -87,7 +87,7 @@ Las opciones están en `Opciones › Grabación` y en el menú de clic derecho d
 
 ## Grabar en ranuras de clip
 
-En el [flujo Clip-launch](/wiki/layouts/), las tomas pueden ir a la cuadrícula de clips en lugar de a la Playlist, como en Ableton Live.
+En el [diseño Clip-launch](/wiki/layouts/), las tomas pueden ir a la cuadrícula de clips en lugar de a la Playlist, como en Ableton Live.
 
 - Arma una pista con su botón de armado en el mixer de Session. Sus ranuras vacías muestran entonces un botón de grabación redondo en lugar del cuadrado de parada. Haz clic en una para grabar en esa ranura.
 - `Grabación de sesión`, bajo la cuadrícula, graba las pistas armadas en la escena seleccionada. Mientras suenan sus clips, se añaden notas nuevas a ellos (overdub).

@@ -204,6 +204,31 @@ Result planTrack (const Song& song, int track, bool withGroup, Start start, Plan
     return r;
 }
 
+Result planRange (const Song& song, const std::vector<int>& clips, int topTrack, std::int64_t from, std::int64_t to, Plan& plan)
+{
+    plan = {};
+    if (to <= from)
+        return Result::nothingSelected;
+    for (auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            if (plays (song, c) && ! isAutomation (c) && c.start < to && c.end() > from)
+                plan.clips.push_back (i);
+        }
+    std::sort (plan.clips.begin(), plan.clips.end());
+    plan.clips.erase (std::unique (plan.clips.begin(), plan.clips.end()), plan.clips.end());
+    plan.name = trackName (song, std::max (0, topTrack)) + " (consolidated)";
+    const auto r = finish (song, plan, false, Result::nothingSelected);
+    if (r != Result::ok)
+        return r;
+    plan.timeSelection = true;
+    plan.start = from;
+    plan.end = to;
+    plan.topTrack = std::max (0, topTrack);
+    return Result::ok;
+}
+
 Song makePlanRenderSong (const Song& song, const Plan& plan)
 {
     Song out = song;

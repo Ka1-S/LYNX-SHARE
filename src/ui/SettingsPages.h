@@ -127,6 +127,7 @@ class SectionTitle final : public juce::Component
 public:
     explicit SectionTitle (juce::String t = {}) : text (std::move (t)) {}
     void setText (const juce::String& t) { text = t; repaint(); }
+    const juce::String& getText() const noexcept { return text; } // (issue #247: Settings' search reads it)
 
     void paint (juce::Graphics& g) override
     {
@@ -153,7 +154,9 @@ inline void styleNote (juce::Label& label, const juce::String& text)
 {
     styleLabel (label, text);
     label.setFont (theme::font (theme::type::small));
-    label.setColour (juce::Label::textColourId, theme::colour::textDisabled);
+    // (round 190oj WG-2: textDisabled read 3.97:1 on the pages; halfway to textSecondary is ~5.2:1 and keeps the notes a
+    // step below the labels, in every theme)
+    label.setColour (juce::Label::textColourId, theme::colour::textDisabled.interpolatedWith (theme::colour::textSecondary, 0.5f));
     label.setJustificationType (juce::Justification::topLeft);
 }
 

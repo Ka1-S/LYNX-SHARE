@@ -1,15 +1,15 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
-![El flujo de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
+![El diseño de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 
-`Ver › Estilo de diseño` tiene tres entradas: `Flujo por patrones (predeterminado)`, `Flujo por lanzamiento de clips` y `Flujo simple`. La misma opción está en `Opciones › Configuración general`, bajo Flujo de trabajo. La elección se conserva al cerrar el programa.
+`Ver › Estilo de diseño` tiene tres entradas: `Diseño Patrón (predeterminado)`, `Diseño de lanzamiento de clips` y `Diseño simple`. La misma opción está en `Opciones › Configuración general`, bajo Diseño. La elección se conserva al cerrar el programa. La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes y elige el diseño que encaja.
 
-El flujo por patrones, el predeterminado, funciona como FL Studio: el Channel Rack, los patrones, el Piano Roll, la Playlist y el Mixer. El flujo por lanzamiento de clips, al estilo de Ableton Live, añade una cuadrícula de clips con escenas junto a la Playlist, un mezclador de sesión y las vistas de clip y de dispositivo; los patrones y el Channel Rack siguen disponibles. El flujo simple mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile: pistas y línea de tiempo, loops, pads y grabación rápida. Al cambiar solo se mueven las ventanas: el proyecto sigue siendo el mismo.
+El diseño Patrón, el predeterminado, funciona como FL Studio: el Channel Rack, los patrones, el Piano Roll, la Playlist y el Mixer. El diseño de lanzamiento de clips, al estilo de Ableton Live, añade una cuadrícula de clips con escenas junto a la Playlist, un mezclador de sesión y las vistas de clip y de dispositivo; los patrones y el Channel Rack siguen disponibles. El diseño simple mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile: pistas y línea de tiempo, loops, pads y grabación rápida. Al cambiar solo se mueven las ventanas: el proyecto sigue siendo el mismo.
 
 ## Lanzar clips en la cuadrícula
 
-1. Elige `Ver › Estilo de diseño › Flujo por lanzamiento de clips`. La cuadrícula de clips aparece junto a la Playlist.
+1. Elige `Ver › Estilo de diseño › Diseño de lanzamiento de clips`. La cuadrícula de clips aparece junto a la Playlist.
 2. Haz clic derecho en una ranura vacía, elige `Poner un patrón aquí` y selecciona un patrón. Con doble clic en una ranura vacía se pone allí el patrón actual.
 3. Haz clic en el triángulo a la izquierda del clip para lanzarlo. Si el transporte está detenido, arranca.
 4. Haz clic en el triángulo de una escena, en la columna `Escenas`, para lanzar todos los clips de esa fila.
@@ -60,30 +60,30 @@ El menú de la ranura también tiene dos opciones para toda la cuadrícula: `Dev
 
 Cuando abres un set de Live, sus clips y escenas de Session pasan a la cuadrícula de clips, con sus ajustes de lanzamiento. `Archivo › Exportar › Set de Ableton Live (.als)` escribe la cuadrícula de vuelta como clips de Session. `Opciones › Configuración general` tiene `Clips de sesión de sets de Live`, donde `Playlist, después del arreglo` los coloca en la Playlist.
 
-## El flujo Simple
+## El diseño simple
 
-`Ver › Estilo de diseño › Flujo simple` es una sola ventana con las pistas y la línea de tiempo, al estilo de BandLab y FL Studio Mobile, y va bien para una primera canción. `Ver › Panel de la pista` muestra bajo la línea de tiempo un panel para la pista seleccionada, con las pestañas `Efectos`, `Instrumento`, `Teclado` y `Editor`. En este flujo, el menú `Ayuda` tiene `Tour de la primera canción` y `Pantalla de bienvenida...`, que ofrece una primera canción en siete pasos, una canción de demostración o un proyecto vacío. Mira [Diseño Simple](/wiki/simple-layout/).
+`Ver › Estilo de diseño › Diseño simple` es una sola ventana con las pistas y la línea de tiempo, al estilo de BandLab y FL Studio Mobile, y va bien para una primera canción. `Ver › Panel de la pista` muestra bajo la línea de tiempo un panel para la pista seleccionada, con las pestañas `Efectos`, `Instrumento`, `Teclado` y `Editor`. En este diseño, el menú `Ayuda` tiene `Tour de la primera canción` y `Pantalla de bienvenida...`, que ofrece una primera canción en siete pasos, una canción de demostración o un proyecto vacío. Mira [Diseño Simple](/wiki/simple-layout/).
 
-`Letra y notas` y `Igualar a la referencia...` en el menú `Ver`, y `Voz limpia` en el menú de un insert del Mixer, están en todos los diseños. En el flujo Simple, `Voz limpia` también está en el menú de una pista.
+`Letra y notas` y `Igualar a la referencia...` en el menú `Ver`, y `Voz limpia` en el menú de un insert del Mixer, están en todos los diseños. En el diseño simple, `Voz limpia` también está en el menú de una pista.
 
 ## Volver atrás
 
-Elige `Ver › Estilo de diseño › Flujo por patrones (predeterminado)`. Vuelve el diseño de ventana que tenías en el flujo por patrones, y los carriles de automatización recuperan el ajuste que tenían antes. Los clips de la cuadrícula se quedan en el proyecto.
+Elige `Ver › Estilo de diseño › Diseño Patrón (predeterminado)`. Vuelve el diseño de ventana que tenías en el diseño Patrón, y los carriles de automatización recuperan el ajuste que tenían antes. Los clips de la cuadrícula se quedan en el proyecto.
 
 ## Conviene saber
 
 - Una pista que lanzó un clip queda en silencio en la Playlist hasta que pulsas `Volver a la Playlist`. La opción `Devolver las pistas a la Playlist al detener el transporte` lo hace por ti en cada detención.
-- Las teclas nuevas de la cuadrícula (`B`, `Q`, `Ctrl+M`, `Ctrl+K` y otras) actúan así solo en el flujo Clip-launch. En el flujo Pattern conservan el significado de FL Studio.
+- Las teclas nuevas de la cuadrícula (`B`, `Q`, `Ctrl+M`, `Ctrl+K` y otras) actúan así solo en el diseño Clip-launch. En el diseño Patrón conservan el significado de FL Studio.
 - Una escena en 6/8 toca un compás de tres tiempos, porque el metro cuenta negras.
 - Las follow actions existen para clips, no para escenas.
-- Los carriles de automatización activados a mano en el flujo por lanzamiento de clips no se conservan al volver.
-- Con el flujo por patrones seleccionado, no se carga nada de la cuadrícula.
+- Los carriles de automatización activados a mano en el diseño de lanzamiento de clips no se conservan al volver.
+- Con el diseño Patrón seleccionado, no se carga nada de la cuadrícula.
 
 ## Relacionado
 
 - [Playlist](/wiki/playlist/)
 - [Si vienes de Ableton Live](/wiki/coming-from-ableton/)
 - [Importar proyectos](/wiki/importing-projects/)
-- [Lo que solo hace LYNX: flujos de trabajo](/why/#workflows)
+- [Lo que solo hace LYNX: diseños](/why/#workflows)
 
 La tercera entrada es una ventana para una primera canción. Mira [Diseño sencillo](/wiki/simple-layout/).

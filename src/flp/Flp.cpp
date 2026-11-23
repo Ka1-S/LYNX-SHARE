@@ -1,6 +1,7 @@
 #include "flp/Flp.h"
 
 #include <algorithm>
+#include <cctype>
 #include <limits>
 #include <cmath>
 #include <cstring>
@@ -91,6 +92,7 @@ enum : std::uint32_t
     evPatternEvents = 0xDF,     // same records: the current pattern's events (event editor)
     evControlValues = 0xE1,     // 12 B records {u32 ?, u32 controlID, i32 value}
     evAutomationLink = 0xE3,    // 20 B records {u32 channel<<16, u32 0, u32 controlID, u32 flags, u32 ?}
+    evLinkFormula = 0xE6,       // round 190ov: the mapping formula of the link record just before it (text; none = "Input")
     evAutomationPoints = 0xEA,  // header 21 B + 24 B per point + 112 B
     evMixerRoutes = 0xEB,       // one byte per destination track
     evChannelLevels = 0xDB,
@@ -109,6 +111,7 @@ enum : std::uint32_t
     evMixerInsertLatencyBypass = 0x31, // u8 "Bypass track latency compensation" of the insert opened by the last 0xEC (REA round 165f-mixer)
     evMixerInsertRecordSource = 0xA5,  // u32 record source point 0..5 of the insert opened by the last 0xEC (REA round 165f-mixer)
     evArrangementName = 0xF1,
+    evArrangementView = 0xF2,   // 28 B per arrangement: u32 index, f64 scroll, f64 zoom, i32 vertical scroll, i32 vertical zoom (round 190oo, PAT-6)
     evTimeMarker = 0x94,          // u32 type << 24 | position
     evTimeMarkerNumerator = 0x21, // u8
     evTimeMarkerDenominator = 0x22,
@@ -482,6 +485,43 @@ namespace
 {
 enum class FileKind { project, channelPreset, mixerPreset };
 
+// FL 11 and older: the step sequencer's steps are not notes but per-channel, per-pattern step grids (REA round 190oz,
+// docs/analise/REA_rodada190oz.md). After a 0x41 inside a channel's events, word events 0x5B (step on), 0x48 (velocity),
+// 0x49 (pan), 0x4D (key), 0x4E (fine pitch), 0x58 / 0x57 (Mod X / Mod Y), 0x5C (shift) carry (value << 8) | step; 0x44
+// (FL 1-3) is a 16-step bit mask of steps on. FL's loader FUN_00f46490 stores them into a 10 x 2 048 byte grid per
+// pattern (FUN_012d45b0, defaults table 0x015d51ac), and for a project older than 11.5.0 turns every step that is on into
+// a step note at load (FUN_010012e0), then frees the grid.
+struct OldStepGrids
+{
+    // the grid's rows, in FL's order (row k = byte k * 2 048 + step)
+    enum Row { pan = 0, velocity = 1, release = 2, modX = 3, modY = 4, finePitch = 5, row6 = 6, shift = 7, key = 8, on = 9 };
+    static constexpr int rows = 10, steps = 2048;
+    static constexpr std::uint8_t defaults[rows] = { 64, 100, 64, 128, 128, 120, 0, 0, 60, 0 };
+
+    std::map<std::pair<int, int>, std::vector<std::uint8_t>> grids; // (pattern, channel) -> rows * steps bytes
+
+    std::vector<std::uint8_t>& grid (int pattern, int channel)
+    {
+        auto& g = grids[{ pattern, channel }];
+        if (g.empty())
+        {
+            g.resize ((std::size_t) rows * steps);
+            for (int r = 0; r < rows; ++r)
+                std::fill_n (g.begin() + (std::ptrdiff_t) r * steps, steps, defaults[r]);
+        }
+        return g;
+    }
+
+    // FUN_012d45b0: a value equal to the row's default does not create a grid
+    void set (int pattern, int channel, int row, int step, int value)
+    {
+        const auto it = grids.find ({ pattern, channel });
+        if (it == grids.end() && value == defaults[row])
+            return;
+        grid (pattern, channel)[(std::size_t) row * steps + (std::size_t) step] = (std::uint8_t) value;
+    }
+};
+
 Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
 {
     const auto channelPreset = kind == FileKind::channelPreset;
@@ -548,11 +588,45 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     auto channel = [&]() -> Channel& { return findOrAdd (project.channels, currentChannel); };
     auto pattern = [&]() -> Pattern& { return findOrAdd (project.patterns, currentPattern); };
     auto arrangement = [&]() -> Arrangement& { return findOrAdd (project.arrangements, currentArrangement); };
+    // FL before 12 (11.0.3 / 11.1.0 in the demos: Housework, Overcome) numbered a channel's plugin parameters from 0x2000,
+    // FL 12 on from 0x8000 (ControlId::pluginParamBase); every FL 12+ demo uses 0x8000 and no other channel control lies in
+    // 0x2000…0x7FFF (round 190pi: Overcome's "Cut" / "Res" / "Vol" clips on Sytrus' parameters 18 / 19 / 0 [EXEC: FL 2026
+    // renders of the intro with and without them])
+    auto oldPluginParam = [&] (std::uint32_t raw) -> std::uint32_t {
+        const auto p = raw & 0xFFFFu;
+        if (project.versionNumber > 0 && project.versionNumber < version (12, 0, 0) && raw < 0x10000000u && p >= 0x2000u && p < 0x8000u)
+            return raw + 0x6000u;
+        return raw;
+    };
+
+    // FL <= 11 step grids (see OldStepGrids): FL's loader keeps the pattern of the last 0x41 (capped at 999) and the
+    // channel of the last 0x40 for them, whatever section the event comes in
+    OldStepGrids oldSteps;
+    int stepPattern = -1;
 
     Event e;
+    // round 190nu: a marker's own events follow its 0x94 (0x21 0x22 0x2E 0x2D 0xA8 0x65 0xCD in FL 2026's files); the key
+    // fields are read only there
+    bool inMarkerTail = false;
+    // round 190ov (rea/FL-FACTS-autolinks.md): FL writes a link's mapping formula as an 0xE6 right after its 0xE3 record
+    // (FUN_00f40840 / FUN_00f46490); -1 = the last event was no automation clip link
+    int formulaLink = -1;
 
     while (reader.next (e))
     {
+        const auto linkBefore = formulaLink;
+        formulaLink = -1;
+        if (inMarkerTail && e.id != evTimeMarkerNumerator && e.id != evTimeMarkerDenominator && e.id != evTimeMarkerName && e.id != 0x2E
+            && e.id != 0x2D && e.id != 0xA8 && e.id != 0x65)
+            inMarkerTail = false;
+        if (inMarkerTail && lastMarkers != nullptr && ! lastMarkers->empty() && (e.id == 0x2E || e.id == 0xA8 || e.id == 0x65))
+        {
+            auto& m = lastMarkers->back();
+            (e.id == 0x2E ? m.keyRoot : e.id == 0xA8 ? m.keyScale : m.keyMask) = (int) e.value;
+            continue;
+        }
+        if (inMarkerTail && e.id == 0x2D)
+            continue;
         switch (e.id)
         {
             case evVersion:
@@ -970,10 +1044,55 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             case evUrl: project.url = text (e); break;
 
             case evNewPattern:
+                stepPattern = (int) std::min<std::uint32_t> (e.value, 999);
                 currentPattern = (int) e.value;
                 pattern();
                 inPattern = true;
                 lastMarkers = nullptr;
+                break;
+
+            // FL <= 11 step grids (FUN_00f46490 → FUN_012d45b0): (value << 8) | step
+            case 0x48: case 0x49: case 0x4D: case 0x4E: case 0x57: case 0x58: case 0x5B: case 0x5C:
+            {
+                if (currentChannel < 0 || stepPattern < 0)
+                    break;
+                const int step = (int) (e.value & 0xFF);
+                int value = (int) (e.value >> 8);
+                int row = OldStepGrids::on;
+                switch (e.id)
+                {
+                    case 0x48: row = OldStepGrids::velocity; break;
+                    case 0x49: row = OldStepGrids::pan; break;
+                    case 0x4D: row = OldStepGrids::key; break;
+                    case 0x4E: row = OldStepGrids::finePitch; break;
+                    case 0x57: // Mod Y; FL's laws for files before 3.2.2 (FUN_00f44df0) and 2.2.0 (the one before 2.0.1,
+                               // FUN_00f44d30, is not modelled)
+                        row = OldStepGrids::modY;
+                        if (project.versionNumber < version (2, 2, 0))
+                            value = (value >> 1) + 0x50;
+                        if (project.versionNumber < version (3, 2, 2))
+                            value = std::clamp (((value - 0x50) * 0x80) / 0x50 + 0x80, 0, 0xFF);
+                        break;
+                    case 0x58: row = OldStepGrids::modX; break; // (FL's laws before 2.2.0 depend on the channel type)
+                    case 0x5C:
+                        row = OldStepGrids::shift;
+                        if (project.versionNumber < version (2, 1, 0))
+                            value = value * 0x30 / 0xFF;
+                        break;
+                    default: break;
+                }
+                oldSteps.set (stepPattern, currentChannel, row, step, value);
+                break;
+            }
+
+            case 0x44: // FL 1-3: bit i = step i on (FUN_00f46490 allocates the grid in any case)
+                if (currentChannel >= 0 && stepPattern >= 0)
+                {
+                    auto& g = oldSteps.grid (stepPattern, currentChannel);
+                    for (int bit = 15; bit >= 0; --bit)
+                        if ((e.value >> bit) & 1)
+                            g[(std::size_t) OldStepGrids::on * OldStepGrids::steps + (std::size_t) bit] = 1;
+                }
                 break;
 
             case evPatternName:
@@ -1139,6 +1258,17 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     arrangement().name = text (e);
                 break;
 
+            case evArrangementView: // FL writes them after every arrangement: the record names its own (round 190oo, PAT-6)
+                if (e.data.size() >= 28)
+                {
+                    const auto index = (int) readLE<std::uint32_t> (e.data, 0);
+                    const auto zoom = readLE<std::int32_t> (e.data, 24);
+                    for (auto& a : project.arrangements)
+                        if (a.index == index && zoom >= 0 && zoom <= 4096)
+                            a.rowZoom = (int) zoom;
+                }
+                break;
+
             case evTimeMarker:
                 if (inPattern && currentPattern >= 0)
                     lastMarkers = &pattern().markers;
@@ -1152,6 +1282,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     lastMarkers = &arrangement().markers;
                 }
                 lastMarkers->push_back ({ e.value & 0xFFFFFFu, (int) (e.value >> 24), 4, 4, {} });
+                inMarkerTail = true;
                 break;
 
             case evTimeMarkerNumerator:
@@ -1364,7 +1495,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
             {
                 std::vector<ControlEvent> list;
                 for (std::size_t o = 0; o + 12 <= e.data.size(); o += 12)
-                    list.push_back ({ readLE<std::uint32_t> (e.data, o), normalizeControlId (readLE<std::uint32_t> (e.data, o + 4)),
+                    list.push_back ({ readLE<std::uint32_t> (e.data, o), ControlId { oldPluginParam (normalizeControlId (readLE<std::uint32_t> (e.data, o + 4)).raw) },
                                       readLE<std::int32_t> (e.data, o + 8) });
                 if (e.id == evInitControls)
                     project.initControls.insert (project.initControls.end(), list.begin(), list.end());
@@ -1393,7 +1524,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                         else if (param == 0x1F01)
                             value *= 100;
                     }
-                    project.controls.push_back ({ normalizeControlId (raw), value });
+                    project.controls.push_back ({ ControlId { oldPluginParam (normalizeControlId (raw).raw) }, value });
                 }
                 break;
 
@@ -1401,14 +1532,34 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 for (std::size_t o = 0; o + 20 <= e.data.size(); o += 20)
                     if ((readLE<std::uint32_t> (e.data, o + 12) & 8) != 0) // 8 = automation clip (4 = remote control)
                     {
-                        const auto source = readLE<std::uint32_t> (e.data, o);
-                        const auto target = normalizeControlId (readLE<std::uint32_t> (e.data, o + 8));
+                        const auto source = oldPluginParam (readLE<std::uint32_t> (e.data, o));
+                        const ControlId target { oldPluginParam (normalizeControlId (readLE<std::uint32_t> (e.data, o + 8)).raw) };
 
                         if ((source & 0xFFFFu) >= 0x8000u) // output of a controller, not a clip
+                        {
                             project.controllerLinks.push_back ({ normalizeControlId (source), target });
+                            formulaLink = -1;
+                        }
                         else
+                        {
                             project.automationLinks.push_back ({ (int) (source >> 16), target });
+                            formulaLink = (int) project.automationLinks.size() - 1;
+                        }
                     }
+                break;
+
+            case evLinkFormula: // round 190ov
+                if (linkBefore >= 0 && linkBefore < (int) project.automationLinks.size())
+                {
+                    auto formula = text (e);
+                    while (! formula.empty() && formula.back() == '\0')
+                        formula.pop_back();
+                    std::string upper;
+                    for (const auto ch : formula)
+                        if (ch != ' ')
+                            upper += (char) std::toupper ((unsigned char) ch);
+                    project.automationLinks[(std::size_t) linkBefore].formula = upper == "INPUT" ? std::string() : formula;
+                }
                 break;
 
             case evAutomationPoints:
@@ -1652,6 +1803,44 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
 
         if (! std::isfinite (ch.stretchTime) || ch.stretchTime < 0.0f)
             ch.stretchTime = 0.0f;
+    }
+
+    // FL's loader, for a project older than 11.5.0 (FUN_00f46490 → FUN_010012e0 for patterns 1…999 and every channel):
+    // each step that is on becomes a step note (length 0) at step × step ticks + shift × step ticks / 48, plus FL's
+    // swing offset (step ticks × swing >> 8, FUN_01311070) on odd steps; key, fine pitch, pan, velocity, Mod X / Y from
+    // the grid, release 64, porta when the step's bit 0x40 is set, flags 0x4000. The notes join the pattern's own.
+    if (project.versionNumber < version (11, 5, 0) && ! oldSteps.grids.empty())
+    {
+        const int stepTicks = std::max (1, project.header.ppq / 4);
+        const int swingOffset = (int) (((unsigned) stepTicks * (unsigned) std::max (0, project.swing)) >> 8);
+        constexpr std::size_t n = OldStepGrids::steps;
+        for (const auto& [key, g] : oldSteps.grids)
+        {
+            const auto [pat, chan] = key;
+            if (pat < 1 || pat > 999)
+                continue;
+            for (std::size_t s = 0; s < n; ++s)
+            {
+                const auto on = g[OldStepGrids::on * n + s];
+                if ((on & 1) == 0)
+                    continue;
+                Note note;
+                note.position = (std::uint32_t) ((int) s * stepTicks + g[OldStepGrids::shift * n + s] * stepTicks / 48
+                                                 + ((s & 1) != 0 ? swingOffset : 0));
+                note.flags = 0x4000;
+                note.channel = (std::uint16_t) chan;
+                note.length = 0;
+                note.key = g[OldStepGrids::key * n + s];
+                note.finePitch = g[OldStepGrids::finePitch * n + s];
+                note.release = 64;
+                note.extra = (on & 0x40) != 0 ? 0x10 : 0;
+                note.pan = g[OldStepGrids::pan * n + s];
+                note.velocity = g[OldStepGrids::velocity * n + s];
+                note.modX = g[OldStepGrids::modX * n + s];
+                note.modY = g[OldStepGrids::modY * n + s];
+                findOrAdd (project.patterns, pat).notes.push_back (note);
+            }
+        }
     }
 
     for (auto& p : project.patterns)

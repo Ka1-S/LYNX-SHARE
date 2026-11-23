@@ -101,9 +101,20 @@ enum class Method
 };
 Method methodFor (Flavour);
 
+// The Linux packages' architecture in their file names: "aarch64" in an arm64 build, else "x86_64" (round 190oy)
+constexpr const char* buildLinuxArch() noexcept
+{
+#if defined(__aarch64__)
+    return "aarch64";
+#else
+    return "x86_64";
+#endif
+}
+
 // The asset a flavour uses (index into `assets`), or -1: the installer "*-setup-x64.exe", the portable
-// "*-windows-x64.zip", macOS "*.dmg", the AppImage "*-x86_64.AppImage", the tarball "*-linux-x86_64.tar.gz".
-int assetFor (Flavour, const std::vector<Asset>& assets);
+// "*-windows-x64.zip", macOS "*.dmg", the AppImage "*-<arch>.AppImage", the tarball "*-linux-<arch>.tar.gz" (arch =
+// linuxArch: "x86_64" or "aarch64"; an arm64 build never takes the x86_64 packages, nor the other way round).
+int assetFor (Flavour, const std::vector<Asset>& assets, const char* linuxArch = buildLinuxArch());
 int checksumsAsset (const std::vector<Asset>& assets); // "SHA256SUMS.txt", or -1
 
 // --- checksums --------------------------------------------------------------------------------------------------
@@ -187,6 +198,21 @@ struct InstallingNote
 };
 std::string formatInstalling (const InstallingNote&);
 InstallingNote parseInstalling (const std::string& text);
+
+// --- leftovers of a newer version (round 190nr) --------------------------------------------------------------------
+// Going back runs the OLDER version's installer over the folder, and its uninstall list doesn't know what newer
+// versions added (0.1.29 left 0.1.30's licenses\ behind, round 190nk). The helper of the version being left (a copy
+// of the NEWER LYNX.exe, --apply-update) removes, after the older installer succeeded, every install-folder entry that
+// arrived after the version installed. Add an entry here whenever the installer (resources/installer/LYNX.nsi) gets a
+// new top-level file or folder. Names are top-level entries of the install folder.
+struct InstallEntry
+{
+    const char* name;
+    const char* since; // the first version whose installer writes it
+};
+const std::vector<InstallEntry>& installEntries();
+// The entries a version older than them doesn't install (empty when `installed` is not valid).
+std::vector<std::string> entriesNewerThan (const Version& installed);
 
 // An automatic check reuses the cached release list for this long (GitHub allows 60 unauthenticated calls an hour
 // per address; LYNX started many times a day asks once every few hours).

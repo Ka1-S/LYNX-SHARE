@@ -3,6 +3,7 @@
 // Ties Song + instruments + scheduler together: given the transport state, renders
 // a block of stereo audio with notes triggered at the exact sample.
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -85,6 +86,23 @@ struct RackState
     // Indices into song.automations, or -1 = no automation.
     static constexpr int maxAutomations = 1024;
     std::vector<std::vector<int>> automationClips; // per automation: clips in the Playlist
+    // round 190ow (details DE-123): FL's triggered automation clips. Per automation, the clips its steps / notes on its
+    // Channel rack row start in Song mode (Pattern::autoNotes inside the Playlist's pattern clips), as clips of its own in
+    // song time: start = the note's song position, length = how long the note holds the clip, offset 0. Empty = none
+    // (every song without such steps: no work anywhere). `triggerSlot[a]` = the slot that carries automation a's value
+    // (its own, or the group's when it shares its target, issue #97); `patternTriggers` = some pattern has such steps
+    // (Pattern mode plays the current pattern's).
+    std::vector<std::vector<Clip>> triggerClips;
+    std::vector<int> triggerSlot;
+    std::vector<char> triggered; // per automation: steps / notes in some pattern (bound for Pattern mode too)
+    bool patternTriggers = false;
+    // the automation's value follows the song position: clips in the Playlist or triggered ones
+    bool positional (int a) const noexcept
+    {
+        return a >= 0 && (std::size_t) a < automationClips.size()
+               && (! automationClips[(std::size_t) a].empty() || ((std::size_t) a < triggerClips.size() && ! triggerClips[(std::size_t) a].empty()));
+    }
+    bool driven (int a) const noexcept { return positional (a) || (a >= 0 && (std::size_t) a < triggered.size() && triggered[(std::size_t) a] != 0); }
     std::vector<char> zoneAutomations;             // per automation: it has clips in the performance zone
     // round 177b: automation lanes (PlaylistTrack::lanes): the lane automations that play, and per lane the automations
     // of the same target that have clips (where one of their clips plays, it wins over the lane)
@@ -103,8 +121,18 @@ struct RackState
         float base = 0.5f;          // the target's own value
         int modulator = 0;
         float depth = 0.0f;
+        bool hosted = false;        // round 190ox: a hosted plugin's parameter (base = ModRoute::base)
     };
     std::vector<ModPlay> modRoutes;
+    // Round 190ox (modulators stage 2): per modulator, what feeds it — the follower's insert, the notes' channel (−1:
+    // none) — and the slot of an automation that drives a Macro's knob (−1: its own value). Empty without modulators.
+    struct ModFeed
+    {
+        int track = -1, channel = -1, macroSlot = -1;
+    };
+    std::vector<ModFeed> modFeeds;
+    std::vector<char> followedTracks; // per insert: a follower reads its level (empty: none)
+    bool modStateful = false;         // a follower, envelope, keytrack or velocity modulator routes somewhere
     // Several automations with clips on one target play as one (issue #97, FL's rule: docs/analise/REA_rodada177b.md):
     // the last of them holds the slot and lists them all here (ascending; empty = it plays alone); the others are
     // marked as followers: they bind nothing and compute nothing.
@@ -128,14 +156,29 @@ struct RackState
     struct EventLane
     {
         int pattern = 0, lane = 0, slot = 0;
+        int shared = -1; // round 190om: several patterns' lanes of one target — the slot bound to it (else −1)
     };
     std::vector<EventLane> eventLanes;
+    // round 190om: the lanes (indices into eventLanes) of each target that several patterns' lanes drive, the bound slot
+    // first; the pattern whose clip started last drives the target, as in FL (before, only the last lane did)
+    std::vector<std::vector<int>> sharedLanes;
     // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
     // a slot after the event lanes whose value is the clip's own through the link's mapping formula
+    // Round 190ov (FL's demos: clips linked to several controls): a link's target that other clips drive too plays them as
+    // one, as issue #97's groups do — the clip that plays (the last one started) or else the last one that ended decides,
+    // through its own link (`link` ≥ 0) or 1:1 (−1: an automation of that one target, which then binds nothing itself).
+    struct LinkMember
+    {
+        int automation = 0, link = -1;
+        linkformula::Formula formula;
+        std::vector<float> scale;
+    };
     struct LinkSlot
     {
         int automation = 0, slot = 0;
         linkformula::Formula formula;
+        std::vector<float> scale;          // round 190ov: Automation::Link::scale
+        std::vector<LinkMember> members;   // round 190ov: empty = this link alone, from its automation's value
     };
     std::vector<LinkSlot> linkSlots;
     std::vector<std::vector<int>> patternClips; // per pattern: its clips in the Playlist, by start
@@ -204,6 +247,7 @@ struct RackState
         int channel = 0;
         OutputMode mode = OutputMode::stereo;
         std::shared_ptr<DelayLine> delay;
+        bool cue = false; // round 190nc (DL-110): a cued track to the Cue Out, at HardwareOutput::cueGain
     };
     std::vector<HwRoute> hwRoutes;
     // FL's "Bypass track latency compensation › When recording or not playing" (REA round 165f-mixer): these tracks'
@@ -224,6 +268,8 @@ struct RackState
     // Current latencies of instruments and effects, in the same layout as `latencies` (0 for the slots bypassed for
     // low latency).
     std::vector<int> currentLatencies() const;
+    // round 190of: currentLatencies() != known, without making the list (the engine asks 30 times a second)
+    bool latenciesDiffer (const std::vector<int>& known) const;
     void buildPdc (const RackState* previous);
 
     // Arpeggiators of channels with arpeggio on (nullptr for the others); reused across snapshots.
@@ -303,6 +349,7 @@ struct RackState
     void buildTaskGraph (const std::vector<int>& depth);
 
     void buildAutomationTables();
+    void buildTriggerClips (int count); // (round 190ow, DE-123)
     // The automation slots that drive `target` in a snapshot of `song` (its automations, then its pattern event
     // lanes, numbered as buildAutomationTables numbers them). REA round 146: a touched control overrides them.
     static void slotsOfTarget (const Song& song, const AutomationTarget& target, std::vector<int>& out);
@@ -476,6 +523,29 @@ struct ProcessTimes
     std::array<std::atomic<std::uint64_t>, maxMixerTracks * maxEffectSlots> effectNs {}; // [track * maxEffectSlots + slot]
     std::atomic<std::uint64_t> audioNs { 0 };  // duration of the audio rendered while enabled
     std::atomic<std::uint64_t> wallNs { 0 };   // time the whole rack took for it
+    // Round 190of (the monitor's Longest and Spikes columns): per instrument / slot, the longest single call since the
+    // monitor last took it (exchange (0)), and the calls that took more than half of the time their own audio lasts
+    // (one plugin alone using half of the real-time budget: what makes the sound stutter), counted up
+    std::array<std::atomic<std::uint32_t>, channels> channelLongestNs {};
+    std::array<std::atomic<std::uint32_t>, maxMixerTracks * maxEffectSlots> effectLongestNs {};
+    std::array<std::atomic<std::uint32_t>, channels> channelSpikes {};
+    std::array<std::atomic<std::uint32_t>, maxMixerTracks * maxEffectSlots> effectSpikes {};
+    // one timed call of an instrument (channel = true, key = its channel) or effect slot (key = track * slots + slot):
+    // `spent` ns for `audio` ns of sound
+    void addCall (bool channel, std::size_t key, std::uint64_t spent, std::uint64_t audio) noexcept
+    {
+        if (channel ? key >= channelNs.size() : key >= effectNs.size())
+            return;
+        (channel ? channelNs[key] : effectNs[key]).fetch_add (spent, std::memory_order_relaxed);
+        auto& longest = channel ? channelLongestNs[key] : effectLongestNs[key];
+        const auto value = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
+        auto seen = longest.load (std::memory_order_relaxed);
+        while (value > seen && ! longest.compare_exchange_weak (seen, value, std::memory_order_relaxed))
+        {
+        }
+        if (audio > 0 && spent * 2 > audio)
+            (channel ? channelSpikes[key] : effectSpikes[key]).fetch_add (1, std::memory_order_relaxed);
+    }
     // Live meters of the effects that have them (the mixing suite's gain reduction, REA round 96; LYNX Tune's pitch and
     // Facet EQ's dynamic gains, round 103; the dynamics suite's band gains and levels, round 108), always published:
     // [(track * maxEffectSlots + slot) * meterOutputs + output] = Effect::controlOutput (output) after the last block.
@@ -656,6 +726,10 @@ public:
     // Round 190ih (FL's channel activity light, PLAN R4): how many blocks struck a note on the channel (any source: song,
     // pattern, typing keyboard, MIDI, Piano roll preview, arpeggiator); a change since the last look = a new note-on,
     // even one shorter than the UI's frame. Safe to read from any thread.
+    // Round 190oa (DF-29, owner decision F5; REA 190oa R1: FL's polyphony readout is the count of its voice pool's lists —
+    // generator voices kept until their release ends, audio clips, automation clips, plugin notes): the notes sounding on
+    // every channel plus the ones released whose channel still sounds (its release tail), as of the last block. Any thread.
+    int voicesSounding() const noexcept { return voicesNow.load (std::memory_order_relaxed); }
     std::uint32_t noteStrikes (int channel) const noexcept
     {
         return channel >= 0 && channel < maxChannels ? strikes[(std::size_t) channel].load (std::memory_order_relaxed) : 0u;
@@ -771,6 +845,8 @@ public:
     // its automation until playback starts again, stopped or playing. The slots set here are released that way; the
     // renderer forgets them itself when the transport starts (and the engine its list of moved targets).
     void setReleasedSlots (const std::vector<int>& slots) noexcept;
+    // round 190oa (DL-58): Live's override — the released slots stay released when playback starts (FL: they go back)
+    void setKeepReleasedOnPlay (bool keep) noexcept { keepReleasedOnPlay.store (keep, std::memory_order_relaxed); }
     bool isSlotOverridden (int slot) const noexcept
     {
         if (slot < 0 || slot >= RackState::maxAutomations)
@@ -1032,12 +1108,30 @@ private:
     void updateAutomation (const RackState& state, double startTick) noexcept;
     void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
     double modSeconds = 0.0; // the free-running modulators' clock
+    // Round 190ox: the stateful modulators' state (envelopes, followers, the last note; audio thread), the followed
+    // inserts' last peak, and per channel the notes struck so far with the last one's key and velocity
+    static constexpr int maxStatefulModulators = 256;
+    std::array<modenv::State, maxStatefulModulators> modStates {};
+    std::array<float, maxMixerTracks> followPeak {};        // [insert]
+    std::array<std::uint32_t, maxChannels> notesStruck {};
+    std::array<std::uint8_t, maxChannels> lastNoteKey {};
+    std::array<float, maxChannels> lastNoteVelocity {};
+    void noteStruck (int channel, int key, float velocity) noexcept
+    {
+        if (channel >= 0 && channel < maxChannels)
+        {
+            ++notesStruck[(std::size_t) channel];
+            lastNoteKey[(std::size_t) channel] = (std::uint8_t) std::clamp (key, 0, 127);
+            lastNoteVelocity[(std::size_t) channel] = velocity;
+        }
+    }
     // ticks from `tick` to the next pattern event (or pattern clip edge) that changes a lane's value; +inf if none
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
     void applyPluginParam (const RackState& state, std::size_t index, int firstSlot, bool andLive) noexcept; // (one binding)
     void applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept;               // (round 190kz)
+    bool updatePatternTriggers (const RackState& state, double startTick) noexcept; // (round 190ow, DE-123)
     // Round 190jg (sample-accurate automation): the automation's changes inside this chunk for hosted CLAP / VST3
     // plugins (Instrument / Effect::setParameterAt), after the chunk's values. Clip automation and lanes (not pattern
     // events: a chunk already ends at each of those). Checked every timedStep samples of the export grid (a ramp moves
@@ -1062,6 +1156,11 @@ private:
     PieceValue<int> trackSamples { 0 }; // the chunk's samples (what trackBuffer zeroes)
 
     double sampleRate = 44100.0;
+    // round 190of: how long `samples` of audio last, in ns (the Plugin performance monitor's spikes)
+    std::uint64_t audioNsOf (int samples) const noexcept
+    {
+        return samples > 0 && sampleRate > 0.0 ? (std::uint64_t) ((double) samples / sampleRate * 1.0e9) : 0;
+    }
     double bpm = 120.0;
     double ownBpm = 120.0;
     double tempoOverride = 0.0;
@@ -1139,7 +1238,40 @@ private:
         int k = 0, n = 0;   // the next step, the slide's length (FL ticks)
     };
     std::array<SlideTicks, maxChannels> slideTicks {};
+    // FL's slide notes move the note properties too (issue #236, round 190od; Song::slideNoteProps): each sounding key's
+    // velocity, pan and Mod X / Y as the channel's voices have them now (set at note on, moved by slides), and a slide in
+    // progress — the keys it moves, where they started and where they go — stepped on the slide's FL ticks
+    struct NoteProps
+    {
+        float velocity = 0.78125f, pan = 0.0f, modX = 0.5f, modY = 0.5f;
+        float cents = 0.0f; // (round 190pi) the note's own cents as its voice started (a chord slide's interval)
+        std::int8_t colour = 0; // (round 190pi) its colour: a slide note moves the notes of its own colour only
+    };
+    struct PropSlide
+    {
+        static constexpr int maxKeys = 16;
+        int count = 0; // keys it moves (0: none in progress)
+        std::array<std::uint8_t, maxKeys> keys {};
+        std::array<NoteProps, maxKeys> from {};
+        NoteProps to;
+        int steps = 0; // FL ticks (n): steps 0…n, the last one at the slide's end
+        // (round 190pi) its own ticks: where it started (song ticks) and the next step — a pitch slide that starts while
+        // it runs (an arpeggiator's Slide step) has its own schedule (SlideTicks) and no longer stops this one
+        double start = 0.0;
+        int k = 0;
+        bool flLaw = false; // an FL native generator: the level moves linearly in FL's volume (InitLevels.Vol), not in velocity
+    };
+    std::vector<NoteProps> noteProps;  // maxChannels × 128 (prepare)
+    std::vector<PropSlide> propSlides; // maxChannels (prepare)
+    // (`only`: the keys it moves — round 190pi, the slide note's colour —; null: every held key)
+    void startPropSlide (int channel, const NoteEvent& slide, int flTicks, bool flLaw, const NoteMask* only = nullptr) noexcept;
+    void stepPropSlide (Instrument& instrument, int channel, int step) noexcept;
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
+    std::atomic<bool> keepReleasedOnPlay { false };         // (round 190oa, DL-58)
+    // round 190oa (DF-29): per channel, the notes released since the channel last fell silent (their voices still
+    // release; renderChannel zeroes it once the channel is idle / below −100 dB), and the block's total
+    std::array<std::uint16_t, maxChannels> releasingVoices {};
+    std::atomic<int> voicesNow { 0 };
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;
     std::array<VoiceOrder, maxChannels> voiceOrders {};      // sounding notes in order, for the channels' Max polyphony

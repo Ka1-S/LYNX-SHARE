@@ -38,6 +38,18 @@ struct Row
     double current = 0.0; // % of real time, smoothed
     double average = 0.0; // since the last reset
     double peak = 0.0;    // highest `current` since the last reset
+    // round 190of: the longest single call since the last reset (ms) and the calls that took more than half of the
+    // time their own audio lasts (what makes the sound stutter)
+    double longestMs = 0.0;
+    std::uint64_t spikes = 0;
+};
+
+// Round 190of: the per-call counters the rack keeps besides the busy time (core/RackRenderer.h ProcessTimes):
+// `longestNs[key]` the longest call since the last update (taken), `spikes[key]` the calls over half their audio (counted up)
+struct CallStats
+{
+    std::vector<std::uint32_t> longestNs;
+    std::vector<std::uint64_t> spikes;
 };
 
 enum class SortBy
@@ -45,7 +57,9 @@ enum class SortBy
     current,
     average,
     peak,
-    name
+    name,
+    longest, // round 190of
+    spikes
 };
 
 class Monitor
@@ -53,7 +67,8 @@ class Monitor
 public:
     // `busyNs[key]`, `audioNs` and `wallNs` are the rack's accumulated counters (ever-growing); the first call only
     // takes the starting point.
-    void update (const std::vector<Source>& list, const std::vector<std::uint64_t>& busyNs, std::uint64_t audioNs, std::uint64_t wallNs);
+    void update (const std::vector<Source>& list, const std::vector<std::uint64_t>& busyNs, std::uint64_t audioNs, std::uint64_t wallNs,
+                 const CallStats* calls = nullptr);
     void reset(); // averages and peaks start again from the next update
 
     // Rows matching every word of `find` (name or place, any case), sorted (highest first; name: A→Z).
@@ -68,6 +83,7 @@ private:
         Source source;
         std::uint64_t lastBusy = 0, totalBusy = 0;
         double current = 0.0, peak = 0.0;
+        std::uint64_t longestNs = 0, lastSpikes = 0, spikes = 0; // (round 190of)
         bool fresh = true;
     };
     std::map<int, Stat> stats;

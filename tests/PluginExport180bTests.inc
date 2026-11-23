@@ -116,8 +116,9 @@ TEST (pluginexport180b_catalog_needs_no_fl_data)
         {
             const auto* engine = lynx::natives::instrumentEngine (e.synth);
             CHECK (engine != nullptr && engine->needs == lynx::natives::Needs::nothing);
-            const auto channel = lynx::banks::defaultChannel (e.synth, e.name);
-            CHECK (channel.has_value());
+            // (a bank's first preset; Tetra and Braid have no bank and start from their engine's defaults: rollup 0.1.31 step 6)
+            const auto channel = lynx::plugexport::instrumentChannel (e);
+            CHECK (channel.instrument == e.synth && lynx::banks::defaultChannel (e.synth, e.name).has_value() == lynx::banks::hasBank (e.synth));
             CHECK (lynx::modelparams::tableOf (e.synth) != nullptr);
         }
         else
@@ -221,7 +222,9 @@ TEST (pluginexport188b_table_codes_are_unique)
     }
     CHECK (rows > 0);
     CHECK (built == (int) lynx::plugexport::catalog.size());
-    CHECK (vst3 >= 1 && vst3 <= 10); // a short list: each VST3 carries the whole runtime (docs/PLUGIN_EXPORT.md)
+    // a short list: each VST3 carries the whole runtime (docs/PLUGIN_EXPORT.md). Round 190pq: 11, the three synths
+    // (Fourfold, Wavecoil, Duoloom) joined the eight, as the round's brief asked
+    CHECK (vst3 >= 1 && vst3 <= 11);
 }
 
 TEST (pluginexport188b_plugin_downloads_are_never_taken_for_the_app)
@@ -230,7 +233,7 @@ TEST (pluginexport188b_plugin_downloads_are_never_taken_for_the_app)
     // pick one for an app update, and their checksum file is not the app's SHA256SUMS.txt
     using namespace lynx::update;
     std::vector<Asset> assets;
-    for (const char* name : { "LYNX-Plugins-0.1.26-win-x64.zip", "LYNX-Plugins-0.1.26-linux-x86_64.tar.xz",
+    for (const char* name : { "LYNX-Plugins-0.1.26-win-x64.zip", "LYNX-Plugins-0.1.26-win-x64.7z", "LYNX-Plugins-0.1.26-linux-x86_64.tar.xz",
                               "LYNX-Plugins-0.1.26-macos-universal.tar.xz", "LYNX-Plugins-0.1.26-SHA256SUMS.txt" })
         assets.push_back ({ name, std::string ("https://example.invalid/") + name, 1 });
     for (const auto f : { Flavour::windowsInstaller, Flavour::windowsPortable, Flavour::macos, Flavour::linuxAppImage, Flavour::linuxTarball })

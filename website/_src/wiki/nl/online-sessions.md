@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Er zijn twee manieren om met anderen aan een project te werken, en beide staan onder `Bestand › Online sessie`. Een pakket is een bestand dat je naar een vriend stuurt, die een deel terugstuurt. Het heeft geen netwerk, account of server nodig. Een livesessie verbindt iedereen via internet door het LYNX SHARE-relay, en elke wijziging bereikt iedereen. Aan één project doen maximaal 4 mensen mee, jou meegerekend.
 
@@ -69,7 +69,7 @@ Het menu `Bestand › Online sessie` heeft deze opdrachten zolang een sessie loo
 | `Livesessie beëindigen` | Voor de host. Iedereen vertrekt en de code werkt niet meer |
 | `Livesessie verlaten` | Voor een gast. Jouw deel van het project blijft bij jou |
 
-In `Mensen en rechten...` krijgt elke persoon een van vier rollen: `De eigen kanalen, patterns, inserts en rijen`, `De eigen delen + tempo en projectinstellingen`, `Alles` of `Alleen luisteren (geen bewerkingen)`. Een toestemming uitzetten verwijdert nooit iets.
+In `Mensen en rechten...` krijgt elke persoon een van vier rollen: `De eigen kanalen, patterns, inserts en rijen`, `De eigen delen + tempo en projectinstellingen`, `Alles` of `Alleen luisteren (geen bewerkingen)`. Een toestemming uitzetten verwijdert nooit iets. De vijfde keuze, `Uit de sessie verwijderen`, haalt de persoon uit de sessie. Standaard krijgt de sessie dan een nieuwe uitnodigingscode voor nieuwe deelnemers, en wie nog in de sessie zit gaat door; `Dezelfde code houden` houdt de oude code.
 
 ## Plugins die de anderen niet hebben
 

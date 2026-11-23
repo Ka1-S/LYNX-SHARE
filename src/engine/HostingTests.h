@@ -27,4 +27,18 @@ int runClapExtTest (const juce::String& pluginPath, const juce::String& reportPa
 // insert) at a known sample; rendered with sample-accurate automation on and off, the sample where the plugin's output
 // steps (LYNX's test plugins put the parameter on their output: tools/testplugin/lynx_test_ext.c, lynx_test_param_vst3.cpp)
 int runAutomationTimingTest (const juce::String& pluginPath, const juce::String& reportPath);
+
+// Round 190of: --pluginbench <plugin | list.txt> report.tsv [--block B] [--rate R] [--seconds S] [--types N]
+// [--names a,b] [--editors]: what each plugin costs when LYNX hosts it, one row per plugin type (list.txt: one file per
+// line, optionally a tab and a name filter). Scan, load and prepare times and the memory they take; the processing of a
+// test signal (an effect: a 110 Hz tone with harmonics; an instrument: a held 4-note chord) on a thread of its own with
+// FTZ/DAZ as LYNX's audio threads: work per block (instructions on Linux, cycles on Windows), wall time, the share of a
+// core, spikes (blocks over 4x the median) and blocks over half the block's time; on Linux, voluntary context switches
+// and page faults on that thread, and with LD_PRELOAD=tools/pluginbench/libbenchcount.so its allocations and mutex
+// locks; then silence (notes released / input zero): when the output falls under -96 dB, what steady silence costs
+// against the signal (a plugin that keeps working in silence gains from smart disable), and the same with
+// flush-to-zero off (its sensitivity to denormals); LYNX's own adapter around the same instance (PluginEffect /
+// PluginInstrument) against the bare processBlock; with --editors the editor's open time and memory. No audio device.
+int runPluginBench (const juce::String& listOrPlugin, const juce::String& reportPath, int block, double rate, double seconds, int typesPerFile,
+                    const juce::String& nameFilter, bool editors);
 } // namespace lynx

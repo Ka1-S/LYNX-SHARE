@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![A janela principal com o projeto de demonstração: barra de ferramentas no topo, Browser à esquerda, Playlist ao fundo e o Channel Rack flutuando sobre ela](/assets/img/wiki/desktop.webp)
 
@@ -79,7 +79,7 @@ O Browser é o fundo da área de trabalho: ele fica encaixado na lateral e as ou
 - Até você mover, redimensionar ou destacar alguma coisa, as janelas voltam às posições padrão sempre que a janela principal muda de tamanho. Depois disso, o seu arranjo é lembrado e escala com a janela.
 - `F12` fecha as janelas de plugin, de configurações de canal e de ferramentas. Não fecha as cinco janelas principais.
 - Enquanto o piano do teclado de digitação está ligado (`Ctrl+T`), as teclas de letra tocam notas e a maioria dos atalhos de uma letra fica em pausa.
-- `Exibir › Estilo de layout` alterna entre o fluxo por padrões (o padrão) e o fluxo por disparo de clipes, que acrescenta uma grade de clipes ao lado da Playlist.
+- `Exibir › Estilo de layout` alterna entre o layout Pattern (o padrão) e o layout de lançamento de clipes, que acrescenta uma grade de clipes ao lado da Playlist.
 
 ## Veja também
 

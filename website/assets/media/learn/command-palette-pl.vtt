@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Szukasz polecenia? Naciśnij klawisz znaku zapytania, żeby otworzyć paletę poleceń.
+
+00:00:08.800 --> 00:00:14.200
+Wpisz, czego chcesz. Każda pozycja menu, skrót i ustawienie jest na liście.
+
+00:00:14.400 --> 00:00:19.200
+Naciśnij Enter, żeby uruchomić. Tu otwiera się Tracker.
+
+00:00:19.400 --> 00:00:24.800
+Teraz CPU. Gdy utwór gra, wskaźnik CPU na pasku narzędzi pokazuje obciążenie.
+
+00:00:25.000 --> 00:00:30.400
+Kliknij go dwukrotnie, żeby zobaczyć Monitor wydajności pluginów: CPU każdego pluginu.
+
+00:00:30.600 --> 00:00:37.200
+Żeby oszczędzać CPU: Narzędzia, Przełącz smart disable dla wszystkich pluginów: plugin odpoczywa, gdy milczy.

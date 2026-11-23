@@ -217,6 +217,10 @@ Layout pitcherLayout()
     v.push_back (menuOf (12, 84, 92, 22, "Range", TR_NOOP ("Range"), "220 Hz|170 Hz|110 Hz|80 Hz|55 Hz|25 Hz"));
     v.push_back (label (12, 108, 92, 12, TR_NOOP ("Lowest note"), dim));
     v.push_back (label (118, 28, 394, 14, TR_NOOP ("Input pitch"), dim));
+    // round 190oa (DP-81, capture 190oa C11): FL's thin INPUT PITCH strip over the note row and OUTPUT PITCH under it,
+    // ticks per note and a red marker at the pitch (left end when there is none)
+    v.push_back (display (118, 41, 394, 4, "pitchin"));
+    v.push_back (display (118, 75, 394, 4, "pitchout"));
     for (int n = 0; n < 12; ++n)
     {
         auto t = toggle (118.0f + 33.0f * (float) n, 46, 30, 28, notes[n], notes[n], boxed);

@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![El editor de Automatización con una curva que sube a lo largo de seis compases](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Activa la grabación con `Automatización` marcado en el filtro de grabación, p
 
 - `Vincular a un controlador MIDI (mueve un control del controlador)` se explica en [Controladores MIDI](/wiki/midi-controllers/).
 - `Vincular a controlador interno` deja que una Envolvente, una Fórmula o un Peak Controller del proyecto maneje el control. Añade uno de ellos primero.
-- `Modular` conecta un modulador, un LFO o una fuente aleatoria que mueve un mando de LYNX SHARE alrededor de su propio valor. `Herram. › Moduladores...` los lista.
+- `Modular con` conecta un modulador que mueve el control alrededor de su propio valor: un LFO, un seguidor de envolvente, una envolvente ADSR, pasos, una fuente aleatoria, una macro, keytrack o velocity. Funciona con los mandos de LYNX SHARE y con los parámetros de plugins de terceros. También puedes arrastrar un modulador sobre un mando, y un anillo en el mando muestra el movimiento. `Herram. › Moduladores...` los lista.
 
 ## Carriles de automatización
 
@@ -88,7 +88,8 @@ Los carriles vienen desactivados. Activa `Carriles de automatización` en el men
 - Varios clips en un mismo control suenan cada uno en su sitio. Antes de su primer clip, un control conserva su propio valor.
 - Al inicio de un clip, el control alcanza el nuevo valor en unos 8 ms. FL Studio lo alcanza deslizándose, así que un proyecto importado puede diferir un poco en esos puntos.
 - Donde se solapan clips del mismo control, el que elige LYNX SHARE puede ser distinto del que elige FL Studio.
-- Los moduladores solo funcionan en los mandos propios de LYNX SHARE, y se omiten al exportar a `.flp`.
+- Al exportar a `.flp`, los moduladores que siguen la posición de la canción pasan a ser clips de automatización (un LFO sincronizado pasa a ser el LFO de clip de FL Studio). Los seguidores, las envolventes, el keytrack y la velocity se dejan fuera, y el informe los lista.
+- ¿Moviste un control durante la reproducción sin grabar? `Capturar automatización` en las opciones de grabación convierte después los últimos movimientos en automatización.
 
 ## Relacionado
 

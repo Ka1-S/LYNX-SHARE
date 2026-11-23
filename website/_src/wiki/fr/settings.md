@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![La page Général de la fenêtre Réglages, avec les onglets de page en haut](/assets/img/wiki/settings-general.webp)
 
@@ -47,7 +47,7 @@ La fenêtre Réglages a huit pages : Audio, MIDI, Général, Thème, Fichiers, E
 
 | Réglage | Ce qu'il fait |
 |---|---|
-| `Style de disposition` | Flux par patterns (par défaut), flux par lancement de clips ou flux simple |
+| `Style de disposition` | Disposition Pattern (par défaut), disposition par lancement de clips ou disposition simple |
 | `Modèle par défaut`, `Projet au démarrage` | Le modèle qui s'ouvre avec `Fichier › Nouveau`, et ce qui s'ouvre au démarrage : `Projet vide`, `Modèle par défaut` ou `Dernier projet utilisé`. `Fichier › Enregistrer comme modèle...` ajoute les vôtres |
 | `Clips de session des sets Live` | Où vont les clips de session d'un set Live importé : la grille de clips, ou la Playlist après l'arrangement |
 | `Langue`, `Police de l'interface` | Appliqués au prochain démarrage |

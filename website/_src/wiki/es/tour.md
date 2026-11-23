@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![La ventana principal con el proyecto de demostración: barra de herramientas arriba, Browser a la izquierda, la Playlist detrás y el Channel Rack flotando encima](/assets/img/wiki/desktop.webp)
 
@@ -79,7 +79,7 @@ El Browser es el fondo del escritorio: se queda acoplado al lado y las demás ve
 - Hasta que muevas, cambies de tamaño o separes algo, las ventanas recuperan sus posiciones por defecto cada vez que la ventana principal cambia de tamaño. Después, tu diseño se recuerda y se escala con la ventana.
 - `F12` cierra las ventanas de plugins, de ajustes de canal y de herramientas. No cierra las cinco ventanas principales.
 - Mientras el piano del teclado de escritura está activado (`Ctrl+T`), las teclas de letras tocan notas y la mayoría de los atajos de una sola letra quedan en pausa.
-- `Ver › Estilo de diseño` cambia entre el flujo por patrones (el predeterminado) y el flujo por lanzamiento de clips, que añade una cuadrícula de clips junto a la Playlist.
+- `Ver › Estilo de diseño` cambia entre el diseño Patrón (el predeterminado) y el diseño de lanzamiento de clips, que añade una cuadrícula de clips junto a la Playlist.
 
 ## Relacionado
 

@@ -6,7 +6,9 @@
 #include "core/CountIn.h"
 #include "core/Details190mv.h" // (round 190mv: Master pitch in Hz)
 #include "core/LayoutStyle.h"
+#include "core/LiveScaleControl.h" // (round 190oo, O-5)
 #include "core/MarkerPlan.h"
+#include "core/SignatureEdit.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
 #include "core/ValueMath.h" // (round 190mv: the phase nudge)
@@ -545,7 +547,7 @@ MasterKnob::MasterKnob (AudioEngine& e, Kind k) : engine (e), kind (k)
 
 bool MasterKnob::available() const
 {
-    return kind == Kind::pitch || ! engine.getSong().mixer.empty();
+    return kind == Kind::pitch || monitor() || ! engine.getSong().mixer.empty();
 }
 
 double MasterKnob::value() const
@@ -554,6 +556,8 @@ double MasterKnob::value() const
 
     if (kind == Kind::pitch)
         return song.masterPitch;
+    if (monitor())
+        return song.mainVolume;
 
     return song.mixer.empty() ? (double) unityFader : (double) song.mixer.front().volume;
 }
@@ -568,6 +572,8 @@ void MasterKnob::setValue (double v)
 
     if (kind == Kind::pitch)
         engine.editSong ([v] (Song& song) { song.masterPitch = (float) v; });
+    else if (monitor())
+        engine.setMainVolume ((float) v);
     else
         engine.editLevels ([v] (Song& song) {
             if (! song.mixer.empty())
@@ -579,6 +585,8 @@ void MasterKnob::setValue (double v)
 
 ui::ValueSpec MasterKnob::spec() const
 {
+    if (kind == Kind::volume && monitor())
+        return ui::faderSpec (tr ("Main volume"), unityFader); // (round 190oa, DF-21: no automation target, as FL's)
     if (kind == Kind::volume)
     {
         auto s = ui::faderSpec (tr ("Master volume"), unityFader);
@@ -764,7 +772,7 @@ void MasterKnob::paint (juce::Graphics& g)
         const auto side = juce::jmin (area.getHeight(), area.getWidth());
         drawKnob (g, area.withSizeKeepingCentre (side, side), value01, kind == Kind::pitch,
                   available() ? colour::knobArc : colour::textDisabled, hover && available());
-        g.setColour (colour::textDisabled);
+        g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
         g.setFont (font (type::caption - 1.0f, true));
         g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), text.withHeight (10.0f).translated (0.0f, 1.0f), juce::Justification::centred, true);
         g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -777,7 +785,7 @@ void MasterKnob::paint (juce::Graphics& g)
 
     area.removeFromLeft (5.0f);
     auto caption = area.removeFromTop (area.getHeight() / 2.0f);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.setFont (font (type::caption - 1.0f, true));
     g.drawText (kind == Kind::volume ? tr ("MASTER") : tr ("PITCH"), caption.withTrimmedTop (1.0f), juce::Justification::bottomLeft, true);
     g.setColour (drag.isActive() ? colour::textPrimary : colour::textSecondary);
@@ -792,7 +800,7 @@ void MasterKnob::mouseDown (const juce::MouseEvent& e)
 
     if (e.mods.isPopupMenu())
     {
-        ui::showValueMenu (*this, kind == Kind::volume ? &engine : nullptr, spec(), value(), [this] (double v) { setValue (v); });
+        ui::showValueMenu (*this, kind == Kind::volume && ! monitor() ? &engine : nullptr, spec(), value(), [this] (double v) { setValue (v); });
         return;
     }
 
@@ -867,7 +875,8 @@ ui::Hint MasterKnob::hintAt (juce::Point<int>)
     if (! available())
         return { tr ("Master volume: this project has no mixer"), {}, false, false };
 
-    const auto gesture = kind == Kind::volume
+    const auto gesture = monitor() ? tr ("Main volume: what you hear, not in exports, not automatable (the Master insert's fader is in the Mixer)") + "  " + ui::valueGestures()
+                         : kind == Kind::volume
                              ? tr ("level of everything you hear (the Master insert's fader)") + "  " + ui::valueGestures()
                              : tr ("tunes the built-in instruments  [LMB] drag (semitones)  [Shift] cents  [Wheel] semitone  [Ctrl][Wheel] cent  [Alt][LMB] reset  [RMB] menu");
     return ui::valueHint (spec(), value(), gesture);
@@ -950,6 +959,19 @@ void PerformanceMeter::setValues (double cpu01, std::int64_t memoryBytes, int po
         paintedSignature = sig;
         repaint();
     }
+}
+
+void PerformanceMeter::setSplit (std::uint64_t liveNs, std::uint64_t aheadNs, std::uint64_t audioNs)
+{
+    if (audioNs > lastAudioNs && liveNs >= lastLiveNs && aheadNs >= lastAheadNs)
+    {
+        const auto span = (double) (audioNs - lastAudioNs);
+        splitLive = (double) (liveNs - lastLiveNs) / span;
+        splitAhead = (double) (aheadNs - lastAheadNs) / span;
+    }
+    else if (audioNs == lastAudioNs)
+        splitLive = splitAhead = 0.0; // (nothing rendered since: no device running)
+    lastLiveNs = liveNs, lastAheadNs = aheadNs, lastAudioNs = audioNs;
 }
 
 juce::Rectangle<float> PerformanceMeter::barBox() const
@@ -1082,7 +1104,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
 
     // CPU: caption, bar, percent
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("CPU"), row1.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);
@@ -1137,7 +1159,7 @@ void PerformanceMeter::paint (juce::Graphics& g)
     // memory and polyphony
     auto left = row2.removeFromLeft (row2.getWidth() * 58 / 100);
     g.setFont (caption);
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190oj: the caption was 3.98:1)
     g.drawText (tr ("RAM"), left.removeFromLeft (30), juce::Justification::centredLeft, false);
     g.setFont (number);
     g.setColour (colour::textSecondary);
@@ -1394,14 +1416,93 @@ void KeyPanel::setLook (toolbarlayout::Look l)
     }
 }
 
+void KeyPanel::setScaleParts (bool on, const juce::String& root, const juce::String& mode)
+{
+    if (on != scaleOn || root != rootText || mode != modeText)
+    {
+        scaleOn = on;
+        rootText = root;
+        modeText = mode;
+        if (threeParts())
+            repaint();
+    }
+}
+
+bool KeyPanel::threeParts() const noexcept { return look == toolbarlayout::Look::live && livescale::shown; }
+
+void KeyPanel::mouseMove (const juce::MouseEvent& e)
+{
+    const auto part = threeParts() ? (int) livescale::partAt (e.x, getWidth()) : -1;
+    if (part != hoveredPart)
+    {
+        hoveredPart = part;
+        repaint();
+    }
+}
+
+// Round 190oo (O-5): Live 12's scale switch, root and mode (live-arrangement-audiolane.png at 100 %: #363636 boxes, the
+// switch's glyph #b5b5b5; the choosers' text and arrows dimmed while the switch is off — Live's #696969 reads 2.4:1 on
+// #363636, so LYNX dims to #9e9e9e, 4.5:1). The switch on: Live's lit #ffad56 with the dark glyph.
+void KeyPanel::paintThreeParts (juce::Graphics& g)
+{
+    const auto parts = livescale::split (getWidth());
+    const auto h = getHeight();
+    const auto over = isMouseOver (true);
+    const juce::Rectangle<int> toggle (parts.toggleX, 0, parts.toggleW, h), root (parts.rootX, 0, parts.rootW, h), mode (parts.modeX, 0, parts.modeW, h);
+    paintLiveBox (g, toggle, over && hoveredPart == 0, scaleOn);
+    paintLiveBox (g, root, over && hoveredPart == 1);
+    paintLiveBox (g, mode, over && hoveredPart == 2);
+
+    // "♭#": a flat at the lower left, a sharp raised at the upper right (LYNX vectors)
+    {
+        const auto ink = scaleOn ? live::onLit : live::text;
+        const auto side = juce::jmin ((float) toggle.getWidth() - 4.0f, (float) h - 4.0f, 13.0f);
+        const auto b = toggle.toFloat().withSizeKeepingCentre (side, side);
+        juce::Path flat;
+        const auto fx = b.getX() + side * 0.12f, fTop = b.getY() + side * 0.22f, fBottom = b.getBottom() - side * 0.04f;
+        flat.startNewSubPath (fx, fTop);
+        flat.lineTo (fx, fBottom);
+        flat.quadraticTo (fx + side * 0.38f, fBottom - side * 0.14f, fx + side * 0.30f, fBottom - side * 0.32f);
+        flat.quadraticTo (fx + side * 0.18f, fBottom - side * 0.42f, fx, fBottom - side * 0.24f);
+        juce::Path sharp;
+        const auto sx = b.getX() + side * 0.48f, sw = side * 0.48f, sy = b.getY(), sh = side * 0.56f;
+        sharp.startNewSubPath (sx + sw * 0.30f, sy + sh * 0.02f);
+        sharp.lineTo (sx + sw * 0.22f, sy + sh);
+        sharp.startNewSubPath (sx + sw * 0.78f, sy);
+        sharp.lineTo (sx + sw * 0.70f, sy + sh * 0.98f);
+        sharp.startNewSubPath (sx, sy + sh * 0.40f);
+        sharp.lineTo (sx + sw, sy + sh * 0.30f);
+        sharp.startNewSubPath (sx, sy + sh * 0.74f);
+        sharp.lineTo (sx + sw, sy + sh * 0.64f);
+        g.setColour (ink);
+        g.strokePath (flat, juce::PathStrokeType (1.2f));
+        g.strokePath (sharp, juce::PathStrokeType (1.0f));
+    }
+
+    const auto dim = juce::Colour (0xff9e9e9e);
+    const auto ink = scaleOn ? live::text : dim;
+    g.setFont (theme::font (theme::type::caption));
+    g.setColour (ink);
+    g.drawFittedText (rootText, root.withTrimmedRight (10).reduced (3, 0), juce::Justification::centredLeft, 1, 0.75f);
+    paintLiveArrow (g, root, ink);
+    g.setColour (ink);
+    g.drawFittedText (modeText, mode.withTrimmedRight (10).reduced (3, 0), juce::Justification::centredLeft, 1, 0.75f);
+    paintLiveArrow (g, mode, ink);
+}
+
 void KeyPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (threeParts()) // round 190oo (O-5, LYNX extra): Live's scale switch + root + mode
+    {
+        paintThreeParts (g);
+        return;
+    }
     if (look == toolbarlayout::Look::live) // round 190iv: Live's key / scale box ("C# minor ▾")
     {
         const auto area = getLocalBounds();
         paintLiveBox (g, area, isMouseOver (true));
-        paintLiveText (g, text.isEmpty() ? tr ("none") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
+        paintLiveText (g, text.isEmpty() ? tr ("No scale") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
         paintLiveArrow (g, area, live::text);
         return;
     }
@@ -1447,12 +1548,27 @@ void KeyPanel::paint (juce::Graphics& g)
 
 void KeyPanel::mouseDown (const juce::MouseEvent& e)
 {
+    if (threeParts() && e.mods.isLeftButtonDown() && ! e.mods.isPopupMenu() && onPart) // round 190oo (O-5)
+    {
+        onPart ((int) livescale::partAt (e.x, getWidth()));
+        return;
+    }
     if ((e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) && onClick)
         onClick();
 }
 
-ui::Hint KeyPanel::hintAt (juce::Point<int>)
+ui::Hint KeyPanel::hintAt (juce::Point<int> position)
 {
+    if (threeParts()) // round 190oo (O-5)
+        switch (livescale::partAt (position.x, getWidth()))
+        {
+            case livescale::Part::toggle:
+                return { tr ("Scale: on, the project key is used; off, no key. Right-click for the Key menu"), scaleOn ? tr ("On") : tr ("Off"), false, true };
+            case livescale::Part::root:
+                return { tr ("Root"), rootText, false, true };
+            case livescale::Part::mode:
+                return { tr ("Scale"), modeText, false, true };
+        }
     return { tr ("Project key: the scale the song is in. Click to choose it, or to guess it from the notes"), {}, false, false };
 }
 
@@ -1519,7 +1635,9 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 
     if (p.y < getHeight() / 2)
     {
-        h.text = tr ("CPU: how much of the audio deadline the processing takes; near 100% the sound breaks up");
+        // (round 190ok, D1: the smart-disable tip first while it holds, so the hint bar's two lines show it)
+        h.text = smartTipText.isNotEmpty() ? smartTipText + "  " : juce::String();
+        h.text << tr ("CPU: how much of the audio deadline the processing takes; near 100% the sound breaks up");
         if (underruns > 0)
             h.text << "  " << tr ("{0} underruns (the sound broke up; red number)", { juce::String ((juce::int64) underruns) });
         if (overDeadline > 0 || lateCalls > 0)
@@ -1533,6 +1651,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });
         h.value = juce::String (cpu * 100.0, 1) + "%" + (peakLoad > 0.0 ? "  (" + tr ("peak {0}%", { juce::String (juce::roundToInt (peakLoad * 100.0)) }) + ")" : juce::String());
+        // round 190of (P24): with render-ahead at work, its two parts (the bar shows the live part: the deadline)
+        if (splitAhead >= 0.0005)
+            h.text << "  " << tr ("Live part {0}%, rendered ahead {1}% (together {2}% of one core).",
+                                  { juce::String (splitLive * 100.0, 1), juce::String (splitAhead * 100.0, 1), juce::String ((splitLive + splitAhead) * 100.0, 1) });
         if (look != toolbarlayout::Look::live)
             h.text << "  " << tr ("The graph under the bar is the load over the last seconds.");
         h.text << "  " << tr ("[Double-click] plugin performance monitor  [RMB] refresh rate");
@@ -1545,7 +1667,7 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
     }
     else
     {
-        h.text = tr ("Polyphony: notes sounding now in the song and from the keyboard (voices still releasing are not counted)");
+        h.text = tr ("Polyphony: voices being mixed now (notes sounding and still releasing, audio and automation clips playing)");
         h.value = juce::String (voices) + "  (" + tr ("max {0}", { juce::String (peakVoices) }) + ")";
     }
 
@@ -2608,6 +2730,8 @@ void SignatureBox::setLook (toolbarlayout::Look l)
 juce::String SignatureBox::text() const
 {
     const auto& song = engine.getSong();
+    if (look == toolbarlayout::Look::simple) // round 190ol (P6): the signature at the song's start (a change at bar 1 included)
+        return juce::String (signatureedit::text (signatureedit::atStart (song)));
     return juce::String (song.beatsPerBar) + " / " + juce::String (song.beatUnit);
 }
 
@@ -2615,7 +2739,8 @@ void SignatureBox::update()
 {
     // (the timer's check compares two numbers; the text is made only when they changed)
     const auto& song = engine.getSong();
-    if (const auto now = song.beatsPerBar * 1000 + song.beatUnit; now != shownSignature)
+    const auto start = look == toolbarlayout::Look::simple ? signatureedit::atStart (song) : std::pair { song.beatsPerBar, song.beatUnit };
+    if (const auto now = start.first * 1000 + start.second; now != shownSignature)
     {
         shownSignature = now;
         shown = text();
@@ -2640,9 +2765,11 @@ void SignatureBox::paint (juce::Graphics& g)
 
 juce::PopupMenu SignatureBox::makeMenu()
 {
-    // (the Pattern menu's "Song time signature" list)
     juce::PopupMenu menu;
     const auto& song = engine.getSong();
+    if (look == toolbarlayout::Look::simple)
+        return simpleMenu (true); // (the numerator's list; mouseDown picks the half that was clicked)
+    // (the Pattern menu's "Song time signature" list)
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
         menu.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats && song.beatUnit == 4, [this, beats] {
             engine.editSong ([beats] (Song& s) {
@@ -2654,14 +2781,59 @@ juce::PopupMenu SignatureBox::makeMenu()
     return menu;
 }
 
+// Round 190ol (P6, BandLab live check s/ANSWERS.md): BandLab's "4 / 4" is two controls — a click on the top number opens a
+// list of numerators (1-6), one on the bottom number a list of denominators (1, 2, 4, 8); the "/" does nothing. They set
+// the signature at the song's start (core/SignatureEdit.h: a change at bar 1 is updated instead). LYNX's own values follow
+// after a separator: numerators 7-16 and the denominator 16. Changes from a bar on are on the ruler's right-click.
+juce::PopupMenu SignatureBox::simpleMenu (bool numerator)
+{
+    juce::PopupMenu menu;
+    const auto now = signatureedit::atStart (engine.getSong());
+    const auto set = [this, numerator] (int value) {
+        engine.editSong ([numerator, value] (Song& s) {
+            const auto sig = signatureedit::atStart (s);
+            signatureedit::set (s, 0, numerator ? value : sig.first, numerator ? sig.second : value);
+        });
+        update();
+    };
+    if (numerator)
+    {
+        for (int n = 1; n <= signatureedit::maxNumerator; ++n)
+        {
+            if (n == signatureedit::bandlabMaxNumerator + 1)
+                menu.addSeparator();
+            menu.addItem (juce::String (n), true, now.first == n, [set, n] { set (n); });
+        }
+    }
+    else
+    {
+        for (const auto d : signatureedit::bandlabDenominators)
+            menu.addItem (juce::String (d), true, now.second == d, [set, d] { set (d); });
+        menu.addSeparator();
+        menu.addItem ("16", true, now.second == 16, [set] { set (16); });
+    }
+    return menu;
+}
+
 void SignatureBox::mouseDown (const juce::MouseEvent& e)
 {
+    if (look == toolbarlayout::Look::simple)
+    {
+        // the half under the pointer: the numerator left of the "/", the denominator right of it (a narrow middle: nothing)
+        const auto centre = getWidth() / 2;
+        if (std::abs (e.x - centre) <= 3)
+            return;
+        simpleMenu (e.x < centre).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        return;
+    }
     if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
         makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
 ui::Hint SignatureBox::hintAt (juce::Point<int>)
 {
+    if (look == toolbarlayout::Look::simple) // (round 190ol, P6)
+        return { tr ("Song time signature at the start; right-click the timeline's ruler to change it from a bar on"), {}, false, true };
     return { tr ("Song time signature"), {}, false, true };
 }
 

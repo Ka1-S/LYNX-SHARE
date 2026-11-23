@@ -1,6 +1,8 @@
+#include "ui/AutoLookEditor.h"
 #include "ui/RemoteControl.h"
 #include "core/EscClose.h"
 #include "ui/NumBox.h"
+#include "ui/DemoMode.h" // round 190pl
 #include "ui/SettingsPages.h"
 #include "ui/LabelFont.h"
 #include "core/TextSize.h"
@@ -13,6 +15,7 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "core/Templates.h" // round 190oo (CS O-2: newProjectDefaults)
 #include "ui/PolyEditor.h"
 #include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
@@ -30,6 +33,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
+#include "ui/SimpleLook.h" // round 190oo (O-4)
 #include "ui/Updater.h"
 
 #include <algorithm>
@@ -116,17 +120,21 @@ struct Rows
 
     // a note under a control: as tall as its text needs at the width it gets (wrapped), at least `minHeight` (issue #189:
     // a larger Text size wraps a note into more lines than the fixed heights had room for)
-    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight)
+    // (round 190oo WG-32: `indent` false: the full page width, as full() places it)
+    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight, bool indent = true)
     {
-        if (theme::textSize() <= 100)
-            return indented (minHeight); // (the standard size keeps its layout to the pixel)
-        const auto width = area.getWidth() - labelWidth;
+        const auto left = indent ? labelWidth : 0;
+        const auto width = area.getWidth() - left;
         const auto border = label.getBorderSize();
         juce::GlyphArrangement text;
         text.addJustifiedText (label.getFont(), label.getText(), 0.0f, 0.0f, (float) juce::jmax (40, width - border.getLeftAndRight()),
                                juce::Justification::topLeft);
         const auto needed = (int) std::ceil (text.getBoundingBox (0, -1, true).getHeight()) + border.getTopAndBottom() + 2;
-        auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, width, juce::jmax (h (minHeight), needed));
+        // (the standard size keeps its layout to the pixel, unless the text needs another line: round 190oj WG-3, the
+        // German Animation-rate note was squeezed to ~7 px and cut in its fixed 32 px)
+        if (theme::textSize() <= 100 && needed <= h (minHeight) + 6)
+            return indent ? indented (minHeight) : full (minHeight);
+        auto r = juce::Rectangle<int> (area.getX() + left, y, width, juce::jmax (h (minHeight), needed));
         y += r.getHeight() + rowGap;
         return r;
     }
@@ -577,7 +585,9 @@ public:
         toggle (checkUpdates, tr ("Check for updates automatically"), options.checkUpdates, [this] (bool on) { options.checkUpdates = on; });
         checkNow.onClick = [] { updater::checkNow(); };
         styleNote (updatesNote, tr ("At start-up LYNX SHARE asks GitHub for the newest version number (nothing about you is sent) and shows a bar "
-                                    "when a new version is out. Help > Check for updates... asks at any time."));
+                                    "when a new version is out. Help > Check for updates... asks at any time.")
+                                    // round 190ns (issue #233)
+                                    + " " + tr ("Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer."));
         // round 190gh (B2): the version before the last update, and the way back to it (Help › Go back to... too)
         {
             const auto previous = persistent ? updater::previousVersion() : juce::String ("0.1.27");
@@ -640,7 +650,7 @@ private:
         reducedEffects.setBounds (r.full (24));
         uiAnimations.setBounds (r.full (24));
         animationBox.setBounds (r.row (animationLabel, 180));
-        animationNote.setBounds (r.indented (32).translated (0, -3));
+        animationNote.setBounds (r.indentedNote (animationNote, 32).translated (0, -3)); // (round 190oj WG-3)
        #if JUCE_WINDOWS
         gpuRendering.setBounds (r.full (24));
         editorsInMain.setBounds (r.full (24));
@@ -649,7 +659,7 @@ private:
         r.section (startupTitle);
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
-        templateNote.setBounds (r.indented (32).translated (0, -3));
+        templateNote.setBounds (r.indentedNote (templateNote, 32).translated (0, -3)); // (round 190oj WG-3)
         for (auto* t : { &projectLayout, &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
@@ -911,7 +921,7 @@ public:
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
                                                                  &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
-                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
+                                                                 &autoClose, &safeOverloads, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &smartDisableNew, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -1011,6 +1021,7 @@ private:
             testButton.setBounds (row.removeFromLeft (150));
         }
         autoClose.setBounds (r.indented (24)); // (FL: "Auto close", under the device in the Input / output panel)
+        safeOverloads.setBounds (r.indented (24)); // (round 190ok: FL's "Safe overloads", the same panel)
         r.section (statusTitle);
         status.setBounds (r.full (22));
         load.setBounds (r.full (22));
@@ -1034,7 +1045,7 @@ private:
         offsetSlider.setBounds (r.row (offsetLabel, 200));
         offsetNote.setBounds (r.full (32).translated (0, -3));
         r.section (cpuTitle); // (FL's order: Input / output, CPU, Mixer)
-        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead })
+        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &smartDisableNew, &renderAhead })
             t->setBounds (r.full (24));
         r.section (mixerTitle);
         resamplingBox.setBounds (r.row (resamplingLabel, 260)); // (FL: the Mixer panel's first row)
@@ -1105,10 +1116,17 @@ private:
         };
         flag (autoClose, tr ("Auto close"),
               tr ("Free the audio device for other applications while LYNX SHARE is in the background and nothing plays or records"), o.autoCloseDevice);
+        // FL's "Safe overloads" (round 190ok, FL's hint; core/OverloadGuard.h): on by default, as in FL
+        flag (safeOverloads, tr ("Safe overloads"), tr ("No risk of GUI freezing when overloads occur"), o.safeOverloads);
         flag (threadGenerators, tr ("Multithreaded generator processing"), tr ("May increase CPU performance"), o.multithreadGenerators);
         flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
         flag (smartDisableAll, tr ("Smart disable"),
               tr ("May increase CPU performance. Off: every effect is processed all the time, whatever its own Smart disable switch says"), o.smartDisable);
+        // LYNX extra (round 190ok, owner decision D2): FL's generator smart disable on for new instrument plugins
+        flag (smartDisableNew, tr ("Smart disable for new instrument plugins"),
+              tr ("New channels with an instrument plugin get Smart disable on: the plugin is not called while it gets no notes and its "
+                  "sound has been silent for 4 seconds. FL Studio starts a new generator with it off."),
+              o.smartDisableNewPlugins);
         // LYNX extra (round 190gq, core/RenderAhead.h; owner decision O22: on by default)
         flag (renderAhead, tr ("Render ahead (lower CPU at small buffers)"),
               tr ("Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the "
@@ -1538,9 +1556,9 @@ private:
     juce::String pingResult;
     SectionTitle mixerTitle { tr ("Mixer") };
     // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
-    juce::ToggleButton autoClose;
+    juce::ToggleButton autoClose, safeOverloads;
     SectionTitle cpuTitle { tr ("CPU") };
-    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, renderAhead;
+    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, smartDisableNew, renderAhead;
     juce::Label resamplingLabel, resamplingNote;
     juce::ComboBox resamplingBox;
     juce::Label metronomeTrackLabel, metronomeTrackNote;
@@ -1563,6 +1581,14 @@ public:
         juce::String detected;                                      // the profile its port name matches ("" = none)
         juce::String status;                                        // where the feedback goes
     };
+
+    // round 190pl: the row's controls by component ID for --demo ("<id>.enabled", "<id>.channel", "<id>.plays")
+    void setDemoIds (const juce::String& id)
+    {
+        enabled.setComponentID (id + ".enabled");
+        channel.setComponentID (id + ".channel");
+        plays.setComponentID (id + ".plays");
+    }
 
     MidiInputRow (const juce::String& deviceName, const prefs::MidiInputPrefs& p, const std::vector<std::string>& channels,
                   const Controllers& controllers, std::function<void (const prefs::MidiInputPrefs&)> changed)
@@ -2123,19 +2149,21 @@ private:
         clockBox.setBounds (r.row (clockLabel, 300));
         clockOffset.setBounds (r.row (clockOffsetLabel, 140));
         clockStatus.setBounds (r.row (clockStatusLabel, 0));
-        clockNote.setBounds (r.indented (16).translated (0, -3));
+        // (round 190oo WG-32: the notes grow when their text needs another line, as round 190oj's WG-3 on General: the
+        // ru / de notes were squeezed and cut in their fixed heights; English keeps its layout to the pixel)
+        clockNote.setBounds (r.indentedNote (clockNote, 16).translated (0, -3));
 
         r.section (notesTitle);
         velocityBox.setBounds (r.row (velocityLabel, 300));
-        velocityNote.setBounds (r.indented (16).translated (0, -3));
+        velocityNote.setBounds (r.indentedNote (velocityNote, 16).translated (0, -3));
         perfBox.setBounds (r.row (perfLabel, 300));
-        perfNote.setBounds (r.indented (32).translated (0, -3));
+        perfNote.setBounds (r.indentedNote (perfNote, 32).translated (0, -3));
         jumpBox.setBounds (r.row (jumpLabel, 300));
-        jumpNote.setBounds (r.indented (32).translated (0, -3));
+        jumpNote.setBounds (r.indentedNote (jumpNote, 32).translated (0, -3));
 
         r.section (controllersTitle);
         typeLabel.setVisible (false); // (round 190aw: the Controller type is each input device's, above, as in FL)
-        typeValue.setBounds (r.full (20));
+        typeValue.setBounds (r.indentedNote (typeValue, 20, false)); // (round 190oo WG-32: "Generic controller: ..." grows too)
         pickup.setBounds (r.full (24));
         pickupNote.setBounds (r.note (pickupNote, 16));
         footPedal.setBounds (r.full (24)); // (FL: right under Pickup, round 187a [UI shots/fl d07c])
@@ -2212,6 +2240,8 @@ private:
                 names.add (d.name);
         else
             names = sampleDevices;
+        if (persistent && demo::active()) // round 190pl: --demo's virtual input (midi.input plays it), listed as a device
+            names.addIfNotAlreadyThere (demo::virtualKeyboardName());
 
         std::vector<std::string> channels;
         for (const auto& c : engine.getSong().channels)
@@ -2251,6 +2281,10 @@ private:
                                                                        safe->rebuildInputs();
                                                                });
                                                        });
+            // round 190pl: by component ID for --demo: midi.input.<n> (the row), .enabled, .channel, .plays
+            const auto id = "midi.input." + juce::String ((int) rows.size());
+            row->setComponentID (id);
+            row->setDemoIds (id);
             add (*row);
             rows.push_back (std::move (row));
         }
@@ -2469,6 +2503,11 @@ public:
             add (row.toggle);
             add (row.note);
         }
+        // issue #239 (round 190od): the user's automatic colour / icon rules
+        add (autoLookTitle);
+        autoLook = std::make_unique<AutoLookEditor> (engine, persistent);
+        autoLook->onHeightChange = [this] { resized(); };
+        add (*autoLook);
         refresh();
     }
 
@@ -2487,7 +2526,9 @@ public:
             juce::AttributedString text (label.getText());
             text.setFont (noteFont);
             juce::TextLayout fitted;
-            fitted.createLayout (text, (float) juce::jmax (40, w - 8));
+            // (round 190oo WG-32: at the width the label draws in, its borders taken off; a ru / de note that wrapped one
+            // line more there than measured here was cut in its box)
+            fitted.createLayout (text, (float) juce::jmax (40, w - juce::jmax (8, label.getBorderSize().getLeftAndRight() + 2)));
             return juce::jmax (1, fitted.getNumLines());
         };
         intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
@@ -2504,6 +2545,8 @@ public:
             const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
             row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
         }
+        r.section (autoLookTitle, false);
+        autoLook->setBounds (r.full (autoLook->heightFor (r.area.getWidth())));
         return r.bottom();
     }
 
@@ -2529,6 +2572,8 @@ private:
     juce::Label intro;
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
+    SectionTitle autoLookTitle { tr ("Automatic colors and icons") };
+    std::unique_ptr<AutoLookEditor> autoLook;
 };
 // ================================================================================================================
 // Link (round 190gl): the reference DAW's Settings › Link, its Link section (manual: "The Link Tab in Live's Settings")
@@ -2650,13 +2695,17 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
+    if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
+    if (id == "project.clipLaunchStrips") return newProjectDefaults().clipLaunchStrips; // (round 190oo CS O-2)
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "simple.projectName") return ui::simplelook::projectNameShown(); // round 190oo (O-4)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
     return false;
 }
@@ -2727,6 +2776,19 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             saved();
         }
     }
+    else if (id == "pianoRoll.stackedLanes") // round 190on (P10): the Piano roll's action switches it and refreshes the editors
+    {
+        if (! toggledBy ("pianoRoll.stackedLanes"))
+        {
+            PianoRollComponent::stackedLanesExtra = on;
+            saved();
+        }
+    }
+    else if (id == "playlist.shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio
+    {
+        PlaylistComponent::shadeFadedAudio = on;
+        saved(); // (saves and repaints the Playlist)
+    }
     else if (id == "pianoRoll.songBarsRuler")
     {
         if (! toggledBy ("pianoRoll.songBarsRuler"))
@@ -2758,12 +2820,25 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             hooks.setGeneral (options);
         }
     }
+    else if (id == "project.clipLaunchStrips") // round 190oo (CS O-2): kept with the new projects' defaults
+    {
+        newProjectDefaults().clipLaunchStrips = on;
+        saved();
+    }
     else if (id == "record.lastLoopPassPlays")
     {
         auto options = engine.getRecordOptions();
         options.lastLoopPassPlays = on;
         engine.setRecordOptions (options);
         saved();
+    }
+    else if (id == "simple.projectName") // round 190oo (O-4): the main window's action also lays the top bar out again
+    {
+        if (! toggledBy ("simple.projectName"))
+        {
+            ui::simplelook::projectNameShown() = on;
+            saved();
+        }
     }
     else if (id == "detail.windowKey" || id == "detail.selectInMixer")
     {

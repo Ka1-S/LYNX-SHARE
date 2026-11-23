@@ -12,35 +12,44 @@ LYNX SHARE
 
 ## Short description
 
-Free, open-source DAW with three workflows in one program: FL Studio-style patterns (Channel Rack, Piano Roll, Playlist, Mixer), Ableton Live-style clip launching, and a simple one-window mode in the style of BandLab and FL Studio Mobile. Opens .flp, .als, .flm, .dawproject, GarageBand .band and BandLab .blx projects.
+Free, open-source DAW with three layouts in one program: FL Studio-style patterns (Channel Rack, Piano Roll, Playlist, Mixer), Ableton Live-style clip launching, and a simple one-window mode in the style of BandLab and FL Studio Mobile. Opens .flp, .als, .flm, .dawproject, GarageBand .band and BandLab .blx projects and exports .flp, .als, .dawproject and .flm.
 
 ## Description
 
-LYNX SHARE is a free, open-source digital audio workstation for making beats and songs. It has three workflows in one
+LYNX SHARE is a free, open-source digital audio workstation for making beats and songs. It has three layouts in one
 program, and you can switch between them at any time without changing the project:
 
 • FL Studio-style patterns (the default): a step-sequencer Channel Rack, patterns, a Piano Roll, a Playlist with
 arrangements and a Mixer with inserts, sends and sidechain.
 • Clip launching in the style of Ableton Live: a grid of clips and scenes, a Session mixer, and clip and device views.
-• A Simple workflow that mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks
+• A Simple layout that mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks
 and a timeline, loops, pads and quick recording, with a guided first song.
+
+The first start asks where you are coming from and opens the matching layout.
 
 It is built to stay light and fast on any PC.
 
 • Lightweight: a lock-free audio engine that spreads channels and mixer tracks across your CPU cores, skips idle
 channels and streams long audio from disk.
-• Complete: more than 100 built-in instruments and effects — synths, drum machines, samplers, EQs, compressors,
-limiters, reverbs, delays, pitch correction, visualizers and more.
+• Complete: more than 100 built-in instruments and effects — synths (wavetable, FM and LYNX Model's physical models
+of mallet instruments), drum machines, samplers, EQs, compressors, limiters, reverbs, delays, pitch correction,
+visualizers and more — plus modulators (LFOs, envelope followers, step sequencers and more) for any knob.
 • Your plugins: hosts VST3, CLAP and VST2 instruments and effects, each optionally in its own sandbox process so a
 crashing plugin cannot take your session down.
 • Your projects: opens FL Studio projects (.flp) with their patterns, notes, mixer, automation and samples; opens and
 saves Ableton Live 11/12 sets (.als), Session clips included; opens and saves DAWproject files (.dawproject) for
-Bitwig, Studio One, Cubase and other apps; exports .flp back to FL Studio; imports FL Studio Mobile projects (.flm,
+Bitwig, Studio One, Cubase and other apps; exports .flp back to FL Studio and saves .flm copies for FL Studio Mobile; imports FL Studio Mobile projects (.flm,
 partial), GarageBand projects (.band, partial), BandLab projects (.blx, partial) and MIDI files.
+• Tracker modules: .mod, .xm, .s3m and .it files open with their samples, patterns and tempo, and a built-in tracker
+edits the notes.
+• Arrange faster: a Sections lane for whole song parts, track clips with their own notes, hide or deactivate tracks to
+save CPU, a command search for every action, and two projects open side by side with copy and paste between them.
+• Make music together: send a project as one file, or edit it live with up to three friends, end-to-end encrypted.
 • Audio editing: ARA 2 plugins such as Melodyne work on audio clips in place, a polyphonic note editor moves and
 retunes single notes inside chords, and audio converts to MIDI.
 • Low latency: ASIO (including LYNX SHARE's own ASIO driver for any device), WASAPI shared and exclusive modes.
 • Record audio and MIDI (MPE too), edit audio, automate anything, render to WAV, FLAC, MP3, OGG, AIFF, M4A or stems.
+• Works offline: no account, and nothing goes online until you say so.
 • Interface in 15 languages: English, Portuguese (Brazil), Spanish, French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian, Japanese, Korean and Chinese (Simplified and Traditional).
 
 No account, no subscription, no ads and no telemetry. LYNX SHARE is free software (GNU AGPL-3.0); the source code is on
@@ -54,18 +63,19 @@ LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub
 
 ## What's new
 
-LYNX SHARE 0.1.30: lighter than ever, using about half the CPU of FL Studio 2026 while FL's Thief demo plays on our test
-PC; ARA 2 hosting, so Melodyne and other ARA plugins edit audio clips in place; a polyphonic note editor and polyphonic
-audio to MIDI; a more natural Newtone; Helix, a new wavetable synth, and Tetra, a 4-operator FM synth; a Chord helper; a
-BandLab-style Drum Machine, a tuner and a Loop Browser in the Simple workflow; return tracks, sends and a crossfader in
-the Clip-launch workflow; MPE and hardware MIDI Out; a DirectWave editor; DAWproject, GarageBand and BandLab projects,
-.gig, .dwp and .ncw instruments and samples, and AIFF and M4A export; more than 40 refitted plugin stand-ins; and fixes
-for around 40 reported issues.
+LYNX SHARE 0.1.31: a built-in Tracker that also opens tracker modules (.mod, .xm, .s3m, .it); LYNX Model, physical
+models of marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba; JSFX effect and instrument scripts; a
+welcome card that sets up the right layout and a start page with your recent projects; a search that finds every command;
+two projects side by side with copy and paste between them; a Sections lane, a Chord lane with Smart Tempo and Track
+versions; automation write modes, Capture automation and modulators for any knob; FL Studio Mobile .flm export; Live's
+rack devices inline with a Macro Map and Solo / Cue in the Clip-launch layout; Duck under and Echo sends in the Simple
+layout; ARA plugins on a mixer insert; FL Studio projects that play closer to FL; and fixes for around 30 reported
+issues.
 
 ## Features
 
-1. Three workflows in one program: FL Studio-style patterns by default, Ableton Live-style clip launching, or a Simple workflow in the style of BandLab and FL Studio Mobile
-2. Opens FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand and BandLab projects and MIDI files; saves .flp, .als and .dawproject
+1. Three layouts in one program: FL Studio-style patterns by default, Ableton Live-style clip launching, or a Simple layout in the style of BandLab and FL Studio Mobile
+2. Opens FL Studio (.flp and zipped), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand and BandLab projects and MIDI files; saves .flp, .als, .dawproject and .flm copies
 3. 100+ built-in instruments and effects
 4. Hosts VST3, CLAP and VST2 plugins, optionally sandboxed in their own process
 5. Low-latency audio: ASIO, WASAPI shared and exclusive
@@ -75,6 +85,12 @@ for around 40 reported issues.
 9. Interface in 15 languages, including Japanese, Korean and Chinese
 10. Free and open source (AGPL-3.0): no account, no ads, no telemetry
 11. ARA 2 plugin hosting, a polyphonic note editor and audio-to-MIDI conversion
+12. Opens tracker modules (.mod, .xm, .s3m, .it) and edits notes in a built-in tracker
+13. LYNX Model: physical models of marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba
+14. Modulators for any knob: LFO, envelope follower, ADSR, steps, random, macro, keytrack and velocity
+15. Sections lane, hide and deactivate tracks, and a search that finds every command
+16. Online sessions: edit a project live with up to three friends, end-to-end encrypted
+17. Works offline: no account, and no connection until you allow it
 
 ## Search terms
 
@@ -95,5 +111,6 @@ for around 40 reported issues.
 - 05-instruments-effects.png — Step sequencer, built-in synths and the parametric EQ
 - 06-audio-editing.png — Edit single notes inside chords in the polyphonic note editor, or open audio clips in Melodyne and other ARA 2 plugins
 - 07-chord-helper.png — The Chord helper suggests related keys and borrowed chords for the selected chord
-- 08-drum-machine.png — Program a beat in the BandLab-style Drum Machine of the Simple workflow
+- 08-drum-machine.png — Program a beat in the BandLab-style Drum Machine of the Simple layout
 - 09-helix-plus.png — Helix, the wavetable synth, with Helix+: a third oscillator, granular and spectral layers, 8 macros, drawn LFOs and effects
+- 10-song-lanes-tracker.png — The Sections lane and the Chord lane for the song's parts and chords, the built-in tracker, and modulators that move any knob

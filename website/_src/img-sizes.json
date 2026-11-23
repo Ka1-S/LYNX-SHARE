@@ -5,7 +5,7 @@
 ],
 "/assets/img/cliplaunch.webp": [
 1920,
-1080
+573
 ],
 "/assets/img/eq.webp": [
 960,
@@ -18,6 +18,366 @@
 "/assets/img/hero.webp": [
 1920,
 1080
+],
+"/assets/img/learn/automation-basics-1.webp": [
+840,
+630
+],
+"/assets/img/learn/automation-basics-2.webp": [
+1060,
+700
+],
+"/assets/img/learn/automation-basics-3.webp": [
+760,
+285
+],
+"/assets/img/learn/clip-launch-tour-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/clip-launch-tour-2.webp": [
+900,
+344
+],
+"/assets/img/learn/clip-launch-tour-3.webp": [
+1100,
+252
+],
+"/assets/img/learn/clip-launch-tour-4.webp": [
+1100,
+345
+],
+"/assets/img/learn/command-palette-1.webp": [
+1000,
+492
+],
+"/assets/img/learn/command-palette-2.webp": [
+420,
+80
+],
+"/assets/img/learn/command-palette-3.webp": [
+1100,
+619
+],
+"/assets/img/learn/eq-basics-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/eq-basics-2.webp": [
+1000,
+660
+],
+"/assets/img/learn/eq-basics-3.webp": [
+1000,
+660
+],
+"/assets/img/learn/export-mp3-1.webp": [
+1100,
+640
+],
+"/assets/img/learn/export-mp3-2.webp": [
+800,
+680
+],
+"/assets/img/learn/export-mp3-3.webp": [
+1000,
+420
+],
+"/assets/img/learn/first-song-tour-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/first-song-tour-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/first-song-tour-3.webp": [
+1280,
+720
+],
+"/assets/img/learn/lynx-instruments-1.webp": [
+1000,
+492
+],
+"/assets/img/learn/lynx-instruments-2.webp": [
+800,
+368
+],
+"/assets/img/learn/lynx-instruments-3.webp": [
+1000,
+692
+],
+"/assets/img/learn/midi-keyboard-1.webp": [
+780,
+520
+],
+"/assets/img/learn/midi-keyboard-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/midi-keyboard-3.webp": [
+1280,
+720
+],
+"/assets/img/learn/mixing-basics-1.webp": [
+940,
+470
+],
+"/assets/img/learn/mixing-basics-2.webp": [
+940,
+470
+],
+"/assets/img/learn/mixing-basics-3.webp": [
+940,
+470
+],
+"/assets/img/learn/modulators-1.webp": [
+860,
+600
+],
+"/assets/img/learn/modulators-2.webp": [
+1000,
+492
+],
+"/assets/img/learn/modulators-3.webp": [
+860,
+600
+],
+"/assets/img/learn/online-session-1.webp": [
+640,
+520
+],
+"/assets/img/learn/online-session-2.webp": [
+580,
+320
+],
+"/assets/img/learn/online-session-3.webp": [
+460,
+214
+],
+"/assets/img/learn/online-session-4.webp": [
+420,
+200
+],
+"/assets/img/learn/online-session-5.webp": [
+960,
+150
+],
+"/assets/img/learn/open-als-1.webp": [
+520,
+520
+],
+"/assets/img/learn/open-als-2.webp": [
+1100,
+321
+],
+"/assets/img/learn/open-als-3.webp": [
+1100,
+596
+],
+"/assets/img/learn/open-als-4.webp": [
+500,
+220
+],
+"/assets/img/learn/open-flp-1.webp": [
+520,
+520
+],
+"/assets/img/learn/open-flp-2.webp": [
+1100,
+414
+],
+"/assets/img/learn/open-flp-3.webp": [
+820,
+570
+],
+"/assets/img/learn/open-flp-4.webp": [
+640,
+200
+],
+"/assets/img/learn/open-mobile-1.webp": [
+520,
+520
+],
+"/assets/img/learn/open-mobile-2.webp": [
+1100,
+332
+],
+"/assets/img/learn/open-mobile-3.webp": [
+1100,
+298
+],
+"/assets/img/learn/open-mobile-4.webp": [
+520,
+240
+],
+"/assets/img/learn/pattern-tour-1.webp": [
+604,
+228
+],
+"/assets/img/learn/pattern-tour-2.webp": [
+1000,
+318
+],
+"/assets/img/learn/pattern-tour-3.webp": [
+900,
+299
+],
+"/assets/img/learn/pattern-tour-4.webp": [
+1000,
+321
+],
+"/assets/img/learn/poly-editor-1.webp": [
+900,
+507
+],
+"/assets/img/learn/poly-editor-2.webp": [
+1000,
+532
+],
+"/assets/img/learn/poly-editor-3.webp": [
+1000,
+532
+],
+"/assets/img/learn/record-voice-1.webp": [
+700,
+540
+],
+"/assets/img/learn/record-voice-2.webp": [
+540,
+400
+],
+"/assets/img/learn/record-voice-3.webp": [
+1100,
+250
+],
+"/assets/img/learn/record-voice-4.webp": [
+520,
+440
+],
+"/assets/img/learn/record-voice-5.webp": [
+700,
+250
+],
+"/assets/img/learn/save-backups-1.webp": [
+1000,
+620
+],
+"/assets/img/learn/save-backups-2.webp": [
+1000,
+420
+],
+"/assets/img/learn/save-backups-3.webp": [
+840,
+500
+],
+"/assets/img/learn/sidechain-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/sidechain-2.webp": [
+1000,
+480
+],
+"/assets/img/learn/sidechain-3.webp": [
+940,
+480
+],
+"/assets/img/learn/simple-beat-1.webp": [
+780,
+714
+],
+"/assets/img/learn/simple-beat-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/simple-beat-3.webp": [
+1280,
+250
+],
+"/assets/img/learn/simple-beat-4.webp": [
+760,
+76
+],
+"/assets/img/learn/simple-beat-5.webp": [
+1280,
+720
+],
+"/assets/img/learn/simple-loops-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/simple-loops-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/simple-loops-3.webp": [
+1280,
+720
+],
+"/assets/img/learn/song-sections-1.webp": [
+1000,
+193
+],
+"/assets/img/learn/song-sections-2.webp": [
+1000,
+193
+],
+"/assets/img/learn/song-sections-3.webp": [
+1000,
+347
+],
+"/assets/img/learn/switch-layouts-1.webp": [
+700,
+671
+],
+"/assets/img/learn/switch-layouts-2.webp": [
+880,
+448
+],
+"/assets/img/learn/switch-layouts-3.webp": [
+1280,
+720
+],
+"/assets/img/learn/switch-layouts-4.webp": [
+1280,
+720
+],
+"/assets/img/learn/tracker-1.webp": [
+1100,
+628
+],
+"/assets/img/learn/tracker-2.webp": [
+850,
+370
+],
+"/assets/img/learn/tracker-3.webp": [
+1000,
+583
+],
+"/assets/img/learn/vocal-chain-1.webp": [
+1280,
+720
+],
+"/assets/img/learn/vocal-chain-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/vocal-chain-3.webp": [
+1280,
+720
+],
+"/assets/img/learn/vst-plugins-1.webp": [
+1040,
+660
+],
+"/assets/img/learn/vst-plugins-2.webp": [
+1280,
+720
+],
+"/assets/img/learn/vst-plugins-3.webp": [
+1280,
+720
 ],
 "/assets/img/logo.png": [
 256,
@@ -61,7 +421,7 @@
 ],
 "/assets/img/wiki/crash-report.webp": [
 640,
-244
+289
 ],
 "/assets/img/wiki/desktop.webp": [
 1600,
@@ -84,8 +444,8 @@
 420
 ],
 "/assets/img/wiki/midi-import-dialog.webp": [
-550,
-373
+488,
+394
 ],
 "/assets/img/wiki/missing-files.webp": [
 760,
@@ -112,7 +472,7 @@
 270
 ],
 "/assets/img/wiki/plugin-monitor.webp": [
-720,
+840,
 380
 ],
 "/assets/img/wiki/quickadd.webp": [
@@ -124,12 +484,12 @@
 900
 ],
 "/assets/img/wiki/record-dialog.webp": [
-475,
-389
+428,
+410
 ],
 "/assets/img/wiki/report-problem.webp": [
 640,
-364
+409
 ],
 "/assets/img/wiki/session-chat.webp": [
 436,
@@ -149,19 +509,19 @@
 ],
 "/assets/img/wiki/settings-audio.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-general.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-midi.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/settings-project.webp": [
 680,
-620
+656
 ],
 "/assets/img/wiki/shortcuts.webp": [
 860,

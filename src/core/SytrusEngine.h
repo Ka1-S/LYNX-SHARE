@@ -49,6 +49,10 @@ std::optional<int> settingValue (const std::vector<std::uint8_t>& state, int set
 // writes it (clamped to the control's range) and re-stores the state; false if the state cannot be read
 bool setSetting (std::vector<std::uint8_t>& state, int setting, int value);
 
+// FL's automation of Sytrus' own parameters (round 190pi): the ones LYNX takes — 0 master level, 1 master LFO, 2 master
+// pitch, 18 Mod X, 19 Mod Y (FL's parameter numbers, the main page's controls)
+inline bool automatable (int param) noexcept { return (param >= 0 && param <= 2) || param == 18 || param == 19; }
+
 // Note of the engine (per FL note).
 struct NoteParams
 {
@@ -59,6 +63,9 @@ struct NoteParams
     float pan = 0.0f;       // note pan −1…1 (adds to Final.Pan)
     int colour = 0;         // note colour (14 inverts PORTA)
     std::int64_t id = 0;    // caller's handle (release by id)
+    // FL's Final.FCut / FRes of the voice, −1…1 (the note's Mod X / Y; round 190pr): they move the articulators' Mod X / Y
+    // map positions, main Mod X / Y + 256 · FCut / FRes [round 31's model]; 0 = the note's default (LYNX before)
+    double fcut = 0.0, fres = 0.0;
 };
 
 // The engine for one instance. Everything is allocated by prepare()/setPatch(); render never allocates except
@@ -86,6 +93,12 @@ public:
     void releaseKey (int key, std::int64_t id = 0) noexcept;
     // a slide note (issue #14): the unreleased voices glide to `toCents` (Final.Pitch, cents from C5) over `samples`
     void slideTo (double toCents, float samples) noexcept;
+    // FL's slide notes move a sounding note's levels (issue #236, round 190pi): the unreleased voices of `key` take the
+    // new Init.Vol (velocity 0…1 through FL's law (11^(1.28·v) − 1)/10; < 0: kept) and note pan (−1…1; NaN: kept)
+    void setNoteLevels (int key, float velocity, float pan) noexcept;
+    // FL's automation of a main-page value (round 190pi): main int 0 (master level), 1 (master LFO), 2 (master pitch),
+    // 190 / 191 (Mod X / Y) — the next notes take it, the sounding ones take the master level, LFO level and Mod X / Y
+    void setMainValue (int mainIndex, int value) noexcept;
     // FL's PITCH knob and main pitch, live (round 167a): the channel pitch the next note starts with (knob + fine tune +
     // main pitch, cents), and the channel's pitch now (every voice moves to it at once)
     void setNextLiveRef (float ref) noexcept;

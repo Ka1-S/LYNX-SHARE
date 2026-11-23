@@ -1,0 +1,180 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 883338,
+   "git_blob_sha1": "895eca83eb3cf4f2a985007d934a4b22a834bfac",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G3_pp_01_far.wav",
+   "sha256": "71aed638f20118b13a1e0e282cc77b51fa45c63ab83f08142d6f258521adc581",
+   "sounding_key": 67,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 963174,
+   "git_blob_sha1": "0ebb689b682277fdbcde0a3c76b9b1e197ef29fa",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G3_ff_01_far.wav",
+   "sha256": "7fd42d4a659886367b7a54275e4050328385294e680de33eba5ee0007e53eb7c",
+   "sounding_key": 67,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 586296,
+   "git_blob_sha1": "5893163b30e2bf27f500034f9beb4bfea81ecab8",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C4_pp_01_far.wav",
+   "sha256": "bea188b7a606c5e75ce78fb5d2b81643899caa7634e9b44afe326257261bb7ec",
+   "sounding_key": 72,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 897126,
+   "git_blob_sha1": "af5c4ea6431fc38aa5049cd202dde9e58102e6b7",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C4_ff_01_far.wav",
+   "sha256": "ef8650516f0734369c5f409f726315db13544e508f59cb82cf46f4206c10518d",
+   "sounding_key": 72,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 551346,
+   "git_blob_sha1": "57df965b1a655b0b593199bcba88bd8c938c83fe",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G4_pp_01_far.wav",
+   "sha256": "32157b9952f62c45db97546734e2a31069de29397702694cb1f6664b231803df",
+   "sounding_key": 79,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 669186,
+   "git_blob_sha1": "dd8e753fbd1a67efa83049e7b226ddabc5644720",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G4_ff_01_far.wav",
+   "sha256": "f7e72d629db9b1f7d37b050cc1abf18bbde9629d616c91647d7abe5d7fb249b8",
+   "sounding_key": 79,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 496566,
+   "git_blob_sha1": "3f32068b2fa2c59467414ca4bd5861bb9555337a",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C5_pp_01_far.wav",
+   "sha256": "cd9c4e1400e26d1e69806989b1b69b8d49f93466cca7c26dc370bfabcbf031f5",
+   "sounding_key": 84,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 504372,
+   "git_blob_sha1": "f8bd2232bc174009e2a4e1a531e879e8cbd74199",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C5_ff_01_far.wav",
+   "sha256": "b2ceeb64877d9975afbdf2fafb8892c416ac760c63bb2bc544007ef2331d35fd",
+   "sounding_key": 84,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 354978,
+   "git_blob_sha1": "88ded0b1729f3955994c38cb48846332c298e885",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G5_pp_01_far.wav",
+   "sha256": "74c7cf3c4ddba750a89ca168cb748aec24229ff5154bc212ce1fb6d424697814",
+   "sounding_key": 91,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 432828,
+   "git_blob_sha1": "7183664e7583871c9221e3b0c40a324a265706f7",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G5_ff_01_far.wav",
+   "sha256": "d5b45edd0c164356c0425b663b9307bbb77a647ba7554423c6a8aa455ac8b2b3",
+   "sounding_key": 91,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 338118,
+   "git_blob_sha1": "b1e154ff8f80f3a90191a3f0c58d68f2c83c318f",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C6_pp_01_far.wav",
+   "sha256": "cd255a44972d733dd8d21a0244297e1ff1ca0482a828474923a25ddadd695c45",
+   "sounding_key": 96,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 393930,
+   "git_blob_sha1": "b947a33529eb125a762090fc368b1942a4e3aa72",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C6_ff_01_far.wav",
+   "sha256": "183d04381c44705f65c3750383f28695f4b2576311ace8fdbe567134f416ff27",
+   "sounding_key": 96,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 270420,
+   "git_blob_sha1": "f1f32cd8e4b7c1fbe3962c371cd08e59d17d32da",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G6_pp_01_far.wav",
+   "sha256": "cf9d1796ab4a2cb182d1325af53e4090d77970d2d552cb448be13b97ee6e5bbf",
+   "sounding_key": 103,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 371682,
+   "git_blob_sha1": "911cb8efac1a84a05d071a04ff35d6b3b087e313",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G6_ff_01_far.wav",
+   "sha256": "8d46e7cb1d2f61f466458f042bd20ce6086802a2396cfc1dab13a5d72232d8bf",
+   "sounding_key": 103,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 241332,
+   "git_blob_sha1": "a12e32d87f6c4a9719752f409282b29e1b2d5280",
+   "layer": "pp",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C7_pp_01_far.wav",
+   "sha256": "158cad742278f85a1e76b2fc6abc5a6415fd8427c380eb896b8c1cac54fea31e",
+   "sounding_key": 108,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 306732,
+   "git_blob_sha1": "d44013498ae967ea9998cb03bac8b59f461865ed",
+   "layer": "ff",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C7_ff_01_far.wav",
+   "sha256": "f922a9ca996341c3cd6d54d3f3c569812e5c4c3325b1bb19de503b113b9a9197",
+   "sounding_key": 108,
+   "velocity": 1.0
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "xylophone",
+ "not_used_extra_takes": [],
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts); round 190nl",
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "xylophone.lpm",
+ "tool": "tools/physmod/calibrate.py 190nl-1"
+}

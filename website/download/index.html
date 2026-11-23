@@ -8,7 +8,7 @@
 <meta property="og:title" content="Download · LYNX SHARE">
 <meta property="og:description" content="Download LYNX SHARE for Windows, macOS or Linux: installer, portable zip, dmg, AppImage and tar.gz, with install notes for each system.">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.30">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
 <meta property="og:url" content="https://lynx-share.com/download/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="69805082";
+window.LYNX_LANG=lang;window.LYNX_V="d90fb3e6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,12 +77,12 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=69805082">
+<link rel="stylesheet" href="/assets/site.css?v=d90fb3e6">
 </head>
 <body>
 <header class="top"><div class="wrap">
   <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
-  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
   <div class="navbtns">
     <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
     <a class="btn btn-red btn-sm" href="/download/" aria-current="page" data-i18n="nav.download">Download</a>
@@ -91,8 +91,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <main>
 <div class="phead"><div class="wrap">
   <h1 data-i18n="dlp.h1">Download</h1>
-  <p data-i18n="dlp.sub">Free, with no account, for Windows, macOS and Linux. Every download has all three workflows: FL Studio, Clip-launch and Simple.</p>
-  <p><span data-i18n="fact.ver">Version</span>: <span class="ver-line">v0.1.30-alpha</span> (<a class="tlink" href="/updates/" data-i18n="fact.verL">what changed</a>)</p>
+  <p data-i18n="dlp.sub">Free, with no account, for Windows, macOS and Linux. Every download has all three layouts: FL Studio, Clip-launch and Simple.</p>
+  <p><span data-i18n="fact.ver">Version</span>: <span class="ver-line">v0.1.31-alpha</span> (<a class="tlink" href="/updates/" data-i18n="fact.verL">what changed</a>)</p>
 </div></div>
 
 <section class="sec" id="download">
@@ -120,8 +120,10 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
         <div class="btns">
           <a class="btn btn-red" data-dl="linux.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fAppImage">AppImage</span><small>x86_64</small></a>
           <a class="btn btn-ghost" data-dl="linux.alt" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fArchive">Archive</span><small>.tar.gz</small></a>
+          <a class="btn btn-ghost" data-dl="linux.arm" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fAppImage">AppImage</span><small>arm64</small></a>
+          <a class="btn btn-ghost" data-dl="linux.armalt" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><span data-i18n="dl.fArchive">Archive</span><small>.tar.gz arm64</small></a>
         </div>
-        <p data-i18n="dl.hlinux"><b>Linux x86_64 with glibc 2.35 or newer</b> (Ubuntu 22.04, Debian 12, Fedora 36 or newer). AppImage: <code>chmod +x LYNX-*.AppImage</code>, then run it (some distros need libfuse2). The .tar.gz has an <code>install.sh</code> that installs for your user with a menu entry.</p>
+        <p data-i18n="dl.hlinux"><b>Linux x86_64 or arm64 with glibc 2.35 or newer</b> (Ubuntu 22.04, Debian 12, Fedora 36 or newer; arm64 also on a Raspberry Pi 4 or 5 with a 64-bit OS). AppImage: <code>chmod +x LYNX-*.AppImage</code>, then run it (some distros need libfuse2). The .tar.gz has an <code>install.sh</code> that installs for your user with a menu entry.</p>
       </div>
     </div>
     <p class="muted" style="margin-top:22px"><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases" data-i18n="dlp.all">All releases and checksums on GitHub</a></p>
@@ -135,12 +137,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <p data-i18n="dlp.know1">LYNX SHARE is an alpha. It opens, plays and exports whole projects, but it has bugs. Save often, and keep a copy of anything you import from another program.</p>
       <p data-i18n="dlp.know2">Installed versions offer new releases through an Update bar under the toolbar. The Microsoft Store version updates through the Store, and the AppImage through AppImageUpdate or Gear Lever.</p>
       <p data-i18n="dlp.know3">Plugin formats differ per system: VST3 and CLAP everywhere, Audio Units on macOS, LV2 on Linux, VST2 on Windows and Linux. ASIO and the 32-bit plugin bridge are Windows-only.</p>
+      <p data-i18n="dlp.know4">The LYNX plugin pack, LYNX SHARE's own effects and instruments as plugins for other DAWs, is a separate, optional download (LYNX-Plugins) on the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases">releases page</a>. LYNX SHARE itself does not need it. On Windows, take the .7z (about 20 MB): the .zip (about 195 MB) has the same files.</p>
+      <p data-i18n="dlp.know5">The first start asks where you are coming from and picks a layout, and connects nowhere until you have answered.</p>
       <p><a class="tlink" href="/wiki/getting-started/" data-i18n="dlp.next">Getting started: first run and first sound</a><br><a class="tlink" href="/wiki/troubleshooting/" data-i18n="dlp.trouble">Troubleshooting: SmartScreen, Gatekeeper, no sound</a></p>
     </div>
     <dl class="facts">
       <div><dt>Windows</dt><dd data-i18n="dlp.reqWin">10 or 11, 64-bit</dd></div>
       <div><dt>macOS</dt><dd data-i18n="dlp.reqMac">11 or newer, Apple Silicon or Intel</dd></div>
-      <div><dt>Linux</dt><dd data-i18n="dlp.reqLin">x86_64, glibc 2.35 or newer</dd></div>
+      <div><dt>Linux</dt><dd data-i18n="dlp.reqLin">x86_64 or arm64, glibc 2.35 or newer</dd></div>
       <div><dt data-i18n="fact.lic">Licence</dt><dd>AGPL-3.0</dd></div>
       <div><dt data-i18n="dlp.privT">Privacy</dt><dd data-i18n="dlp.priv">No telemetry and no account. Crash reports are sent only if you agree. <a href="/#signing">Details</a></dd></div>
     </dl>
@@ -156,7 +160,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=69805082" defer></script>
-<script src="/assets/motion.js?v=69805082" defer></script>
+<script src="/assets/site.js?v=d90fb3e6" defer></script>
+<script src="/assets/motion.js?v=d90fb3e6" defer></script>
 </body>
 </html>

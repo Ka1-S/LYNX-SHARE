@@ -13,10 +13,14 @@
 # same bytes every time) and, with FL=1, FL Studio's demo songs Thief and Exoplanet plus Live's Patience from the
 # local installs (never committed). CI runs the synthetic ones (.github/workflows/tests.yml, profile ci-ubuntu).
 #
-# usage: scripts/perf-gate.sh [compare|update|measure] [results dir]
+# usage: scripts/perf-gate.sh [compare|update|measure|ab] [results dir]
 #   compare (default)  measure, then compare with tests/perf/baseline-$PROFILE.json; exit 1 on a regression
 #   update             measure twice and write the baseline (after a reviewed, intended change: commit it with a reason)
 #   measure            measure only (results.json)
+#   ab                 (rollup 0.1.31 step 5, round 190ok's proposal) the bench cells of main's perfbench (BASE_PERFBENCH=path)
+#                      and this one, measured alternately in this session, ROUNDS (>= 5, default 5) rounds (main, new, new,
+#                      main, ...), a calibration before and after each side's run; perf_gate.py ab compares median with
+#                      median (summary-ab.md): how a wall-clock failure of compare is confirmed or dismissed
 # env:
 #   PROFILE=local         baseline name (local = this machine; ci-ubuntu = GitHub's ubuntu-24.04 runners)
 #   PERFBENCH=path        tools/perfbench build (default: build-linux/perfbench, then build/perfbench)
@@ -151,5 +155,22 @@ case $mode in
       python3 scripts/perf_gate.py compare "$OUT" "$BASELINE" > /dev/null && { cat "$OUT/summary.md"; exit 0; }
     done
     cat "$OUT/summary.md"; exit 1 ;;
-  *) echo "usage: $0 [compare|update|measure] [results dir]" >&2; exit 2 ;;
+  ab)
+    [ -n "${BASE_PERFBENCH:-}" ] && [ -x "$BASE_PERFBENCH" ] || { echo "perf-gate: ab needs BASE_PERFBENCH (main's perfbench)" >&2; exit 2; }
+    ROUNDS=${ROUNDS:-5}; [ "$ROUNDS" -lt 5 ] && ROUNDS=5
+    TOP=$OUT; NEW_PERFBENCH=$PERFBENCH
+    side () { # side (base|new) run number
+      OUT=$TOP/$1; mkdir -p "$OUT"; cp "$TOP/machine.txt" "$OUT/machine.txt"
+      if [ "$1" = base ]; then PERFBENCH=$BASE_PERFBENCH; else PERFBENCH=$NEW_PERFBENCH; fi
+      calibrate "$2-a"
+      for s in $(projects); do for b in $BLOCKS; do echo "== ab $1 bench $s@$b #$2"; bench "$s@$b" "$2"; done; done
+      calibrate "$2-b"
+      OUT=$TOP; PERFBENCH=$NEW_PERFBENCH
+    }
+    for n in $(seq 1 "$ROUNDS"); do
+      if [ $((n % 2)) = 1 ]; then side base "$n"; side new "$n"; else side new "$n"; side base "$n"; fi
+    done
+    python3 scripts/perf_gate.py ab "$TOP" > /dev/null; rc=$?
+    cat "$TOP/summary-ab.md"; exit $rc ;;
+  *) echo "usage: $0 [compare|update|measure|ab] [results dir]" >&2; exit 2 ;;
 esac

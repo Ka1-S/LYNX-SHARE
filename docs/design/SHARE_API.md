@@ -156,6 +156,11 @@ room). Today it only forwards/echoes; the session protocol on top is the app's (
   frame, 4 KiB per control (text) message. A room or connection that hits one is closed with WebSocket code **4001**
   (the app then tells the user and does not reconnect). `/health` → `relay.limits` lists them and `limitsHit` counts
   how often one was hit; no addresses are logged. Rooms live in memory only: nothing is written to disk.
+- **Per-peer outboxes (round 190oh)**: every peer has its own queue, written by a task of its own, so a peer that
+  reads slowly never holds up what its sender sends to the others (before, one 128 KiB/s reader delayed another peer's
+  edits by 4.5 s median, 12 s at worst; now 0.5 ms median locally). A peer with more than `LYNX_RELAY_PEER_QUEUE`
+  (16 MiB) waiting is closed with code **4002** ("too slow"); the app reconnects and its transfers go on from where
+  they were.
 
 ### 3.2 Connect
 
@@ -179,6 +184,23 @@ yourself, for tests and RTT), bytes 1… are the payload. The relay delivers `[s
 frame (`LYNX_RELAY_MAX_FRAME`); each peer may send 4 MiB/s on average (beyond that the relay slows the reader
 down instead of dropping, so the stream stays reliable and ordered). WebSocket pings every 25 s keep NAT mappings
 alive.
+
+### 3.4 Removing a peer (round 190on)
+
+`POST /v1/rooms/<room>/kick` with `Authorization: Bearer <hostToken>` and the body
+`{"peer": 2, "ban": true, "token": "<new room token>"}` → `200 {"ok":true,"removed":true,"peers":[1,3]}`.
+
+- `peer` (0…4): its socket is closed with WebSocket code **4003** ("removed by host"); its peer number is free at once.
+  `0` removes nobody (only the token changes).
+- `ban` (default `true`): the peer's client address (the same salted in-memory key as the rate limits, never logged)
+  may not connect to this room again: `403` before the upgrade. The host's own address is never banned (a guest on the
+  host's network), and a room remembers at most 64.
+- `token` (optional, 43…128 characters as in §3.1): the room token for **new** connections from now on; the peers
+  already connected stay. LYNX SHARE sends the derived token of a new invite code (same room, new secret), and gives the
+  new code to the guests still in the session inside the encrypted stream, so only newcomers need it.
+- `400` for a body that is not a JSON object or a field of the wrong shape, `401` wrong host token, `404` unknown room.
+- LYNX SHARE also calls it (with `ban`, no `token`) for a knocker the host turned away, so that one can't knock again
+  with the same code.
 
 ### 3.3 Mapping to ONLINE_SESSIONS.md
 

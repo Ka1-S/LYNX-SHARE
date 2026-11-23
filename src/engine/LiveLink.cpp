@@ -1,4 +1,5 @@
 #include "engine/LiveLink.h"
+#include "core/Offline.h"
 #include "platform/CvWait.h"
 
 #include <chrono>
@@ -79,6 +80,11 @@ void Connection::open (const std::string& url, const std::string& token, const s
         const std::lock_guard<std::mutex> g (lock);
         incoming.clear();
     }
+    if (offline::enabled()) // (the callers check available() first: this is the last line)
+    {
+        state = 3;
+        return;
+    }
     stopping = false;
     state = 1;
     reader = std::thread ([this, url, token, userAgent] { run (url, token, userAgent); });
@@ -110,7 +116,16 @@ std::wstring widen (const std::string& s)
 
 Connection::Connection() : impl (std::make_unique<Impl>()) {}
 
-bool Connection::available (std::string*) { return true; }
+bool Connection::available (std::string* why)
+{
+    if (offline::enabled()) // no connection at all (round 190nx)
+    {
+        if (why != nullptr)
+            *why = offline::whyShort;
+        return false;
+    }
+    return true;
+}
 
 void Connection::run (std::string url, std::string token, std::string userAgent)
 {
@@ -356,6 +371,12 @@ Connection::Connection() : impl (std::make_unique<Impl>()) {}
 
 bool Connection::available (std::string* why)
 {
+    if (offline::enabled()) // no connection at all (round 190nx)
+    {
+        if (why != nullptr)
+            *why = offline::whyShort;
+        return false;
+    }
     if (why != nullptr)
         *why = curl().why;
     return curl().ok();
@@ -414,7 +435,7 @@ void Connection::run (std::string url, std::string token, std::string userAgent)
         {
             std::size_t off = 0;
             const unsigned flags = m.first ? wsBinary : wsText;
-            while (off < m.second.size() || (m.second.empty() && off == 0))
+            while ((off < m.second.size() || (m.second.empty() && off == 0)) && ! stopping.load())
             {
                 std::size_t sent = 0;
                 const auto r = c.wsSend (h, m.second.data() + off, m.second.size() - off, &sent, 0, flags);
@@ -429,8 +450,16 @@ void Connection::run (std::string url, std::string token, std::string userAgent)
                 {
                     closed.text = "send failed";
                     done = true;
+                    break;
                 }
-                break;
+                // round 190oh: a frame curl took only part of (the socket's buffer is full: a message over ~64 KiB over
+                // TLS to a far relay) goes on with the rest, the same frame and flags. Leaving it half-sent made the
+                // next message fail (curl error 43), the link closed and a guest's upload started again from its
+                // first piece, for ever (seen from this PC on relay.lynx-share.com; never from a relay close by)
+                if (off >= m.second.size())
+                    break;
+                pollfd p { fd, POLLOUT, 0 };
+                ::poll (&p, 1, 50);
             }
         }
         pollfd p { fd, POLLIN, 0 };
@@ -525,7 +554,7 @@ HttpAnswer http (const std::string& method, const std::string& url, const std::v
                  const std::string& userAgent, int timeoutSeconds)
 {
     HttpAnswer answer;
-    if (! httpAvailable())
+    if (offline::enabled() || ! httpAvailable())
         return answer;
     auto& c = curl();
     void* h = c.easyInit();

@@ -127,6 +127,9 @@ struct Options
     // markers and each section becomes a file named after its marker ("<name> - 02 Verse"); with stems, each section
     // gets its stems. Song range only (markerSections).
     bool sections = false;
+    // Round 190ol (LYNX's own, off by default): "One file per section" — the same, cut at the Sections lane's sections
+    // (core/Sections.h) instead of the markers; each file is named after its section. Wins over `sections` when both are on.
+    bool songSections = false;
     // Issue #215 (round 190ng): the file name's template with wildcards (core/ExportNaming.h; "$project" = as before)
     std::string nameTemplate = "$project";
 
@@ -207,6 +210,10 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 
 // The selection exists (loop region set and inside the song).
 bool hasSelection (const Song& song) noexcept;
+// Round 190pr: the spans [from, to) of the song an export of it plays, in order. Song::exportMarkers on (FL 2026's
+// render): from the first Start marker (else bar 1) to the song's end, over every Marker skip's section; Marker pauses
+// and marker loops are not followed. Off: the whole song, { 0, end }
+std::vector<std::pair<std::int64_t, std::int64_t>> exportSpans (const Song& song);
 
 // Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded). Round 190gh (B7):
 // also the inserts fed only by extra outputs — a hosted multi-output instrument's Connections (as the engine plays
@@ -296,6 +303,10 @@ Song makeSectionSong (const Song& song, const Section& section);
 Options sectionOptions (Options o);
 // Whether an export with `o` is split by sections: the option is on, the range is the song and it has markers.
 bool exportsSections (const Song& song, const Options& o);
+// Round 190ol: the Sections lane's sections as export sections (in song order; a gap between two is not exported)
+std::vector<Section> laneSections (const Song& song);
+// The sections an export with `o` writes: the lane's with "One file per section", else the markers' (empty: one file)
+std::vector<Section> exportSections (const Song& song, const Options& o);
 
 // "<base> - <NN> <name>" (no extension: the stems of a section add theirs): the number is the section's place, two
 // digits (three from 100 sections on) so the files sort in song order; illegal file name characters replaced.

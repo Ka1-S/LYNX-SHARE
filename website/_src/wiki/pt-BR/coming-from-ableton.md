@@ -1,24 +1,39 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 
-O LYNX SHARE começa no fluxo por padrões: um Channel Rack, patterns e uma Playlist. O fluxo por disparo de clipes é opcional e acrescenta uma grade de clipes com cenas ao lado da Playlist. O LYNX SHARE lê e grava sets `.als`. Não tem nenhuma ligação com a Ableton.
+O LYNX SHARE começa no layout Pattern: um Channel Rack, patterns e uma Playlist. O layout de lançamento de clipes é opcional e acrescenta uma grade de clipes com cenas ao lado da Playlist. O LYNX SHARE lê e grava sets `.als`. Não tem nenhuma ligação com a Ableton.
+
+Esta página serve também para quem usa o Bitwig Studio: a grade de clipes funciona do mesmo jeito, e os arquivos DAWproject do Bitwig (`.dawproject`) abrem com `Arquivo › Abrir...` e são gravados por `Arquivo › Exportar › DAWproject (.dawproject)...`.
+
+## Seus primeiros passos
+
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem. Clique em `Ableton Live ou Bitwig`: o Layout de lançamento de clipes abre. Depois, `Exibir › Estilo de layout › Layout de lançamento de clipes` troca para ele a qualquer momento.
+2. **Preencha um slot.** Arraste um sample ou um pattern do Browser para um slot, ou clique com o botão direito num slot vazio e escolha `Colocar um padrão aqui`.
+3. **Dispare.** Clique no triângulo à esquerda de um clipe, ou no triângulo de uma cena na coluna `Cenas` para disparar a linha toda. Ou abra um dos seus sets `.als` (abaixo).
+
+O que é diferente do Live:
+
+- A Playlist é o arranjo, e as faixas dela são as colunas da grade. Uma faixa que disparou um clipe fica na grade até você apertar `Voltar à Playlist`.
+- Fora da grade, as teclas seguem o FL Studio. `Ctrl+Z` desfaz um passo e, pressionado de novo, refaz.
+- Só alguns dos devices próprios do Live são convertidos (veja Bom saber). Plugins de terceiros vêm com o estado deles.
+- O Layout Pattern, o jeito de trabalhar do FL Studio com Channel Rack e patterns, funciona no mesmo projeto.
 
 ## Abrir um set do Live
 
 1. Escolha `Arquivo › Abrir...` (`Ctrl+O`) e selecione o `.als`. Sets salvos pelo Live 11 e pelo Live 12 são lidos.
-2. Escolha `Exibir › Estilo de layout › Fluxo por disparo de clipes` para trabalhar com a grade de clipes, para onde vão os clipes de Session e as cenas do set.
+2. Escolha `Exibir › Estilo de layout › Layout de lançamento de clipes` para trabalhar com a grade de clipes, para onde vão os clipes de Session e as cenas do set.
 3. Use a chave `Grid / Both / Song` na barra de título da Playlist para mostrar a grade, a Playlist ou as duas.
 4. Escolha `Arquivo › Salvar`. Ele pergunta onde gravar um arquivo `.lynx`. O `.als` não é alterado.
 
-`Exibir › Estilo de layout › Fluxo por padrões (padrão)` volta ao anterior. A mesma escolha está em `Opções › Configurações gerais...`. Patterns e o Channel Rack continuam disponíveis nos dois layouts.
+`Exibir › Estilo de layout › Layout Pattern (padrão)` volta ao anterior. A mesma escolha está em `Opções › Configurações gerais...`. Patterns e o Channel Rack continuam disponíveis nos dois layouts.
 
 ## O que corresponde a quê
 
 | No Live | No LYNX SHARE |
 |---|---|
-| Session view | A grade de clipes do fluxo por disparo de clipes |
+| Session view | A grade de clipes do layout de lançamento de clipes |
 | Vista de arranjo | A Playlist |
 | Faixas | Faixas da Playlist, que são as colunas da grade de clipes |
 | Cenas | Cenas, as linhas da grade de clipes. Uma cena pode definir o tempo ao ser disparada |
@@ -59,7 +74,7 @@ As follow actions rodam depois de um número de compassos ou de passagens do cli
 
 | Gravado | Não gravado |
 |---|---|
-| Uma faixa MIDI por canal, com as notas como clipes MIDI | Os instrumentos e efeitos próprios do LYNX SHARE. As faixas e as notas deles são mantidas |
+| Uma faixa MIDI por canal, com as notas como clipes MIDI | Os instrumentos e efeitos próprios do LYNX SHARE, exceto o Helix, que vira Wavetable. As faixas e as notas deles são mantidas |
 | Faixas de áudio com stretch, transposição, ganho, fades e modo de warp | Automação de parâmetros de efeitos |
 | Grupos, retornos e sends | Rotas de insert para insert |
 | Plugins VST2 e VST3 com o estado deles | |
@@ -70,9 +85,11 @@ Um relatório depois da exportação lista o que ficou de fora.
 
 ## Bom saber
 
-- Muitos dos devices do próprio Live entram como os do LYNX SHARE, com suas configurações e automação: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift e Operator (sem FM). Os outros são descartados e listados no relatório de importação.
-- Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros, e um Drum Rack vira o Drum Rack do LYNX SHARE. Os MIDI Effect Racks do Live ainda não são convertidos e aparecem no relatório de importação.
+- Muitos dos devices do próprio Live entram como os do LYNX SHARE, com suas configurações e automação: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable e Meld. Os outros são descartados e listados no relatório de importação.
+- Os Instrument Racks e Audio Effect Racks entram com suas cadeias, zonas e macros, e um Drum Rack vira o Drum Rack do LYNX SHARE. O Arpeggiator do Live vira o arpejador do canal. Pitch, Velocity, Chord, Note Length e os MIDI Effect Racks são gravados nas notas.
 - O relatório de importação lista o que ficou de fora.
+- No Device View, um rack mostra os devices de suas cadeias na própria linha, e o modo Macro Map (os botões `Map` do rack) entrega o parâmetro de um device a uma macro, como no Live.
+- O mixer Session tem o interruptor Solo / Cue do Live, com um `Cue Out` para os seus fones e um `Volume do cue`.
 - O Live corta os clipes de áudio que se sobrepõem em um set exportado.
 - Os warp markers de um set do Live são mantidos na importação e gravados de volta na exportação.
 
@@ -82,4 +99,5 @@ Um relatório depois da exportação lista o que ficou de fora.
 - [Layouts](/wiki/layouts/)
 - [Importar projetos](/wiki/importing-projects/)
 - [Formatos de arquivo](/wiki/file-formats/)
-- [Dois fluxos de trabalho em um só programa](/why/#workflows)
+- [Dois layouts em um só programa](/why/#workflows)
+- [Aprenda: tutoriais](/learn/)

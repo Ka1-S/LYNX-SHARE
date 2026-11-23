@@ -1,5 +1,9 @@
 <p>LYNX SHARE 保留了你熟悉的工作方式：通道机架、样式、播放列表和混音台，快捷键也一样。它可以直接打开 <code>.flp</code> 工程，也可以写回一个。</p>
 <p>LYNX SHARE 是一个独立的程序。它与 Image-Line 没有任何关联，未获其认可或赞助，也不包含任何 Image-Line 的代码。FL Studio 是 Image-Line Software 的注册商标。</p>
+<h2 id="your-first-steps">你的第一步</h2>
+<ol><li><strong>选择布局。</strong> 第一次启动 LYNX SHARE 时，欢迎卡片会问你从哪里转过来。点击 <code>FL Studio</code>：你会得到默认的模式布局，有通道机架、钢琴卷帘、播放列表和混音台。卡片上的“跳过”效果相同。</li><li><strong>打开工程。</strong> 打开你的某个 <code>.flp</code> 工程（见下文），或在通道机架中点击步进来做一段节拍。</li><li><strong>找到你的插件。</strong> LYNX SHARE 会在后台扫描常用的插件文件夹。若有你自己的文件夹，请打开 <code>选项 › 插件管理器...</code>，点击 <code>插件文件夹...</code>，添加它，然后点击 <code>查找新插件</code>。</li></ol>
+<p>与 FL Studio 的不同之处：</p>
+<ul><li>FL Studio 自己的插件在 LYNX SHARE 重建的引擎上播放，每个引擎都有质量等级（见下文）。打开 <code>.flp</code> 不需要 FL Studio 本身。</li><li>LYNX SHARE 自己的新增功能默认是关闭的，要在 <code>选项 › LYNX 附加功能...</code> 中打开。</li><li>另外两种布局可以处理同一个工程：片段启动（带场景的片段网格）和简易（一个窗口里有音轨、循环和快速录音）。</li><li><a href="/learn/online-session/">在线会话</a>可让最多 4 个人实时在同一个工程里工作。</li></ul>
 <h2 id="open-a-flp-project">打开 .flp 工程</h2>
 <ol><li>选择 <code>文件 › 打开...</code>（<code>Ctrl+O</code>），选取该 <code>.flp</code>。</li><li>LYNX SHARE 会解析工程中的插件和采样，然后打开工程。标题会显示“(imported from FL Studio)”。</li><li>选择 <code>帮助 › Last FL Studio import report</code>，查看哪些内容被近似处理、被舍去或未找到。</li><li>选择 <code>帮助 › 缺失的文件...</code>，查看缺失的采样和插件。</li><li>选择 <code>文件 › 保存</code>。它会询问把 <code>.lynx</code> 文件写到哪里。<code>.flp</code> 本身永远不会被写入。</li></ol>
 <h2 id="what-maps-to-what">对应关系</h2>
@@ -22,6 +26,6 @@
 <p><code>文件 › 打开...</code> 也能打开 <code>.flm</code> 工程。导入是部分的。</p>
 <ul><li>会导入：速度、拍号、每个 FLM 通道对应一个混音台插入轨、每条泳道对应一个播放列表轨道、样式（每次循环作为一个片段）、带偏移和音高的音频片段、鼓组、DW Sampler 采样和 <code>.dwp</code> 程序以及 Slicer（用 FLM 自己的引擎）、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw 乐器、FLM 的效果器（作为 Pocket 效果器）、电平、声像、静音、独奏、弯音、发送和乐器参数的自动化，以及和弦集和调锁定。</li><li>不会导入：FLM 的其他乐器，它们用内置合成器播放。</li><li>采样会在 <code>.flm</code> 旁边以及 FL Studio 中 FLM 资源的副本里查找。找不到的 <code>.dwp</code> 会用替身来播放。</li></ul>
 <h2 id="good-to-know">须知</h2>
-<ul><li>FLEX 包是加密的，永远不会被打开。FLEX 通道会根据其预设名称得到一个合成器音色。</li><li>调制器会被 <code>.flp</code> 导出舍去，导出报告里会写明这一点。</li><li>导入报告会列出：哪些内容由内置合成器近似处理，哪些没有对应项，哪些插件被找到或未安装，哪些效果器被舍去或只部分重现，以及缺失了多少个采样。</li><li>未安装的第三方效果器会被作用相同的 LYNX SHARE 效果器替换。原来的效果器仍保留在工程中。</li></ul>
+<ul><li>FLEX 包是加密的，永远不会被打开。FLEX 通道会根据其预设名称得到一个合成器音色。</li><li>导出为 <code>.flp</code> 时，跟随歌曲位置的调制器会变成自动化片段（同步的 LFO 会变成 FL Studio 的片段 LFO）。跟随器、包络、按键跟踪和力度会被舍去，导出报告会写明这一点。</li><li>导入报告会列出：哪些内容由内置合成器近似处理，哪些没有对应项，哪些插件被找到或未安装，哪些效果器被舍去或只部分重现，以及缺失了多少个采样。</li><li>未安装的第三方效果器会被作用相同的 LYNX SHARE 效果器替换。原来的效果器仍保留在工程中。</li></ul>
 <h2 id="related">相关页面</h2>
-<ul><li><a href="/wiki/built-in/">内置乐器和效果器</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/wiki/file-formats/">文件格式</a></li><li><a href="/wiki/shortcuts/">快捷键</a></li><li><a href="/why/#fl-settings">只有 LYNX SHARE 才能对 FL 设置做的事</a></li></ul>
+<ul><li><a href="/wiki/built-in/">内置乐器和效果器</a></li><li><a href="/wiki/plugins/">第三方插件</a></li><li><a href="/wiki/file-formats/">文件格式</a></li><li><a href="/wiki/shortcuts/">快捷键</a></li><li><a href="/why/#fl-settings">只有 LYNX SHARE 才能对 FL 设置做的事</a></li><li><a href="/learn/">学习：教程</a></li></ul>

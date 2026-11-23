@@ -69,6 +69,9 @@ bool isSandboxedPlugin (const juce::AudioPluginInstance& plugin);
 std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription& description, double sampleRate,
                                                                   int blockSize, const std::string& stateBase64, juce::String& error,
                                                                   const juce::String& group = {});
+// FL's wrapper Settings › GUI for a proxy (round 190oh, P3): the child makes the editor's window DPI-unaware (Windows) and
+// takes the editor's reported size in logical pixels, as ui/PluginWindow.cpp does in LYNX's own process
+void setSandboxedEditorScaling (juce::AudioPluginInstance& plugin, bool dpiAware, bool scaleEditorDimensions);
 // Running group processes (tests), and a proxy's group ("" for a process of its own; for the 32-bit bridge "32|"...)
 int sandboxProcessCount();
 juce::String sandboxGroupOf (const juce::AudioPluginInstance& plugin);

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 
 #include "core/AlsExport.h"
 #include "core/AlsImport.h"
@@ -55,6 +56,38 @@ constexpr int volWidth = 52, panWidth = 30, ledWidth = 18, soloWidth = 18;
 
 juce::String str (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
+// Round 190nc (DL-95): Live 12.4's rack in the Device View with the selected chain's devices inline, and its Macro Map
+// overlay, measured in 190my raw/l8.png (Map on, Glue Compressor's Attack picked) and 190mv raw/mm6.png (Map on). Only
+// in the Clip-launch layout's Live look (the Device View card; a rack's own window keeps LYNX's devices pane).
+//  - a chain device: Live's device chrome as the Device View's cards (17 px #464646 title bar, the 13 px power disc, the
+//    name, round wells), its body #363636; devices 2 px apart on #242424 (l8 x 379..381, 676..678), no meters between;
+//  - the rack's own title bar spans only its own part (rack x 249..378 title, Glue Compressor's title from x 381);
+//  - Map on: the M well #00DA48 in a #111111 rim with a dark M (l8 x 312..324 y 809..821); a "Map" pill under each macro
+//    (#1E1E1E in a #111111 rim, #B5B5B5 word, 13 px high, l8 x 274..316 y 889..901); every mappable device parameter
+//    on #25693C (37,105,60), a mapped one on #226639 with an "M n" label 21 x 13 at its top right (#464646 in a 1 px
+//    #00DA48 rim, #B5B5B5 text, l8 x 516..536 y 919..931); the picked one framed by #919191 corner brackets, 7 px arms,
+//    1 px (190my B2); the chain list's volume and pan tinted #00D94B at 31.5 % (mm6 x 474..575 y 863: 36 -> 25,93,48);
+//  - the Macro Mappings list in the Browser's place (mm6 / l8 x 9..462 y 88..206): the title band, a 19 px #464646
+//    header (Macro ▲ | Path | Name | Min | Max, #757575 1 px separators at 142 / 242 / 342 / 392 / 442), 18 px rows on
+//    #363636 with 1 px #242424 lines, the macro cell in its macro's plate colour, Min in a #242424 field and Max in a
+//    #007383 field (48 x 13, #111111 rim).
+const juce::Colour liveMapWell { 0xff00da48 }, liveMapWellRim { 0xff111111 }, liveMappable { 0xff25693c }, liveMapped { 0xff226639 },
+    liveMapBracket { 0xff919191 }, liveMapTint { 0x5000d94b }, liveMinField { 0xff242424 }, liveMaxField { 0xff007383 },
+    liveListLine { 0xff757575 };
+constexpr int inlineGap = 2, inlineFoldedWidth = 22, inlineAddWidth = 44, inlineEmptyWidth = 200, inlineTitle = 17;
+constexpr int inlineKnobColumn = 62, inlineKnobRow = 70, inlineMaxKnobs = 7, inlinePictureWidth = 172;
+constexpr int liveMapTitle = 23, liveMapHeader = 19, liveMapPitch = 19;
+constexpr int liveMapWidths[] { 142, 100, 100, 50, 50 };
+
+// a device's name turned on its side (a folded device, as the Device View's)
+void drawSideways (juce::Graphics& g, const juce::String& text, juce::Rectangle<int> area)
+{
+    juce::Graphics::ScopedSaveState save (g);
+    g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) area.getCentreX(), (float) area.getCentreY()));
+    const auto turned = juce::Rectangle<int> (area.getHeight(), area.getWidth()).withCentre (area.getCentre());
+    g.drawText (text, turned.reduced (4, 0), juce::Justification::centredRight, true);
+}
+
 // a chain volume as Live shows it ("-6.0 dB", "-inf dB")
 juce::String volumeText (float gain)
 {
@@ -106,6 +139,23 @@ struct RackView::Impl
     std::function<void (int)> openNode;
 
     PatcherDoc shown; // what was last painted
+    // --- round 190nc (DL-95): the chain's devices inline (Live's look in the Device View) and the Map overlay
+    struct InlineCard
+    {
+        int node = -1, position = 0;
+        juce::Rectangle<int> box;
+        bool folded = false;
+        std::vector<int> params; // the knobs: the device's first parameters (none: a plugin, an instrument, a rack)
+    };
+    std::vector<InlineCard> inlineCards;
+    juce::Rectangle<int> inlineAdd;       // the "+" card (an empty chain: Live's drop area)
+    std::set<int> foldedNodes;            // view-local, as the Device View's folds (not saved)
+    int selectedNode = -1;
+    std::optional<RackMapping> picked;    // Map mode: the parameter clicked, waiting for a macro's Map button
+    int knobNode = -1, knobParam = -1;    // an inline knob being dragged
+    std::unique_ptr<juce::Component> mappingsPanel; // the Macro Mappings list over the Browser (Map mode)
+    juce::Component::SafePointer<juce::Component> mappingsHost;
+    std::function<void (bool)> syncAccessory; // the title bar's M follows Map mode
     std::vector<std::unique_ptr<ctlui::Knob>> knobs;
     juce::TextButton rand { "Rand" }, map { "Map" };
     std::uint32_t seed = 0x183c183cu;
@@ -117,7 +167,7 @@ struct RackView::Impl
     juce::Rectangle<int> header, column, variations, macros, chains, zones, devices, mapList;
     int deviceScroll = 0; // the devices pane scrolls sideways when the card is narrower than its devices (Device View)
     // a drag in progress
-    enum class Drag { none, volume, pan, selector, zoneMove, zoneLo, zoneHi, zoneFadeLo, zoneFadeHi, morph, mapMin, mapMax, padScroll, pad, send };
+    enum class Drag { none, volume, pan, selector, zoneMove, zoneLo, zoneHi, zoneFadeLo, zoneFadeHi, morph, mapMin, mapMax, padScroll, pad, send, inlineKnob };
     Drag drag = Drag::none;
     int dragChain = -1, dragMacro = -1, dragMapping = -1;
     // a Drum Rack (round 190ec): its pad view, an empty pad picked (view-local), the pad dragged / previewed, the chain
@@ -321,6 +371,8 @@ struct RackView::Impl
             shown = d != nullptr ? *d : PatcherDoc {};
             owner.resized();
             owner.repaint();
+            if (mappingsPanel != nullptr) // (round 190nc: the Macro Mappings list follows)
+                mappingsPanel->repaint();
         }
     }
 
@@ -508,23 +560,144 @@ struct RackView::Impl
         return r.drum ? area.withTrimmedBottom (headerStrip) : area;
     }
 
+    // --- round 190nc (DL-95): Live's look in the Device View shows the chain's devices inline ---------------------------
+    bool inlineLook() const { return ! ownHeader && theme::livelook::active(); }
+    bool inlineShown() const
+    {
+        const auto* r = rack();
+        return inlineLook() && r != nullptr && r->showDevices;
+    }
+    // the strip over the rack's own part kept for the Device View's title bar (its devices draw their own beside it)
+    int ownTop() const { return inlineShown() ? inlineTitle + 2 : 0; }
+    std::vector<int> inlineParams (const PatchNode& node) const
+    {
+        std::vector<int> out;
+        if (node.generator || node.effect.kind == EffectKind::plugin || node.effect.kind == EffectKind::patcher || rack::isRack (node.effect))
+            return out;
+        const auto count = std::min (inlineMaxKnobs, (int) effectInfo (node.effect.kind).params.size());
+        for (int p = 0; p < count; ++p)
+            out.push_back (p);
+        return out;
+    }
+    int inlineWidthOf (int n) const
+    {
+        if (foldedNodes.count (n) > 0)
+            return inlineFoldedWidth;
+        const auto params = inlineParams (shown.nodes[(std::size_t) n]);
+        return params.empty() ? inlinePictureWidth : std::max (136, 16 + ((int) params.size() + 1) / 2 * inlineKnobColumn);
+    }
+    int inlineContentWidth (const RackDoc& r) const
+    {
+        int w = inlineGap;
+        for (const auto n : shownDevices (r))
+            w += inlineWidthOf (n) + inlineGap;
+        return w + (shownDevices (r).empty() ? inlineEmptyWidth : inlineAddWidth) + inlineGap;
+    }
+    // the rack's own part (everything left of its devices)
+    int ownPartWidth (const RackDoc& r) const
+    {
+        int w = viewColumn;
+        if (r.showVariations)
+            w += variationsWidth;
+        if (r.showMacros)
+            w += macroColumns() * macroWidth + 8;
+        if (r.drum && r.showPads)
+            w += padsWidth;
+        if (r.showChains)
+            w += chainsWidth (r) + (r.zoneEditor >= 0 ? zoneWidth : 0);
+        // round 190oj (CS-16): the rack's own part carries its title bar — the power disc (21 px), a few letters of the
+        // name, the R / M wells (Live look; Rand / Map otherwise) and the card's three title buttons. With every panel
+        // hidden it was ~93 px and the R well covered half of the power disc; Live's narrowest rack title is ~134 px
+        const auto live = theme::livelook::active();
+        return std::max (w, 21 + 18 + (live ? 32 : RackView::titleAccessoryWidth) + 4 + 3 * (live ? 16 : 18) + 4);
+    }
+    void layoutInline (const RackDoc& r)
+    {
+        inlineCards.clear();
+        inlineAdd = {};
+        if (! inlineShown() || devices.isEmpty())
+            return;
+        auto x = devices.getX() + inlineGap;
+        int position = 0;
+        for (const auto n : shownDevices (r))
+        {
+            InlineCard c;
+            c.node = n;
+            c.position = position++;
+            c.folded = foldedNodes.count (n) > 0;
+            c.params = c.folded ? std::vector<int> {} : inlineParams (shown.nodes[(std::size_t) n]);
+            const auto w = inlineWidthOf (n);
+            c.box = { x, devices.getY(), w, devices.getHeight() };
+            x += w + inlineGap;
+            inlineCards.push_back (std::move (c));
+        }
+        inlineAdd = { x, devices.getY(), inlineCards.empty() ? inlineEmptyWidth : inlineAddWidth, devices.getHeight() };
+    }
+    static juce::Rectangle<int> inlineLed (const InlineCard& c) { return { c.box.getX() + 3, c.box.getY() + 2, 13, 13 }; }
+    static juce::Rectangle<int> inlineWindow (const InlineCard& c) { return { c.box.getRight() - 16, c.box.getY() + 2, 13, 13 }; }
+    static juce::Rectangle<int> inlineTitleBar (const InlineCard& c) { return c.box.withHeight (inlineTitle); }
+    static juce::Rectangle<int> inlineKnob (const InlineCard& c, int k)
+    {
+        return { c.box.getX() + 8 + (k / 2) * inlineKnobColumn, c.box.getY() + inlineTitle + 6 + (k % 2) * inlineKnobRow, inlineKnobColumn - 8, inlineKnobRow - 6 };
+    }
+    // the device box at chain position i (inline cards or the pane's cards), for drops
+    juce::Rectangle<int> deviceBox (int i) const
+    {
+        if (! inlineCards.empty() || inlineShown())
+            return i >= 0 && i < (int) inlineCards.size() ? inlineCards[(std::size_t) i].box : inlineAdd;
+        return deviceCard (i);
+    }
+    RackMapping paramMapping (int node, int param) const
+    {
+        RackMapping x;
+        x.node = node, x.param = param;
+        return x;
+    }
+    float nodeValue (int n, int p) const
+    {
+        if (n < 0 || n >= (int) shown.nodes.size() || p < 0 || p >= (int) shown.nodes[(std::size_t) n].effect.params.size())
+            return 0.0f;
+        return shown.nodes[(std::size_t) n].effect.params[(std::size_t) p];
+    }
+    void setNodeValue (int n, int p, float v, bool undoable)
+    {
+        edit ([n, p, v = std::clamp (v, 0.0f, 1.0f)] (PatcherDoc& d) {
+            if (n < (int) d.nodes.size() && p >= 0 && p < (int) d.nodes[(std::size_t) n].effect.params.size())
+                d.nodes[(std::size_t) n].effect.params[(std::size_t) p] = v;
+        },
+              undoable);
+    }
+    juce::String nodeValueText (int n, int p) const
+    {
+        const auto& node = shown.nodes[(std::size_t) n];
+        return str (formatEffectParam (node.effect.kind, p, nodeValue (n, p), engine.getSong().bpm));
+    }
+    // Map mode: a parameter picked; the status line says what comes next (Live's "(Press the Map button of a Macro
+    // Control to make an assignment.)", 190my l8)
+    void pick (const RackMapping& x)
+    {
+        picked = x;
+        ui::postHint ({ tr ("(Press the Map button of a Macro Control to make an assignment.)"), {} }, 4000);
+        owner.repaint();
+    }
+    void mapPicked (int m)
+    {
+        if (! picked)
+            return;
+        edit ([m, x = *picked] (PatcherDoc& d) { rack::map (d, m, x); });
+        if (mappingsPanel != nullptr)
+            mappingsPanel->repaint();
+    }
+
     // (`devicesOnly`: the narrowest width, with the devices pane one card wide; it scrolls)
     int width (int /*height*/, bool devicesOnly = false) const
     {
         const auto* r = rack();
         if (r == nullptr)
             return 200;
-        int w = viewColumn;
-        if (r->showVariations)
-            w += variationsWidth;
-        if (r->showMacros)
-            w += macroColumns() * macroWidth + 8;
-        if (r->drum && r->showPads)
-            w += padsWidth;
-        if (r->showChains)
-            w += chainsWidth (*r) + (r->zoneEditor >= 0 ? zoneWidth : 0);
+        int w = ownPartWidth (*r);
         if (r->showDevices)
-            w += devicesOnly ? deviceWidth + 12 : devicesContentWidth (*r);
+            w += inlineShown() ? inlineContentWidth (*r) : devicesOnly ? deviceWidth + 12 : devicesContentWidth (*r);
         if (owner.mapping && ownHeader)
             w += mapListWidth;
         return std::max (w, viewColumn + 60);
@@ -542,14 +715,16 @@ struct RackView::Impl
             rand.setBounds (h.removeFromRight (40));
         }
         const auto* r = rack();
-        column = area.removeFromLeft (viewColumn);
+        const auto top = ownTop(); // (round 190nc: the Device View's title bar over the rack's own part)
+        const auto cut = [top] (juce::Rectangle<int> x) { return x.withTrimmedTop (top); };
+        column = cut (area.removeFromLeft (viewColumn));
         if (owner.mapping && ownHeader)
             mapList = area.removeFromRight (mapListWidth);
         else
             mapList = {};
-        variations = r != nullptr && r->showVariations ? area.removeFromLeft (variationsWidth) : juce::Rectangle<int>();
-        macros = r != nullptr && r->showMacros ? area.removeFromLeft (macroColumns() * macroWidth + 8) : juce::Rectangle<int>();
-        pads = r != nullptr && r->drum && r->showPads ? area.removeFromLeft (padsWidth) : juce::Rectangle<int>();
+        variations = r != nullptr && r->showVariations ? cut (area.removeFromLeft (variationsWidth)) : juce::Rectangle<int>();
+        macros = r != nullptr && r->showMacros ? cut (area.removeFromLeft (macroColumns() * macroWidth + 8)) : juce::Rectangle<int>();
+        pads = r != nullptr && r->drum && r->showPads ? cut (area.removeFromLeft (padsWidth)) : juce::Rectangle<int>();
         if (! pads.isEmpty())
         {
             auto inner = pads.reduced (6);
@@ -560,10 +735,12 @@ struct RackView::Impl
         }
         else
             overview = padGrid = {};
-        chains = r != nullptr && r->showChains ? area.removeFromLeft (chainsWidth (*r)) : juce::Rectangle<int>();
-        zones = r != nullptr && r->showChains && r->zoneEditor >= 0 ? area.removeFromLeft (zoneWidth) : juce::Rectangle<int>();
+        chains = r != nullptr && r->showChains ? cut (area.removeFromLeft (chainsWidth (*r))) : juce::Rectangle<int>();
+        zones = r != nullptr && r->showChains && r->zoneEditor >= 0 ? cut (area.removeFromLeft (zoneWidth)) : juce::Rectangle<int>();
         devices = r != nullptr && r->showDevices ? area : juce::Rectangle<int>();
-        deviceScroll = r != nullptr ? juce::jlimit (0, std::max (0, devicesContentWidth (*r) - devices.getWidth()), deviceScroll) : 0;
+        deviceScroll = r != nullptr && ! inlineShown() ? juce::jlimit (0, std::max (0, devicesContentWidth (*r) - devices.getWidth()), deviceScroll) : 0;
+        if (r != nullptr)
+            layoutInline (*r);
 
         // the macro knobs: 2 rows (Live: 2 × 4 for 8 shown), a Map button under each in Map mode
         const auto shownCount = r != nullptr ? r->shownMacros : 0;
@@ -602,6 +779,12 @@ struct RackView::Impl
         return { rowsArea.getX() + (m % cols) * macroWidth, rowsArea.getY() + (m / cols) * cellH, macroWidth, cellH };
     }
 
+    // a macro's Map button (Map mode): under its value, 13 px (Live's pill)
+    juce::Rectangle<int> mapButton (int m) const
+    {
+        const auto cell = macroCell (m);
+        return cell.withTrimmedTop (cell.getHeight() - 15).reduced (8, 1);
+    }
     juce::Rectangle<int> powerLed() const { return { header.getX() + 7, header.getCentreY() - 5, 10, 10 }; }
     juce::Rectangle<int> columnButton (int k) const
     {
@@ -752,8 +935,16 @@ struct RackView::Impl
     void paint (juce::Graphics& g)
     {
         const auto live = theme::livelook::active();
-        g.fillAll (live ? theme::livelook::surface : col::bg2);
         const auto* r = rack();
+        if (const auto top = ownTop(); top > 0 && r != nullptr) // (round 190nc: the title strip stays the Device View's)
+        {
+            g.setColour (theme::livelook::surface);
+            g.fillRect (0, top, devices.getX(), owner.getHeight() - top);
+            g.setColour (theme::livelook::separator);
+            g.fillRect (devices);
+        }
+        else
+            g.fillAll (live ? theme::livelook::surface : col::bg2);
         if (r == nullptr)
             return;
         g.setFont (theme::font (theme::type::caption));
@@ -829,7 +1020,12 @@ struct RackView::Impl
         if (! zones.isEmpty())
             paintZones (g, *r);
         if (! devices.isEmpty())
-            paintDevices (g, *r);
+        {
+            if (inlineShown())
+                paintInline (g, *r);
+            else
+                paintDevices (g, *r);
+        }
         if (! mapList.isEmpty())
             paintMapList (g, *r);
         if (dropMarkerX >= 0 && ! devices.isEmpty()) // (round 190hr: where a dragged device lands)
@@ -909,7 +1105,17 @@ struct RackView::Impl
             valueRow = valueRow.removeFromBottom (13);
             g.setColour (live ? theme::livelook::text : mapped ? col::textPrimary : col::textSecondary);
             g.drawFittedText (macroText (m, r.macros[(std::size_t) m].value), valueRow, juce::Justification::centred, 1, 0.8f);
-            if (owner.mapping)
+            if (owner.mapping && live) // round 190nc: Live's Map pill (190my l8 x 274..316 y 889..901)
+            {
+                const auto button = mapButton (m).toFloat();
+                g.setColour (liveMapWellRim);
+                g.fillRoundedRectangle (button, button.getHeight() * 0.5f);
+                g.setColour (theme::livelook::well);
+                g.fillRoundedRectangle (button.reduced (1.0f), button.getHeight() * 0.5f - 1.0f);
+                g.setColour (theme::livelook::text);
+                g.drawText (tr ("Map"), button, juce::Justification::centred);
+            }
+            else if (owner.mapping)
             {
                 auto button = cell.withTrimmedTop (cell.getHeight() - 15).reduced (8, 1).toFloat();
                 g.setColour (col::accentMuted);
@@ -1038,6 +1244,14 @@ struct RackView::Impl
                 g.setColour (col::textPrimary);
                 g.drawText (volumeText (chain.volume), cells.vol, juce::Justification::centred);
                 g.drawText (panText (chain.pan), cells.pan, juce::Justification::centred);
+                if (owner.mapping && inlineLook() && ! isReturn) // round 190nc: mappable in Map mode (Live tints them green)
+                {
+                    g.setColour (liveMapTint);
+                    g.fillRect (cells.vol);
+                    g.fillRect (cells.pan);
+                    if (picked && picked->chain == slot && picked->target != RackMapping::Target::param)
+                        paintBrackets (g, picked->target == RackMapping::Target::chainVolume ? cells.vol : cells.pan);
+                }
             }
             auto led = cells.led.toFloat().withSizeKeepingCentre (9.0f, 9.0f);
             g.setColour (chain.active ? col::ledOn : col::ledOff);
@@ -1350,8 +1564,246 @@ struct RackView::Impl
         g.setFont (theme::font (theme::type::caption));
     }
 
+    // --- round 190nc (DL-95): the chain's devices inline, in Live's device chrome --------------------------------------
+    static void paintBrackets (juce::Graphics& g, juce::Rectangle<int> box)
+    {
+        // Live's picked parameter (190my B2): four L-shaped corners, 7 px arms, 1 px, #919191
+        g.setColour (liveMapBracket);
+        const auto x0 = box.getX(), y0 = box.getY(), x1 = box.getRight() - 1, y1 = box.getBottom() - 1;
+        g.fillRect (x0, y0, 7, 1), g.fillRect (x0, y0, 1, 7);
+        g.fillRect (x1 - 6, y0, 7, 1), g.fillRect (x1, y0, 1, 7);
+        g.fillRect (x0, y1, 7, 1), g.fillRect (x0, y1 - 6, 1, 7);
+        g.fillRect (x1 - 6, y1, 7, 1), g.fillRect (x1, y1 - 6, 1, 7);
+    }
+
+    void paintInline (juce::Graphics& g, const RackDoc& r)
+    {
+        namespace ll = theme::livelook;
+        const juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (devices);
+        for (const auto& c : inlineCards)
+            if (g.clipRegionIntersects (c.box))
+                paintInlineCard (g, r, c);
+        if (! inlineAdd.isEmpty() && g.clipRegionIntersects (inlineAdd))
+        {
+            const bool hot = inlineAdd.contains (owner.getMouseXYRelative()) && owner.isMouseOver();
+            g.setColour (hot ? ll::raised : ll::surface);
+            g.fillRoundedRectangle (inlineAdd.toFloat(), 3.0f);
+            g.setColour (hot ? col::textPrimary : ll::text);
+            if (inlineCards.empty()) // (an empty chain: Live's drop area, "Drop Audio Effects Here")
+            {
+                g.setFont (theme::font (theme::type::small));
+                g.drawFittedText (emptyPadPane (r)                         ? tr ("Drop an instrument or sample here")
+                                  : r.kind == RackDoc::Kind::instrument ? tr ("Drop an instrument or effect here")
+                                                                         : tr ("Drop effects here"),
+                                  inlineAdd.reduced (10), juce::Justification::centred, 3);
+            }
+            else
+            {
+                g.setFont (theme::font (22.0f));
+                g.drawText ("+", inlineAdd, juce::Justification::centred, false);
+            }
+        }
+    }
+
+    void paintInlineCard (juce::Graphics& g, const RackDoc& r, const InlineCard& c)
+    {
+        namespace ll = theme::livelook;
+        const auto& node = shown.nodes[(std::size_t) c.node];
+        const bool on = node.generator || node.effect.enabled;
+        const bool selected = c.node == selectedNode;
+        const auto box = c.box.toFloat();
+        const auto bar = selected ? ll::selectionUnfocused : ll::raised;
+        g.setColour (c.folded ? bar : ll::surface);
+        g.fillRoundedRectangle (box, 3.0f);
+        if (! c.folded)
+        {
+            juce::Path title;
+            title.addRoundedRectangle (box.getX(), box.getY(), box.getWidth(), (float) inlineTitle, 3.0f, 3.0f, true, true, false, false);
+            g.setColour (bar);
+            g.fillPath (title);
+        }
+        ll::drawPower (g, inlineLed (c).toFloat(), on);
+        g.setColour (selected ? ll::ink : ll::text);
+        g.setFont (theme::font (theme::type::small));
+        if (c.folded)
+        {
+            drawSideways (g, nodeName (c.node), c.box.withTrimmedTop (inlineTitle));
+            return;
+        }
+        g.drawText (nodeName (c.node), inlineTitleBar (c).withTrimmedLeft (20).withTrimmedRight (20), juce::Justification::centredLeft, true);
+        {
+            // the window well: a small frame with its title band (the Device View's)
+            const auto well = inlineWindow (c).toFloat();
+            g.setColour (ll::drawWell (g, well, false));
+            const auto f = juce::Rectangle<float> (7.0f, 6.0f).withCentre (well.getCentre());
+            g.drawRect (f, 1.0f);
+            g.fillRect (f.withHeight (2.0f));
+        }
+        const auto body = [&] {
+            if (c.params.empty()) // a plugin, an instrument, a rack: its name in a well (its own window has its controls)
+            {
+                const auto area = c.box.withTrimmedTop (inlineTitle + 6).reduced (8, 0).withHeight (80);
+                g.setColour (ll::well);
+                g.fillRect (area);
+                g.setColour (col::textSecondary);
+                g.setFont (theme::font (theme::type::small, true));
+                g.drawFittedText (nodeName (c.node), area.reduced (6), juce::Justification::centred, 2);
+                return;
+            }
+            const auto& info = effectInfo (node.effect.kind);
+            for (int k = 0; k < (int) c.params.size(); ++k)
+            {
+                const auto p = c.params[(std::size_t) k];
+                const auto cell = inlineKnob (c, k);
+                int mappedIndex = -1;
+                const auto macro = rack::macroOf (r, paramMapping (c.node, p), &mappedIndex);
+                const auto mapping = owner.mapping;
+                if (mapping)
+                {
+                    g.setColour (macro >= 0 ? liveMapped : liveMappable);
+                    g.fillRect (cell);
+                }
+                const auto hot = knobNode == c.node && knobParam == p;
+                auto rr = cell;
+                g.setColour (hot ? col::textPrimary : ll::text);
+                g.setFont (theme::font (theme::type::small));
+                g.drawText (str (info.params[(std::size_t) p].name), rr.removeFromTop (14), juce::Justification::centred, true);
+                const auto knob = rr.removeFromTop (30).toFloat().withSizeKeepingCentre (27.0f, 27.0f);
+                const auto dim = macro >= 0; // (a macro drives it: Live greys it)
+                if (dim)
+                    g.beginTransparencyLayer (0.5f);
+                ll::drawKnob (g, knob, nodeValue (c.node, p), std::clamp (info.params[(std::size_t) p].defaultValue, 0.0f, 1.0f));
+                g.setColour (hot ? col::textPrimary : ll::text);
+                g.drawText (nodeValueText (c.node, p), rr.removeFromTop (14), juce::Justification::centred, true);
+                if (dim)
+                    g.endTransparencyLayer();
+                if (mapping && macro >= 0) // "M n" at the top right
+                {
+                    const auto label = juce::Rectangle<int> (cell.getRight() - 21, cell.getY(), 21, 13);
+                    g.setColour (liveMapWell);
+                    g.fillRect (label);
+                    g.setColour (ll::raised);
+                    g.fillRect (label.reduced (1));
+                    g.setColour (ll::text);
+                    g.setFont (theme::font (theme::type::small));
+                    g.drawText ("M " + juce::String (macro + 1), label, juce::Justification::centred, false);
+                }
+                if (mapping && picked && picked->target == RackMapping::Target::param && picked->node == c.node && picked->param == p)
+                    paintBrackets (g, cell);
+            }
+        };
+        if (on)
+            body();
+        else // switched off: its controls dim (the Device View's)
+        {
+            g.beginTransparencyLayer (0.45f);
+            body();
+            g.endTransparencyLayer();
+        }
+    }
+
+    // round 190nc: the Macro Mappings list in Live's look (190mv mm6 / 190my l8, the Browser's place)
+    // Live's column widths (453 px wide there), scaled down when the Browser is narrower so Min and Max stay in view
+    std::array<int, 5> liveMapColumns() const
+    {
+        std::array<int, 5> w {};
+        const auto total = 442, have = std::max (120, mapList.getWidth() - 8);
+        for (int k = 0; k < 5; ++k)
+            w[(std::size_t) k] = have >= total ? liveMapWidths[k] : liveMapWidths[k] * have / total;
+        return w;
+    }
+    juce::Rectangle<int> liveMapRow (int i) const { return { mapList.getX(), mapList.getY() + liveMapTitle + liveMapHeader + i * liveMapPitch, mapList.getWidth(), liveMapPitch - 1 }; }
+    juce::String mappingValueText (const RackMapping& x, float v) const
+    {
+        if (x.target == RackMapping::Target::chainVolume)
+            return volumeText (rack::volumeGain (v));
+        if (x.target == RackMapping::Target::chainPan)
+            return panText (v * 2.0f - 1.0f);
+        if (x.target == RackMapping::Target::selector)
+            return juce::String (juce::roundToInt (v * 127.0f));
+        if (x.node >= 0 && x.node < (int) shown.nodes.size())
+        {
+            const auto& node = shown.nodes[(std::size_t) x.node];
+            if (! node.generator && node.effect.kind != EffectKind::plugin && node.effect.kind != EffectKind::patcher)
+                if (const auto text = str (formatEffectParam (node.effect.kind, x.param, v, engine.getSong().bpm)); text.isNotEmpty())
+                    return text;
+        }
+        return juce::String (juce::roundToInt (v * 100.0f)) + " %";
+    }
+    void paintMapListLive (juce::Graphics& g, const RackDoc& r)
+    {
+        namespace ll = theme::livelook;
+        g.setColour (ll::surface);
+        g.fillRect (mapList);
+        g.setFont (theme::font (theme::type::small));
+        g.setColour (ll::text);
+        g.drawText (tr ("Macro Mappings"), mapList.withHeight (liveMapTitle).withTrimmedLeft (6), juce::Justification::centredLeft, true);
+        const auto head = juce::Rectangle<int> (mapList.getX(), mapList.getY() + liveMapTitle, mapList.getWidth(), liveMapHeader);
+        g.setColour (ll::raised);
+        g.fillRect (head);
+        const juce::String titles[] { tr ("Macro"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") };
+        const auto widths = liveMapColumns();
+        auto x = mapList.getX();
+        for (int k = 0; k < 5; ++k)
+        {
+            const auto cell = juce::Rectangle<int> (x, head.getY(), widths[(std::size_t) k], head.getHeight());
+            g.setColour (ll::text);
+            g.setFont (theme::font (theme::type::small, true));
+            g.drawFittedText (titles[k], cell.reduced (4, 0).withTrimmedRight (k == 0 ? 12 : 0), juce::Justification::centredLeft, 1, 0.75f);
+            if (k == 0) // (Live sorts by macro: its ▲, rows of whole pixels)
+            {
+                g.setColour (juce::Colour (0xff5c5c5c));
+                for (int row = 0; row < 4; ++row)
+                    g.fillRect (cell.getRight() - 12 + 3 - row, cell.getCentreY() - 2 + row, 1 + 2 * row, 1);
+            }
+            x += widths[(std::size_t) k];
+            g.setColour (liveListLine);
+            g.fillRect (x - 1, head.getY() + 3, 1, head.getHeight() - 6);
+        }
+        int i = 0;
+        for (int m = 0; m < rackMacroCount; ++m)
+            for (const auto& mp : r.macros[(std::size_t) m].mappings)
+            {
+                const auto row = liveMapRow (i++);
+                if (row.getBottom() > mapList.getBottom())
+                    return;
+                g.setColour (ll::separator);
+                g.fillRect (row.getX(), row.getBottom(), row.getWidth(), 1);
+                auto cells = row;
+                const auto macroCellArea = cells.removeFromLeft (widths[0]);
+                g.setColour (ll::padName); // (the macro's plate: mapped)
+                g.fillRect (macroCellArea);
+                g.setColour (ll::ink);
+                g.setFont (theme::font (theme::type::small));
+                g.drawText (macroName (m), macroCellArea.reduced (5, 0), juce::Justification::centredLeft, true);
+                g.setColour (ll::text);
+                g.drawText (mappingPath (mp).fromLastOccurrenceOf (" | ", false, false), cells.removeFromLeft (widths[1]).reduced (4, 0), juce::Justification::centredLeft, true);
+                g.drawText (mappingName (mp), cells.removeFromLeft (widths[2]).reduced (4, 0), juce::Justification::centredLeft, true);
+                for (const auto low : { true, false })
+                {
+                    const auto column = cells.removeFromLeft (widths[low ? 3 : 4]);
+                    const auto field = column.withSizeKeepingCentre (std::min (48, column.getWidth() - 2), 13);
+                    g.setColour (liveMapWellRim);
+                    g.fillRect (field);
+                    g.setColour (low ? liveMinField : liveMaxField);
+                    g.fillRect (field.reduced (1));
+                    g.setColour (ll::text);
+                    g.drawFittedText (mappingValueText (mp, low ? mp.min : mp.max), field.reduced (1, 0), juce::Justification::centred, 1, 0.7f);
+                }
+            }
+        if (i == 0)
+        {
+            g.setColour (ll::text.withAlpha (0.6f));
+            g.drawFittedText (tr ("Click a device parameter, then a macro's Map button"), mapList.withTrimmedTop (liveMapTitle + liveMapHeader + 8).reduced (8, 0),
+                              juce::Justification::centredTop, 2);
+        }
+    }
+
     void paintMapList (juce::Graphics& g, const RackDoc& r)
     {
+        if (theme::livelook::active())
+            return paintMapListLive (g, r);
         g.setColour (col::bg1);
         g.fillRect (mapList);
         auto head = mapList.withHeight (22).reduced (4, 2);
@@ -1421,7 +1873,13 @@ struct RackView::Impl
         if (macros.contains (p) && owner.mapping)
             for (int m = 0; m < r->shownMacros; ++m)
                 if (macroCell (m).withTrimmedTop (macroCell (m).getHeight() - 15).contains (p))
+                {
+                    // round 190nc (Live, 190my B2): a parameter picked first goes to this macro; nothing picked: LYNX's
+                    // menu of what it can drive
+                    if (picked && ! e.mods.isPopupMenu())
+                        return mapPicked (m);
                     return showMapMenu (m);
+                }
         if (macros.contains (p) && e.mods.isPopupMenu())
             for (int m = 0; m < r->shownMacros; ++m)
                 if (macroCell (m).withHeight (16).contains (p))
@@ -1433,9 +1891,86 @@ struct RackView::Impl
         if (zones.contains (p))
             return zonesDown (e, *r);
         if (devices.contains (p))
-            return devicesDown (e, *r);
+            return inlineShown() ? inlineDown (e, *r) : devicesDown (e, *r);
         if (mapList.contains (p))
             return mapListDown (e, *r);
+    }
+
+    // round 190nc (DL-95): a click on the inline devices — the power disc, the window well, the title (select; double-click
+    // folds), a knob (drag; double-click / Alt resets; Map mode: picks it), "+" / the drop area (add)
+    void inlineDown (const juce::MouseEvent& e, const RackDoc& r)
+    {
+        const auto p = e.getPosition();
+        for (const auto& c : inlineCards)
+        {
+            if (! c.box.contains (p))
+                continue;
+            const auto n = c.node;
+            if (e.mods.isPopupMenu())
+                return showDeviceMenu (r.selectedChain, c.position, n);
+            const auto& node = shown.nodes[(std::size_t) n];
+            if (inlineLed (c).expanded (2).contains (p))
+            {
+                if (! node.generator)
+                    edit ([n] (PatcherDoc& d) {
+                        if (n < (int) d.nodes.size())
+                        {
+                            d.nodes[(std::size_t) n].effect.enabled = ! d.nodes[(std::size_t) n].effect.enabled;
+                            rack::compile (d);
+                        }
+                    });
+                return;
+            }
+            if (! c.folded && inlineWindow (c).contains (p))
+                return openDevice (n);
+            if (c.folded || inlineTitleBar (c).contains (p))
+            {
+                selectedNode = n;
+                if (e.getNumberOfClicks() > 1)
+                    toggleFold (n);
+                owner.repaint();
+                return;
+            }
+            for (int k = 0; k < (int) c.params.size(); ++k)
+            {
+                if (! inlineKnob (c, k).contains (p))
+                    continue;
+                const auto param = c.params[(std::size_t) k];
+                if (owner.mapping) // (Live: picking leaves the device's selection as it is, 190my l8)
+                    return pick (paramMapping (n, param));
+                selectedNode = n;
+                if (rack::macroOf (r, paramMapping (n, param)) >= 0) // (a macro drives it)
+                    return;
+                if (ui::isResetClick (e) || e.getNumberOfClicks() > 1)
+                {
+                    setNodeValue (n, param, std::clamp (effectInfo (node.effect.kind).params[(std::size_t) param].defaultValue, 0.0f, 1.0f), true);
+                    return;
+                }
+                drag = Drag::inlineKnob;
+                knobNode = n, knobParam = param;
+                dragStartValue = nodeValue (n, param);
+                setNodeValue (n, param, dragStartValue, true); // (the drag's one undo step)
+                ui::postHint ({ str (effectInfo (node.effect.kind).params[(std::size_t) param].name), nodeValueText (n, param), false, false }, 1200);
+                owner.repaint();
+                return;
+            }
+            selectedNode = n;
+            owner.repaint();
+            return;
+        }
+        if (inlineAdd.contains (p))
+        {
+            if (emptyPadPane (r))
+                return showPadAddMenu (emptyPadKey >= 0 ? emptyPadKey : firstFreeKey (r));
+            showAddMenu (r.selectedChain);
+        }
+    }
+    void toggleFold (int n)
+    {
+        if (foldedNodes.erase (n) == 0)
+            foldedNodes.insert (n);
+        owner.resized(); // (the rack's width changes: the Device View lays its chain out again)
+        owner.repaint();
     }
 
     void variationsDown (const juce::MouseEvent& e, const RackDoc& r)
@@ -1492,6 +2027,15 @@ struct RackView::Impl
             const auto cells = rowCells (r, row, isReturn);
             emptyPadKey = -1;
             edit ([c] (PatcherDoc& d) { rack::rackOf (d)->selectedChain = c; }, false);
+            if (owner.mapping && inlineLook() && ! isReturn && (cells.vol.contains (p) || cells.pan.contains (p))) // (round 190nc)
+            {
+                RackMapping x;
+                x.chain = c;
+                x.target = cells.vol.contains (p) ? RackMapping::Target::chainVolume : RackMapping::Target::chainPan;
+                if (x.target == RackMapping::Target::chainVolume)
+                    x.min = 0.0f, x.max = rack::unityVolume;
+                return pick (x);
+            }
             if (cells.led.contains (p))
                 return edit ([c, on = ! chain.active] (PatcherDoc& d) { rack::setActive (d, c, on); });
             if (cells.solo.contains (p))
@@ -1731,11 +2275,12 @@ struct RackView::Impl
 
     void mapListDown (const juce::MouseEvent& e, const RackDoc& r)
     {
+        const auto live = theme::livelook::active(); // (round 190nc: Live's columns)
         int i = 0;
         for (int m = 0; m < rackMacroCount; ++m)
             for (int k = 0; k < (int) r.macros[(std::size_t) m].mappings.size(); ++k)
             {
-                auto row = mapRow (i++);
+                auto row = live ? liveMapRow (i++) : mapRow (i++);
                 if (! row.contains (e.getPosition()))
                     continue;
                 if (e.mods.isPopupMenu())
@@ -1746,8 +2291,9 @@ struct RackView::Impl
                     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner));
                     return;
                 }
-                row.removeFromLeft (66 + 104 + 84);
-                const auto minCell = row.removeFromLeft (34), maxCell = row.removeFromLeft (34);
+                const auto lw = liveMapColumns();
+                row.removeFromLeft (live ? lw[0] + lw[1] + lw[2] : 66 + 104 + 84);
+                const auto minCell = row.removeFromLeft (live ? lw[3] : 34), maxCell = row.removeFromLeft (live ? lw[4] : 34);
                 const auto& x = r.macros[(std::size_t) m].mappings[(std::size_t) k];
                 if (minCell.contains (e.getPosition()) || maxCell.contains (e.getPosition()))
                 {
@@ -1786,6 +2332,14 @@ struct RackView::Impl
                 edit ([v = std::clamp ((float) (e.getPosition().x - s.getX()) / (float) s.getWidth(), 0.0f, 1.0f)] (PatcherDoc& d) { rack::setMorph (d, v); }, false);
                 break;
             }
+            case Drag::inlineKnob: // round 190nc: 200 px for the whole range (Ctrl: fine)
+                if (knobNode >= 0)
+                {
+                    setNodeValue (knobNode, knobParam, dragStartValue + dy / 200.0f, false);
+                    const auto& node = shown.nodes[(std::size_t) knobNode];
+                    ui::postHint ({ str (effectInfo (node.effect.kind).params[(std::size_t) knobParam].name), nodeValueText (knobNode, knobParam), false, false }, 1200);
+                }
+                break;
             case Drag::mapMin:
             case Drag::mapMax:
             {
@@ -1860,6 +2414,13 @@ struct RackView::Impl
 
     void mouseUp (const juce::MouseEvent& e)
     {
+        if (drag == Drag::inlineKnob) // (round 190nc: its undo step was made when it began)
+        {
+            knobNode = knobParam = -1;
+            drag = Drag::none;
+            owner.repaint();
+            return;
+        }
         if (previewKey >= 0) // (a pad's Play button let go: the note ends)
         {
             if (const auto channel = channelOfRack(); channel >= 0)
@@ -2177,6 +2738,8 @@ struct RackView::Impl
     void showDeviceMenu (int chain, int position, int node)
     {
         juce::PopupMenu menu;
+        if (inlineShown()) // round 190nc: an inline device folds as the Device View's devices do
+            menu.addItem (foldedNodes.count (node) > 0 ? tr ("Unfold") : tr ("Fold"), [this, node] { toggleFold (node); });
         menu.addItem (tr ("Edit"), [this, node] { openDevice (node); });
         menu.addItem (tr ("Move left"), position > 0, false, [this, chain, position] { edit ([chain, position] (PatcherDoc& d) { rack::moveDevice (d, chain, position, position - 1); }); });
         menu.addItem (tr ("Move right"), true, false, [this, chain, position] { edit ([chain, position] (PatcherDoc& d) { rack::moveDevice (d, chain, position, position + 1); }); });
@@ -2210,7 +2773,7 @@ struct RackView::Impl
             return -1;
         const auto n = (int) shownDevices (r).size();
         for (int i = 0; i < n; ++i)
-            if (p.x < deviceCard (i).getCentreX())
+            if (p.x < deviceBox (i).getCentreX())
                 return i;
         return -1;
     }
@@ -2902,9 +3465,10 @@ std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
             g.drawText ("R", wellOf (0), juce::Justification::centred, false);
             const auto m = wellOf (1);
             const bool lit = map.getToggleState();
-            g.setColour (ll::wellRim);
+            // round 190nc: lit in Live's Map green #00DA48 in a #111111 rim (190my l8 x 312..324 y 809..821)
+            g.setColour (lit ? liveMapWellRim : ll::wellRim);
             g.fillRoundedRectangle (m, 2.0f);
-            g.setColour (lit ? ll::on : ll::well);
+            g.setColour (lit ? liveMapWell : ll::well);
             g.fillRoundedRectangle (m.reduced (1.0f), 1.5f);
             g.setColour (lit ? ll::ink : ll::text);
             g.drawText ("M", m, juce::Justification::centred, false);
@@ -2943,6 +3507,13 @@ std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
         if (safe != nullptr)
             safe->setMapMode (m->getToggleState());
     };
+    // (round 190nc: Map mode can end from elsewhere — another rack mapping, a check: the M follows it)
+    impl->syncAccessory = [button = &a->map, owner = juce::Component::SafePointer<juce::Component> (a.get())] (bool on) {
+        if (owner == nullptr)
+            return;
+        button->setToggleState (on, juce::dontSendNotification);
+        owner->repaint();
+    };
     return a;
 }
 
@@ -2979,46 +3550,171 @@ void RackView::setPowerSwitch (std::function<bool()> isOn, std::function<void()>
     repaint();
 }
 
+namespace
+{
+std::function<juce::Component*()> mappingsHostFn;   // round 190nc: rackcards::setMappingsHost
+juce::Component::SafePointer<RackView> mappingRack; // the Device View rack in Map mode (one at a time, as Live)
+
+// Round 190nc (DL-95): Live's Macro Mappings list over the Browser (its place in Live, 190mv mm6), drawn and handled by
+// the rack view; it follows the host's size and goes with Map mode
+struct MappingsPanel final : juce::Component, private juce::ComponentListener
+{
+    juce::Component::SafePointer<juce::Component> host;
+    std::function<void (juce::Graphics&, juce::Rectangle<int>)> paintList;
+    std::function<void (const juce::MouseEvent&, juce::Rectangle<int>, int)> mouse; // (0 down, 1 drag, 2 up)
+    explicit MappingsPanel (juce::Component& h) : host (&h)
+    {
+        setTitle (tr ("Macro Mappings"));
+        h.addAndMakeVisible (*this);
+        toFront (false);
+        h.addComponentListener (this);
+        setBounds (h.getLocalBounds());
+    }
+    ~MappingsPanel() override
+    {
+        if (host != nullptr)
+        {
+            host->removeComponentListener (this);
+            host->removeChildComponent (this);
+        }
+    }
+    void componentMovedOrResized (juce::Component& c, bool, bool) override { setBounds (c.getLocalBounds()); }
+    void paint (juce::Graphics& g) override { paintList (g, getLocalBounds()); }
+    void mouseDown (const juce::MouseEvent& e) override { mouse (e, getLocalBounds(), 0); }
+    void mouseDrag (const juce::MouseEvent& e) override { mouse (e, getLocalBounds(), 1); }
+    void mouseUp (const juce::MouseEvent& e) override { mouse (e, getLocalBounds(), 2); }
+};
+} // namespace
+
 void RackView::setMapMode (bool on)
 {
+    if (on && ! impl->ownHeader && mappingRack != nullptr && mappingRack.getComponent() != this) // (one rack maps at a time)
+        mappingRack->setMapMode (false);
     mapping = on;
     impl->map.setToggleState (on, juce::dontSendNotification);
+    if (impl->syncAccessory)
+        impl->syncAccessory (on);
+    impl->picked.reset();
+    impl->mappingsPanel.reset();
+    if (! impl->ownHeader)
+        mappingRack = on ? this : nullptr;
     resized();
     repaint();
-    if (on && ! impl->ownHeader && isShowing())
+    if (! on || impl->ownHeader)
+        return;
+    juce::Component::SafePointer<RackView> safe (this);
+    auto paintList = [safe] (juce::Graphics& g, juce::Rectangle<int> area) {
+        if (safe == nullptr || safe->impl->rack() == nullptr)
+            return;
+        const auto saved = safe->impl->mapList;
+        safe->impl->mapList = area;
+        safe->impl->paintMapList (g, *safe->impl->rack());
+        safe->impl->mapList = saved;
+    };
+    auto mouse = [safe] (const juce::MouseEvent& e, juce::Rectangle<int> area, int phase) {
+        if (safe == nullptr || safe->impl->rack() == nullptr)
+            return;
+        auto& impl = *safe->impl;
+        const auto saved = impl.mapList;
+        impl.mapList = area;
+        impl.dragStart = phase == 0 ? e.getPosition() : impl.dragStart;
+        if (phase == 0)
+        {
+            impl.drag = Impl::Drag::none;
+            impl.mapListDown (e, *impl.rack());
+        }
+        else if (phase == 1)
+            impl.mouseDrag (e);
+        else
+            impl.mouseUp (e);
+        impl.mapList = saved;
+    };
+    // Live's look: the list in the Browser's place (round 190nc), else beside the rack (decision R2)
+    if (auto* host = impl->inlineLook() && mappingsHostFn ? mappingsHostFn() : nullptr; host != nullptr)
+    {
+        auto panel = std::make_unique<MappingsPanel> (*host);
+        panel->paintList = paintList;
+        panel->mouse = mouse;
+        impl->mappingsPanel = std::move (panel);
+        return;
+    }
+    if (isShowing())
     {
         auto popup = std::make_unique<MapListPopup>();
         popup->view = this;
-        juce::Component::SafePointer<RackView> safe (this);
-        popup->paintList = [safe] (juce::Graphics& g, juce::Rectangle<int> area) {
-            if (safe == nullptr || safe->impl->rack() == nullptr)
-                return;
-            const auto saved = safe->impl->mapList;
-            safe->impl->mapList = area;
-            safe->impl->paintMapList (g, *safe->impl->rack());
-            safe->impl->mapList = saved;
-        };
-        popup->mouse = [safe] (const juce::MouseEvent& e, juce::Rectangle<int> area, int phase) {
-            if (safe == nullptr || safe->impl->rack() == nullptr)
-                return;
-            auto& impl = *safe->impl;
-            const auto saved = impl.mapList;
-            impl.mapList = area;
-            impl.dragStart = phase == 0 ? e.getPosition() : impl.dragStart;
-            if (phase == 0)
-            {
-                impl.drag = Impl::Drag::none;
-                impl.mapListDown (e, *impl.rack());
-            }
-            else if (phase == 1)
-                impl.mouseDrag (e);
-            else
-                impl.mouseUp (e);
-            impl.mapList = saved;
-        };
+        popup->paintList = paintList;
+        popup->mouse = mouse;
         juce::CallOutBox::launchAsynchronously (std::move (popup), getScreenBounds().withWidth (40), nullptr);
     }
 }
+
+bool RackView::showsDevicesInline() const { return impl->inlineShown(); }
+int RackView::titleBarWidth() const
+{
+    const auto* r = impl->rack();
+    return r != nullptr && impl->inlineShown() ? impl->ownPartWidth (*r) : 0;
+}
+bool RackView::hitTest (int x, int y)
+{
+    if (const auto top = impl->ownTop(); top > 0 && y < top && x < titleBarWidth())
+        return false;
+    return juce::Component::hitTest (x, y);
+}
+ui::Hint RackView::hintAt (juce::Point<int> p)
+{
+    auto& in = *impl;
+    const auto* r = in.rack();
+    if (r == nullptr || ! in.inlineLook())
+        return {};
+    if (mapping && in.macros.contains (p))
+        for (int m = 0; m < r->shownMacros; ++m)
+            if (in.mapButton (m).contains (p))
+                return { tr ("Map: click a device parameter first, then this button to give it to this macro. Its range is set in the Macro Mappings list"),
+                         {}, false, true };
+    for (const auto& c : in.inlineCards)
+    {
+        if (! c.box.contains (p))
+            continue;
+        const auto name = in.nodeName (c.node);
+        if (Impl::inlineLed (c).expanded (2).contains (p))
+            return { tr ("Device on / off"), name, false, false };
+        if (! c.folded && Impl::inlineWindow (c).contains (p))
+            return { tr ("Show or hide the window"), name, false, false };
+        for (int k = 0; k < (int) c.params.size(); ++k)
+            if (Impl::inlineKnob (c, k).contains (p))
+            {
+                const auto param = c.params[(std::size_t) k];
+                const auto& node = in.shown.nodes[(std::size_t) c.node];
+                const auto label = str (effectInfo (node.effect.kind).params[(std::size_t) param].name);
+                if (mapping)
+                    return { tr ("Click to pick this parameter, then press a macro's Map button"), label, false, false };
+                if (const auto m = rack::macroOf (*r, in.paramMapping (c.node, param)); m >= 0)
+                    return { tr ("Driven by {0}", { in.macroName (m) }), label + ": " + in.nodeValueText (c.node, param), false, false };
+                return { label, in.nodeValueText (c.node, param), false, false };
+            }
+        return { tr ("Click: select. Double-click the title: fold / unfold. Right-click: its menu"), name, false, true };
+    }
+    return {};
+}
+int RackView::inlineDeviceCountForCheck() const { return (int) impl->inlineCards.size(); }
+juce::Rectangle<int> RackView::inlineDeviceBoundsForCheck (int device) const
+{
+    return device >= 0 && device < (int) impl->inlineCards.size() ? impl->inlineCards[(std::size_t) device].box : juce::Rectangle<int>();
+}
+juce::Rectangle<int> RackView::inlineKnobBoundsForCheck (int device, int knob) const
+{
+    if (device < 0 || device >= (int) impl->inlineCards.size())
+        return {};
+    const auto& c = impl->inlineCards[(std::size_t) device];
+    return knob >= 0 && knob < (int) c.params.size() ? Impl::inlineKnob (c, knob) : juce::Rectangle<int>();
+}
+void RackView::toggleInlineFoldForCheck (int device)
+{
+    if (device >= 0 && device < (int) impl->inlineCards.size())
+        impl->toggleFold (impl->inlineCards[(std::size_t) device].node);
+}
+juce::Rectangle<int> RackView::mapButtonBoundsForCheck (int macro) const { return impl->mapButton (macro); }
+juce::Component* RackView::mappingsListForCheck() const { return impl->mappingsPanel.get(); }
 
 void RackView::paint (juce::Graphics& g) { impl->paint (g); }
 void RackView::resized() { impl->place(); }
@@ -3076,7 +3772,7 @@ void RackView::itemDragMove (const SourceDetails& details)
     {
         const auto at = impl->dropPositionAt (*r, details.localPosition);
         const auto n = (int) impl->shownDevices (*r).size();
-        x = (at < 0 ? impl->deviceCard (n) : impl->deviceCard (at)).getX() - 2;
+        x = (at < 0 ? impl->deviceBox (n) : impl->deviceBox (at)).getX() - 2;
     }
     if (x != impl->dropMarkerX)
     {
@@ -3329,7 +4025,14 @@ public:
     int preferredWidth (int bodyHeight) const override
     {
         const auto wanted = view->preferredWidth (bodyHeight);
+        if (view->showsDevicesInline()) // (round 190nc: Live's rack is as wide as its devices; the Device View scrolls)
+            return wanted + 4;
         return widthLimit > 0 ? std::max (std::min (wanted, widthLimit), view->minimumWidth (bodyHeight)) : wanted;
+    }
+    int titleBarWidth() const override
+    {
+        const auto w = view->titleBarWidth();
+        return w > 0 ? w + 2 : 0; // (the body sits 2 px in)
     }
     juce::Component* titleAccessory() override { return accessory.get(); }
     int titleAccessoryWidth() const override { return theme::livelook::active() ? 32 : RackView::titleAccessoryWidth; }
@@ -3340,6 +4043,8 @@ private:
     std::unique_ptr<juce::Component> accessory;
 };
 } // namespace
+
+void setMappingsHost (std::function<juce::Component*()> host) { mappingsHostFn = std::move (host); }
 
 void install()
 {

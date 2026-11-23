@@ -1,10 +1,12 @@
 #include "engine/SandboxWorker.h"
 
 #include <map>
+#include <optional>
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "core/Denormals.h"
+#include "platform/NativeEmbed.h"
 #include "platform/PowerThrottling.h"
 #include "engine/PluginSandbox.h"
 #include "engine/SandboxShared.h"
@@ -385,6 +387,17 @@ void SandboxSlot::handle (const juce::ValueTree& message)
         hang = true;
     else if (message.hasType ("showEditor") && plugin != nullptr && plugin->hasEditor())
     {
+        // FL's wrapper Settings › GUI (round 190oh, P3), as in LYNX's own process (ui/PluginWindow.cpp): "DPI aware" off
+        // makes the window and the editor DPI-unaware (Windows), "Scale editor dimensions" sizes it in logical pixels
+       #if JUCE_WINDOWS
+        const auto unaware = ! (bool) message.getProperty ("dpiAware", true);
+       #else
+        const auto unaware = false;
+       #endif
+        const auto scaleDims = (bool) message.getProperty ("scaleDims", false);
+        std::optional<juce::ScopedDPIAwarenessDisabler> dpi;
+        if (unaware)
+            dpi.emplace();
         if (window == nullptr)
         {
             window = std::make_unique<SandboxWindow> (plugin->getName());
@@ -394,7 +407,11 @@ void SandboxSlot::handle (const juce::ValueTree& message)
                                                     .setProperty ("char", (int) key.getTextCharacter(), nullptr));
             };
             if (auto* ed = plugin->createEditorIfNeeded())
+            {
+                if (unaware || scaleDims)
+                    platform::setEditorScaling (*ed, unaware, scaleDims);
                 window->setContentOwned (ed, true);
+            }
             window->centreWithSize (window->getWidth(), window->getHeight());
         }
         if (! window->isOnDesktop())

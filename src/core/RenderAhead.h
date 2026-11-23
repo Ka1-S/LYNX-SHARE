@@ -142,6 +142,39 @@ struct Stats
     std::atomic<float> probeCpuOff { 0.0f }, probeCpuOn { 0.0f }, probeOverOff { 0.0f }, probeOverOn { 0.0f };
     std::atomic<int> aheadChannels { 0 }, aheadTracks { 0 }, boundary { 0 }, window { 0 };
     std::atomic<bool> engaged { false };
+    // Round 190of (P24, the split CPU meter, like Cubase 14's real-time / prefetch figures): the device callback's own
+    // time in the renderers (the live part, and whatever it had to render of the ahead part itself), the render-ahead
+    // thread's rendering time, and the audio they were for, in ns, counted up while playing or stopped (readers take
+    // differences: share of real time = time / audio)
+    std::atomic<std::uint64_t> liveNs { 0 }, aheadNs { 0 }, audioNs { 0 };
+};
+
+// Round 190of (P24): the split CPU meter's figures between two readings of Stats: the live part and the part rendered
+// ahead as shares of real time (1 = one core for the whole time the audio lasts). Any thread.
+struct SplitLoad
+{
+    double live = 0.0, ahead = 0.0;
+    bool valid = false; // false: no audio was rendered since the last reading
+};
+class SplitLoadReader
+{
+public:
+    SplitLoad take (const Stats& stats) noexcept
+    {
+        const auto live = stats.liveNs.load (std::memory_order_relaxed), ahead = stats.aheadNs.load (std::memory_order_relaxed),
+                   audio = stats.audioNs.load (std::memory_order_relaxed);
+        SplitLoad out;
+        if (audio > lastAudio && live >= lastLive && ahead >= lastAhead)
+        {
+            const auto span = (double) (audio - lastAudio);
+            out = { (double) (live - lastLive) / span, (double) (ahead - lastAhead) / span, true };
+        }
+        lastLive = live, lastAhead = ahead, lastAudio = audio;
+        return out;
+    }
+
+private:
+    std::uint64_t lastLive = 0, lastAhead = 0, lastAudio = 0;
 };
 } // namespace renderahead
 
@@ -189,6 +222,7 @@ public:
     // the touched / released automation slots (RackRenderer::setOverriddenSlots / setReleasedSlots) reach both renderers
     void setOverriddenSlots (const std::vector<int>& slots) noexcept;
     void setReleasedSlots (const std::vector<int>& slots) noexcept;
+    void setKeepReleasedOnPlay (bool keep) noexcept; // (round 190oa, DL-58: both renderers)
     void setProfiling (bool on) noexcept;
     // The render-ahead thread renders nothing more (the engine is going away: its snapshots are about to be freed);
     // returns once it is idle. prepare() lets it work again.

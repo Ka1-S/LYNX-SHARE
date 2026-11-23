@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHARE działa też bez otwierania okna. Jedna opcja renderuje projekt do audio, inne konwertują go do projektu FL Studio albo setu Ableton Live, a kilka służy do testów. Własne testy projektu używają tych samych opcji.
 
@@ -18,7 +18,7 @@ Program nazywa się `LYNX.exe` w Windows i `LYNX` w macOS i Linuksie. W macOS pe
 LYNX.exe project.lynx
 ```
 
-Uruchamia LYNX SHARE z oknem i otwiera plik. Przyjmuje `.lynx`, `.flp`, `.als`, `.flm` i `.mid`. Ścieżka względna jest liczona od bieżącego folderu.
+Uruchamia LYNX SHARE z oknem i otwiera plik. Przyjmuje `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` i `.mid`. Ścieżka względna jest liczona od bieżącego folderu.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ Otwiera projekt `.lynx` bez wczytywania jego pluginów innych producentów, tak 
 
 | Opcja | Co robi |
 |---|---|
-| `--export <project> <out>` | Renderuje cały utwór razem z ogonem, tak jak okno eksportu. Rozszerzenie `<out>` wybiera format: `.wav` (24 bity), `.flac`, `.ogg` lub `.mp3` (320 kb/s) |
+| `--export <project> <out>` | Renderuje cały utwór razem z ogonem, tak jak okno eksportu. Rozszerzenie `<out>` wybiera format: `.wav` (24 bity), `.flac`, `.ogg`, `.mp3` (320 kb/s), `.aif` / `.aiff` (24 bity) lub `.m4a` (192 kb/s, nie w Linuksie) |
 | `--export ... --pattern` | Renderuje tylko bieżący pattern |
 | `--export ... --insert N` | Renderuje tylko wyjście inserta N Mixera |
 | `--export ... --rate N` | Renderuje z inną częstotliwością próbkowania, w Hz |
 | `--stems <project> <base.wav>` | Zapisuje jeden plik WAV na każdy insert Mixera, który ma kanały: `base - 1.wav`, `base - 2.wav` i tak dalej |
 | `--export-flp <project> <out.flp>` | Zapisuje projekt FL Studio. Z `out.zip` zapisuje spakowaną paczkę pętli |
 | `--export-flp ... --substitute` | Zamienia pluginy dostępne tylko w LYNX na najbliższy plugin FL zamiast renderować je do audio |
+| `--export-flm <project> <out.flm>` | Zapisuje projekt FL Studio Mobile i kopiuje sample do folderu `<name> Samples` obok |
 | `--export-als <project> <folder>` | Zapisuje set Ableton Live w `<folder>/<name> Project/<name>.als`, dla Live 12 |
 | `--export-als ... --live11` | Zapisuje set dla Live 11 |
 | `--export-bundle <project> <folder>` | Zapisuje w folderze pakiet z `Plik › Eksportuj › Dla innych aplikacji...` |

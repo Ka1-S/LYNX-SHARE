@@ -1,5 +1,5 @@
 ---
-source: 1b54c6493f
+source: cab9a0b0d1
 ---
 ![Playlist z klipami na ścieżkach](/assets/img/playlist.webp)
 
@@ -115,7 +115,7 @@ Pole aranżacji na pasku narzędzi przełącza między aranżacjami. Projekt mo�
 ## Warto wiedzieć
 
 - Playlist słychać tylko w trybie Song. W trybie Pattern `Space` gra bieżący pattern, niezależnie od tego, co leży na ścieżkach.
-- `Widok › Styl układu › Praca z uruchamianiem klipów` dodaje obok Playlisty siatkę klipów i scen. Jest opcjonalny. Zobacz [Układy](/wiki/layouts/).
+- `Widok › Styl układu › Układ z uruchamianiem klipów` dodaje obok Playlisty siatkę klipów i scen. Jest opcjonalny. Zobacz [Układy](/wiki/layouts/).
 - Gdy na jednym elemencie sterującym leży kilka nakładających się klipów automatyki, wybór tego, który gra, może się różnić od FL Studio (notatki do wydania 0.1.25).
 - Jak w FL Studio, pattern gra z jednego klipu naraz. Gdy zaczyna się późniejszy klip tego samego patternu, na dowolnej ścieżce, wcześniejszy klip od tego miejsca nie startuje już żadnych nut. Klipy różnych patternów grają razem. Dotyczy to nowych projektów i projektów FL Studio. Projekt .lynx zapisany przed 0.1.27 nadal gra każdy klip w całości.
 - Tempo przesunięte przez powiązany kontroler MIDI nie zmienia rozmiaru klipów audio.

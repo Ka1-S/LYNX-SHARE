@@ -86,6 +86,10 @@ inline bool liveOn = true;     // ui-options.txt clipLanesLive (Live: automation
 
 inline bool shownIn (bool clipLaunch, bool simple) noexcept { return ! simple && (clipLaunch ? liveOn : patternOn); }
 inline void setShownIn (bool clipLaunch, bool value) noexcept { (clipLaunch ? liveOn : patternOn) = value; }
+// Round 190oo (CS O-3, LYNX extra, off by default): Live folds a track's automation lanes; with this on, a project opened
+// (or imported) shows its automation lanes folded the first time the Clip-launch arrangement shows it. The track's lane
+// arrow unfolds them as before; nothing else changes. ui-options.txt clipLanesFoldedLive.
+inline bool foldedOnOpen = false;
 
 // The rows as drawn: `order[row]` = the track on that row, `rowOf[track]` = its row, `owner[track]` = the track it is
 // drawn under as a lane (-1: an ordinary row), `children[track]` = how many lanes are drawn under it.
@@ -187,6 +191,51 @@ inline Projection project (const Song& song, int tracks, bool on)
     for (int i = 0; i < tracks; ++i)
         p.rowOf[(std::size_t) p.order[(std::size_t) i]] = i;
     return p;
+}
+
+// Round 190oo (CS-19): Live draws an automation lane as one envelope over the lane's whole length, not as clip blocks.
+// For each track drawn as a lane (`p`), the automation clips of its arrangement in time order (indices into
+// Song::playlist); the Live look joins them into one line: before the first clip flat at its first value, between and
+// after the clips flat at the value the last one ended on (what plays there). Empty for every other track.
+inline std::vector<std::vector<int>> laneClipLists (const Song& song, const Projection& p, int tracks)
+{
+    std::vector<std::vector<int>> lists ((std::size_t) std::max (0, tracks));
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.track >= 0 && c.track < tracks && p.isChild (c.track) && c.kind == ClipKind::automation && c.gridSlot < 0 && c.length > 0
+            && c.automation >= 0 && c.automation < (int) song.automations.size())
+            lists[(std::size_t) c.track].push_back (i);
+    }
+    for (auto& l : lists)
+        std::stable_sort (l.begin(), l.end(), [&song] (int a, int b) { return song.playlist[(std::size_t) a].start < song.playlist[(std::size_t) b].start; });
+    return lists;
+}
+
+// The value an automation clip starts / ends on (0..1, with its LFO), in its own clip time.
+inline float clipStartValue (const Song& song, const Clip& c)
+{
+    return song.automations[(std::size_t) c.automation].playAt ((double) c.offset, (double) c.start);
+}
+inline float clipEndValue (const Song& song, const Clip& c)
+{
+    const auto last = (double) std::max<std::int64_t> (0, c.length - 1);
+    return song.automations[(std::size_t) c.automation].playAt ((double) c.offset + last, (double) c.start + last);
+}
+
+// Round 190oo (CS O-3): the tracks whose lanes start folded — every track with automation clip lanes drawn under it
+// (`p`) and, while round 177b's lanes are shown (`laneTracks`), every track with lanes of its own. Tracks already folded
+// are left out, so an empty result means there is nothing to change (no edit, no publish).
+inline std::vector<int> tracksToFold (const Song& song, const Projection& p, bool laneTracks)
+{
+    std::vector<int> out;
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+    {
+        const auto& track = song.playlistTracks[(std::size_t) t];
+        if (! track.lanesFolded && (p.childCount (t) > 0 || (laneTracks && ! track.lanes.empty())))
+            out.push_back (t);
+    }
+    return out;
 }
 
 // A vertical move of clips by `rows` drawn rows: the track each original lands on, or -1 when the move is refused (a

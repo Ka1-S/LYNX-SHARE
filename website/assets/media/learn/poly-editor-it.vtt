@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Questi accordi sono una registrazione audio: una clip, tutte le note mescolate.
+
+00:00:08.800 --> 00:00:13.800
+Clicca con il tasto destro sulla clip e scegli Modifica note (polifonico).
+
+00:00:14.000 --> 00:00:19.600
+LYNX SHARE trova ogni nota degli accordi e le disegna una per una.
+
+00:00:19.800 --> 00:00:25.400
+Trascina la nota più alta giù di un semitono: sol maggiore diventa sol minore. Le altre note restano.
+
+00:00:25.600 --> 00:00:30.800
+Premi Play nell'editor per ascoltare l'accordo con la nuova nota.
+
+00:00:31.000 --> 00:00:36.600
+Ogni modifica è un passo di annullamento, e il brano riproduce l'audio modificato.

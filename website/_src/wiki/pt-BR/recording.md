@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![A janela Gravação pergunta o que gravar: áudio, notas e automação, tudo, ou áudio no editor de áudio](/assets/img/wiki/record-dialog.webp)
 
@@ -87,7 +87,7 @@ As opções estão em `Opções › Gravação` e no menu de clique direito do b
 
 ## Gravação em slots de clipe
 
-No [fluxo por disparo de clipes](/wiki/layouts/), os takes podem ir para a grade de clipes em vez da Playlist, como no Ableton Live.
+No [layout de lançamento de clipes](/wiki/layouts/), os takes podem ir para a grade de clipes em vez da Playlist, como no Ableton Live.
 
 - Arme uma faixa com o botão de armar dela no mixer Session. Os slots vazios dela mostram então um botão redondo de gravar no lugar do quadrado de parar. Clique em um para gravar nesse slot.
 - `Gravação de sessão`, sob a grade, grava as faixas armadas na cena selecionada. Enquanto os clipes delas tocam, notas novas são acrescentadas a eles (overdub).

@@ -38,7 +38,7 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [x] Import automation from `.flp` (points, curves, targets)
 
 ## Phase 4: mixer and plugins ✅
-- [x] Mixer: Master + up to 127 inserts, FL fader curve (0.8 = 0 dB), pan, mute, solo, stereo meters, click-free ramps
+- [x] Mixer: Master + up to 500 inserts, FL fader curve (0.8 = 0 dB), pan, mute, solo, stereo meters, click-free ramps
 - [x] Channel → insert routing; imported from `.flp`
 - [x] Sends between inserts with levels, "route to this track only", solo along the signal path
 - [x] 10 effect slots per insert (and on the Master) with bypass, replace, move, remove

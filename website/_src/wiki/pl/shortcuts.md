@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Okno Zarządzaj skrótami: przeszukiwalna lista akcji z klawiszami każdej z nich](/assets/img/wiki/shortcuts.webp)
 
@@ -79,7 +79,7 @@ Niektóre z tych klawiszy robią coś innego w edytorze, który ma fokus. W Pian
 
 ## Clip View i Device View
 
-Te klawisze działają tylko w pracy z uruchamianiem klipów.
+Te klawisze działają tylko w układu z uruchamianiem klipów.
 
 | Klawisz | Co robi |
 |---|---|

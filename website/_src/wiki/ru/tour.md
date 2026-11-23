@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Главное окно с демонстрационным проектом: панель инструментов сверху, Browser слева, позади Playlist, а поверх него плавает Channel Rack](/assets/img/wiki/desktop.webp)
 

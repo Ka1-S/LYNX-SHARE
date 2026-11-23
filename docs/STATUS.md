@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-14 (release 0.1.27 alpha). Everything below is verified by the core tests (more than a million checks), the
+Last updated: 2026-11-20 (release 0.1.30 alpha). Everything below is verified by the core tests (more than a million checks), the
 app's self-test (`LYNX.exe --selftest`), off-screen UI snapshots (`--snapshot`) and a regression run that
 exports the 30 demo projects shipped with FL Studio 2026.
 
@@ -36,7 +36,7 @@ Core Audio / ALSA + JACK (PipeWire).
   inline automation-point editing (axis locks, typed values, re-range), track and clip menus.
 - **Automation:** right-click any knob/fader (channel, mixer, effects, plugin parameters) → a Playlist clip with
   a point/curve editor (Alt+drag for curves); tempo automation; MIDI learn on any parameter.
-- **Mixer:** up to 127 inserts, sends with levels, "route to this track only", solo along the signal path, FL
+- **Mixer:** up to 500 inserts, sends with levels, "route to this track only", solo along the signal path, FL
   fader curve, gain ramps, stereo separation, phase invert, L/R swap, colours, built-in 3-band track EQ,
   10 effect slots with dry/wet, smart disable, per-edge PDC, **sidechain** (right-click a compressor slot →
   "Sidechain from"), render insert to audio. Multi-select inserts (faders/pans move together), Alt+Left/Right
@@ -103,8 +103,8 @@ Core Audio / ALSA + JACK (PipeWire).
   Reeverb 2/LuxeVerb, delay → Delay 3, limiter, compressor, EQ…) from a data-driven table, translating settings when
   the saved state is readable; the original reference is kept byte for byte and comes back once the plugin is
   installed (docs/PLUGIN_FALLBACK.md).
-- **Export:** WAV 16/24/32f, FLAC, OGG; whole song or pattern; tail until silence; TPDF dither + noise shaping
-  for 16-bit.
+- **Export:** WAV 16/24/32f, MP3, FLAC, OGG, AIFF 16/24 and M4A (AAC through the system's encoder: Windows and macOS,
+  not Linux); whole song or pattern; tail until silence; TPDF dither + noise shaping for 16-bit.
 - **Performance:** lock-free engine, channels and mixer layers on worker threads, idle channels skipped, FTZ/DAZ.
 
 ### FL Studio import (`.flp`)
@@ -210,7 +210,7 @@ Core Audio / ALSA + JACK (PipeWire).
   instrument; other Live devices that have no LYNX equivalent are listed in the report. LYNX's own instruments and
   effects are not converted in exported sets yet (listed in the export report).
 - Since 0.1.26: Instrument and Audio Effect Racks (chains, zones, macros) both ways; MIDI Effect Racks are written
-  on export only (Live's own are listed as unsupported on import); note chance,
+  on export (imported since 0.1.30); note chance,
   velocity range and probability groups, the project key as Live's Scale Mode, and Live 12's MIDI Transformations in
   the Clip View. A Clip View and Device View are part of the Clip-launch workflow.
 - Since 0.1.27 (rounds 190bq, 190cf, 190ed and their refits 190cx, 190da, 190ek): Live's own devices onto LYNX's
@@ -222,8 +222,27 @@ Core Audio / ALSA + JACK (PipeWire).
   notes; VST2 / VST3 automation by parameter id. Laws of EQ Eight, Utility, Auto Filter, Saturator, Glue, Drum Buss
   and Reverb decay fitted to Live 12.4.16 renders; others marked [ASSUMED] in docs/analise/ALS_FORMAT.md. Dropped
   device lines in the 19 sample sets: 182 → 61. A Drum Rack is LYNX's Drum Rack both ways (export not yet opened in
-  Live). Still dropped: Hybrid Reverb, Grain Delay, Spectral devices, Amp, Roar, Cabinet, Vinyl, FM Operator, other
+  Live).
+- Since 0.1.28: Hybrid Reverb, Roar and Grain Delay. Since 0.1.30: Operator with FM → Tetra, Wavetable → Helix (and
+  Helix back to Wavetable on export), Meld → Braid, Erosion → Corrode, Vinyl Distortion → Platter, Corpus →
+  Soundboard, Spectral Time → Timeprism, Spectral Resonator → Harmonia, Looper; MIDI Effect Racks written into the
+  notes. Still dropped: Amp, Cabinet, Beat Repeat, Vocoder and other devices without a LYNX counterpart, other
   synths, devices past an insert's 10 slots.
+
+### DAWproject (`.dawproject`, since 0.1.30)
+- Import and export (`src/core/DawProject.h`): tracks, folders, clips, notes, audio with its warp markers, automation,
+  tempo and time signature, markers, the mixer with sends, and VST3 / VST2 / CLAP plugins with their state; the
+  format's Equalizer / Compressor / NoiseGate / Limiter as Facet EQ / Crest / Sentry / Apex; scenes into the clip grid
+  on import. LYNX's own instruments and effects go out as LYNX devices that LYNX reads back. Note effects and per-note
+  expressions (import) and the clip grid, other arrangements and some per-note details (export) are listed in the
+  report.
+
+### GarageBand (`.band`) and BandLab (`.blx`) import (since 0.1.30, partial)
+- GarageBand 10 and GarageBand for iOS: tracks, MIDI and audio regions, tempo, time signature, key, sections, levels,
+  pan and mute, as Simple-workflow tracks; Sampler instruments made in GarageBand for iOS play their own recordings,
+  other instrument tracks the built-in synth and drums. Projects from GarageBand 11 and older are not readable.
+- BandLab (a project downloaded by Cakewalk / Sonar): tracks, regions with their loops, tempo, key, the mix, volume
+  and pan automation and the common effects, as Simple-workflow tracks. Tested on made-up projects only.
 
 ### FL Studio Mobile import (`.flm`, partial)
 - `docs/analise/FLM_FORMAT.md`: tempo, time signature, title; note, drum and audio lanes → patterns, clips and audio

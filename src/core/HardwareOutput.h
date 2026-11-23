@@ -126,6 +126,8 @@ struct HardwareOutput
 
     // set by the engine: true only while a device plays live (not during an export)
     std::atomic<bool> active { false };
+    // round 190nc (DL-110): the Cue Volume as a gain, for the cued tracks' routes to the Cue Out (set by the engine)
+    std::atomic<float> cueGain { 1.0f };
 
     // renderer: adds into channel `c` at `offset` within the current callback piece
     float* bus (int c, int offset, int n) noexcept

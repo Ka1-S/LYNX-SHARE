@@ -116,6 +116,11 @@ std::vector<Action> makeActions()
         // FL's AlignAllChannelEditorsAction, ShortCut 8315 = Shift+F12 (round 169k)
         { "view.alignChannelEditors", TR_NOOP ("Align all channel editors"), Context::global, { chord (f12, shift) } },
         { "view.touchKeyboard", TR_NOOP ("Show or hide the Touch keyboard"), Context::global, { chord (f7, alt) } },
+        // round 190nw (0.1.31): LYNX's tracker editor (a view of the patterns' notes). Round 190ob: Shift+F7, beside FL's
+        // F7 (Piano roll), the other view of the same notes. FL 2026 has no Shift+F7: its ShortcutsModule binds none
+        // (DFM dump of round 167j: F7 Piano roll, Alt+F7 Touch controller only) and FL did nothing on it in the live
+        // check (round 190ob, /mnt/e/lynx-work/190ob); no LYNX key uses it in any context.
+        { "view.tracker", TR_NOOP ("Show or hide the Tracker (the pattern's notes as rows and channels)"), Context::global, { chord (f7, shift) } },
         { "panel.maximisePlaylist", TR_NOOP ("Maximize or restore the Playlist"), Context::global, { chord (enter) } },
 
         // patterns
@@ -143,6 +148,8 @@ std::vector<Action> makeActions()
         { "record.punch", TR_NOOP ("Punch in/out on the loop region on/off"), Context::global, {} },
         { "record.quickAudio", TR_NOOP ("Record audio now: arm the selected insert and record (press again to stop)"), Context::global, { chord ('R', shift) } },
         { "record.captureMidi", TR_NOOP ("Capture MIDI: the notes just played without recording into the pattern"), Context::global, { chord ('R', ctrl | shift | alt) } },
+        // LYNX extra (round 190op, P7; Live 13's "Capture Automation"): no default key, FL's and Live 12's lists stay free
+        { "record.captureAutomation", TR_NOOP ("Capture automation: the moves just made without recording become automation"), Context::global, {} },
 
         // files and history
         { "file.new", TR_NOOP ("New project"), Context::global, { chord ('N', ctrl) } },
@@ -179,6 +186,16 @@ std::vector<Action> makeActions()
         { "edit.history", TR_NOOP ("Undo history"), Context::global, { chord ('H', ctrl | alt) } },
         { "tools.stopSound", TR_NOOP ("Stop sound (all notes off)"), Context::global, { chord ('H', ctrl) } },
         { "help.shortcuts", TR_NOOP ("Shortcut sheet (press again to close)"), Context::global, { chord (f1) } },
+        // #228 (round 190nq, LYNX extra): the action search. "?" opens it wherever the Clip-launch Info View (Live's "?")
+        // doesn't use the key (MainComponent::keyPressed); no other key until the user gives it one
+        { "help.searchActions", TR_NOOP ("Search every LYNX action and run it"), Context::global, {} },
+        // round 190on (research190oe P2, owner decision O-2): the command palette — the same box with the menus, the LYNX
+        // extras, the Settings pages and the recent projects. O-2's keys are all taken: Ctrl+Shift+P is FL's "Open in
+        // project browser" (its Patterns menu; live check 190on), Ctrl+Shift+Space starts FL's playback (live check) and
+        // is Live 12's "Move Insert Marker to Playhead Position", Ctrl+Alt+P Live's "Hide/Show Open Plug-In Windows". The
+        // first free one: Ctrl+Shift+Y — in no list of Live 12's (its manual's chapter 42), nothing in FL 2026 with the
+        // Playlist, Channel rack, Piano roll, Mixer or Browser focused (live check 190on), free in LYNX
+        { "view.commandPalette", TR_NOOP ("Command palette: find and run any command, menu item, LYNX extra or setting"), Context::global, { chord ('Y', ctrl | shift) } },
         { "browser.search", TR_NOOP ("Search the Browser"), Context::global, { chord ('F', ctrl) } },
 
         // Channel Rack (focused)
@@ -275,6 +292,7 @@ std::vector<Action> makeActions()
         { "pianoRoll.backgroundWave", TR_NOOP ("Background waveform on/off"), Context::pianoRoll, { chord ('N', alt) } },
         { "pianoRoll.showChordName", TR_NOOP ("Show chord name for selection on/off"), Context::pianoRoll, {} },
         { "pianoRoll.songBarsRuler", TR_NOOP ("Piano roll ruler: song bars on/off"), Context::pianoRoll, {} },
+        { "pianoRoll.stackedLanes", TR_NOOP ("Piano roll: stacked controller lanes on/off (LYNX)"), Context::pianoRoll, {} }, // round 190on (P10)
         { "pianoRoll.selectRandomOne", TR_NOOP ("Select one at random"), Context::pianoRoll, { chord ('R', shift) }, true },
         { "pianoRoll.selectRandomMore", TR_NOOP ("Select more at random"), Context::pianoRoll, { chord ('M', shift) }, true },
         { "pianoRoll.selectOddSteps", TR_NOOP ("Select odd (swung) notes"), Context::pianoRoll, { chord ('O', shift) }, true },
@@ -332,6 +350,9 @@ std::vector<Action> makeActions()
         { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190ht, issue #154): the linked headers list their mixer track's insert effects
         { "playlist.trackInserts", TR_NOOP ("Show insert effects on linked tracks on/off"), Context::playlist, {} },
+        // LYNX extra (round 190op, P4): hidden Playlist tracks
+        { "playlist.showHiddenTracks", TR_NOOP ("Show hidden tracks on/off"), Context::playlist, {} },
+        { "playlist.hideUnusedTracks", TR_NOOP ("Hide unused tracks"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
@@ -354,6 +375,17 @@ std::vector<Action> makeActions()
         { "playlist.swipeSelectionToComp", TR_NOOP ("Send the time selection of the take lane to its comp"), Context::playlist, {} },
         { "playlist.timePrevious", TR_NOOP ("Select previous time"), Context::playlist, { chord (left, ctrl) } },
         { "playlist.timeNext", TR_NOOP ("Select next time"), Context::playlist, { chord (right, ctrl) } },
+        // round 190on (research190oe P8, core/TransientNav.h): Pro Tools' Tab to transient, a LYNX extra. No default key in
+        // any layout: Tab is FL's (Pattern), Shift+Tab Live's clip / device switch (Clip-launch), Alt+Left / Right the
+        // Playlist's nudge (Simple's tracks are the Playlist's); the user picks keys in the Shortcut manager
+        { "playlist.nextTransient", TR_NOOP ("Song position to the next transient of the selected audio clips"), Context::playlist, {} },
+        { "playlist.prevTransient", TR_NOOP ("Song position to the previous transient of the selected audio clips"), Context::playlist, {} },
+        { "playlist.extendToNextTransient", TR_NOOP ("Extend the time selection to the next transient"), Context::playlist, {} },
+        { "playlist.extendToPrevTransient", TR_NOOP ("Extend the time selection to the previous transient"), Context::playlist, {} },
+        { "audioEditor.nextTransient", TR_NOOP ("Audio editor / Clip View: cursor to the next transient"), Context::global, {} },
+        { "audioEditor.prevTransient", TR_NOOP ("Audio editor / Clip View: cursor to the previous transient"), Context::global, {} },
+        { "audioEditor.extendToNextTransient", TR_NOOP ("Audio editor / Clip View: extend the selection to the next transient"), Context::global, {} },
+        { "audioEditor.extendToPrevTransient", TR_NOOP ("Audio editor / Clip View: extend the selection to the previous transient"), Context::global, {} },
         // FL 2026's Playlist › Time markers (round 167k: EEMarkerAdd2Menu 32852, EEMarkerAddAutoMenu 16468,
         // EEMarkerAddTSChangeMenu 41044, EEMarkerAddSongLoopMenu 8276); Ctrl+T stays the typing piano elsewhere
         { "playlist.markerAdd", TR_NOOP ("Time markers: Add one..."), Context::playlist, { chord ('T', alt) } },
@@ -422,6 +454,8 @@ std::vector<Action> makeActions()
         { "playlist.loopHalve", TR_NOOP ("Halve the time selection"), Context::playlist, {} },
         { "playlist.loopDouble", TR_NOOP ("Double the time selection"), Context::playlist, {} },
         { "playlist.duplicateTime", TR_NOOP ("Duplicate time"), Context::playlist, {} },
+        // round 190ne (core/TrackClips.h): Bitwig's "Duplicate as Alias" (Ctrl+Alt+D) on FL's Duplicate key
+        { "playlist.duplicateLinked", TR_NOOP ("Duplicate the selected clips as linked copies (track clips share their notes)"), Context::playlist, { chord ('B', ctrl | alt) } },
         { "playlist.cutTime", TR_NOOP ("Cut time"), Context::playlist, {} },
         { "playlist.copyTime", TR_NOOP ("Copy time"), Context::playlist, {} },
         { "playlist.pasteTime", TR_NOOP ("Paste time"), Context::playlist, {} },
@@ -473,6 +507,10 @@ std::vector<Action> makeActions()
         // Mixer (focused)
         { "mixer.moveLeft", TR_NOOP ("Move the selected inserts left"), Context::mixer, { chord (left, alt) } },
         { "mixer.moveRight", TR_NOOP ("Move the selected inserts right"), Context::mixer, { chord (right, alt) } },
+        // #225 (round 190nq): FL 2026 selects the previous / next mixer track with Left / Right, and with Ctrl or Shift held
+        // too (checked in FL, [SHOT] 190nq mixkeys); Alt moves the tracks (above)
+        { "mixer.selectPrevious", TR_NOOP ("Select the previous mixer track"), Context::mixer, { chord (left), chord (left, ctrl), chord (left, shift) } },
+        { "mixer.selectNext", TR_NOOP ("Select the next mixer track"), Context::mixer, { chord (right), chord (right, ctrl), chord (right, shift) } },
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },

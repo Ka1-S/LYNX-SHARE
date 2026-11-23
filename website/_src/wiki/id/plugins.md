@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHARE menjalankan plugin instrumen dan efek dari pembuat lain. Ia menemukan
 3. Tekan `F8` untuk pemilih plugin dan ketik sebagian nama plugin.
 4. Klik dua kali atau tekan `Enter`. Instrumen menjadi channel baru. Efek masuk ke insert Mixer yang dipilih.
 
-Pada awal pertama, wizard pengaturan mencantumkan folder plugin dan memindainya di latar belakang. `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...` membukanya lagi. LYNX SHARE juga mencari plugin baru beberapa detik setelah setiap awal.
+Pada awal pertama, LYNX SHARE memindai folder plugin di latar belakang selagi kartu selamat datang terbuka. `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...` menampilkan folder-nya lagi. LYNX SHARE juga mencari plugin baru beberapa detik setelah setiap awal.
 
 ## Format per sistem
 
 | Sistem | Format yang dijalankan |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 VST2 tidak dijalankan di macOS. Di Linux, plugin Windows bekerja lewat [yabridge](https://github.com/robbert-vdh/yabridge) dan Wine, yang kamu instal sendiri: tambahkan folder tujuan sinkronisasi yabridge sebagai folder plugin.
+
+Skrip JSFX, format efek dan instrumen REAPER, berjalan di setiap sistem: 31 skrip gratis (dari chokehold, lisensi MIT) disertakan dengan LYNX SHARE, di Browser pada `Database plugin › Efek › JSFX` dan `Database plugin › Generator › JSFX` serta di pemilih plugin. Skrip di `Documents/LYNX/JSFX` dan di folder Effects REAPER juga ditemukan, dan `Pengaturan › File › Folder JSFX` menambahkan folder lain. LYNX SHARE menampilkan slider sebuah skrip di panelnya sendiri; skrip yang menggambar tampilannya sendiri hanya menampilkan slidernya.
 
 ## Pengelola plugin
 
@@ -102,6 +104,18 @@ Plugin native FL Studio, seperti Sytrus, Harmor, dan Patcher, hanya berjalan di 
 Apa yang kamu buat di dalam FL Studio disimpan bersama proyek LYNX SHARE. `FL Studio VSTi (Multi)` punya 16 output stereo, yang bisa dimainkan di insert terpisah (lihat bagian di atas). Lisensi FL Studio-mu menentukan plugin FL mana yang berfungsi di dalamnya. LYNX SHARE tidak memuat file plugin FL Studio dengan sendirinya.
 
 Jika plugin FL Studio tercantum sebagai `Gagal dimuat`, klik kanan di `Opsi › Pengelola plugin...` dan pilih `Coba lagi (pindai file ini sekarang)`.
+
+## Plugin LYNX sendiri di DAW lain
+
+Efek dan instrumen milik LYNX SHARE sendiri, seperti Facet EQ, Apex Limiter, LYNX Tune, dan LYNX Model, juga tersedia sebagai plugin untuk DAW lain. Semuanya unduhan terpisah dan opsional di [halaman rilis](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` untuk Windows, macOS, dan Linux.
+
+- Semua plugin ada dalam satu file CLAP, `LYNX Plugins.clap`. Daftar pendek juga tersedia sebagai VST3 dan, di Linux, sebagai LV2.
+- Instrumen dalam paket: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil, dan LYNX Duoloom.
+- Di Windows, pilih `LYNX-Plugins-<version>-win-x64.7z` (sekitar 20 MB). `.zip` (sekitar 195 MB) berisi file yang sama.
+- Jalankan skrip instalasi di dalam arsip (`install.cmd` di Windows, `install.sh` di macOS dan Linux), lalu pindai ulang plugin di DAW Anda.
+- Plugin membuka editor yang sama seperti di dalam LYNX SHARE, dan state-nya bisa dibuka di LYNX SHARE sebagai proyek.
+
+Daftar lengkapnya ada di [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md).
 
 ## Folder Plugin database
 

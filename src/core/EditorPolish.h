@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "core/TrackClips.h"
 #include "core/Song.h"
 
 namespace lynx::polish
@@ -168,6 +169,19 @@ inline float flSizeForHeight (int height, int base = defaultTrackHeight)
     return (float) std::max (0, clampTrackHeight (height) - minTrackHeight) / (float) (base - minTrackHeight);
 }
 
+// FL's Playlist vertical zoom (the .flp's event 0xF2 i32 at +24, round 190oo PAT-6) ↔ its row height at 100 % UI scale:
+// 16 + 2·v px (FL's vertical zoom setter 0xe83850 hands the row layout FUN_00ea0b30 the smallest row + 2·v; FL 2026's new
+// project v = 16 → 48 px, Ookay - Thief v = 5 → 26 px), within LYNX's row limits.
+inline int flRowHeightForZoom (int zoom)
+{
+    return clampTrackHeight (minTrackHeight + 2 * std::max (0, zoom));
+}
+
+inline int flZoomForRowHeight (int height)
+{
+    return (clampTrackHeight (height) - minTrackHeight) / 2;
+}
+
 // Heights of tracks 0..n-1 laid out top to bottom: `heights[i]` (0 or missing = `fallback`).
 struct TrackLayout
 {
@@ -260,9 +274,15 @@ inline void makeClipsUnique (Song& song, const std::vector<int>& clips)
             if (to < 0)
             {
                 auto copy = song.patterns[(std::size_t) c.pattern];
-                copy.name = freeName (copy.name, [&song] (const std::string& n) {
-                    return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
-                });
+                if (copy.trackClip) // (round 190ne: a track clip's copy is a new clip of its track, core/TrackClips.h)
+                {
+                    copy.name = trackclips::newClipName (song, c.track);
+                    copy.uid = 0;
+                }
+                else
+                    copy.name = freeName (copy.name, [&song] (const std::string& n) {
+                        return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
+                    });
                 song.patterns.push_back (std::move (copy));
                 to = (int) song.patterns.size() - 1;
                 patterns.push_back ({ c.pattern, to });

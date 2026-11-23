@@ -1,0 +1,16 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+The Tracker writes a pattern with the keyboard: time runs down, one column per channel.
+
+00:00:08.800 --> 00:00:13.600
+Press Ctrl+E for Edit mode. The typing keys now write notes.
+
+00:00:13.800 --> 00:00:20.400
+Type a note, then move down with the arrow keys. Here, a kick on every beat.
+
+00:00:20.600 --> 00:00:25.400
+Press Play: the kick joins the clap and the hi-hats.
+
+00:00:25.600 --> 00:00:31.200
+1 writes a note off, Delete clears a cell, and Ctrl+Up or Down transposes.

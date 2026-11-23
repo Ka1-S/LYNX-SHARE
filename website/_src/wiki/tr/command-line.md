@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHARE penceresini açmadan da çalışır. Bir seçenek projeyi sese render eder, diğerleri onu FL Studio projesine veya Ableton Live set'ine dönüştürür, birkaçı da test içindir. Projenin kendi kontrolleri de aynı seçenekleri kullanır.
 
@@ -18,7 +18,7 @@ Program Windows'ta `LYNX.exe`, macOS ve Linux'ta `LYNX` adını taşır. macOS't
 LYNX.exe project.lynx
 ```
 
-LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `.flm` ve `.mid` kabul eder. Göreli yol, geçerli klasörden alınır.
+LYNX SHARE'i pencereyle başlatır ve dosyayı açar. `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` ve `.mid` kabul eder. Göreli yol, geçerli klasörden alınır.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ Bir `.lynx` projesini, `Dosya › Üçüncü taraf plugin'ler olmadan aç...` gi
 
 | Seçenek | Ne yapar |
 |---|---|
-| `--export <project> <out>` | Tüm şarkıyı kuyruğuyla birlikte render eder; tıpkı Dışa aktarma penceresi gibi. `<out>` uzantısı formatı belirler: `.wav` (24 bit), `.flac`, `.ogg` veya `.mp3` (320 kbps) |
+| `--export <project> <out>` | Tüm şarkıyı kuyruğuyla birlikte render eder; tıpkı Dışa aktarma penceresi gibi. `<out>` uzantısı formatı belirler: `.wav` (24 bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24 bit) veya `.m4a` (192 kbps, Linux'ta yok) |
 | `--export ... --pattern` | Yalnızca geçerli pattern'i render eder |
 | `--export ... --insert N` | Yalnızca N numaralı Mixer insert'inin çıkışını render eder |
 | `--export ... --rate N` | Başka bir örnekleme hızında render eder, Hz cinsinden |
 | `--stems <project> <base.wav>` | Kanalı olan her Mixer insert'i için bir WAV yazar: `base - 1.wav`, `base - 2.wav` ve böyle devam eder |
 | `--export-flp <project> <out.flp>` | Bir FL Studio projesi yazar. `out.zip` ile sıkıştırılmış bir loop paketi yazar |
 | `--export-flp ... --substitute` | Yalnızca LYNX'te bulunan plugin'leri sese render etmek yerine en yakın FL plugin'iyle değiştirir |
+| `--export-flm <project> <out.flm>` | Bir FL Studio Mobile projesi yazar ve sample'ları yanındaki `<name> Samples` klasörüne kopyalar |
 | `--export-als <project> <folder>` | Live 12 için `<folder>/<name> Project/<name>.als` konumuna bir Ableton Live set'i yazar |
 | `--export-als ... --live11` | Set'i Live 11 için yazar |
 | `--export-bundle <project> <folder>` | `Dosya › Dışa aktar › Diğer uygulamalar için...` paketini klasöre yazar |

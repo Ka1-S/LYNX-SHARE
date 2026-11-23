@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
 Cada canal suena a través de un insert del Mixer. Cada insert tiene un fader, pan, silenciar y solo, un medidor de picos, diez ranuras de efecto con su propia cantidad dry/wet, y un EQ integrado. Todos los inserts acaban en el Master salvo que los enrutes a otro sitio. Pulsa `F9` para mostrar u ocultar el Mixer.
 
-Un proyecto puede tener hasta 127 inserts. El Mixer tiene una franja para añadir uno nuevo. La caja de la barra de título del Mixer elige uno de ocho diseños de franja, de `Compacto` a `Extra grande`.
+Un proyecto puede tener hasta 500 inserts. El Mixer tiene una franja para añadir uno nuevo. La caja de la barra de título del Mixer elige uno de ocho diseños de franja, de `Compacto` a `Extra grande`.
 
 ## Poner un efecto en un canal
 
@@ -115,9 +115,9 @@ Cuando eliges una entrada externa para un insert que también graba otro audio, 
 - Un plugin de instrumento con varias salidas puede reproducir cada salida en su propio insert. Consulta [Plugins de terceros](/wiki/plugins/).
 - `Ctrl+L` hace cosas distintas en el Channel Rack y en el Mixer. En el rack elige inserts libres. En el Mixer usa el insert seleccionado.
 - Los interruptores de ruta aparecen en las demás franjas, no en la seleccionada.
-- El límite es de 127 inserts por proyecto y diez ranuras de efecto por insert.
+- El límite es de 500 inserts por proyecto y diez ranuras de efecto por insert.
 - La grabación de Edison se guarda como archivo WAV en la carpeta del proyecto, no dentro del archivo del proyecto.
-- El mixer de Session bajo la cuadrícula de clips pertenece solo al flujo Clip-launch. Muestra los mismos inserts que este Mixer. Mira [Diseños](/wiki/layouts/).
+- El mixer de Session bajo la cuadrícula de clips pertenece solo al diseño Clip-launch. Muestra los mismos inserts que este Mixer. Mira [Diseños](/wiki/layouts/).
 
 ## Relacionado
 

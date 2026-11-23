@@ -756,6 +756,7 @@ Layout grossBeat()
     v.push_back (display (298, 529, 532, 30, "gbslot"));
     l.editedElsewhere.push_back ("Time slot"); // the slot grids
     l.editedElsewhere.push_back ("Volume slot");
+    l.editedElsewhere.push_back ("Time offset (scratching)"); // (round 190oa, DP-8: the scratch dial "gbjog")
     return l;
 }
 
@@ -1667,6 +1668,9 @@ Layout maximus()
     auto& v = l.items;
     v.push_back (display (8, 4, 181, 181, "maxcurve"));
     v.push_back (display (192, 4, 433, 181, "maxbands"));
+    // round 190oa (DP-27, capture 190oa C2): FL's "Monitor scrolling speed" slider beside a SPEED caption, under the display
+    v.push_back (label (458, 188, 40, 13, TR_NOOP ("Speed")));
+    v.push_back (display (500, 190, 120, 9, "maxspeed"));
     v.push_back (section (2, 205, 248, 183, nullptr, boxed));
     v.push_back (section (252, 205, 176, 183, nullptr, boxed));
     v.push_back (section (430, 205, 67, 183, nullptr, boxed));
@@ -4653,7 +4657,8 @@ bool displayTakesMouse (const char* display)
     if (display == nullptr)
         return false;
     static const char* const ids[] { "eq", "xy", "sgamount", "sgpresets", "prismbands", "emberbands", "tunekeys", "tuneautokey",
-                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve", "equosend", "lpcurve", "cvcurve", "vxcurve", "vxmapsel", "pitchport" };
+                                     "pitchring", "waveshaper", "tssenvelope", "tsssend0", "tsssend1", "maxcurve", "equosend", "lpcurve", "cvcurve", "vxcurve", "vxmapsel", "pitchport",
+                                     "maxbands", "maxspeed", "vocbands" }; // (round 190oa, DP-27 / DP-33)
     for (const auto* id : ids)
         if (std::strcmp (id, display) == 0)
             return true;

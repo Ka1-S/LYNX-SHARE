@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![La fenêtre d'enregistrement demande quoi enregistrer : audio, notes et automation, tout, ou audio dans l'éditeur audio](/assets/img/wiki/record-dialog.webp)
 
@@ -87,7 +87,7 @@ Les options se trouvent dans `Options › Enregistrement` et dans le menu du cli
 
 ## Enregistrer dans des emplacements de clips
 
-Dans le [flux par lancement de clips](/wiki/layouts/), les prises peuvent aller dans la grille de clips au lieu de la Playlist, comme dans Ableton Live.
+Dans le [disposition par lancement de clips](/wiki/layouts/), les prises peuvent aller dans la grille de clips au lieu de la Playlist, comme dans Ableton Live.
 
 - Armez une piste avec son bouton d'armement dans la table de mixage de session. Ses emplacements vides affichent alors un bouton d'enregistrement rond à la place du carré d'arrêt. Cliquez sur l'un d'eux pour enregistrer dans cet emplacement.
 - `Enregistrement de session`, sous la grille, enregistre les pistes armées dans la scène sélectionnée. Pendant que leurs clips jouent, les nouvelles notes y sont ajoutées (overdub).

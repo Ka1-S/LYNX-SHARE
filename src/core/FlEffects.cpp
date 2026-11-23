@@ -896,6 +896,7 @@ std::optional<VocodexConversion> vocodexEffect (const std::vector<std::uint8_t>&
     VocodexConversion out;
     out.slot = makeEffectSlot (EffectKind::vocodex);
     out.slot.state = d;
+    vocodex::controlsToParams (*state, out.slot.params); // round 190pt: FL's controls as parameters, followed live
     out.modIn = state->lrEncoding ? 0 : state->modIn;
     out.carIn = state->lrEncoding ? 0 : state->carIn;
     if (state->internalCarrier() && vocodex::makeInternalCarrier (*state) == nullptr)
@@ -1751,6 +1752,18 @@ std::optional<FlParamMap> effectParamFromFl (const std::string& pluginName, int 
         || (is ("Fruity Blood Overdrive") && k >= 0 && k < flbasic::bloodOverdriveParams)
         || (is ("Fruity Send") && k >= 0 && k < 3)) // (pan, volume, dry; the insert is not a parameter in FL)
         return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    // Formula Controller: knobs a, b, c (FL parameters 0…2) → slot parameters 0…2, 0…1 as FL sends them; without this a
+    // Patcher cable from a Control Surface (or any controller) into a Formula Controller is dropped on import
+    if (is ("Fruity Formula Controller") && k >= 0 && k < 3)
+        return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    // Vocodex (round 190pt): its 20 controls, (raw − min) / (max − min) over the DLL's ranges (core/Vocodex.h liveControls)
+    if (is ("Vocodex") && k >= 0 && k < vocodex::paramCount)
+        return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    // X-Y-Z Controller (round 190pt): FL's parameters 0…2 are the X / Y / Z levels (0…65536, sent 0…1), LYNX's level (axis)
+    // = 4 × axis; a Patcher cable into them moves the axis' target (Stroll Up's Patchers: Control Surface → X-Y-Z
+    // "mappers" → effect parameters)
+    if (is ("Fruity X-Y-Z Controller") && k >= 0 && k < 3)
+        return FlParamMap { xy::level (k), [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
     // Hardcore's 50 parameters: FL sends 0…1 for all of them (the box types and the cabinet as raw numbers, REA_rodada71)
     if (is ("Hardcore") && k >= 0 && k < hardcore::numParams)
         return FlParamMap { k, [k] (float v) { return hardcore::toSlot (k, std::clamp (v, 0.0f, 1.0f)); } };
@@ -1789,7 +1802,10 @@ std::optional<FlParamMap> effectParamFromFl (const std::string& pluginName, int 
     // the exact Delay Bank: its four global controls (0…128) are the slot's parameters
     if (is ("Fruity Delay Bank") && k >= 0 && k < fldbank::globalControls)
         return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    // (round 190pt: the return below had been lost in a merge, which made the Fast Dist / Flangus / Flanger line its body:
+    // Multiband, Fast Dist, Flangus and Flanger links and automation were all dropped as "not mapped")
     if (is ("Fruity Multiband Compressor") && k >= 0 && k < flmb::controls) // FL's controls as they are (value over range)
+        return FlParamMap { k, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
     // the exact Fast Dist / Flangus / Flanger take FL's controls over their ranges
     if ((is ("Fruity Fast Dist") && k >= 0 && k < fastdistfx::params) || (is ("Fruity Flangus") && k >= 0 && k < flangusfx::params)
         || (is ("Fruity Flanger") && k >= 0 && k < flangerfx::params))

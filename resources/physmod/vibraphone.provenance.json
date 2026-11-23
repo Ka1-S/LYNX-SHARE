@@ -1,0 +1,239 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 973692,
+   "git_blob_sha1": "859f9625a662560facae4de31e8af82f78469492",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F2_v1_rr1_Main.wav",
+   "sha256": "df5cfcc72af80fac2191300d09922474c4ac25c5cbc43ff387953d607f7c1320",
+   "sounding_key": 53,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 1569944,
+   "git_blob_sha1": "bdf8117e17ce9f7e0d7878f2b99f1f3c6e846855",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F2_v2_rr1_Main.wav",
+   "sha256": "14c3f7a2492f6a87aecd6463611bbbbfe2094383bfa267a2df67f94766e00df5",
+   "sounding_key": 53,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1811676,
+   "git_blob_sha1": "5e0049f968a46453e531d235c55dec82d7cda29d",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A2_v1_rr1_Main.wav",
+   "sha256": "b6e23a94322107d0ab884d7c38e51be538eb45f613c6a24e980c2261151bed75",
+   "sounding_key": 57,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2420596,
+   "git_blob_sha1": "2beb86397ab2fedb87a8428e5bc715deefa9ea38",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A2_v2_rr1_Main.wav",
+   "sha256": "683d2b5a9ece5e5bcf421a9ae62d74e5004b40493e1b5893f125bb96fd52cb64",
+   "sounding_key": 57,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1815048,
+   "git_blob_sha1": "8413d99c880ff57e696be5ca4de5eb2b0774aabd",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C3_v1_rr2_Main.wav",
+   "sha256": "1dda9a4c3205c365345d66dcb68c8e09c0dca76a310b8fe8108e43c7e8c1cd0a",
+   "sounding_key": 60,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2117636,
+   "git_blob_sha1": "750bf1b714d4435a11fc4f53226c0fc27e251541",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C3_v2_rr1_Main.wav",
+   "sha256": "83950902ab4323f372bbf81b924fc05c6bd0ea42c9742db44464d562c20414bf",
+   "sounding_key": 60,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 2081904,
+   "git_blob_sha1": "19a3cc3b74fb64d19a9e6995f634685ab41a90f6",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E3_v1_rr2_Main.wav",
+   "sha256": "620a241017d0de0e6cb789c97d439401f25d659d08f753746690632e71de8f0b",
+   "sounding_key": 64,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2665284,
+   "git_blob_sha1": "3e5d93391a1e94724a6e2e2cb2f75181ea78e2dc",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E3_v2_rr1_Main.wav",
+   "sha256": "268f0a703ca5e394533913bce3760e8c06661a5d72841601ade887ea72a00312",
+   "sounding_key": 64,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 2519544,
+   "git_blob_sha1": "36a655b6f107c87cd5e7ed06aa1805449600576a",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_G3_v1_rr1_Main.wav",
+   "sha256": "9b479e4c84fb1caafba8c1c106a8922cea20bba81c37d65f93afae339626767f",
+   "sounding_key": 67,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 3221132,
+   "git_blob_sha1": "daeca7e9d2fa64996c0c59473786a9594235879a",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_G3_v2_rr1_Main.wav",
+   "sha256": "ecd350b0fec96ce465a185c44a9c3b2ee966d6b56784c27c17d42e9b5d887882",
+   "sounding_key": 67,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1850652,
+   "git_blob_sha1": "bacab8cdb0f85f9f4f28a1654ded6811318bb9f8",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_B3_v1_rr1_Main.wav",
+   "sha256": "7edfbd70f93781d2cbb17c2fc8befe474de9987c6353db2358af4e13a0269345",
+   "sounding_key": 71,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2851524,
+   "git_blob_sha1": "c2050a8979ad5673be81c0466833014736254977",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_B3_v2_rr1_Main.wav",
+   "sha256": "9d2466c4d3375f2eb24c57f17e15736052a5492d6c84b876c1d0a4997eea99a0",
+   "sounding_key": 71,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1973784,
+   "git_blob_sha1": "df2e9089d97a1f002655b75e9dcf9656fffb5950",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_D4_v1_rr1_Main.wav",
+   "sha256": "daedf613863d4de0a383d66b2db6ab9ffd8dc492d16ff7d735cf3b3107046a26",
+   "sounding_key": 74,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2625224,
+   "git_blob_sha1": "88e93ea2798d9583c81a867a8a27c7559c873c35",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_D4_v2_rr1_Main.wav",
+   "sha256": "aa5626038a653de08057e1dae8a7160b12f2ce26c85a525bc545b8d14843ce80",
+   "sounding_key": 74,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1368508,
+   "git_blob_sha1": "0e230262665e212a99cab1a11cfdad30b9977492",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F4_v1_rr1_Main.wav",
+   "sha256": "95b7d6eeb71d77cce607c0c52b0a6dfd23d0eeedc2eb393fb9a6c5a5768f4aa5",
+   "sounding_key": 77,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2027468,
+   "git_blob_sha1": "ec0b4f8a15407cf79e943c7e895a0292947e7de1",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F4_v2_rr1_Main.wav",
+   "sha256": "76c2813ea1e87870dfbf3035360af46aee54214eda5e95b03bffb83f64a89b1c",
+   "sounding_key": 77,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1465148,
+   "git_blob_sha1": "0e113727968fe8c907e483ef619abadb8060431f",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A4_v1_rr1_Main.wav",
+   "sha256": "48e942290a982768d7a0038e28a76a99cb666673518b29ebdc55de5e1491025f",
+   "sounding_key": 81,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2388580,
+   "git_blob_sha1": "f49a1fadfdbc378aacbfbb2a57a6fb434dd90ede",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A4_v2_rr1_Main.wav",
+   "sha256": "fb507c5cb2f2023289fdf1384092f3c5e13f03a2b5b1c39f6792cc57aa77d58d",
+   "sounding_key": 81,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 641932,
+   "git_blob_sha1": "46a9c03a0ecfaee7246b10e2eec32908853ab860",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C5_v1_rr1_Main.wav",
+   "sha256": "be995c1164dcbbcf83688d095864a4abd0feaa68b71d1d2e78c35f62461fc03b",
+   "sounding_key": 84,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 1161864,
+   "git_blob_sha1": "7896c7155ca938445cf59e16c779c4504e911630",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C5_v2_rr1_Main.wav",
+   "sha256": "129c5661e386f3c08a4f777c108815f174d96e02f5fb4b4026a9437905327847",
+   "sounding_key": 84,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1019012,
+   "git_blob_sha1": "5ed1086c7afbe31827afa8be8a8c7c55dcbd7b01",
+   "layer": "v1",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E5_v1_rr1_Main.wav",
+   "sha256": "d2a9412550115bfdc4e1087cad3cd6e9d8146c1f4a91bf47f60aa7936c5f5dbe",
+   "sounding_key": 88,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 1496764,
+   "git_blob_sha1": "db7d41afbd1212d374ff9ae1050dae58fced279c",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E5_v2_rr1_Main.wav",
+   "sha256": "7e854b01269cd206cd863025c5b61416bba90362fa965597a7b174851d07648e",
+   "sounding_key": 88,
+   "velocity": 1.0
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "vibraphone",
+ "not_used_extra_takes": [],
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "vibraphone.lpm",
+ "tool": "tools/physmod/calibrate.py 190ni-1"
+}

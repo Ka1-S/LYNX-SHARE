@@ -1,0 +1,25 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+LYNX usa plugins VST3 y CLAP. Opciones, Gestor de plugins los lista.
+
+00:00:09.000 --> 00:00:14.400
+Carpetas de plugins muestra dónde busca LYNX: las carpetas estándar y las que añadas.
+
+00:00:14.800 --> 00:00:20.400
+Buscar plugins nuevos comprueba cada archivo en un proceso aparte, así uno defectuoso no tumba LYNX.
+
+00:00:20.800 --> 00:00:26.000
+Aquí: plugins gratuitos como Dragonfly Reverb y la colección LSP.
+
+00:00:26.400 --> 00:00:31.600
+Para usar uno, selecciona una pista del Mixer y haz clic en un slot vacío...
+
+00:00:32.000 --> 00:00:37.600
+...Plugin, Más plugins, y búscalo por nombre.
+
+00:00:38.000 --> 00:00:43.000
+Añadir abre la ventana propia del plugin.
+
+00:00:43.400 --> 00:00:49.000
+Pulsa Play: los acordes suenan ahora en la reverb de sala.

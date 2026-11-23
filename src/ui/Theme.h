@@ -79,6 +79,9 @@ inline juce::Colour noteSoft { 0xffb3545a };     // note colour at velocity 0
 inline juce::Colour noteHard { 0xffff6b6e };     // note colour at velocity 1
 inline juce::Colour noteMuted { 0xff4a4e57 };
 inline juce::Colour audioClip { 0xff5a87b8 };
+// issue #238 (round 190od): Playlist tracks, mixer tracks and channels without a colour of their own (FL's grey; Settings ›
+// Theme › Tracks)
+inline juce::Colour defaultTrack { 0xff485156 };
 } // namespace colour
 
 // User themes (round 162d): the tokens above hold LYNX's built-in look until a theme replaces them (ui/ThemeSettings.h
@@ -167,6 +170,12 @@ void saveUiFont (const juce::String& family);
 
 // Same for a text button (its padding included).
 int buttonWidth (const juce::TextButton& button, int minWidth, int maxWidth);
+
+// Round 190oo (design review 2, WG-13 / WG-31): for boxes laid out for the English texts (fixed widths, not sized yet):
+// how much wider than its English text the translation of any of `english` is in `font` (the largest difference; 0 in
+// English and when no translation is longer). A fixed English width + this keeps the English layout to the pixel and
+// gives a long translation (de "Übernehmen", ru "Насыщенность") the room it needs.
+int translationExtra (const juce::Font& font, std::initializer_list<const char*> english);
 
 // --- menus -------------------------------------------------------------------------------------------
 // Options › General › Menu density (round 163): compact rows close to native Windows / FL menus (the default),
@@ -318,6 +327,11 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
 // WCAG contrast ratio of two colours (1 … 21).
 float contrast (juce::Colour a, juce::Colour b);
 
+// Live's marks on a clip or track colour (round 190oj, design190oj CS-4/5/6): the colour × k (Live: name ×0.24, waveform
+// ×0.15; 7–10:1 on Live's pastels) when that reaches `ratio` on the fill, else `light` — on LYNX's and FL's darker colours
+// Live's dark ink read 1.5–3:1. Cached per colour (message thread; paint calls it per clip).
+juce::Colour liveMarkOn (juce::Colour fill, float k, float ratio, juce::Colour light);
+
 // A user colour as FL fills a button or a header band with it: the colour itself (FL keeps its saturation: Synth Bass
 // #0E4498, Grv Kick #8A211A measured in fl-channelrack.png), its brightness held in [lo, hi] so white text on it keeps
 // its contrast (LYNX: FL's lighter fills such as Titey Tom #B65227 read 4.2:1 with white).
@@ -343,6 +357,9 @@ void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce:
 // FL's middle ellipsis (core/MiddleEllipsis.h): `text` as it fits in `width` with `font`, start + ".." + end when it is
 // too long. Cached by text, font height and width, so a paint measures each name once.
 juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width);
+
+// Round 190pb: the palette's change count (setPalette), for keys of pictures drawn in the theme's colours.
+std::uint64_t paletteStampNow() noexcept;
 
 // Upper case for small caption headers, including accented Latin letters (ã -> Ã), which the C
 // runtime's towupper leaves alone on Windows.
@@ -490,6 +507,10 @@ public:
     juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos, juce::Rectangle<int> parentArea) override;
     void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
     void drawAlertBox (juce::Graphics&, juce::AlertWindow&, const juce::Rectangle<int>& textArea, juce::TextLayout&) override;
+    // JUCE's message boxes (showMessageBoxAsync, showOkCancelBox, showAsync...) on LYNX's one dialog frame (round 190oo, WG-6)
+    juce::AlertWindow* createAlertWindow (const juce::String& title, const juce::String& message, const juce::String& button1,
+                                          const juce::String& button2, const juce::String& button3, juce::MessageBoxIconType iconType,
+                                          int numButtons, juce::Component* associatedComponent) override;
     int getAlertWindowButtonHeight() override { return 30; }
     juce::Font getAlertWindowTitleFont() override;
     juce::Font getAlertWindowMessageFont() override;

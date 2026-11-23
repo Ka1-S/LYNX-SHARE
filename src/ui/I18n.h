@@ -43,7 +43,8 @@ juce::String saved();                         // id stored in the settings (defa
 void save (const juce::String& id);           // applied at the next start
 void initialise (const juce::StringArray& commandLine); // --lang <id> overrides the saved setting
 
-// The embedded table for a language id (empty for English).
+// The embedded table for a language id (empty for English; English shows a few keys through its display table,
+// resources/i18n/en/display.txt -> ui/I18nEnglish.h, applied by initialise()).
 juce::String tableText (const juce::String& id);
 bool hasTable (const juce::String& id);
 

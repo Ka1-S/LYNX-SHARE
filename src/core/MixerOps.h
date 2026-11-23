@@ -4,6 +4,7 @@
 // sidechain gestures, linking channels, effect slot reordering). Pure functions over the Song model:
 // no JUCE, unit-tested in tests/WorkflowP2Tests.inc.
 
+#include <functional>
 #include <set>
 #include <string>
 #include <vector>
@@ -12,6 +13,11 @@
 
 namespace lynx::mixerops
 {
+// Every reference to an insert in `song` (channels, Playlist tracks, sends, side-chains, slot sends, automation, links,
+// mix snapshots) through `map` (old insert -> new number; -1 = gone: sends removed, channels to the Master, automation
+// without a target). The mixer itself is not reordered (round 190pe, core/TrackImport.h).
+void remapInsertReferences (Song& song, const std::function<int (int)>& map);
+
 // Swaps inserts a and b (both >= 1): everything that refers to them by number follows (channel routing,
 // sends, sidechain inputs, automation and MIDI targets, controller sources).
 void swapTracks (Song& song, int a, int b);
@@ -120,6 +126,36 @@ std::set<int> revealedAfterDelete (const std::set<int>& revealed, std::vector<in
 // inserts shown, that number when its insert shows (in use or kept), else the nearest shown one before it (the Master
 // at worst), so no blank insert comes back into view.
 int selectionAfterDelete (const Song& song, const std::set<int>& revealed, int firstDeleted, bool usedOnly);
+
+// #226 (round 190nq): the name an automation clip gets when the mixer track it controlled is deleted (once: deleting
+// another track later doesn't add it again).
+inline std::string targetDeletedName (const std::string& name)
+{
+    static const std::string mark = " (target deleted)";
+    return name.size() >= mark.size() && name.compare (name.size() - mark.size(), mark.size(), mark) == 0 ? name : name + mark;
+}
+
+// #225 (round 190nq): FL 2026's Left / Right (and Ctrl / Shift + Left / Right) in the focused Mixer select the previous /
+// next mixer track, one track, nothing moved ([SHOT] 190nq mixkeys: HI TOM -> Right -> CRASH 2). The track `delta` steps
+// from `from` among `count` tracks (0 = Master), skipping the ones `hidden` says are not shown; it stays put at the ends.
+template <typename Hidden>
+int neighbourTrack (int count, int from, int delta, Hidden&& hidden)
+{
+    if (count <= 0)
+        return 0;
+    auto at = from < 0 ? 0 : (from >= count ? count - 1 : from);
+    const auto step = delta < 0 ? -1 : 1;
+    for (auto left = delta < 0 ? -delta : delta; left > 0; --left)
+    {
+        auto next = at + step;
+        while (next >= 0 && next < count && hidden (next))
+            next += step;
+        if (next < 0 || next >= count)
+            break;
+        at = next;
+    }
+    return at;
+}
 
 // Channels whose output goes to `track`.
 std::vector<int> channelsOn (const Song& song, int track);

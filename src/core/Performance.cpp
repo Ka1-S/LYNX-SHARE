@@ -1,5 +1,7 @@
 #include "core/Performance.h"
 #include "core/NoteEdit.h"
+#include "core/Sections.h"
+#include "core/ChordLane.h"
 
 #include <algorithm>
 #include <cmath>
@@ -579,6 +581,8 @@ void prepareForPerformance (Song& song, int count, std::int64_t spacing)
     spacing = std::max<std::int64_t> (1, spacing);
     const auto zone = (std::int64_t) count * spacing;
     noteedit::insertTime (song.playlist, song.markers(), 0, zone);
+    sections::insertTime (song.sections(), 0, zone); // (round 190ol: the Sections lane follows)
+    chordlane::insertTime (song.chords(), 0, zone);  // (round 190pf: the Chord lane too)
     for (int k = 0; k < count; ++k)
     {
         Marker m;

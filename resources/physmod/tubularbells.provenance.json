@@ -1,0 +1,240 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 2486736,
+   "git_blob_sha1": "f02c9d742f41ce4a1c5a9dd66bbc2c909003c77e",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C4_v2_1.wav",
+   "sha256": "a0a3cb432ed46c166ee5228c67b8a8a88a06fe24550a5b954547ef1528ffb0fd",
+   "sounding_key": 72,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 3377124,
+   "git_blob_sha1": "76efa7c6770b43a670a2cdde701ec26486af9c46",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C4_v4_1.wav",
+   "sha256": "d11d52910e0fc03c348bec0b0969960d737a6fdd3fa7380804f5751959e422c2",
+   "sounding_key": 72,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1729660,
+   "git_blob_sha1": "64c846a59b8410b9797b6dd32fd219d1fddc7255",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D4_v2_1.wav",
+   "sha256": "b1cfe7ba1e981f1d39487d4be03876c7ed932dd0e299444b1550279ef9f08d05",
+   "sounding_key": 74,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 3182656,
+   "git_blob_sha1": "a5b2de841fab544be3e6cced58b51f255b60a402",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D4_v4_2.wav",
+   "sha256": "4b496c05b345b33241342726237218b9c466f958bce36d95a504da21396e1694",
+   "sounding_key": 74,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 4099136,
+   "git_blob_sha1": "14278e7f262059be9d20cec7bd62b29c51d9fbde",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E4_v2_1.wav",
+   "sha256": "e1d7ae40d1d8632dbd44b6b6e1b32f3978e7bc52a22126919263dccf171c218d",
+   "sounding_key": 76,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 4319576,
+   "git_blob_sha1": "5bb77f3e3597dc81235001d63c00ab99f65bd363",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E4_v4_1.wav",
+   "sha256": "0bc73d5d044c3b43608a0f94e0658b46ce74da301186c304c8a673838cd78ca4",
+   "sounding_key": 76,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 3674268,
+   "git_blob_sha1": "70a5350168678a44127ce9de5bc9d5243830a7ea",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F4_v2_2.wav",
+   "sha256": "ca9d6627163e6f638a4e353d13c9ef11ea5f355436ee4e04a55103cfb840e645",
+   "sounding_key": 77,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 4546636,
+   "git_blob_sha1": "9e777c73eb1d7e46a1622d41bc84a628082f2173",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F4_v4_1.wav",
+   "sha256": "e2b2e695b67d845ee23cf8cf9c47754906a1d884f892065765ee0a47cc2cd6ef",
+   "sounding_key": 77,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 2189508,
+   "git_blob_sha1": "0879700d8af2f0f82253f746bc05dbcc809d83ce",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_G4_v2_1.wav",
+   "sha256": "6e7d2c65a88cc22203f25af7da82a1e075b5a702b52d043a80cce083b0bf50d3",
+   "sounding_key": 79,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2873324,
+   "git_blob_sha1": "5360b27e9e160acea82a4e705381007b0845b06c",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_G4_v4_1.wav",
+   "sha256": "de3df68f1dd86e71819de9c3a8284d5b5b11650e6f1c37483f505f86aa07cf68",
+   "sounding_key": 79,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 1709956,
+   "git_blob_sha1": "08ff477eb83489404366f61cda369da7f3bd9e69",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_A4_v2_1.wav",
+   "sha256": "1adb591ce8d5cf491a7e2a9fb9c2a4bc8ad6dd9f19f73e09e228f4ee1d1097d4",
+   "sounding_key": 81,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2705272,
+   "git_blob_sha1": "b18952c5dc4736bf6f138e87d61cd730ddfb4ebe",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_A4_v4_1.wav",
+   "sha256": "1767a647f2f8d5ac52f69c67692335f5718eedd2bce68106472f8b1ebacba9d0",
+   "sounding_key": 81,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 3641372,
+   "git_blob_sha1": "9246692c8c5f7b5535bc9405ddaf7c395e0c5d64",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_B4_v2_1.wav",
+   "sha256": "4442f49d2484136651bcb87759e3406f474b949d450390db89517ae1a695d8f3",
+   "sounding_key": 83,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 6379160,
+   "git_blob_sha1": "883fa764a28f69b06e756bf5d98371080a01da63",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_B4_v4_1.wav",
+   "sha256": "46dd90b325c971e8a37a9282e143da8cf457dfee1650276ba47b40480e74538f",
+   "sounding_key": 83,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 3296144,
+   "git_blob_sha1": "00a39246b47575981c2fee12b90d81c24945232d",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C5_v2_1.wav",
+   "sha256": "816b398d78d7bb0881c88e64ba781aaec4a1816495401f9ff4674854f4b70bec",
+   "sounding_key": 84,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 7836692,
+   "git_blob_sha1": "0256331a16c9c3a77a584f63d2c2caecffbba60d",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C5_v4_1.wav",
+   "sha256": "6ffc24c2ac7fba7158cd05ea0489bf4695a72388f45726c8fe68c4320a608661",
+   "sounding_key": 84,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 3430192,
+   "git_blob_sha1": "a1266721a159d5d9bdda1dbe6f33119a3a8a469b",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D5_v2_2.wav",
+   "sha256": "9d788db2ad32fabb9d8479560f24444b05e0e4169f17c8eb7c312d954f6151a7",
+   "sounding_key": 86,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 4396116,
+   "git_blob_sha1": "2b8a554644564e138b9f26e403e5b0ab96688be1",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D5_v4_1.wav",
+   "sha256": "d318b3ae041debbaf8205ddca22c6d2bc0b5cc435fa4ec5d7ea26e36158ea707",
+   "sounding_key": 86,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 2128072,
+   "git_blob_sha1": "831149f51e4e3a72cb35db4f8fc9b3b7c89d5fbb",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E5_v2_1.wav",
+   "sha256": "441d548b7feea9262dba6b1bc60a31e147e1f5f10d685bfa55c8114998215cce",
+   "sounding_key": 88,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 3007268,
+   "git_blob_sha1": "bf74da188e2f2676b640445a0f9dcc2aa23a50ed",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E5_v4_2.wav",
+   "sha256": "c4da2e348ffce8859213013ad839b5710300141368749cf380e1ecb76c2212d9",
+   "sounding_key": 88,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 2336976,
+   "git_blob_sha1": "5415ea3d805fb047a21ef1f5dd380678df3682fd",
+   "layer": "v2",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F5_v2_2.wav",
+   "sha256": "34736a3a68fad88dde3ff7d04613bdbc1ba7be0804b039fc07312089e5cb1c44",
+   "sounding_key": 89,
+   "velocity": 0.5
+  },
+  {
+   "bytes": 2150364,
+   "git_blob_sha1": "a0ac69c9184756b4f57879eab62031eb31e13778",
+   "layer": "v4",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F5_v4_1.wav",
+   "sha256": "73092de8cf6e23ee4b4d1e0ad8df28743b7ec3c04de3afe48f1c01f7d1ebd2bc",
+   "sounding_key": 89,
+   "velocity": 1.0
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "tubularbells",
+ "not_used_extra_takes": [],
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts; round 190nm: then each anchor's level matched through the engine, --level); rounds 190nl, 190nm",
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "tubularbells.lpm",
+ "tool": "tools/physmod/calibrate.py 190nm-1"
+}

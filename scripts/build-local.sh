@@ -19,10 +19,15 @@ fi
 # LYNX_OPT_FLAGS (round toolchain190gt): the optimisation flags, -O2 by default; e.g. "-O3" runs the test suite (and its
 # bit-exact hash tests) with the release builds' optimisation of the core
 FLAGS="-std=c++20 ${LYNX_OPT_FLAGS:--O2} -g -ffp-contract=off -Wall -Wextra -Wpedantic -Isrc -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher"
-CORE="src/flp/Flp.cpp src/core/Song.cpp src/core/MarkerPlan.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Comping.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/TimeStretch.cpp src/core/WarpEngines.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/AudioToMidi.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/PocketFx.cpp src/core/PocketMultiFx.cpp src/core/VisualFx.cpp src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/core/VideoPlayer.cpp src/core/FruityDance.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/EdisonFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/NebulaCloud.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/core/Scheduler.cpp src/core/Performance.cpp src/core/ClipLauncher.cpp src/core/Patcherize.cpp src/core/Instruments.cpp src/core/RackRenderer.cpp src/core/LoadTrace.cpp src/core/ModuleWarmup.cpp src/core/FlpImport.cpp src/core/FlpExport.cpp src/core/XmlLite.cpp src/core/Gzip.cpp src/core/AlsImport.cpp src/core/AlsExport.cpp src/flp/FlpWrite.cpp src/core/Effects.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp src/core/WaveTraveller.cpp src/core/FruitySlicer.cpp src/core/Slicex.cpp src/core/SlicexEngine.cpp src/core/VideoTime.cpp src/core/VideoTrack.cpp src/core/Adr.cpp src/core/DialogueAlign.cpp src/core/FlmFormat.cpp src/core/FlmImport.cpp src/core/BandFormat.cpp src/core/BandImport.cpp src/core/FlmEffects.cpp src/core/PocketFxC.cpp src/core/PocketFxD.cpp src/core/PocketFxE.cpp src/core/PocketReverb.cpp src/core/PocketFxB.cpp src/core/PocketFxA.cpp src/core/Fpc.cpp src/core/FpcInstrument.cpp src/core/FpcEnvelope.cpp src/core/Rack.cpp src/core/AlsDevices.cpp src/core/FlmNoteFx.cpp src/core/FlmDwSampler.cpp src/core/FlmSlicer.cpp src/core/SessionOps.cpp src/core/DrawMode.cpp src/core/AutoPointEdit.cpp src/core/Groove.cpp src/core/AlsDevicesLot2.cpp src/core/AlsDevicesLot3.cpp src/core/AlsDevicesLot4.cpp src/core/RemoteMap.cpp src/core/BlxImport.cpp src/core/RegionLoop.cpp src/core/SmartControls.cpp src/core/FactoryContent.cpp src/core/LoopKeywords.cpp src/core/SampleProps.cpp src/core/EdisonView.cpp src/core/HarmorResynth.cpp src/core/RenderAhead.cpp src/core/AlsDevicesLot5.cpp"
+CORE="src/flp/Flp.cpp src/core/Song.cpp src/core/MarkerPlan.cpp src/core/NoteEdit.cpp src/core/Recorder.cpp src/core/TakeRecording.cpp src/core/Comping.cpp src/core/Pdc.cpp src/core/WorkerPool.cpp src/core/OverloadGuard.cpp src/core/TimeStretch.cpp src/core/WarpEngines.cpp src/core/Arpeggiator.cpp src/core/SynthPresets.cpp src/core/Slicer.cpp src/core/AudioToMidi.cpp src/core/Templates.cpp src/core/FlWrapper.cpp src/core/FlEffects.cpp src/core/Effector.cpp src/core/VintagePhaser.cpp src/core/EmphasizerFx.cpp src/core/EmphasisFx.cpp src/core/TransporterFl.cpp src/core/EmphasisEngine.cpp src/core/FreqShifterFl.cpp src/core/LowLifterFl.cpp src/core/FlLegacyFx.cpp src/core/PocketFx.cpp src/core/PocketMultiFx.cpp src/core/VisualFx.cpp src/core/FlExtraFx.cpp src/core/Scratcher.cpp src/core/Dvs.cpp src/core/Transmitter.cpp src/core/VideoPlayer.cpp src/core/FruityDance.cpp src/core/Reeverb2.cpp src/core/LuxeVerb.cpp src/core/IldspMath.cpp src/core/ConvolverFx.cpp src/core/EquoFx.cpp src/core/PitchShifterFl.cpp src/core/SimSynth.cpp src/core/Wasp.cpp src/core/Granulizer.cpp src/core/Drumaxx.cpp src/core/FruityFilters.cpp src/core/NewtoneFx.cpp src/core/EdisonFx.cpp src/core/VocalPitch.cpp src/core/LynxTune.cpp src/core/LynxVerbs.cpp src/core/NebulaCloud.cpp src/core/MixSuite.cpp src/core/VoiceMatch.cpp src/core/EchoSuite.cpp src/core/LovePhilter.cpp src/core/DistructorFx.cpp src/core/MultibandDelayFx.cpp src/core/FrequencySplitter.cpp src/core/Slayer.cpp src/core/FlangusFastDist.cpp src/core/FruityPhaser.cpp src/core/FruityDelayBank.cpp src/core/FruityMultiband.cpp src/core/Vocodex.cpp src/core/FruityVocoder.cpp src/core/DelphiMath.cpp src/core/MaximusFx.cpp src/core/ParametricEqFl.cpp src/core/ParametricEqLinear.cpp src/core/FruityBasicFx.cpp src/core/TransistorBass.cpp src/core/GrossBeat.cpp src/core/StereoFx.cpp src/core/FruityDelay.cpp src/core/FruityShapers.cpp src/core/ChorusFx.cpp src/core/FruityDynamics.cpp src/core/FlSamplers.cpp src/core/FlSynths.cpp src/core/FlSytrus.cpp src/core/FlGenerators.cpp src/core/PhysicalModels.cpp src/core/DrumSynthLive.cpp src/core/SytrusEngine.cpp src/core/Harmless.cpp src/core/HarmlessFx.cpp src/core/Harmor.cpp src/core/Gms.cpp src/core/Morphine.cpp src/core/Ogun.cpp src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/FruitKick.cpp src/core/BassDrum.cpp src/core/MiniSynth.cpp src/core/Dx10.cpp src/core/Kepler.cpp src/core/PoiZone.cpp src/core/FlPatcher.cpp src/core/Patcher.cpp src/core/Vfx.cpp src/core/VfxSequencer.cpp src/core/Inflate.cpp src/core/WavPack.cpp src/core/Scheduler.cpp src/core/Performance.cpp src/core/ClipLauncher.cpp src/core/Patcherize.cpp src/core/Instruments.cpp src/core/RackRenderer.cpp src/core/LoadTrace.cpp src/core/ModuleWarmup.cpp src/core/FlpImport.cpp src/core/FlpExport.cpp src/core/XmlLite.cpp src/core/Gzip.cpp src/core/AlsImport.cpp src/core/AlsExport.cpp src/flp/FlpWrite.cpp src/core/Effects.cpp src/core/EmberClassic.cpp src/core/RhythmPan.cpp src/core/VoxStrip.cpp src/core/WaveTraveller.cpp src/core/FruitySlicer.cpp src/core/Slicex.cpp src/core/SlicexEngine.cpp src/core/VideoTime.cpp src/core/VideoTrack.cpp src/core/Adr.cpp src/core/DialogueAlign.cpp src/core/FlmFormat.cpp src/core/FlmImport.cpp src/core/FlmExport.cpp src/core/ModulatorExport.cpp src/core/BandFormat.cpp src/core/BandImport.cpp src/core/FlmEffects.cpp src/core/PocketFxC.cpp src/core/PocketFxD.cpp src/core/PocketFxE.cpp src/core/PocketReverb.cpp src/core/PocketFxB.cpp src/core/PocketFxA.cpp src/core/Fpc.cpp src/core/FpcInstrument.cpp src/core/FpcEnvelope.cpp src/core/Rack.cpp src/core/AlsDevices.cpp src/core/FlmNoteFx.cpp src/core/FlmDwSampler.cpp src/core/FlmSlicer.cpp src/core/SessionOps.cpp src/core/DrawMode.cpp src/core/AutoPointEdit.cpp src/core/Groove.cpp src/core/AlsDevicesLot2.cpp src/core/AlsDevicesLot3.cpp src/core/AlsDevicesLot4.cpp src/core/RemoteMap.cpp src/core/BlxImport.cpp src/core/RegionLoop.cpp src/core/SmartControls.cpp src/core/FactoryContent.cpp src/core/LoopKeywords.cpp src/core/SampleProps.cpp src/core/EdisonView.cpp src/core/HarmorResynth.cpp src/core/RenderAhead.cpp src/core/AlsDevicesLot5.cpp"
 
 # (the generated test chunks include tests/*.inc; the same flags everywhere keep one cached object per core file)
 FLAGS="$FLAGS -iquote tests"
+# Linux arm64 (a native build or a cross one, CXX=aarch64-linux-gnu-g++): a signed plain char, as on x86 and Apple
+# arm64 (CMakeLists.txt does the same; round 190oy)
+if $CXX -dM -E -x c++ /dev/null 2> /dev/null | grep -q '__aarch64__' && ! $CXX -dM -E -x c++ /dev/null 2> /dev/null | grep -q '__APPLE__'; then
+    FLAGS="$FLAGS -fsigned-char"
+fi
 
 mkdir -p build-local build-local/wavpack
 # workflow shell (key map, workspace layout, rack operations)
@@ -32,6 +37,7 @@ CORE="$CORE src/core/DawProject.cpp src/core/ZipLite.cpp" # DAWproject import / 
 CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/MidiTools.cpp src/core/MidiGenerate.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/GeneratorPresets.cpp src/core/ParamHelp.cpp"
 # Slicex as a channel (round 190l)
 CORE="$CORE src/core/SlicexInstrument.cpp"
+CORE="$CORE src/core/Jsfx.cpp" # JSFX scripts' identity, file policy and state (round 190pj)
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
 # Simple workflow: adding a track (round 184a)
@@ -52,6 +58,16 @@ CORE="$CORE src/core/GmsMobile.cpp"
 CORE="$CORE src/core/PocketSuperSaw.cpp"
 # Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
 CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
+# LYNX Model: LYNX's own physical-modelling instrument, mallets on a modal core (round 190ni)
+CORE="$CORE src/core/physmod/ModalBank.cpp src/core/physmod/LynxModel.cpp src/core/LynxModelBank.cpp"
+# Track clips: "Clips own their notes" on FL's instrument tracks (round 190ne)
+CORE="$CORE src/core/TrackClips.cpp"
+# The tracker editor's model and the module import (round 190nw)
+CORE="$CORE src/core/TrackerGrid.cpp src/core/ModuleImport.cpp"
+# Copy and paste between LYNX SHARE windows: what a pasted clip brings along (round 190nz, #232 stage 2)
+CORE="$CORE src/core/CrossPaste.cpp"
+# Track versions and the import of tracks from another project (round 190pe, research190oe P20 / P11)
+CORE="$CORE src/core/TrackVersions.cpp src/core/TrackImport.cpp"
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/WavetableUser.cpp src/core/AlsDevicesWt.cpp"
 # Braid (Live's Meld) and the spectral effects' import, round 190ko
@@ -162,11 +178,39 @@ mkdir -p build-local/pocketpy
 obj=build-local/pocketpy/pocketpy.o
 [[ -f "$obj" && "$obj" -nt third_party/pocketpy/pocketpy.c && "$obj" -nt third_party/pocketpy/pocketpy.h ]] || $CC -c -O2 -w -std=c11 -DPK_ENABLE_OS=0 -DPK_ENABLE_WATCHDOG=1 -Ithird_party/pocketpy third_party/pocketpy/pocketpy.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# libxmp-lite 4.7.4 (MIT; third_party/libxmp-lite): the module import's reader (round 190nw)
+mkdir -p build-local/libxmp
+for f in third_party/libxmp-lite/src/*.c third_party/libxmp-lite/src/loaders/*.c; do
+    obj="build-local/libxmp/$(basename "$f" .c).o"
+    [[ -f "$obj" && "$obj" -nt "$f" ]] || $CC -c -O2 -w -std=c99 -DLIBXMP_CORE_PLAYER -DLIBXMP_STATIC -D_REENTRANT -Ithird_party/libxmp-lite/include/libxmp-lite -Ithird_party/libxmp-lite/src "$f" -o "$obj"
+done
+WAVPACK="$WAVPACK $(ls build-local/libxmp/*.o | tr '\n' ' ')"
 # Monocypher (BSD-2 / CC0; third_party/monocypher): the live sessions' encryption (round 169b)
 mkdir -p build-local/monocypher
 obj=build-local/monocypher/monocypher.o
 [[ -f "$obj" && "$obj" -nt third_party/monocypher/monocypher.c ]] || $CC -c -O2 -w -Ithird_party/monocypher third_party/monocypher/monocypher.c -o "$obj"
 WAVPACK="$WAVPACK $obj"
+# ysfx + WDL's EEL2 (Apache-2.0 / zlib-style; third_party/ysfx): the JSFX runtime the tests check against upstream's
+# reference render (round 190pj; flags as CMakeLists.txt's lynx_ysfx: no @gfx, the GAS x86-64 code generator, empty on
+# other CPUs) (rollup 0.1.31 step 7: the Core jobs build with this script)
+mkdir -p build-local/ysfx
+YSFX_WDL=third_party/ysfx/thirdparty/WDL/source/WDL
+YSFX_DEFS="-DYSFX_API= -DYSFX_NO_GFX -DWDL_FFT_REALSIZE=8 -DWDL_LINEPARSE_ATOF=ysfx_wdl_atof -DNSEEL_ATOF=ysfx_wdl_atof -D_FILE_OFFSET_BITS=64 -Ithird_party/ysfx/include -Ithird_party/ysfx/sources -Ithird_party/ysfx/thirdparty/WDL/source -Ithird_party/ysfx/thirdparty/dr_libs"
+for f in third_party/ysfx/sources/ysfx*.cpp "$YSFX_WDL"/fft.c "$YSFX_WDL"/eel2/nseel-caltab.c "$YSFX_WDL"/eel2/nseel-cfunc.c \
+         "$YSFX_WDL"/eel2/nseel-compiler.c "$YSFX_WDL"/eel2/nseel-eval.c "$YSFX_WDL"/eel2/nseel-lextab.c "$YSFX_WDL"/eel2/nseel-ram.c \
+         "$YSFX_WDL"/eel2/nseel-yylex.c third_party/ysfx/sources/eel2-gas/sources/asm-nseel-x64-sse.S; do
+    name="$(basename "$f")"; obj="build-local/ysfx/${name%.*}.o"
+    if [[ ! -f "$obj" || "$f" -nt "$obj" ]]; then
+        case "$f" in
+            *.cpp) $CXX -c -O2 -w -std=gnu++17 -fsigned-char $YSFX_DEFS "$f" -o "$obj" ;;
+            *.S) $CC -c -O2 -w $YSFX_DEFS "$f" -o "$obj" ;;
+            *) $CC -c -O2 -w -std=gnu11 -fsigned-char $YSFX_DEFS "$f" -o "$obj" ;;
+        esac
+    fi
+    WAVPACK="$WAVPACK $obj"
+done
+[[ "$(uname -s)" == Linux ]] && WAVPACK="$WAVPACK -ldl -lpthread"
+FLAGS="$FLAGS -Ithird_party/ysfx/include -DYSFX_API="
 # zig links its compiler_rt, whose archive member also defines WEAK cos/sin/exp/log (double and x87 long double). When a
 # link needs any builtin of that member (128-bit division...), those copies replace glibc's libm, whose last bits the
 # x87 bit-exact goldens hold: the "no-LTO failures" of multiband_delay_exact and the Kepler tests (round speed185a; the
@@ -280,6 +324,10 @@ $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
 # a Live set, one WAV per MIDI track (round 190hs: the LYNX side of the Operator / Tetra quality gate)
 $CXX $FLAGS $CORE $WAVPACK tools/alsrender.cpp -o build-local/alsrender 2> >(grep -v 'glibc version' >&2)
+# LYNX Model's renderer / cost per voice (round 190ni: the timbre score's and the calibration's renders)
+$CXX $FLAGS $CORE $WAVPACK tools/physmodrender.cpp -o build-local/physmodrender 2> >(grep -v 'glibc version' >&2)
+# a tracker module rendered by libxmp-lite's own player (round 190nw): the module import's reference renders
+$CXX $FLAGS -DLIBXMP_STATIC -Ithird_party/libxmp-lite/include/libxmp-lite tools/modrender.cpp $(ls build-local/libxmp/*.o | tr '\n' ' ') -lm -o build-local/modrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/OggVorbis.cpp $(ls build-local/vorbis/*.o | tr '\n' ' ') tools/oggdecode.cpp -o build-local/oggdecode 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(grep -v 'glibc version' >&2)
 # LYNX effects offline, the LYNX side of the third-party parity harness (round tp172b)
@@ -322,6 +370,16 @@ if [[ -n "$TOOLS_QUEUE" && -f "$TOOLS_QUEUE" ]]; then
         xargs -P "$tools_jobs" -d '\n' -I{} bash -c '{}' < "$TOOLS_QUEUE"
         rm -f "$TOOLS_QUEUE"
     fi
+fi
+# LYNX_TESTS_RUN=0: build only, run nothing (a cross build, e.g. CXX=aarch64-linux-gnu-g++, whose tests then run under
+# qemu-user or on an arm64 machine: docs/BUILDING.md "Linux arm64")
+if [[ "${LYNX_TESTS_RUN:-1}" == 0 ]]; then
+    if [[ -n "${tools_pid:-}" ]]; then
+        wait "$tools_pid" || true
+        [[ "$(cat build-local/tools.rc 2> /dev/null)" == 0 ]] || { echo "build-local: the tools did not build (build-local/tools.log)" >&2; exit 1; }
+    fi
+    echo "build-local: built (LYNX_TESTS_RUN=0: no tests run)"
+    exit 0
 fi
 # LYNX_TEST_JOBS=<n> (or "auto": the CPUs) runs the tests in parallel shards, then the timing-sensitive ones alone
 # (scripts/run-tests.sh: same tests, same checks, the same "N checks, M failures" line). Unset or 1: one process, as before.

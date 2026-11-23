@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
 Elk kanaal speelt via een Mixer-insert. Elke insert heeft een fader, pan, mute en solo, een piekmeter, tien effectslots met elk een dry/wet-hoeveelheid, en een ingebouwde EQ. Alle inserts komen uiteindelijk in de Master tenzij je ze elders naartoe routeert. Druk op `F9` om de Mixer te tonen of te verbergen.
 
-Een project kan tot 127 inserts hebben. De Mixer heeft een toevoegstrook voor een nieuwe. Het vak in de titelbalk van de Mixer kiest een van acht striplayouts, van `Compact` tot `Extra groot`.
+Een project kan tot 500 inserts hebben. De Mixer heeft een toevoegstrook voor een nieuwe. Het vak in de titelbalk van de Mixer kiest een van acht striplayouts, van `Compact` tot `Extra groot`.
 
 ## Een effect op een kanaal zetten
 
@@ -115,9 +115,9 @@ Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt
 - Een instrumentplugin met meerdere uitgangen kan elke uitgang op een eigen insert laten spelen. Zie [Plugins van derden](/wiki/plugins/).
 - `Ctrl+L` doet verschillende dingen in het Channel Rack en in de Mixer. In het rack kiest het vrije inserts. In de Mixer gebruikt het de geselecteerde insert.
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.
-- De limiet is 127 inserts per project en tien effectslots per insert.
+- De limiet is 500 inserts per project en tien effectslots per insert.
 - De opname van Edison wordt bewaard als WAV-bestand in de map van het project, niet in het projectbestand zelf.
-- De Sessiemixer onder het clipraster hoort alleen bij de Clip-launch-werkwijze. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
+- De Sessiemixer onder het clipraster hoort alleen bij de Clipstart-lay-out. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
 
 ## Gerelateerd
 

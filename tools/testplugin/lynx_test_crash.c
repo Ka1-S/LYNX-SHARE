@@ -9,7 +9,7 @@
  *               (LYNX --plugintest / --crashguardtest: the slot must be switched off, the render must finish)
  *   "memcpy"  - the same, but as a memcpy from a null pointer (the fault is inside the C library, issue #155)
  *   "state"   - a null-pointer write when a saved state is loaded into it (state extension load)
- *   "thread"  - (Linux / macOS; round 190gg) in the Nth process() call it starts a thread of its own that writes to a
+ *   "thread"  - (Linux / macOS, round 190gg; Windows, round 190oh) in the Nth process() call it starts a thread of its own that writes to a
  *               null pointer: a fault outside every call the host makes (LYNX --crashguardtest ... thread)
  *   "editor-create" - (Linux / macOS; round 190gg) it offers an editor (CLAP gui, X11 / Cocoa) and writes to a null
  *               pointer when the host creates it (LYNX --crashguardtest ... ui: the editor is made under the guard)
@@ -102,6 +102,13 @@ static void* faulting_thread (void* arg)
     null_write();
     return NULL;
 }
+#else
+static DWORD WINAPI faulting_thread (LPVOID arg) /* (round 190oh: Windows) */
+{
+    (void) arg;
+    null_write();
+    return 0;
+}
 #endif
 static clap_process_status p_process (const clap_plugin_t* p, const clap_process_t* proc)
 {
@@ -113,14 +120,18 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
             null_write();
         if (crash_mode ("memcpy"))
             null_copy();
-#if ! defined(_WIN32)
         if (crash_mode ("thread"))
         {
+#if ! defined(_WIN32)
             pthread_t thread;
             if (pthread_create (&thread, NULL, faulting_thread, NULL) == 0)
                 pthread_detach (thread);
-        }
+#else
+            HANDLE thread = CreateThread (NULL, 0, faulting_thread, NULL, 0, NULL);
+            if (thread != NULL)
+                CloseHandle (thread);
 #endif
+        }
     }
     if (proc->audio_inputs_count < 1 || proc->audio_outputs_count < 1) return CLAP_PROCESS_CONTINUE;
     for (uint32_t c = 0; c < 2 && c < proc->audio_inputs[0].channel_count && c < proc->audio_outputs[0].channel_count; ++c)

@@ -12,6 +12,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/ScriptDialog.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
@@ -40,8 +41,7 @@ public:
           options (std::move (panelOptions))
     {
         header.setText (juce::String::fromUTF8 (form.title.c_str()), juce::dontSendNotification);
-        header.setFont (theme::font (theme::type::title));
-        header.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        ui::dialog::styleTitle (header); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (header);
         description.setText (juce::String::fromUTF8 (form.description.c_str()), juce::dontSendNotification);
         description.setFont (theme::font (theme::type::body));
@@ -146,7 +146,7 @@ public:
                 edit();
         };
         runButton.setButtonText (options.acceptText.isNotEmpty() ? options.acceptText : tr ("Run"));
-        runButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        ui::dialog::styleButton (runButton, true); // (WG-6: ... Cancel | Accept, the one accent button at the far right)
         runButton.onClick = [this] {
             stopTimer();
             accepted = true;
@@ -181,7 +181,8 @@ public:
             layout.createLayout (text, (float) (500 - 2 * theme::space::lg - 8));
             descriptionHeight = juce::jlimit (22, 200, (int) std::ceil (layout.getHeight()) + 6);
         }
-        setSize (500, 24 + 34 + (form.description.empty() ? 0 : descriptionHeight + 8) + (int) form.controls.size() * 36 + 52);
+        // (round 190oo WG-13: wider by what the translated buttons add, see buttonWidths; WG-6: the title row)
+        setSize (500 + buttonWidths().extra, 24 + 34 + titleGrowth + (form.description.empty() ? 0 : descriptionHeight + 8) + (int) form.controls.size() * 36 + 52);
     }
 
     ~ScriptPanel() override
@@ -190,13 +191,12 @@ public:
             options.dismissed();
     }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+    void paint (juce::Graphics& g) override { ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); }
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced (theme::space::lg);
-        header.setBounds (area.removeFromTop (26));
-        area.removeFromTop (8);
+        header.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto area = ui::dialog::bodyOf (getLocalBounds()).reduced (theme::space::lg);
         if (description.isVisible())
         {
             description.setBounds (area.removeFromTop (descriptionHeight));
@@ -210,18 +210,48 @@ public:
             area.removeFromTop (8);
         }
         auto buttons = area.removeFromBottom (30);
-        previewToggle.setBounds (buttons.removeFromLeft (84));
-        regenerateButton.setBounds (buttons.removeFromLeft (92));
-        cancelButton.setBounds (buttons.removeFromRight (70));
+        const auto w = buttonWidths(); // (round 190oo WG-13: translated widths; WG-6: the primary at the far right)
+        previewToggle.setBounds (buttons.removeFromLeft (w.preview));
+        regenerateButton.setBounds (buttons.removeFromLeft (w.regenerate));
+        runButton.setBounds (buttons.removeFromRight (w.run));
         buttons.removeFromRight (6);
-        runButton.setBounds (buttons.removeFromRight (70));
+        cancelButton.setBounds (buttons.removeFromRight (w.cancel));
         buttons.removeFromRight (6);
-        editButton.setBounds (buttons.removeFromRight (82));
+        editButton.setBounds (buttons.removeFromRight (w.edit));
         buttons.removeFromRight (6);
-        resetButton.setBounds (buttons.removeFromRight (64));
+        resetButton.setBounds (buttons.removeFromRight (w.reset));
     }
 
 private:
+    // the title row (WG-6) against the old 26 px header line and its 8 px gap
+    static constexpr int titleGrowth = ui::dialog::titleRowHeight + 1 - 26 - 8;
+    // Round 190oo (design review 2, WG-13): the buttons take the width their translation needs (de "Übernehmen" was
+    // "Überneh..." in 70 px, ru "Прослушивание" squeezed in 84); English keeps its widths (they are the minimum), and the
+    // form grows by what the shown buttons add.
+    struct ButtonWidths
+    {
+        int preview = 84, regenerate = 92, cancel = 70, run = 70, edit = 82, reset = 64, extra = 0;
+    };
+
+    ButtonWidths buttonWidths() const
+    {
+        ButtonWidths w;
+        const auto font = theme::font (theme::type::body);
+        const auto text = [&font] (const juce::Button& b, int padding, int minWidth) {
+            return juce::jlimit (minWidth, minWidth + 120, (int) std::ceil (juce::GlyphArrangement::getStringWidth (font, b.getButtonText())) + padding);
+        };
+        const auto before = (previewToggle.isVisible() ? w.preview + w.regenerate : 0) + w.cancel + w.run + (editButton.isVisible() ? w.edit : 0) + w.reset;
+        w.preview = text (previewToggle, 30, w.preview); // (the tick box, its gap and the text)
+        w.regenerate = text (regenerateButton, 18, w.regenerate);
+        w.cancel = text (cancelButton, 18, w.cancel);
+        w.run = text (runButton, 18, w.run);
+        w.edit = text (editButton, 18, w.edit);
+        w.reset = text (resetButton, 18, w.reset);
+        const auto after = (previewToggle.isVisible() ? w.preview + w.regenerate : 0) + w.cancel + w.run + (editButton.isVisible() ? w.edit : 0) + w.reset;
+        w.extra = juce::jmin (260, after - before);
+        return w;
+    }
+
     void changed()
     {
         if (previewToggle.getToggleState())

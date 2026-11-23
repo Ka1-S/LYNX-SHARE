@@ -1,15 +1,15 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
-![Le flux par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
+![La disposition par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 
-`Vue › Style de disposition` propose trois entrées : `Flux par patterns (par défaut)`, `Flux par lancement de clips` et `Flux simple`. Le même choix existe dans `Options › Réglages généraux`, sous Flux de travail. Le choix est conservé quand vous fermez le programme.
+`Vue › Style de disposition` propose trois entrées : `Disposition Pattern (par défaut)`, `Disposition par lancement de clips` et `Disposition simple`. Le même choix existe dans `Options › Réglages généraux`, sous Disposition. Le choix est conservé quand vous fermez le programme. Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez et choisit la disposition qui convient.
 
-Le flux par patterns, celui par défaut, fonctionne comme FL Studio : le Channel Rack, les patterns, le Piano Roll, la Playlist et le Mixer. Le flux par lancement de clips, dans le style d'Ableton Live, ajoute une grille de clips avec des scènes à côté de la Playlist, une table de mixage de session et les vues clip et appareil ; les patterns et le Channel Rack restent disponibles. Le flux simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile : des pistes et une timeline, des boucles, des pads et l'enregistrement rapide. Changer de flux ne déplace que les fenêtres : le projet reste le même.
+La disposition Pattern, celle par défaut, fonctionne comme FL Studio : le Channel Rack, les patterns, le Piano Roll, la Playlist et le Mixer. La disposition par lancement de clips, dans le style d'Ableton Live, ajoute une grille de clips avec des scènes à côté de la Playlist, une table de mixage de session et les vues clip et appareil ; les patterns et le Channel Rack restent disponibles. La disposition simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile : des pistes et une timeline, des boucles, des pads et l'enregistrement rapide. Changer de disposition ne déplace que les fenêtres : le projet reste le même.
 
 ## Lancer des clips dans la grille
 
-1. Choisissez `Vue › Style de disposition › Flux par lancement de clips`. La grille de clips apparaît à côté de la Playlist.
+1. Choisissez `Vue › Style de disposition › Disposition par lancement de clips`. La grille de clips apparaît à côté de la Playlist.
 2. Faites un clic droit sur un emplacement vide, choisissez `Placer un pattern ici` et sélectionnez un pattern. Un double-clic sur un emplacement vide y place le pattern actuel.
 3. Cliquez sur le triangle à gauche du clip pour le lancer. Si le transport est arrêté, il démarre.
 4. Cliquez sur le triangle d'une scène, dans la colonne `Scènes`, pour lancer tous les clips de cette ligne.
@@ -60,30 +60,30 @@ Le menu de l'emplacement a aussi deux options pour toute la grille : `Rendre les
 
 Quand vous ouvrez un set Live, ses clips de session et ses scènes vont dans la grille de clips, avec leurs réglages de lancement. `Fichier › Exporter › Set Ableton Live (.als)` réécrit la grille sous forme de clips de session. `Options › Réglages généraux` a `Clips de session des sets Live`, où `Playlist, après l'arrangement` les place plutôt dans la Playlist.
 
-## Le flux simple
+## La disposition simple
 
-`Vue › Style de disposition › Flux simple` est une fenêtre unique avec les pistes et la timeline, dans le style de BandLab et de FL Studio Mobile, et convient à un premier morceau. `Vue › Panneau de la piste` affiche sous la timeline un dock pour la piste sélectionnée, avec les onglets `Effets`, `Instrument`, `Clavier` et `Éditeur`. Dans ce flux, le menu `Aide` propose `Tour de la première chanson` et `Écran d'accueil...`, qui offre un premier morceau en sept étapes, un morceau de démonstration ou un projet vide. Voir [Disposition simple](/wiki/simple-layout/).
+`Vue › Style de disposition › Disposition simple` est une fenêtre unique avec les pistes et la timeline, dans le style de BandLab et de FL Studio Mobile, et convient à un premier morceau. `Vue › Panneau de la piste` affiche sous la timeline un dock pour la piste sélectionnée, avec les onglets `Effets`, `Instrument`, `Clavier` et `Éditeur`. Dans cette disposition, le menu `Aide` propose `Tour de la première chanson` et `Écran d'accueil...`, qui offre un premier morceau en sept étapes, un morceau de démonstration ou un projet vide. Voir [Disposition simple](/wiki/simple-layout/).
 
-`Paroles et notes` et `Correspondance de référence...` du menu `Vue`, et `Voix claire` dans le menu d'un insert du Mixer, existent dans toutes les dispositions. Dans le flux simple, `Voix claire` est aussi dans le menu d'une piste.
+`Paroles et notes` et `Correspondance de référence...` du menu `Vue`, et `Voix claire` dans le menu d'un insert du Mixer, existent dans toutes les dispositions. Dans la disposition simple, `Voix claire` est aussi dans le menu d'une piste.
 
 ## Revenir en arrière
 
-Choisissez `Vue › Style de disposition › Flux par patterns (par défaut)`. La disposition des fenêtres que vous aviez dans le flux par patterns revient, et les couloirs d'automation retrouvent leur réglage d'avant. Les clips de la grille restent dans le projet.
+Choisissez `Vue › Style de disposition › Disposition Pattern (par défaut)`. La disposition des fenêtres que vous aviez dans la disposition Pattern revient, et les couloirs d'automation retrouvent leur réglage d'avant. Les clips de la grille restent dans le projet.
 
 ## Bon à savoir
 
 - Une piste qui a lancé un clip reste muette dans la Playlist jusqu'à ce que vous appuyiez sur `Retour à la Playlist`. L'option `Rendre les pistes à la Playlist à l'arrêt du transport` le fait pour vous à chaque arrêt.
-- Les nouvelles touches de la grille (`B`, `Q`, `Ctrl+M`, `Ctrl+K` et d'autres) n'agissent ainsi que dans le flux par lancement de clips. Dans le flux par patterns, elles gardent le sens qu'elles ont dans FL Studio.
+- Les nouvelles touches de la grille (`B`, `Q`, `Ctrl+M`, `Ctrl+K` et d'autres) n'agissent ainsi que dans la disposition par lancement de clips. Dans la disposition Pattern, elles gardent le sens qu'elles ont dans FL Studio.
 - Une scène en 6/8 joue une mesure de trois temps, parce que la métrique compte des noires.
 - Les actions suivantes existent pour les clips, pas pour les scènes.
-- Les couloirs d'automation activés à la main dans le flux par lancement de clips ne sont pas conservés quand vous revenez en arrière.
-- Avec le flux par patterns sélectionné, rien de la grille n'est chargé.
+- Les couloirs d'automation activés à la main dans la disposition par lancement de clips ne sont pas conservés quand vous revenez en arrière.
+- Avec la disposition Pattern sélectionnée, rien de la grille n'est chargé.
 
 ## Voir aussi
 
 - [Playlist](/wiki/playlist/)
 - [Venir d'Ableton Live](/wiki/coming-from-ableton/)
 - [Importer des projets](/wiki/importing-projects/)
-- [Ce que seul LYNX fait : les flux de travail](/why/#workflows)
+- [Ce que seul LYNX fait : les dispositions](/why/#workflows)
 
 La troisième entrée est une fenêtre pour un premier morceau. Voir [Disposition simple](/wiki/simple-layout/).

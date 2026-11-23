@@ -1,5 +1,5 @@
 ---
-source: 98cfcfdbfe
+source: 3043ff188d
 ---
 ![Het venster Sneltoetsen beheren: een doorzoekbare lijst van acties met de toetsen van elke actie](/assets/img/wiki/shortcuts.webp)
 
@@ -79,7 +79,7 @@ Een aantal van deze toetsen doet iets anders binnen een editor die de focus heef
 
 ## Clip View en Device View
 
-Deze toetsen werken alleen in de Clipstart-werkwijze.
+Deze toetsen werken alleen in de Clipstart-lay-out.
 
 | Toets | Wat hij doet |
 |---|---|

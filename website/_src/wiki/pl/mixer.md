@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![Mixer](/assets/img/mixer.webp)
 
 Każdy kanał gra przez insert Mixera. Każdy insert ma suwak, panoramę, wyciszenie i solo, miernik szczytów, dziesięć slotów efektów z własną ilością dry/wet oraz wbudowany korektor. Wszystkie inserty kończą w Masterze, chyba że poprowadzisz je gdzie indziej. Naciśnij `F9`, żeby pokazać lub ukryć Mixer.
 
-Projekt może mieć do 127 insertów. Mixer ma pasek dodawania nowego. Pole w pasku tytułu Mixera wybiera jeden z ośmiu układów pasków, od `Kompaktowy` do `Bardzo duży`.
+Projekt może mieć do 500 insertów. Mixer ma pasek dodawania nowego. Pole w pasku tytułu Mixera wybiera jeden z ośmiu układów pasków, od `Kompaktowy` do `Bardzo duży`.
 
 ## Dodaj efekt do kanału
 
@@ -115,9 +115,9 @@ Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio,
 - Plugin instrumentu z kilkoma wyjściami może grać każde wyjście na własnym insercie. Zobacz [Pluginy innych producentów](/wiki/plugins/).
 - `Ctrl+L` robi co innego w Channel Racku i w Mixerze. W racku wybiera wolne inserty. W Mixerze używa zaznaczonego insertu.
 - Przełączniki tras pojawiają się na innych paskach, nie na zaznaczonym.
-- Limit to 127 insertów na projekt i dziesięć slotów efektów na insert.
+- Limit to 500 insertów na projekt i dziesięć slotów efektów na insert.
 - Nagranie Edisona jest przechowywane jako plik WAV w folderze projektu, a nie w pliku projektu.
-- Mikser sesji pod siatką klipów należy tylko do sposobu pracy Clip-launch. Pokazuje te same inserty co ten Mixer. Zobacz [Układy](/wiki/layouts/).
+- Mikser sesji pod siatką klipów należy tylko do układu Clip-launch. Pokazuje te same inserty co ten Mixer. Zobacz [Układy](/wiki/layouts/).
 
 ## Powiązane
 

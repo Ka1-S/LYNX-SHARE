@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![Edytor automatyzacji z krzywą rosnącą przez sześć taktów](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Włącz nagrywanie z zaznaczonym `Automatyka` w filtrze nagrywania, naciśnij od
 
 - `Powiąż z kontrolerem MIDI (porusz gałką na kontrolerze)` opisujemy w [Kontrolerach MIDI](/wiki/midi-controllers/).
 - `Powiąż z kontrolerem wewnętrznym` pozwala, żeby elementem sterowała Obwiednia, Formula albo Peak Controller z projektu. Najpierw dodaj jeden z nich.
-- `Moduluj` podpina modulator, czyli LFO albo losowe źródło, które porusza gałką LYNX SHARE wokół jej własnej wartości. `Narzędzia › Modulatory...` je wylicza.
+- `Moduluj przez` podpina modulator, który porusza elementem sterującym wokół jego własnej wartości: LFO, follower obwiedni, obwiednię ADSR, kroki, losowe źródło, makro, keytrack lub velocity. Działa na gałkach LYNX SHARE i na parametrach pluginów zewnętrznych. Modulator można też przeciągnąć na gałkę, a pierścień na gałce pokazuje ruch. `Narzędzia › Modulatory...` wylicza je.
 
 ## Ścieżki automatyzacji
 
@@ -88,7 +88,8 @@ Włącz nagrywanie z zaznaczonym `Automatyka` w filtrze nagrywania, naciśnij od
 - Kilka klipów na jednym elemencie gra każdy w swoim miejscu. Przed pierwszym klipem element zachowuje własną wartość.
 - Na początku klipu element osiąga nową wartość w około 8 ms. FL Studio dojeżdża tam płynnie, więc zaimportowany projekt może w tych punktach nieco się różnić.
 - Tam, gdzie klipy na tym samym elemencie się nakładają, klip wybrany przez LYNX SHARE może być inny niż wybrany przez FL Studio.
-- Modulatory działają tylko na własnych gałkach LYNX SHARE i są pomijane przy eksporcie do `.flp`.
+- Przy eksporcie do `.flp` modulatory, które podążają za pozycją w utworze, stają się klipami automatyki (zsynchronizowane LFO staje się klipowym LFO FL Studio). Followery, obwiednie, keytrack i velocity są pomijane, a raport je wylicza.
+- Poruszyłeś elementem sterującym podczas odtwarzania bez nagrywania? `Przechwyć automatykę` w opcjach nagrywania zamienia ostatnie ruchy na automatykę po fakcie.
 
 ## Powiązane
 

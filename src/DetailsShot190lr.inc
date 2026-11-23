@@ -155,7 +155,11 @@
                                && juce::String (offline.getSong().patterns[(std::size_t) b].name).endsWith (" B"));
                     dock->stepsAddClipForCheck(); // (BandLab: an empty pattern is not put on the track)
                     check ("Add on an empty pattern: nothing added", offline.getSong().playlist.back().pattern != b);
+                    check ("Add on an empty pattern: the bubble says why", dock->stepsMessagesShownForCheck() == 1);
+                    dock->stepsAddClipForCheck();
+                    check ("Add again: still one bubble (round 190nr)", dock->stepsMessagesShownForCheck() == 1);
                     dock->stepsClickForCheck (0, 0);
+                    check ("a step set: the bubble goes (round 190nr; it stayed over the window shot)", dock->stepsMessagesShownForCheck() == 0);
                     dock->stepsClickForCheck (0, 8);
                     offline.dispatchPendingMessages();
                     const auto clips = offline.getSong().playlist.size();

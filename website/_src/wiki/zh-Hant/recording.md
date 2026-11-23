@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![錄製視窗詢問要錄製什麼：音訊、音符和自動化、全部，或是錄入音訊編輯器的音訊](/assets/img/wiki/record-dialog.webp)
 

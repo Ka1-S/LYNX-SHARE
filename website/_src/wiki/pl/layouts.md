@@ -1,15 +1,15 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
-![Praca z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
+![Układ z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 
-`Widok › Styl układu` ma trzy pozycje: `Praca na wzorcach (domyślnie)`, `Praca z uruchamianiem klipów` i `Prosty sposób pracy`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Sposób pracy. Wybór jest zapamiętywany po zamknięciu programu.
+`Widok › Styl układu` ma trzy pozycje: `Układ Pattern (domyślnie)`, `Układ z uruchamianiem klipów` i `Prosty układ`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Układ. Wybór jest zapamiętywany po zamknięciu programu. Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz, i wybiera pasujący układ.
 
-Praca na wzorcach, domyślna, działa tak jak FL Studio: Channel Rack, patterny, Piano Roll, Playlist i Mixer. Praca z uruchamianiem klipów, w stylu Ableton Live, dodaje obok Playlisty siatkę klipów ze scenami, mikser sesji oraz widok klipu i urządzeń; patterny i Channel Rack pozostają dostępne. Prosty sposób pracy łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile: ścieżki i oś czasu, pętle, pady i szybkie nagrywanie. Przełączenie przestawia tylko okna: projekt zostaje ten sam.
+Układ Pattern, domyślny, działa tak jak FL Studio: Channel Rack, patterny, Piano Roll, Playlist i Mixer. Układ z uruchamianiem klipów, w stylu Ableton Live, dodaje obok Playlisty siatkę klipów ze scenami, mikser sesji oraz widok klipu i urządzeń; patterny i Channel Rack pozostają dostępne. Prosty układ łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile: ścieżki i oś czasu, pętle, pady i szybkie nagrywanie. Przełączenie przestawia tylko okna: projekt zostaje ten sam.
 
 ## Uruchamiaj klipy w siatce
 
-1. Wybierz `Widok › Styl układu › Praca z uruchamianiem klipów`. Obok Playlisty pojawia się siatka klipów.
+1. Wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`. Obok Playlisty pojawia się siatka klipów.
 2. Kliknij pusty slot prawym przyciskiem, wybierz `Umieść tu wzorzec` i wskaż pattern. Dwuklik na pustym slocie umieszcza tam bieżący pattern.
 3. Kliknij trójkąt po lewej stronie klipu, żeby go uruchomić. Jeśli transport jest zatrzymany, ruszy.
 4. Kliknij trójkąt sceny w kolumnie `Sceny`, żeby uruchomić każdy klip w tym wierszu.
@@ -60,23 +60,23 @@ Menu slotu ma też dwie opcje dla całej siatki: `Oddawaj ścieżki Playliście 
 
 Gdy otwierasz set Live, jego klipy i sceny Session trafiają do siatki klipów razem z ustawieniami uruchamiania. `Plik › Eksportuj › Set Ableton Live (.als)` zapisuje siatkę z powrotem jako klipy Session. `Opcje › Ustawienia ogólne` ma `Klipy sesji z zestawów Live`, gdzie `Playlista, po aranżacji` umieszcza je zamiast tego na Playliście.
 
-## Prosty sposób pracy
+## Prosty układ
 
-`Widok › Styl układu › Prosty sposób pracy` to jedno okno ze ścieżkami i osią czasu, w stylu BandLab i FL Studio Mobile, które dobrze nadaje się na pierwszy utwór. `Widok › Panel ścieżki` pokazuje pod osią czasu dok wybranej ścieżki, z kartami `Efekty`, `Instrument`, `Klawiatura` i `Edytor`. W tym sposobie pracy menu `Pomoc` ma `Samouczek pierwszej piosenki` i `Ekran powitalny...`, które oferuje siedmiokrokowy pierwszy utwór, utwór demo albo pusty projekt. Zobacz [Prosty układ](/wiki/simple-layout/).
+`Widok › Styl układu › Prosty układ` to jedno okno ze ścieżkami i osią czasu, w stylu BandLab i FL Studio Mobile, które dobrze nadaje się na pierwszy utwór. `Widok › Panel ścieżki` pokazuje pod osią czasu dok wybranej ścieżki, z kartami `Efekty`, `Instrument`, `Klawiatura` i `Edytor`. W tym układzie menu `Pomoc` ma `Samouczek pierwszej piosenki` i `Ekran powitalny...`, które oferuje siedmiokrokowy pierwszy utwór, utwór demo albo pusty projekt. Zobacz [Prosty układ](/wiki/simple-layout/).
 
-`Tekst i notatki` i `Dopasowanie do referencji...` w menu `Widok` oraz `Czysty wokal` w menu insertu Mixera są dostępne w każdym układzie. W prostym sposobie pracy `Czysty wokal` jest też w menu ścieżki.
+`Tekst i notatki` i `Dopasowanie do referencji...` w menu `Widok` oraz `Czysty wokal` w menu insertu Mixera są dostępne w każdym układzie. W prostym układzie `Czysty wokal` jest też w menu ścieżki.
 
 ## Wróć
 
-Wybierz `Widok › Styl układu › Praca na wzorcach (domyślnie)`. Układ okien, który miałeś w pracy na wzorcach, wraca, a ścieżki automatyzacji wracają do ustawienia sprzed zmiany. Klipy w siatce zostają w projekcie.
+Wybierz `Widok › Styl układu › Układ Pattern (domyślnie)`. Układ okien, który miałeś w układzie Pattern, wraca, a ścieżki automatyzacji wracają do ustawienia sprzed zmiany. Klipy w siatce zostają w projekcie.
 
 ## Warto wiedzieć
 
 - Ścieżka, która uruchomiła klip, milczy w Playliście, dopóki nie naciśniesz `Powrót do Playlisty`. Opcja `Oddawaj ścieżki Playliście po zatrzymaniu transportu` robi to za ciebie przy każdym zatrzymaniu.
-- Nowe klawisze siatki (`B`, `Q`, `Ctrl+M`, `Ctrl+K` i inne) działają w ten sposób tylko w sposobie pracy Clip-launch. W sposobie pracy Pattern zachowują znaczenie z FL Studio.
+- Nowe klawisze siatki (`B`, `Q`, `Ctrl+M`, `Ctrl+K` i inne) działają w ten sposób tylko w układzie Clip-launch. W układzie Pattern zachowują znaczenie z FL Studio.
 - Scena w 6/8 gra takt z trzech uderzeń, ponieważ metrum liczy ćwierćnuty.
 - Akcje następcze istnieją dla klipów, nie dla scen.
-- Ścieżki automatyzacji włączone ręcznie podczas pracy z uruchamianiem klipów nie są zachowywane po powrocie.
+- Ścieżki automatyzacji włączone ręcznie podczas układu z uruchamianiem klipów nie są zachowywane po powrocie.
 - Przy wybranej pracy na wzorcach nic z siatki nie jest wczytywane.
 
 ## Powiązane
@@ -84,6 +84,6 @@ Wybierz `Widok › Styl układu › Praca na wzorcach (domyślnie)`. Układ okie
 - [Playlist](/wiki/playlist/)
 - [Przejście z Ableton Live](/wiki/coming-from-ableton/)
 - [Import projektów](/wiki/importing-projects/)
-- [Co robi tylko LYNX: sposoby pracy](/why/#workflows)
+- [Co robi tylko LYNX: układy](/why/#workflows)
 
 Trzecia pozycja to jedno okno na pierwszy utwór. Zobacz [Układ prosty](/wiki/simple-layout/).

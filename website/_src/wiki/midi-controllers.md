@@ -102,7 +102,7 @@ MPE is at a first stage. An MPE controller plays each note with its own pitch be
 
 ## MIDI Map Mode and Key Map Mode
 
-In the [Clip-launch workflow](/wiki/layouts/), clips, scenes and buttons can be mapped as in Ableton Live. The `MIDI` and `Key` buttons beside the `Both`, `Grid`, `Song` switch turn the modes on, as do `Ctrl+M` and `Ctrl+K`.
+In the [Clip-launch layout](/wiki/layouts/), clips, scenes and buttons can be mapped as in Ableton Live. The `MIDI` and `Key` buttons beside the `Both`, `Grid`, `Song` switch turn the modes on, as do `Ctrl+M` and `Ctrl+K`.
 
 1. Press `Ctrl+M` for MIDI Map Mode, or `Ctrl+K` for Key Map Mode. Every element that can be mapped is tinted, blue for MIDI and orange for keys.
 2. Click an element: a clip slot, a scene, a track's stop button, `Stop all clips`, play, stop, record, `Session Record`, the metronome, or a knob of the Session mixer or the Device View.
@@ -147,7 +147,7 @@ In the [Clip-launch workflow](/wiki/layouts/), clips, scenes and buttons can be 
 - A note held by a pedal is recorded up to the moment the pedal comes up.
 - An automation clip does not take a control back while you move it from a controller. The control follows its automation again when playback next starts.
 - Note links made in `Remote control settings` are not written to a .flp export.
-- `Ctrl+M` and `Ctrl+K` start the map modes in the Clip-launch workflow only. Map Mode has no macro mapping or note ranges yet.
+- `Ctrl+M` and `Ctrl+K` start the map modes in the Clip-launch layout only. Map Mode has no macro mapping or note ranges yet.
 
 ## Related
 

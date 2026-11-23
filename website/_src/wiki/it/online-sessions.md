@@ -1,5 +1,5 @@
 ---
-source: 7db9a73959
+source: bf45e1d436
 ---
 Ci sono due modi per lavorare a un progetto con altre persone, e tutti e due sono sotto `File › Sessione online`. Un pacchetto è un file che invii a un amico, il quale ti rimanda una parte. Non richiede rete, account né server. Una sessione live collega tutti via internet attraverso il relay di LYNX SHARE, e ogni modifica arriva a tutti. In un progetto possono partecipare fino a 4 persone, te compreso.
 
@@ -69,7 +69,7 @@ Il menu `File › Sessione online` ha questi comandi mentre una sessione è in c
 | `Chiudi sessione live` | Per l'host. Tutti escono e il codice smette di funzionare |
 | `Lascia sessione live` | Per un ospite. La tua parte del progetto resta con te |
 
-In `Persone e permessi...`, ogni persona ha uno di quattro ruoli: `I propri canali, pattern, insert e righe`, `Le proprie parti + tempo e impostazioni del progetto`, `Tutto` o `Solo ascolto (nessuna modifica)`. Disattivare un permesso non elimina mai nulla.
+In `Persone e permessi...`, ogni persona ha uno di quattro ruoli: `I propri canali, pattern, insert e righe`, `Le proprie parti + tempo e impostazioni del progetto`, `Tutto` o `Solo ascolto (nessuna modifica)`. Disattivare un permesso non elimina mai nulla. La quinta scelta, `Rimuovi dalla sessione`, toglie la persona dalla sessione. Per impostazione predefinita la sessione riceve allora un nuovo codice d'invito per chi si unisce da quel momento, e chi è ancora dentro continua; `Mantieni lo stesso codice` mantiene il vecchio.
 
 ## Plugin che gli altri non hanno
 

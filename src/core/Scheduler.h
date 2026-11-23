@@ -38,6 +38,9 @@ struct NoteEvent
     float slideSamples = 0.0f; // slide: glide duration
     bool porta = false;        // the note inverts the channel's porta
     bool echo = false;         // a repeat of the channel's echo delay (FL's generated voices: not in the Mono list, round 168l)
+    // slide: the arpeggiator's own Slide step (round 190pi) — it glides the arpeggio's voice to its next key and moves
+    // nothing else (a slide note of the song still moves the voice's velocity, pan and Mod X / Y, issue #236)
+    bool arpGlide = false;
     // audio clips: fades (in samples) and the position within the clip when the note starts
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f;
     // bit 0: the fade-in is a crossfade (FL's S curve, clipops::crossfadeCurve), bit 1: the fade-out (round 166e);
@@ -126,6 +129,7 @@ public:
     void clear() noexcept
     {
         count = 0;
+        heldCount = 0;
         overflow = false;
         clock = 0.0;
     }
@@ -147,6 +151,7 @@ public:
     // channels inserted, removed or moved: from[c] = the old index of channel c (−1 = a new channel)
     void moveChannels (const std::vector<int>& from) noexcept;
     int sounding() const noexcept { return count; }
+    int heldSteps() const noexcept { return heldCount; }
 
 private:
     struct Entry
@@ -157,6 +162,10 @@ private:
     };
     std::array<Entry, capacity> entries {};
     int count = 0;
+    // FL's held step notes (round 190oz, REA_rodada190oz §5): a step note on a generator (an "on" with lengthTicks < 0)
+    // sounds until its channel's next note starts; then its "off" comes on that note's sample, before it. One per channel.
+    std::array<Entry, 1024> held {};
+    int heldCount = 0;
     bool overflow = false; // a note could not be kept: every "off" passes until the next clear()
     double clock = 0.0;    // ticks played since clear()
     std::uint32_t nextId = 1; // (round 190ej: 1 … 2^24 − 1; the top byte is left for NoteEcho's repeats, noteEchoId)
@@ -211,6 +220,13 @@ PlaybackLoop playbackLoop (bool songMode, double loopStart, double loopEnd, doub
 // The position hosted plugins see (their play head): within the pattern in Pattern mode, within the song in Song
 // mode, so plugins synced to the host follow the loop like in FL instead of counting on forever.
 double hostPositionTick (const Song& song, double tick, std::int64_t songLength) noexcept; // songLength = song.songLength()
+// Issue #199 (round 190od): where that position wraps while it plays (the pattern's end in Pattern mode; the loop's
+// end, or the song's end without a loop region, in Song mode) and where it goes on from, in the same terms. at = 0: none.
+struct HostPositionWrap
+{
+    double at = 0.0, to = 0.0;
+};
+HostPositionWrap hostPositionWrap (const Song& song, std::int64_t songLength) noexcept;
 
 // Index built once per snapshot so scheduleSong doesn't scan every note on every block:
 // song length and the longest note of each pattern. Requires notes sorted by start.

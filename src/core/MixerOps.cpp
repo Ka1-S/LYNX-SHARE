@@ -294,37 +294,40 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
                 pt.mode = PlaylistTrackMode::unassigned;
         }
 
+    auto fix = [&map] (EffectSlot& slot) {
+        const auto exportsOrigin = originMatches (slot);
+        for (auto* source : { &slot.sidechain, &slot.sidechain2 })
+            if (*source > 0)
+                *source = std::max (-1, map (*source));
+        for (auto& send : slot.sendTracks)
+            if (send > 0)
+                send = std::max (0, map (send));
+        for (auto& t : slot.patcher.outputTracks)
+            if (t > 0)
+                t = std::max (0, map (t));
+        if (slot.kind == EffectKind::fruitySend)
+            remapTrackParam (slot.params[3], map);
+        else if (slot.kind == EffectKind::flTransporter)
+            remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
+        if (exportsOrigin)
+        {
+            patchOriginTracks (slot); // (unchanged numbers write the same bytes)
+            slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
+        }
+    };
     for (auto& track : song.mixer)
     {
         for (auto& send : track.sends)
             send.target = map (send.target);
         track.sends.erase (std::remove_if (track.sends.begin(), track.sends.end(), [] (const MixerSend& s) { return s.target <= 0; }),
                            track.sends.end());
-
-        auto fix = [&map] (EffectSlot& slot) {
-            const auto exportsOrigin = originMatches (slot);
-            for (auto* source : { &slot.sidechain, &slot.sidechain2 })
-                if (*source > 0)
-                    *source = std::max (-1, map (*source));
-            for (auto& send : slot.sendTracks)
-                if (send > 0)
-                    send = std::max (0, map (send));
-            for (auto& t : slot.patcher.outputTracks)
-                if (t > 0)
-                    t = std::max (0, map (t));
-            if (slot.kind == EffectKind::fruitySend)
-                remapTrackParam (slot.params[3], map);
-            else if (slot.kind == EffectKind::flTransporter)
-                remapTrackParam (slot.params[(std::size_t) transporter::sendParam], map);
-            if (exportsOrigin)
-            {
-                patchOriginTracks (slot); // (unchanged numbers write the same bytes)
-                slot.flOrigin.fingerprint = flpexport::fingerprint (slot);
-            }
-        };
         for (auto& slot : track.effects)
             forEachSlot (slot, fix);
     }
+    for (auto& pt : song.playlistTracks) // round 190pe: the device chains kept by track versions that are not active
+        for (auto& v : pt.versions)
+            for (auto& slot : v.chain)
+                forEachSlot (slot, fix);
 
     song.forEachTarget ([&map] (AutomationTarget& t) {
         if (! isTrackTarget (t.kind))
@@ -344,6 +347,12 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
     mixsnap::remap (song, map); // the mix snapshots' inserts and sends (round 190hp)
 }
 } // namespace
+
+// round 190pe (core/TrackImport.h): the same renumbering for a song of another project before its inserts come in
+void remapInsertReferences (Song& song, const std::function<int (int)>& map)
+{
+    remapTrackReferences (song, map);
+}
 
 void swapTracks (Song& song, int a, int b)
 {
@@ -636,9 +645,19 @@ bool deleteTrack (Song& song, int t)
     if (t < 1 || t >= count)
         return false;
 
+    // #226 (round 190nq): an automation clip whose target goes with the insert (its fader, a send to it...) keeps its
+    // points but controls nothing: its name says so, instead of still naming the deleted track
+    std::vector<std::size_t> targeted;
+    for (std::size_t a = 0; a < song.automations.size(); ++a)
+        if (song.automations[a].target.kind != AutomationTargetKind::none)
+            targeted.push_back (a);
+
     // one shift of every reference: the deleted insert's links go, the following inserts move one place left and a
     // blank insert takes the last place (the count stays)
     remapTrackReferences (song, [t] (int x) { return x == t ? -1 : x > t ? x - 1 : x; });
+    for (const auto a : targeted)
+        if (auto& automation = song.automations[a]; automation.target.kind == AutomationTargetKind::none)
+            automation.name = targetDeletedName (automation.name);
     song.mixer.erase (song.mixer.begin() + t);
     song.mixer.emplace_back();
     renumberDefaultNames (song, t, -1);

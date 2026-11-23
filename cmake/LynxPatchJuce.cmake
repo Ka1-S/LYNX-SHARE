@@ -322,6 +322,47 @@
 #       deeper tree made Clip-launch's Arrangement +9 % slower before this). Equal keys stay JUCE's equal keys.
 #    Both caches are pure functions of their keys, so the pixels are the same; the memory is a few MB at most.
 #
+# 47. Every platform ("fix 190oh" in round online_host_190oh's branch),
+#    juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (round 190oh, P3: FL's wrapper Settings › GUI): the
+#    VST3 editor window's two size conversions (componentToVST3Rect / vst3ToComponentRect) leave the display's scale out
+#    when LYNX marked the editor "lynxScaleEditorDimensions" (FL's "Scale editor dimensions", or a DPI-unaware window):
+#    the size the plugin reports is then taken in logical pixels. An editor LYNX did not mark is sized as before.
+#
+# 48. Windows only ("fix 190os" in round perf6_190os's branch), juce_graphics/native/juce_DirectX_windows.h,
+#    on top of fix 43: the Direct3D 11 device has no driver threads by default when LYNX may use 4 logical CPUs or
+#    fewer (LYNX_D3D_DRIVER_THREADS=1: always the driver's threads; =0: never, as fix 43). Measured with a song that
+#    overloads a PC with 2 CPUs (big200 at 64 samples, the safe-overload guard engaged): the message thread spent 80-100 %
+#    of every frame gap over 50 ms waiting in NVIDIA's driver for its own thread, which got the CPU only between the
+#    audio threads; with no driver threads 51.4 fps and the longest gap 46-70 ms (from 45.0 / 252 ms). With 12 CPUs the
+#    same with or without (69-72 fps): there the driver's threads stay. perf190os/HANDOFF.md.
+#
+# 49. Linux/BSD only ("fix 190ou" in round bugs_190ou's branch),
+#    juce_gui_basics/native/juce_XWindowSystem_linux.cpp (issue #254): X11 reports a horizontal wheel (a tilt wheel, a
+#    mouse's second wheel, a touchpad's sideways edge) as buttons 6 (left) and 7 (right), which JUCE dropped: the
+#    horizontal wheel did nothing on Linux. They now come as a wheel event with deltaX = +/-50/256 (6 = left = positive,
+#    as Windows' WM_MOUSEHWHEEL gives it through JUCE) and deltaY 0, not smooth.
+#
+# 50. ("fix 50" in round lv2_190pk's branch; the LV2 plugin pack on Linux):
+#  a. Linux/BSD only, juce_gui_basics/native/juce_XWindowSystem_linux.cpp: WM_PROTOCOLS, WM_TAKE_FOCUS, WM_DELETE_WINDOW
+#     and _NET_WM_PING are created when missing, as JUCE already does for its other atoms. On an X server no window
+#     manager ever ran on (a fresh Xvfb, CI's xvfb-run) they don't exist, so every new window set its WM_PROTOCOLS
+#     property with atom 0: BadAtom on X_ChangeProperty. A standalone JUCE app ignores X errors (its own handler); a
+#     plugin's host has Xlib's default handler, which ends the process: plugexporttest ended on LYNX FM10's and LYNX
+#     Model's LV2 editors. isIconic / isHidden no longer read WM_STATE / _NET_WM_STATE when those atoms don't exist
+#     (BadAtom on X_GetProperty, the next error the LV2 editors hit there).
+#  b. Every platform (compiled only for LV2), juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: JUCE's LV2
+#     wrapper enables every bus and declares the ports of a bus that is off by default (the effects' side chain)
+#     lv2:connectionOptional, i.e. a host may connect them to NULL, but it copied the input from there: the 6 LV2 effects
+#     crashed in their first run() under JUCE's own LV2 host, which connects NULL for each channel its buffer lacks. An
+#     unconnected input is silence now, and an unconnected output is skipped while the processor is suspended. The
+#     .ttl files it writes (juce_LV2ManifestHelper) give parameter ranges and scale points as decimals ("1.0": "1" is an
+#     integer, which lv2lint failed on every parameter), and an effect its LV2 class when the build defines
+#     JucePlugin_LV2Class (cmake/LynxPlugins.cmake, from the VST3 category; else lv2:Plugin, as before).
+#
+# 51. Every platform (compiled only for LV2; round 190qd, the 0.1.31 release, owner OK 11-23),
+#    juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: the plugin's .ttl that JUCE's LV2 manifest helper writes
+#    names its licence, `doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>` (LYNX's plugins are AGPL-3.0-or-later,
+#    LICENSE). JUCE wrote none, and lv2lint warned on every LV2 plugin of the pack ("no license specified").#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -498,6 +539,40 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("frame moved, not restacked" "LYNX patch (issue #45): a frame that moved"
             "    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle))|NL|        dismissBlockingModals (peer);"
             "    // LYNX patch (issue #45): a frame that moved, not a restack|NL|    if (configure.window != peerHandle && isParentWindowOf (configure.window, peerHandle) && lynxWindowMovedOrResized (configure))|NL|        dismissBlockingModals (peer);")
+
+        lynx_juce_fix("WM_PROTOCOLS atoms created (fix 50)" "LYNX patch (fix 50): created when missing"
+            "    protocols                    = getIfExists (display, \"WM_PROTOCOLS\");|NL|    protocolList [TAKE_FOCUS]    = getIfExists (display, \"WM_TAKE_FOCUS\");|NL|    protocolList [DELETE_WINDOW] = getIfExists (display, \"WM_DELETE_WINDOW\");|NL|    protocolList [PING]          = getIfExists (display, \"_NET_WM_PING\");|NL|"
+            "    // LYNX patch (fix 50): created when missing. On an X server no window manager ever ran on (a fresh Xvfb)|NL|    // these atoms don't exist yet, and every new window set its WM_PROTOCOLS property with atom 0: BadAtom, which ends|NL|    // a plugin's host (JUCE installs its X error handler only in a standalone app)|NL|    protocols                    = getCreating (display, \"WM_PROTOCOLS\");|NL|    protocolList [TAKE_FOCUS]    = getCreating (display, \"WM_TAKE_FOCUS\");|NL|    protocolList [DELETE_WINDOW] = getCreating (display, \"WM_DELETE_WINDOW\");|NL|    protocolList [PING]          = getCreating (display, \"_NET_WM_PING\");|NL|")
+
+        lynx_juce_fix("no WM_STATE read with atom 0 (fix 50)" "LYNX patch (fix 50): no WM_STATE atom"
+            "    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.state, 0, 64, false, atoms.state);|NL|"
+            "    // LYNX patch (fix 50): no WM_STATE atom (no window manager ever ran), so no window has that property; asking with|NL|    // atom 0 was a BadAtom error|NL|    if (atoms.state == None)|NL|        return false;|NL||NL|    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.state, 0, 64, false, atoms.state);|NL|")
+        lynx_juce_fix("no _NET_WM_STATE read with atom 0 (fix 50)" "LYNX patch (fix 50): no _NET_WM_STATE atom"
+            "    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.windowState, 0, 128, false, XA_ATOM);|NL|"
+            "    // LYNX patch (fix 50): no _NET_WM_STATE atom (no EWMH window manager ever ran), so no window has that property|NL|    if (atoms.windowState == None)|NL|        return false;|NL||NL|    XWindowSystemUtilities::ScopedXLock xLock;|NL|    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.windowState, 0, 128, false, XA_ATOM);|NL|")
+
+        lynx_juce_fix("horizontal wheel (buttons 6 / 7) (fix 49)" "LYNX patch (fix 49, issue #254)"
+            "    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|"
+            "    // LYNX patch (fix 49, issue #254): buttons 6 / 7 are the horizontal wheel (a tilt wheel, a second wheel), left /|NL|    // right; JUCE dropped them. deltaX > 0 = left, as Windows' WM_MOUSEHWHEEL comes through JUCE|NL|    if (buttonPressEvent.button == 6 || buttonPressEvent.button == 7)|NL|    {|NL|        MouseWheelDetails wheel;|NL|        wheel.deltaX = buttonPressEvent.button == 6 ? 50.0f / 256.0f : -50.0f / 256.0f;|NL|        wheel.deltaY = 0.0f;|NL|        wheel.isReversed = false;|NL|        wheel.isSmooth = false;|NL|        wheel.isInertial = false;|NL||NL|        peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),|NL|                                getEventTime (buttonPressEvent), wheel);|NL|        return;|NL|    }|NL||NL|    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);|NL|")
+    elseif(file MATCHES "juce_audio_plugin_client_LV2.cpp$")
+        lynx_juce_fix("LV2: optional audio inputs may stay unconnected (fix 50)" "LYNX patch (fix 50): an input port"
+            "        for (auto i = 0, end = processor->getTotalNumInputChannels(); i < end; ++i)|NL|            audio.copyFrom (i, 0, ports.getBufferForAudioInput (i), audio.getNumSamples());|NL|"
+            "        // LYNX patch (fix 50): an input port the host left unconnected is silence. JUCE declares the ports of a bus that|NL|        // is off by default (a side chain) lv2:connectionOptional, so a host may connect them to NULL, and copying from|NL|        // there crashed (JUCE's own LV2 host does it for every channel its buffer doesn't have)|NL|        for (auto i = 0, end = processor->getTotalNumInputChannels(); i < end; ++i)|NL|        {|NL|            if (const auto* input = ports.getBufferForAudioInput (i))|NL|                audio.copyFrom (i, 0, input, audio.getNumSamples());|NL|            else|NL|                audio.clear (i, 0, audio.getNumSamples());|NL|        }|NL|")
+        lynx_juce_fix("LV2: parameter ranges as decimals (fix 50)" "LYNX patch (fix 50): decimals"
+            "            os << \"\\\\tlv2:default \" << defaultValue << \" ;\\\\n\"|NL|                  \"\\\\tlv2:minimum \" << min << \" ;\\\\n\"|NL|                  \"\\\\tlv2:maximum \" << max;|NL|"
+            "            // LYNX patch (fix 50): decimals (\"0.0\", not \"0\": an integer literal is no atom:Float; lv2lint failed every|NL|            // parameter on it)|NL|            const auto lynxDecimal = [] (float v) { const String text (v); return text.containsAnyOf (\".eE\") ? text : text + \".0\"; };|NL||NL|            os << \"\\\\tlv2:default \" << lynxDecimal (defaultValue) << \" ;\\\\n\"|NL|                  \"\\\\tlv2:minimum \" << lynxDecimal (min) << \" ;\\\\n\"|NL|                  \"\\\\tlv2:maximum \" << lynxDecimal (max);|NL|")
+        lynx_juce_fix("LV2: scale points as decimals (fix 50)" "LYNX patch (fix 50): a decimal"
+            "                          \"\\\\t\\\\trdf:value \" << value << \" ;\\\\n\"|NL|"
+            "                          \"\\\\t\\\\trdf:value \" << lynxDecimal (value) << \" ;\\\\n\" // LYNX patch (fix 50): a decimal|NL|")
+        lynx_juce_fix("LV2: the effect's plugin class (fix 50)" "LYNX patch (fix 50): the effect's class"
+            "             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|"
+            "             #elif defined (JucePlugin_LV2Class) // LYNX patch (fix 50): the effect's class (lv2:EQPlugin, ...)|NL|              JucePlugin_LV2Class|NL|             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|")
+        lynx_juce_fix("LV2: the plugin's licence in its .ttl (fix 51)" "LYNX patch (fix 51): the licence"
+            "              \"\\\\tlv2:minorVersion \" << minorVersion << \" ;\\\\n\"|NL|"
+            "              \"\\\\tdoap:license <http://spdx.org/licenses/AGPL-3.0-or-later> ;\\\\n\" // LYNX patch (fix 51): the licence (LYNX's plugins are AGPL-3.0-or-later)|NL|              \"\\\\tlv2:minorVersion \" << minorVersion << \" ;\\\\n\"|NL|")
+        lynx_juce_fix("LV2: unconnected outputs while suspended (fix 50)" "LYNX patch (fix 50): an output port"
+            "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL|                    std::fill (ptr, ptr + numSteps, 0.0f);|NL|"
+            "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL||NL|                    if (ptr != nullptr) // LYNX patch (fix 50): an output port the host left unconnected|NL|                        std::fill (ptr, ptr + numSteps, 0.0f);|NL|")
     elseif(file MATCHES "juce_CoreGraphicsContext_mac.mm$")
         lynx_juce_fix("no gradient flood from an empty path" "LYNX patch (issue #11): an empty path"
             "        CGContextReplacePathWithStrokedPath (context.get());|NL||NL|    ScopedCGContextState scopedState (context.get());"
@@ -615,6 +690,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 sample-accurate automation" "LYNX patch (round 190jg, fix 39): the automation's changes inside"
             "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL|"
             "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL||NL|        // LYNX patch (round 190jg, fix 39): the automation's changes inside this block, at their sample offsets (LYNX's|NL|        // engine/TimedParameters.h; indices as getParameters()). The last one is the parameter's value afterwards.|NL|        for (int k = 0; k < lynxTimedParamCount; ++k)|NL|        {|NL|            const auto& list = getParameters();|NL|            const auto index = lynxTimedParamIndices[k];|NL|            if (! isPositiveAndBelow (index, list.size()))|NL|                continue;|NL|            if (auto* p = dynamic_cast<VST3Parameter*> (list[index]))|NL|            {|NL|                const auto value = jlimit (0.0f, 1.0f, lynxTimedParamValues[k]);|NL|                inputParameterChanges->set (cachedParamValues.getParamID (p->lynxVstIndex()), value, jlimit (0, numSamples - 1, lynxTimedParamOffsets[k]));|NL|                cachedParamValues.exchangeWithoutNotifying (p->lynxVstIndex(), value);|NL|                parameterDispatcher.push (p->lynxVstIndex(), value);|NL|            }|NL|        }|NL|")
+        lynx_juce_fix("VST3 editor size: Scale editor dimensions (fix 47)" "LYNX patch (round 190oh, fix 47): FL's"
+            "        const auto combinedScale = nativeScaleFactor * getDesktopScaleFactor();"
+            "        // LYNX patch (round 190oh, fix 47): FL's wrapper \"Scale editor dimensions\" (or a DPI-unaware window): the|NL|        // plugin's reported size is taken in logical pixels (src/platform/NativeEmbed.h, setEditorScaling)|NL|        const auto combinedScale = ((bool) getProperties()[\"lynxScaleEditorDimensions\"] ? 1.0f : nativeScaleFactor) * getDesktopScaleFactor();")
     elseif(file MATCHES "juce_Windowing_windows.cpp$")
         lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
             "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"
@@ -684,6 +762,14 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no driver threads for the Direct2D device (fix 43)" "LYNX patch (round 190la, fix 43): no driver threads"
             "        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;"
             "        // LYNX patch (round 190la, fix 43): LYNX_D3D_DRIVER_THREADS=0: no driver threads for these frames (A/B; default as before)|NL|        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT|NL|                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"0\" ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);")
+        lynx_juce_fix("no driver threads with 4 CPUs or fewer (fix 48)" "lynxNoDriverThreads() ? D3D11_CREATE_DEVICE"
+            "                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"0\" ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);"
+            "                                   | (lynxNoDriverThreads() ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);"
+        )
+        lynx_juce_fix("no driver threads with 4 CPUs or fewer, the rule (fix 48)" "LYNX patch (round 190os, fix 48, on fix 43): the rule"
+            "    static Ptr create (ComSmartPtr<ID2D1Factory2> d2dFactory, ComSmartPtr<IDXGIAdapter1> dxgiAdapterIn)|NL|    {"
+            "    // LYNX patch (round 190os, fix 48, on fix 43): the rule. The graphics driver's own threads (NVIDIA's \"threaded optimization\")|NL|    // take the frames' commands off the message thread, which then waits for them at the present; with 4 logical CPUs|NL|    // or fewer for LYNX they compete with the audio threads, and a frame waited 100-250 ms behind them while a song|NL|    // overloaded a 2-CPU PC (round 190os). There the message thread does that work itself. LYNX_D3D_DRIVER_THREADS=1:|NL|    // always the driver's threads; =0: never (fix 43's A/B switch). More CPUs: as JUCE does.|NL|    static bool lynxNoDriverThreads()|NL|    {|NL|        const auto choice = SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {});|NL||NL|        if (choice == \"0\" || choice == \"1\")|NL|            return choice == \"0\";|NL||NL|        DWORD_PTR process = 0, system = 0;|NL||NL|        if (! GetProcessAffinityMask (GetCurrentProcess(), &process, &system))|NL|            return false;|NL||NL|        int cpus = 0;|NL||NL|        for (auto mask = process; mask != 0; mask &= mask - 1)|NL|            ++cpus;|NL||NL|        return cpus > 0 && cpus <= 4;|NL|    }|NL||NL|    static Ptr create (ComSmartPtr<ID2D1Factory2> d2dFactory, ComSmartPtr<IDXGIAdapter1> dxgiAdapterIn)|NL|    {"
+        )
         lynx_juce_fix("no WARP device beside a hardware adapter" "LYNX patch (round 190go): a software adapter"
             "        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        }|NL|"
             "        // LYNX patch (round 190go): a software adapter (WARP, the \"Microsoft Basic Render Driver\") gets its devices only|NL|        // when no hardware adapter gave any; before, every adapter got a Direct3D 11 + Direct2D device at start-up|NL|        std::vector<ComSmartPtr<IDXGIAdapter1>> lynxSoftwareAdapters;|NL|        const auto lynxAdd = [this] (ComSmartPtr<IDXGIAdapter1> dxgiAdapter)|NL|        {|NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        };|NL||NL|        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            DXGI_ADAPTER_DESC1 lynxDesc {};|NL||NL|            if (dxgiAdapter != nullptr && SUCCEEDED (dxgiAdapter->GetDesc1 (&lynxDesc))|NL|                && ((lynxDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0 || (lynxDesc.VendorId == 0x1414 && lynxDesc.DeviceId == 0x8c)))|NL|            {|NL|                lynxSoftwareAdapters.push_back (dxgiAdapter);|NL|                continue;|NL|            }|NL||NL|            lynxAdd (dxgiAdapter);|NL|        }|NL||NL|        if (adapterArray.isEmpty())|NL|            for (auto& dxgiAdapter : lynxSoftwareAdapters)|NL|                lynxAdd (dxgiAdapter);|NL|")
@@ -832,6 +918,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")

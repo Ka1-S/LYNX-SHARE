@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![A página General da janela Configurações, com as abas de página ao longo do topo](/assets/img/wiki/settings-general.webp)
 
@@ -47,7 +47,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 
 | Opção | O que faz |
 |---|---|
-| `Estilo de layout` | Fluxo por patterns (padrão), fluxo por disparo de clipes ou fluxo simples |
+| `Estilo de layout` | Layout Pattern (padrão), layout de lançamento de clipes ou layout Simple |
 | `Modelo padrão`, `Projeto ao iniciar` | O template que abre com `Arquivo › Novo`, e o que abre na inicialização: `Projeto vazio`, `Modelo padrão` ou `Último projeto usado`. `Arquivo › Salvar como modelo...` adiciona os seus |
 | `Clipes de sessão de sets do Live` | Para onde vão os clipes de sessão de um set do Live importado: a grade de clipes, ou a Playlist depois do arranjo |
 | `Idioma`, `Fonte da interface` | Valem na próxima inicialização |

@@ -1,9 +1,9 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
 ![Der Clip-Start-Arbeitsablauf: links ein Raster aus Clips und Szenen, rechts die Auswahl und die Playlist](/assets/img/cliplaunch.webp)
 
-`Ansicht › Layout-Stil` hat drei Einträge: `Pattern-Arbeitsablauf (Standard)`, `Clip-Start-Arbeitsablauf` und `Einfacher Arbeitsablauf`. Dieselbe Wahl gibt es unter `Optionen › Allgemeine Einstellungen`, im Bereich Arbeitsablauf. Die Wahl bleibt erhalten, wenn du das Programm schließt.
+`Ansicht › Layout-Stil` hat drei Einträge: `Pattern-Arbeitsablauf (Standard)`, `Clip-Start-Arbeitsablauf` und `Einfacher Arbeitsablauf`. Dieselbe Wahl gibt es unter `Optionen › Allgemeine Einstellungen`, im Bereich Arbeitsablauf. Die Wahl bleibt erhalten, wenn du das Programm schließt. Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst, und wählt das passende Layout.
 
 Der Pattern-Arbeitsablauf, der Standard, arbeitet so wie FL Studio: Channel Rack, Patterns, Piano Roll, Playlist und Mixer. Der Clip-Start-Arbeitsablauf im Stil von Ableton Live ergänzt neben der Playlist ein Clip-Raster mit Szenen, einen Session-Mixer sowie die Clip- und Geräteansicht; Patterns und das Channel Rack bleiben verfügbar. Der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile: Spuren und Zeitleiste, Loops, Pads und schnelle Aufnahme. Ein Wechsel verschiebt nur die Fenster: Das Projekt bleibt dasselbe.
 

@@ -119,7 +119,7 @@ TEST (helix190mt_layout_and_parameters)
     using namespace lynx;
     namespace w = wt;
     // the third block follows Helix+ 2's; every (target, source) pair has its own value, none inside another's
-    CHECK (w::ext3Base == w::ext2Base + w::ext2::count && w::stateSize == w::ext3Base + w::ext3::count);
+    CHECK (w::ext3Base == w::ext2Base + w::ext2::count && w::ext4Base == w::ext3Base + w::ext3::count); // (190oc: round 4's block follows)
     CHECK (w::rev2TargetCount == 68 && w::allTargetCount == 80 && w::tgt::grainPos == 68 && w::tgt::specGain == 79);
     std::set<int> cells;
     for (int t = 0; t < w::allTargetCount; ++t)
@@ -143,14 +143,14 @@ TEST (helix190mt_layout_and_parameters)
     CHECK (! w::automatable (w::ext3Base) && findEngineParam (t, w::ext2Base + w::ext2::mbGain)->name == "Multiband Gain"); // (190ml's names stay)
     // revision 3 for a new channel, Clean on; the block's own defaults keep Clean off (a revision 2 channel taken to 3 keeps
     // its sound); a round 3 value set on an older channel takes it to 3
-    CHECK (helixDefaults()[(std::size_t) w::extBase] == 3.0f && (int) helixDefaults().size() == w::stateSize);
+    CHECK (helixDefaults()[(std::size_t) w::extBase] == (float) w::currentRevision && (int) helixDefaults().size() == w::stateSize); // (190oc: 4)
     CHECK (helixDefaults()[(std::size_t) (w::ext3Base + w::ext3::sampleClean)] == 1.0f && w::defaults()[(std::size_t) (w::ext3Base + w::ext3::sampleClean)] == 0.0);
     ChannelDef old;
     old.instrument = InstrumentKind::helix;
     old.modelParams.assign ((std::size_t) w::ext3Base, 0.0f);
     old.modelParams[(std::size_t) w::extBase] = 2.0f;
     auto a = old;
-    CHECK (modelparams::setRawValue (a, w::ext3Base + w::ext3::grainSpray, 0.4f) && a.modelParams[(std::size_t) w::extBase] == 3.0f
+    CHECK (modelparams::setRawValue (a, w::ext3Base + w::ext3::grainSpray, 0.4f) && a.modelParams[(std::size_t) w::extBase] == (float) w::currentRevision
            && (int) a.modelParams.size() == w::stateSize && a.modelParams[(std::size_t) (w::ext3Base + w::ext3::sampleClean)] == 0.0f);
     // texts and names
     CHECK (w::paramText (w::ext3Base + w::ext3::grainSize, 0.08) == "80.0 ms" && w::paramText (w::ext3Base + w::ext3::grainDensity, 20.0) == "20 /s");
@@ -477,7 +477,7 @@ TEST (helix190mt_factory_presets)
         wt::HelixUserData d;
         CHECK (wt::decodeUserData (loaded->pluginState, d) && d.sample.frames() > 0);
         const auto state = helixState (*loaded);
-        CHECK (state[(std::size_t) wt::extBase] == 3.0 && (state[(std::size_t) (wt::ext3Base + wt::ext3::grainOn)] > 0.5 || state[(std::size_t) (wt::ext3Base + wt::ext3::specOn)] > 0.5));
+        CHECK (state[(std::size_t) wt::extBase] >= 3.0 && (state[(std::size_t) (wt::ext3Base + wt::ext3::grainOn)] > 0.5 || state[(std::size_t) (wt::ext3Base + wt::ext3::specOn)] > 0.5));
         std::vector<wt::RefNote> notes { { 0, 48, 0.9f, 48000 }, { 0, 55, 0.9f, 48000 }, { 0, 60, 0.9f, 48000 } };
         const auto out = wt::renderReference (state, notes, 48000.0, 48000 * 2, 256, 120.0, &d);
         auto peak = 0.0f;
@@ -487,5 +487,5 @@ TEST (helix190mt_factory_presets)
     }
     CHECK (found == 3);
     // the presets before round 3 keep their places (190ml's last one is still where it was)
-    CHECK (bank.size() >= 25 && bank[(std::size_t) bank.size() - 4].name == "Drawn Pulse Bass");
+    CHECK (bank.size() >= 25 && bank[(std::size_t) bank.size() - 6].name == "Drawn Pulse Bass"); // (190oc: two more after round 3's)
 }

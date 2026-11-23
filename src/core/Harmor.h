@@ -97,9 +97,33 @@ struct RefNote
 // compressor stays off). `mt` (625 words: index, then the 624-word state) seeds the random draws like the DLL's
 // Mersenne Twister; empty = LYNX's fixed per-instance seed. Returns interleaved stereo float samples (2·length),
 // empty if the state is unusable.
+// One parameter change for the reference renderer (round 190pr): at sample `at`, FL's parameter `k` takes the raw value
+// `raw` (ProcessParam with REC_UpdateValue, as the harness sends it); only the parameters harmor::automatable lists move
+struct RefParam
+{
+    int at = 0, k = 0, raw = 0;
+};
+
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, int block = 512, const std::vector<std::uint32_t>& mt = {}, double bpm = 120.0,
-                                    const std::vector<std::uint8_t>& compressorState = {}, int engineRev = 1);
+                                    const std::vector<std::uint8_t>& compressorState = {}, int engineRev = 1,
+                                    const std::vector<RefParam>& params = {});
+
+// FL's numbers of Harmor's parameters (automation clips, pattern events, the song-start values 0xD8; REA_rodada190pr):
+// k < 772 is part k / 386's parameter k % 386, 772…824 the global parameter k − 772 [DECOMP FUN_00879380]. Their raw
+// ranges come from the DLL itself [EXEC: ProcessParam with REC_FromMIDI at 0 and 2^30, read back]: FL's normalised value v
+// is raw = min + Round (v · (max − min)), rounded half to even.
+constexpr int flParamCount = 825;
+std::optional<std::pair<int, int>> flParamRange (int k) noexcept;
+// the part / index of FL's parameter k (part −1: global), as harmorParamOffset takes them; nullopt outside 0…824
+std::optional<std::pair<int, int>> flParamSlot (int k) noexcept;
+// true when the parameter is a plain value of the state (not one of a part's articulator settings, FL's 95…342)
+bool flParamInState (int k) noexcept;
+// FL's raw value of a normalised one (Round half to even, as the DLL)
+int flRawOf (int k, double v) noexcept;
+// The parameters LYNX's Harmor follows live under automation (ChannelDef::engineRev 3 on; the sounding voices move as in
+// FL, through the voice's own smoothing): both parts' filter 1 / 2 frequency (52, 64, 438, 450) and Mod X / Y / Z (772…774)
+bool automatable (int k) noexcept;
 
 // IPP's 11-bit Exp_32f_A11 / Ln_32f_A11 as FL's DLL computes them on the AVX2 code path (Harmor's precision
 // "Average"; REA_rodada165g-flbeta165h §3), exposed for the tests

@@ -1,5 +1,5 @@
 ---
-source: b96330a448
+source: 1aea1764bf
 ---
 ![L'éditeur d'automation avec une courbe qui monte sur six mesures](/assets/img/wiki/automation.webp)
 
@@ -76,7 +76,7 @@ Activez l'enregistrement avec `Automation` coché dans le filtre d'enregistremen
 
 - `Lier à un contrôleur MIDI (bougez un bouton du contrôleur)` est traité dans [Contrôleurs MIDI](/wiki/midi-controllers/).
 - `Lier à un contrôleur interne` laisse un Envelope, Formula ou Peak Controller du projet piloter la commande. Ajoutez-en un d'abord.
-- `Moduler` attache un modulateur, un LFO ou une source aléatoire qui fait osciller un bouton de LYNX SHARE autour de sa propre valeur. `Outils › Modulateurs...` les liste.
+- `Moduler avec` attache un modulateur qui fait osciller la commande autour de sa propre valeur : un LFO, un suiveur d'enveloppe, une enveloppe ADSR, des pas, une source aléatoire, une macro, le keytrack ou la vélocité. Il fonctionne sur les boutons de LYNX SHARE et sur les paramètres des plugins tiers. Vous pouvez aussi glisser un modulateur sur un bouton, et un anneau sur le bouton montre le mouvement. `Outils › Modulateurs...` les liste.
 
 ## Couloirs d'automation
 
@@ -88,7 +88,8 @@ Les couloirs sont désactivés par défaut. Activez `Couloirs d'automation` dans
 - Plusieurs clips sur une même commande jouent chacun à leur place. Avant son premier clip, une commande garde sa propre valeur.
 - Au début d'un clip, la commande atteint la nouvelle valeur en environ 8 ms. FL Studio y glisse progressivement, donc un projet importé peut différer légèrement à ces endroits.
 - Là où des clips de la même commande se chevauchent, celui que choisit LYNX SHARE peut différer de celui que choisit FL Studio.
-- Les modulateurs ne fonctionnent que sur les boutons propres à LYNX SHARE, et ils sont laissés de côté à l'export en `.flp`.
+- À l'export en `.flp`, les modulateurs qui suivent la position du morceau deviennent des clips d'automation (un LFO synchronisé devient le LFO de clip de FL Studio). Les suiveurs, les enveloppes, le keytrack et la vélocité sont laissés de côté, et le rapport les liste.
+- Vous avez bougé une commande pendant la lecture sans enregistrer ? `Capturer l'automation` dans les options d'enregistrement transforme ensuite les derniers mouvements en automation.
 
 ## Voir aussi
 

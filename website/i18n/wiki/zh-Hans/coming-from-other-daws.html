@@ -1,0 +1,17 @@
+<p>LYNX SHARE 有三种布局。如果你从 Logic、Cubase、Reaper、Pro Tools 或 Studio One 转过来，请从 <strong>带着混音台的简易布局</strong> 开始：时间线上每个乐器或声音一条音轨，和你熟悉的一样。想用样式时，还有模式布局，也就是 FL Studio 的工作方式。</p>
+<h2 id="your-first-steps">你的第一步</h2>
+<ol><li><strong>选择布局。</strong> 第一次启动 LYNX SHARE 时，欢迎卡片会问你从哪里转过来。点击 <code>Logic、Cubase、Reaper、Pro Tools 或 Studio One</code>：简易布局会打开它的新音轨卡片，混音台会带着你的第一条音轨出现。之后，<code>视图 › 布局样式 › 简易工作流程</code> 可随时切换到它，<code>F9</code> 可打开混音台。</li><li><strong>添加音轨。</strong> <code>+ 添加音轨</code> 提供 <code>人声 / 音频</code>、<code>乐器</code>、<code>鼓</code>、<code>采样器</code>、<code>吉他 / 贝斯</code>、<code>导入</code> 和 <code>循环素材</code>。用电脑按键、屏幕键盘或 MIDI 键盘来演奏乐器音轨。</li><li><strong>录音。</strong> 在 <code>选项 › 音频设置...</code> 中选择你的音频设备，然后见<a href="/learn/record-voice/">录下你的声音</a>。</li></ol>
+<h2 id="what-is-the-same">哪些相同</h2>
+<ul><li>时间线上的音轨，带有音频、MIDI 和自动化片段。</li><li>音频和 MIDI 录音，支持循环录音和合成录音。</li><li>带有插入效果、发送、侧链、编组和延迟补偿的混音台。</li><li>第三方插件：所有系统上的 VST3 和 CLAP，macOS 上的 Audio Units，Linux 上的 LV2，Windows 和 Linux 上的 VST2。</li><li>导出歌曲、按音轨导出分轨，以及导出 MIDI。</li></ul>
+<h2 id="what-is-different">哪些不同</h2>
+<ul><li><strong>音轨和混音台插入轨是分开的。</strong> 在简易布局中，每条新音轨都有自己的通道和混音台轨道。在模式布局中，你要像在 FL Studio 里一样自己把通道路由到插入轨。</li><li><strong>样式。</strong> 在模式布局中，音符放在样式里，你把样式摆到播放列表上，一个样式可以包含多个乐器。</li><li><strong>按键沿用 FL Studio。</strong> <code>Ctrl+Z</code> 撤销一步，再按一次则重做。<code>Ctrl+Alt+Z</code> 可以撤销得更远。</li><li><strong>不能导入 Logic、Cubase、Reaper 或 Pro Tools 的工程。</strong> 请用 DAWproject 文件、分轨或 MIDI 来迁移工程（见下文）。</li></ul>
+<h2 id="keys">按键</h2>
+<div class="tablewrap"><table><thead><tr><th>要做什么</th><th>按键</th></tr></thead><tbody><tr><td>播放，或停止并返回</td><td><code>Space</code></td></tr><tr><td>开启或关闭录音</td><td><code>R</code></td></tr><tr><td>混音台</td><td><code>F9</code></td></tr><tr><td>钢琴卷帘</td><td><code>F7</code></td></tr><tr><td>播放列表</td><td><code>F5</code></td></tr><tr><td>浏览器</td><td><code>Alt+F8</code></td></tr><tr><td>打开、保存</td><td><code>Ctrl+O</code>、<code>Ctrl+S</code></td></tr><tr><td>撤销，以及撤销得更远</td><td><code>Ctrl+Z</code>、<code>Ctrl+Alt+Z</code></td></tr><tr><td>导出音频、MP3、MIDI</td><td><code>Ctrl+R</code>、<code>Ctrl+Shift+R</code>、<code>Ctrl+Shift+M</code></td></tr></tbody></table></div>
+<p><code>帮助 › 快捷键</code> 列出了所有按键。见<a href="/wiki/shortcuts/">快捷键</a>。</p>
+<h2 id="moving-projects-across">迁移工程</h2>
+<ul><li><strong>Cubase、Studio One 和 Bitwig</strong>：在那边保存一个 DAWproject 文件（<code>.dawproject</code>），然后用 <code>文件 › 打开...</code> 打开。音轨、文件夹、片段、音符、带扭曲标记的音频、自动化、速度、标记、带发送的混音台，以及带状态的 VST3、VST2 和 CLAP 插件都会带过来。<code>文件 › 导出 › DAWproject (.dawproject)...</code> 则走相反的方向。</li><li><strong>Logic、Reaper 和 Pro Tools</strong>：把每条音轨从歌曲开头导出为音频或 MIDI 文件，放进同一个文件夹。在 LYNX SHARE 中点击 <code>+ 添加音轨</code>，再点击 <code>导入</code> 旁边的 <code>文件夹...</code>：每个文件会成为一条从开头开始的音轨。</li><li><strong>导出回去</strong>：导出窗口会为每个混音台插入轨或每个通道写出一个文件，<code>文件 › 导出 › MIDI文件...</code> 则写出音符。</li></ul>
+<p>见<a href="/wiki/file-formats/">文件格式</a>和<a href="/wiki/exporting/">导出</a>。</p>
+<h2 id="good-to-know">须知</h2>
+<ul><li>Logic 是 Apple Inc. 的商标，Cubase 是 Steinberg Media Technologies 的商标，Reaper 是 Cockos Incorporated 的商标，Pro Tools 是 Avid Technology 的商标，Studio One 是 PreSonus Audio Electronics 的商标，Bitwig 是 Bitwig GmbH 的商标。LYNX SHARE 是一个独立的程序，与它们没有关联，也未获其认可。</li><li>片段启动布局会在时间线旁边增加一个带场景的片段网格。见<a href="/wiki/layouts/">布局</a>。</li></ul>
+<h2 id="related">相关页面</h2>
+<ul><li><a href="/wiki/layouts/">布局</a></li><li><a href="/wiki/mixer/">混音台</a></li><li><a href="/wiki/recording/">录音</a></li><li><a href="/wiki/coming-from-fl-studio/">从 FL Studio 转过来</a></li><li><a href="/learn/">学习：教程</a></li></ul>

@@ -1,24 +1,39 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
-LYNX SHARE startuje w trybie pracy na wzorcach: Channel Rack, patterny i Playlist. Praca z uruchamianiem klipów jest opcjonalna i dodaje obok Playlisty siatkę klipów ze scenami. LYNX SHARE odczytuje i zapisuje sety `.als`. Nie jest powiązany z firmą Ableton.
+LYNX SHARE startuje w układzie Pattern: Channel Rack, patterny i Playlist. Układ z uruchamianiem klipów jest opcjonalny i dodaje obok Playlisty siatkę klipów ze scenami. LYNX SHARE odczytuje i zapisuje sety `.als`. Nie jest powiązany z firmą Ableton.
+
+Ta strona jest też dla użytkowników Bitwig Studio: siatka klipów działa tak samo, a pliki DAWproject Bitwiga (`.dawproject`) otwierasz przez `Plik › Otwórz...` i zapisujesz przez `Plik › Eksportuj › DAWproject (.dawproject)...`.
+
+## Pierwsze kroki
+
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz. Kliknij `Ableton Live lub Bitwig`: otwiera się układ Clip-launch. Później przełączysz się na ten układ w każdej chwili przez `Widok › Styl układu › Układ z uruchamianiem klipów`.
+2. **Wypełnij slot.** Przeciągnij sample lub pattern z Browsera do slotu albo kliknij pusty slot prawym przyciskiem i wybierz `Umieść tu wzorzec`.
+3. **Uruchom.** Kliknij trójkąt po lewej stronie klipu albo trójkąt sceny w kolumnie `Sceny`, żeby uruchomić cały wiersz. Możesz też otworzyć jeden ze swoich setów `.als` (niżej).
+
+Czym różni się od Live:
+
+- Playlist to aranżacja, a jej ścieżki to kolumny siatki. Ścieżka, która uruchomiła klip, zostaje w siatce, dopóki nie naciśniesz `Powrót do Playlisty`.
+- Poza siatką klawisze są jak w FL Studio. `Ctrl+Z` cofa jeden krok, a naciśnięty ponownie ponawia go.
+- Tylko część własnych urządzeń Live jest konwertowana (zobacz Warto wiedzieć). Pluginy zewnętrzne przechodzą ze swoim stanem.
+- Układ Pattern, czyli praca jak w FL Studio z Channel Rack i patternami, działa na tym samym projekcie.
 
 ## Otwórz set Live
 
 1. Wybierz `Plik › Otwórz...` (`Ctrl+O`) i wskaż plik `.als`. Odczytywane są sety zapisane w Live 11 i Live 12.
-2. Wybierz `Widok › Styl układu › Praca z uruchamianiem klipów`, aby pracować z siatką klipów, do której trafiają klipy sesji i sceny z setu.
+2. Wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`, aby pracować z siatką klipów, do której trafiają klipy sesji i sceny z setu.
 3. Przełącznik `Grid / Both / Song` na pasku tytułu Playlisty pokazuje siatkę, Playlist albo oba naraz.
 4. Wybierz `Plik › Zapisz`. Program zapyta, gdzie zapisać plik `.lynx`. Plik `.als` nie jest zmieniany.
 
-`Widok › Styl układu › Praca na wzorcach (domyślnie)` wraca do poprzedniego trybu. Ten sam wybór jest w `Opcje › Ustawienia ogólne...`. Patterny i Channel Rack są dostępne w obu układach.
+`Widok › Styl układu › Układ Pattern (domyślnie)` wraca do poprzedniego trybu. Ten sam wybór jest w `Opcje › Ustawienia ogólne...`. Patterny i Channel Rack są dostępne w obu układach.
 
 ## Co odpowiada czemu
 
 | W Live | W LYNX SHARE |
 |---|---|
-| Widok Session | Siatka klipów w trybie pracy z uruchamianiem klipów |
+| Widok Session | Siatka klipów w trybie układu z uruchamianiem klipów |
 | Widok Arrangement | Playlist |
 | Ścieżki | Ścieżki Playlisty, które są kolumnami siatki klipów |
 | Sceny | Sceny, czyli wiersze siatki klipów. Scena może ustawiać tempo przy uruchomieniu |
@@ -59,7 +74,7 @@ Akcje następcze uruchamiają się po określonej liczbie taktów lub przejść 
 
 | Zapisywane | Niezapisywane |
 |---|---|
-| Ścieżka MIDI na każdy kanał, z nutami jako klipami MIDI | Własne instrumenty i efekty LYNX SHARE. Ich ścieżki i nuty zostają |
+| Ścieżka MIDI na każdy kanał, z nutami jako klipami MIDI | Własne instrumenty i efekty LYNX SHARE, poza Helix, który staje się Wavetable. Ich ścieżki i nuty zostają |
 | Ścieżki audio z rozciąganiem, transpozycją, wzmocnieniem, fade'ami i trybem warp | Automatyka parametrów efektów |
 | Grupy, returny i wysyłki | Trasy między insertami |
 | Pluginy VST2 i VST3 wraz ze stanem | |
@@ -70,9 +85,11 @@ Raport po eksporcie wymienia, co pominięto.
 
 ## Warto wiedzieć
 
-- Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift i Operator (bez FM). Pozostałe są pomijane i wymienione w raporcie importu.
-- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Racki MIDI Effect z Live nie są jeszcze konwertowane i są wymienione w raporcie importu.
+- Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable i Meld. Pozostałe są pomijane i wymienione w raporcie importu.
+- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Arpeggiator z Live staje się arpeggiatorem kanału. Pitch, Velocity, Chord, Note Length i Racki MIDI Effect są zapisywane w nutach.
 - Raport importu wymienia, co pominięto.
+- W widoku Device rack pokazuje urządzenia swoich łańcuchów w linii, a tryb Macro Map (przyciski `Mapa` racka) przypisuje parametr urządzenia do makra, tak jak w Live.
+- Mikser sesji ma przełącznik Solo / Cue z Live, z wyjściem `Cue Out` na słuchawki i regulatorem `Głośność odsłuchu`.
 - Live przycina klipy audio, które na siebie nachodzą, w wyeksportowanym secie.
 - Znaczniki warp z setu Live są zachowywane przy imporcie i zapisywane z powrotem przy eksporcie.
 
@@ -83,3 +100,4 @@ Raport po eksporcie wymienia, co pominięto.
 - [Import projektów](/wiki/importing-projects/)
 - [Formaty plików](/wiki/file-formats/)
 - [Dwa tryby pracy w jednym programie](/why/#workflows)
+- [Nauka: samouczki](/learn/)

@@ -1,5 +1,5 @@
 ---
-source: 1b54c6493f
+source: cab9a0b0d1
 ---
 ![A Playlist com clipes nas faixas](/assets/img/playlist.webp)
 
@@ -115,7 +115,7 @@ A caixa de arranjo na barra de ferramentas alterna entre arranjos. Um projeto po
 ## Bom saber
 
 - A Playlist só é ouvida no modo Song. No modo Pattern, `Space` toca o pattern atual, seja o que for que estiver nas faixas.
-- `Exibir › Estilo de layout › Fluxo por disparo de clipes` acrescenta uma grade de clipes e cenas ao lado da Playlist. É opcional. Veja [Layouts](/wiki/layouts/).
+- `Exibir › Estilo de layout › Layout de lançamento de clipes` acrescenta uma grade de clipes e cenas ao lado da Playlist. É opcional. Veja [Layouts](/wiki/layouts/).
 - Com vários clipes de automação sobrepostos em um mesmo controle, a escolha de qual deles toca pode diferir da do FL Studio (notas da versão 0.1.25).
 - Como no FL Studio, um pattern toca a partir de um clipe de cada vez. Quando um clipe posterior do mesmo pattern começa, em qualquer faixa, o clipe anterior não inicia mais notas a partir dali. Clipes de patterns diferentes tocam juntos. Isso vale em projetos novos e em projetos do FL Studio. Um projeto .lynx salvo antes da 0.1.27 continua tocando todos os clipes por inteiro.
 - Um tempo alterado por um controlador MIDI vinculado não redimensiona os clipes de áudio.

@@ -10,6 +10,10 @@ namespace lynx
 // format(s) of the last export (FL's File › Export › "Last exported format(s)"), 0 WAV, 1 MP3, 2 OGG, 3 FLAC = that
 // format alone (FL's "Wave file...", "MP3 file"...; REA round 139).
 void showExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName, int format = -1);
+// Round 190pl (--demo file.export): the song (or the pattern, as the window picks) rendered into `file` in `format` (0 WAV,
+// 1 MP3...) with the Export window's remembered choices, on the calling (message) thread, without a window. `seconds` and
+// `peak` (linear) of the render. Empty = written, else why not.
+juce::String exportAudioNow (AudioEngine& engine, int format, const juce::File& file, double& seconds, float& peak);
 // File › Export › "Master..." (Ctrl+Alt+M; round 168e): the Export window with the render mastered on the computer
 // (core/Mastering.h: a loudness target, −1 dBTP ceiling) where FL sends it to FL Cloud; "<project> (mastered)".
 // File › Export › "Project bones..." (REA round 168e, FUN_011edb50): the project's parts as files in a sub-folder of a
@@ -78,6 +82,8 @@ void consolidatePlaylistTrack (AudioEngine& engine, int track, bool fromSongStar
 // Tools › "Consolidate playlist selection" (Ctrl+Alt+C From selection start, Ctrl+Shift+Alt+C From song start): the same
 // for the selected clips (`selectedClips`: indices into the Playlist), the new track above the highest one.
 void consolidatePlaylistSelection (AudioEngine& engine, const std::vector<int>& selectedClips, bool fromSongStart);
+// Round 190pa (P14): the same for a range on chosen tracks (core/RangeEdit.h): its clips over its time, cut at its edges.
+void consolidatePlaylistRange (AudioEngine& engine, const std::vector<int>& clips, int topTrack, std::int64_t from, std::int64_t to);
 // Patterns › "Render as audio clip..." (how 0), "Quick render as audio clip" (1: the last choices, no window), "Render and
 // replace..." (2: the pattern's Playlist clips become clips of the render): a new audio clip channel named after it.
 void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how);

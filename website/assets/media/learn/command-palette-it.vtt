@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Cerchi un comando? Premi il tasto del punto interrogativo per aprire la palette dei comandi.
+
+00:00:08.800 --> 00:00:14.200
+Scrivi cosa vuoi. Ogni voce di menu, scorciatoia e impostazione è nell'elenco.
+
+00:00:14.400 --> 00:00:19.200
+Premi Invio per eseguirlo. Qui si apre il Tracker.
+
+00:00:19.400 --> 00:00:24.800
+Ora la CPU. Mentre il brano suona, l'indicatore CPU della barra mostra il carico.
+
+00:00:25.000 --> 00:00:30.400
+Fai doppio clic per il Monitor delle prestazioni dei plugin: la CPU di ogni plugin.
+
+00:00:30.600 --> 00:00:37.200
+Per risparmiare CPU: Strumenti, Attiva/disattiva smart disable per tutti i plugin: un plugin riposa quando è silenzioso.

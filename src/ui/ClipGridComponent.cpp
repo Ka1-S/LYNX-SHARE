@@ -1,7 +1,12 @@
 #include "ui/TextCache.h"
 #include "ui/ClipGridComponent.h"
+#include "ui/TrackerComponent.h"
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
+#include "core/SectionOps.h" // round 190ol (P1: scenes from sections)
+#include "ui/PluginOffTag.h"
+#include "core/CrossPaste.h"   // issue #232 stage 2 (round 190nz)
+#include "ui/WindowClipboard.h"
 
 #include <algorithm>
 #include <set>
@@ -9,7 +14,9 @@
 #include <cstring>
 
 #include "core/ClipLauncher.h"
+#include "core/ClipLoopOps.h"
 #include "core/Comping.h"
+#include "core/TrackStates.h"
 #include "core/SessionMixer.h"
 #include "core/DetailChain.h"
 #include "core/PlaylistOps.h"
@@ -272,13 +279,19 @@ public:
             // each part draws inside its own box, so the pixels are the same
             const auto cull = ui::paintCache();
             const auto reaches = [&g, cull] (juce::Rectangle<int> box) { return ! cull || g.clipRegionIntersects (box); };
+            // round 190op (P4): deactivated tracks and hidden ones shown (nothing looked up per column while there are none)
+            const auto anyStates = deactivate::anyMarked (song) || (PlaylistComponent::showHiddenTracks && trackstates::hiddenCount (song) > 0);
             for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
             {
                 const auto x = columnX (t);
                 if (! reaches ({ x, 0, columnWidth, cells.getBottom() + statusHeight }))
                     continue;
                 if (reaches ({ x, 0, columnWidth, headerHeight }))
+                {
                     paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
+                    if (anyStates)
+                        paintTrackStateMark (g, song, t, { x, 0, columnWidth, headerHeight });
+                }
                 if (reaches ({ x, cells.getBottom(), columnWidth, statusHeight }))
                     paintStatus (g, song, state, t, { x, cells.getBottom(), columnWidth, statusHeight });
                 juce::Graphics::ScopedSaveState rows (g);
@@ -359,10 +372,10 @@ public:
             g.setColour (c::textSecondary);
             g.setFont (theme::font (theme::type::caption));
             g.drawText (tr ("Stop all clips"), stop.withX (stop.getRight() + 6).withWidth (sceneWidthNow() - 30), juce::Justification::centredLeft, true);
+            // (round 190oj CS-10: a solid square as Live's and as the tracks' stop squares; with a light outline it read
+            // as an unticked checkbox)
             g.setColour (stopAllDown ? c::bg6 : juce::Colour (0xff1e1e1e));
             g.fillRect (stop.withSizeKeepingCentre (9, 9));
-            g.setColour (c::textSecondary);
-            g.drawRect (stop.withSizeKeepingCentre (9, 9), 1);
             return;
         }
         // the footer: controls on the scene side and the buttons, on a band
@@ -863,6 +876,7 @@ public:
     }
 
     SessionMixerComponent* sessionMixer() noexcept { return mixer.get(); }
+    void syncMixerForSnapshot() { syncMixer(); }
     void deviceDropForSnapshot (int t) { setDeviceDropTrack (t); }
 
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
@@ -977,6 +991,14 @@ public:
             && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDeactivateClip) && launcher::clipAt (*grid, selectedTrack, selectedScene) != nullptr)
         {
             toggleClipActive (selectedTrack, selectedScene);
+            return true;
+        }
+        // round gap190og (detail-020): Live's Crop Clip key (Ctrl+Shift+J) on the selected MIDI clip, Clip-launch layout only
+        if (key.getModifiers().isCommandDown() && key.getModifiers().isShiftDown() && ! key.getModifiers().isAltDown() && ! sceneSelected && ! titleSelected
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code) == 'J' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridCropClip)
+            && canCropClip (selectedTrack, selectedScene))
+        {
+            cropClip (selectedTrack, selectedScene);
             return true;
         }
         // round 190bv: the clipboard, duplicate and a new empty MIDI clip
@@ -1304,6 +1326,7 @@ public:
         std::uint64_t stamp = ~std::uint64_t (0);
         std::size_t tracks = 0, clips = 0;
         const ClipGrid* grid = nullptr;
+        bool showHidden = false; // (round 190op: PlaylistComponent::showHiddenTracks when it was worked out)
     };
     mutable ColumnMap columns_;
     const ColumnMap& columnMap() const
@@ -1311,8 +1334,10 @@ public:
         const auto& song = engine.getSong();
         const auto* grid = gridOf();
         auto& m = columns_;
-        if (m.stamp == engine.getSongStamp() && m.tracks == song.playlistTracks.size() && m.grid == grid && m.clips == grid->clips.size())
+        if (m.stamp == engine.getSongStamp() && m.tracks == song.playlistTracks.size() && m.grid == grid && m.clips == grid->clips.size()
+            && m.showHidden == PlaylistComponent::showHiddenTracks)
             return m;
+        m.showHidden = PlaylistComponent::showHiddenTracks;
         m.stamp = engine.getSongStamp();
         m.tracks = song.playlistTracks.size();
         m.grid = grid;
@@ -1330,7 +1355,9 @@ public:
         for (int t = 0; t < launcher::maxTracks && (t < bound || (int) m.columnTracks.size() < minColumns); ++t)
         {
             // (a lane that holds grid clips keeps its column: nothing in the grid is ever out of reach)
-            const auto lane = ! holdsClips[(std::size_t) t] && comp::isTakeLane (song, t);
+            // (round 190op, P4: a hidden track has no column either, until Show hidden tracks; it still plays)
+            const auto lane = (! holdsClips[(std::size_t) t] && comp::isTakeLane (song, t))
+                              || (! PlaylistComponent::showHiddenTracks && trackstates::isHidden (song, t));
             m.trackColumns.push_back (lane ? -1 : (int) m.columnTracks.size());
             if (! lane)
                 m.columnTracks.push_back (t);
@@ -1547,6 +1574,22 @@ public:
         return {};
     }
 
+    // Round 190op (P4): a deactivated track's title dimmed with the power tag; a hidden track shown again, dimmed
+    void paintTrackStateMark (juce::Graphics& g, const Song& song, int t, juce::Rectangle<int> r) const
+    {
+        const auto off = trackstates::trackDeactivated (song, trackstates::unitsOfTrack (song, t));
+        const auto hidden = PlaylistComponent::showHiddenTracks && trackstates::isHidden (song, t);
+        if (! off && ! hidden)
+            return;
+        g.setColour (theme::colour::bg0.withAlpha (0.45f));
+        g.fillRect (r);
+        if (off && r.getHeight() >= 12)
+        {
+            const auto size = (float) juce::jmin (13, r.getHeight() - 4);
+            ui::drawPluginOffTag (g, { (float) r.getRight() - size - 4.0f, (float) r.getY() + ((float) r.getHeight() - size) * 0.5f, size + 1.0f, size });
+        }
+    }
+
     void paintHeader (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
     {
         if (liveLook())
@@ -1754,8 +1797,8 @@ public:
     static juce::Colour liveInk (juce::Colour fill)
     {
         // (the Live-pastel style of the shared clip colours, theme::clipBody: ink = colour × 0.24)
-        return fill.getPerceivedBrightness() > 0.55f ? theme::clipBody (fill, fill, ClipKind::pattern, theme::ClipStyle::livePastel).ink
-                                                     : theme::livelook::text.brighter (0.4f);
+        // (round 190oj, CS-6: chosen by contrast, not by brightness: "Mello" #258ed0 took light ink at 2.1:1)
+        return theme::liveMarkOn (fill, 0.24f, 4.5f, theme::livelook::text.brighter (0.4f));
     }
     // Live's grid text: LYNX's UI font at 12 px, 12 % wider — Live's own face is wider at the same 7 px cap ("Drums" 30 px
     // in Live, 26 px in LYNX's plain font; round 190ia's font note); Live's face itself is not copied
@@ -2351,7 +2394,8 @@ public:
             first.gridSlot = -1;
             first.uid = 0;
             first.start = 0;
-            PlaylistComponent::setCopiedClips ({ first });
+            PlaylistComponent::setCopiedClips ({ first }, carriedOf (block.clips.front().content)); // (round 190ne: a track clip travels along)
+            PlaylistComponent::publishCopiedClips (engine); // (issue #232: its first clip to another LYNX SHARE window)
             copiedBlock = std::move (block);
             copiedSlot.reset();
             copiedSlotStamp = PlaylistComponent::copiedStamp();
@@ -2368,22 +2412,52 @@ public:
         clip.gridSlot = -1;
         clip.uid = 0;
         clip.start = 0;
-        PlaylistComponent::setCopiedClips ({ clip });
+        PlaylistComponent::setCopiedClips ({ clip }, carriedOf (*content)); // (round 190ne: a track clip travels along)
+        PlaylistComponent::publishCopiedClips (engine); // (issue #232: and to another LYNX SHARE window)
         copiedSlot = std::move (content);
         copiedSlotStamp = PlaylistComponent::copiedStamp();
         if (cutToo)
             engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
         repaint();
     }
+    // round 190ne (core/TrackClips.h): what a copied slot's track clip gives the shared clipboard
+    static trackclips::Carried carriedOf (const session::SlotClip& content)
+    {
+        trackclips::Carried carried;
+        if (content.trackClip)
+            carried.patterns.emplace_back (content.clip.pattern, *content.trackClip);
+        return carried;
+    }
     static bool canPaste()
     {
         if ((copiedSlot || copiedBlock) && copiedSlotStamp == PlaylistComponent::copiedStamp())
+            return true;
+        if (windowclip::hasIncoming (crossclipboard::Kind::clips)) // (issue #232: copied in another LYNX SHARE window)
             return true;
         const auto& clips = PlaylistComponent::copiedClips();
         return std::any_of (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
     }
     void pasteSlot (int track, int scene)
     {
+        // issue #232 (round 190nz): a clip copied in another LYNX SHARE window: its first pattern or audio clip, with what
+        // it plays (core/CrossPaste.h)
+        if (auto incoming = windowclip::incoming (crossclipboard::Kind::clips))
+        {
+            auto& clips = incoming->fragment.playlist;
+            clips.erase (std::remove_if (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; }), clips.end());
+            if (! clips.empty())
+            {
+                clips.resize (1);
+                engine.editSong ([&incoming, track, scene] (Song& s) {
+                    const auto pasted = crosspaste::importClips (s, incoming->fragment);
+                    if (! pasted.empty())
+                        session::putClip (s, pasted.front(), track, scene);
+                });
+                ui::postHint ({ windowclip::pastedFrom (*incoming) }, 2500);
+                repaint();
+                return;
+            }
+        }
         if (copiedBlock && copiedSlotStamp == PlaylistComponent::copiedStamp()) // round 190lx (DL-29): top-left on the slot
         {
             engine.editSong ([=, block = *copiedBlock] (Song& s) { session::pasteBlock (s, track, scene, block); });
@@ -2401,7 +2475,11 @@ public:
             const auto it = std::find_if (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
             if (it == clips.end())
                 return;
-            engine.editSong ([=, clip = *it] (Song& s) { session::putClip (s, clip, track, scene); });
+            engine.editSong ([=, clip = *it, carried = PlaylistComponent::copiedPatterns()] (Song& s) {
+                std::vector<Clip> one { clip };
+                trackclips::materialize (s, one, carried); // (round 190ne: a copied track clip comes back as a copy of its own)
+                session::putClip (s, one.front(), track, scene);
+            });
         }
         repaint();
     }
@@ -2565,6 +2643,16 @@ public:
         addGrooveItems (menu, track, scene, true, false);
     }
 
+    // round 190nw (LYNX's own): a pattern clip's notes in the tracker editor, on that clip's pattern
+    void addEditInTracker (juce::PopupMenu& menu, int track, int scene)
+    {
+        const auto* grid = gridOf();
+        const auto* clip = grid != nullptr ? launcher::clipAt (*grid, track, scene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::pattern || clip->pattern < 0 || clip->pattern >= (int) engine.getSong().patterns.size())
+            return;
+        menu.addItem (tr ("Edit in tracker"), [this, pattern = clip->pattern] { openTracker (engine, pattern); });
+    }
+
 public:
     juce::PopupMenu buildSlotMenu (int track, int scene)
     {
@@ -2593,11 +2681,19 @@ public:
             menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
                           [this, track, scene] { toggleClipActive (track, scene); });
             menu.addSeparator();
+            // round gap190og (detail-020): Live's Crop Clip, its own group before the colours [SHOT
+            // details2_190ld/shots/ref/live-clip-menu.png "Crop Clip  Ctrl+Shift+J"]; MIDI clips (an audio clip's is Crop Sample)
+            if (canCropClip (track, scene))
+            {
+                menu.addItem (tr ("Crop Clip") + sessionkeys::menuKey (sessionkeys::Command::gridCropClip), [this, track, scene] { cropClip (track, scene); });
+                menu.addSeparator();
+            }
             menu.addSubMenu (tr ("Change color"), ui::colourMenu (slot->colour, [this, track, scene] (std::uint32_t c) {
                 editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
             }, mouseArea()));
             menu.addSeparator();
             addClipOptions (menu, track, scene, false);
+            addEditInTracker (menu, track, scene);
             menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
             menu.addSeparator();
             addGridOptions (menu);
@@ -2623,6 +2719,7 @@ public:
                 editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
             }, mouseArea()));
             addGrooveItems (menu, track, scene, true, true);
+            addEditInTracker (menu, track, scene);
             menu.addSeparator();
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, track, scene] { copySlot (track, scene, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });
@@ -2647,6 +2744,31 @@ public:
         menu.addSeparator();
         addGridOptions (menu);
         return menu;
+    }
+
+    // round gap190og (detail-020): Live's Crop Clip (core/ClipLoopOps.h): the MIDI clip's notes outside its loop (Start..End
+    // with Loop off) go and the kept span starts its pattern; one undo step
+    bool canCropClip (int track, int scene) const
+    {
+        const auto& song = engine.getSong();
+        const auto* grid = gridOf();
+        const auto* c = grid != nullptr ? launcher::clipAt (*grid, track, scene) : nullptr;
+        return c != nullptr && cliploop::canEdit (*c, song);
+    }
+    void cropClip (int track, int scene)
+    {
+        engine.editSong ([track, scene] (Song& s) {
+            if (! s.clipGrid)
+                return;
+            for (auto& c : s.clipGrid->clips)
+                if (c.track == track && c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) s.clipGrid->slots.size()
+                    && s.clipGrid->slots[(std::size_t) c.gridSlot].scene == scene)
+                {
+                    cliploop::cropClip (s, c);
+                    return;
+                }
+        });
+        repaint();
     }
 
 private:
@@ -2798,6 +2920,22 @@ public:
             bounceTrackInPlace (engine, channel);
             repaint();
         });
+        // round 190op (P4, LYNX extras; owner decision O-3): Deactivate Track unloads the track's devices (the Track
+        // Activator stays Live's mute); Hide takes the column out of view (Show hidden tracks, Playlist menu)
+        {
+            const auto units = trackstates::unitsOfTrack (song, track);
+            const auto off = trackstates::trackDeactivated (song, units);
+            menu.addItem (off ? tr ("Reactivate Track") : tr ("Deactivate Track"), ! units.empty(), off, [this, track, off] {
+                const auto u = trackstates::unitsOfTrack (engine.getSong(), track);
+                engine.setDeactivated (u.channels, u.inserts, ! off);
+                repaint();
+            });
+            const auto hidden = trackstates::isHidden (song, track);
+            menu.addItem (tr ("Hide Track"), true, hidden, [this, track, hidden] {
+                engine.editSong ([track, hidden] (Song& s) { trackstates::setHidden (s, { track }, ! hidden); });
+                repaint();
+            });
+        }
         menu.addSeparator();
         const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
         menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {
@@ -3247,6 +3385,14 @@ private:
 
     void addGridOptions (juce::PopupMenu& menu)
     {
+        // round 190ol (research190oe P1; Live users' "markers to scenes"): one scene per section of the arrangement's
+        // Sections lane, named and coloured after it, with each track's clip of that section (core/SectionOps.h)
+        const auto sectionCount = (int) engine.getSong().sections().size();
+        menu.addItem (tr ("Create scenes from sections") + (sectionCount > 0 ? " (" + juce::String (sectionCount) + ")" : juce::String()), sectionCount > 0, false, [this] {
+            engine.editSong ([] (Song& s) { sections::createScenes (s); });
+            clampScroll();
+            repaint();
+        });
         // round 190ef: the reference's View › Scene Tempo And Time Signature (a preference, kept with the UI settings)
         menu.addItem (tr ("Scene tempo and time signature"), true, sceneFieldsOn, [this] {
             sceneFieldsOn = ! sceneFieldsOn;
@@ -3725,6 +3871,12 @@ SessionMixerComponent* clipGridMixer (juce::Component& grid)
 {
     auto* g = dynamic_cast<ClipGridComponent*> (&grid);
     return g != nullptr ? g->sessionMixer() : nullptr;
+}
+
+void syncClipGridMixerForSnapshot (juce::Component& grid) // (round 190ou: off-screen routes run no timer)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->syncMixerForSnapshot();
 }
 
 void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)

@@ -1,4 +1,5 @@
 #include "core/DynamicsSuite.h"
+#include "core/FastMath.h"
 
 #include <numbers>
 #include <algorithm>
@@ -1615,6 +1616,10 @@ bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) no
 class Compressor final : public Effect
 {
 public:
+    // round 190ok (D3): 2 = the detector's log10 / exp / log and the gain's dB-to-gain through core/FastMath.h
+    void setEngineRev (int rev) noexcept override { engineRev = rev; }
+    int engineRev = 0;
+
     explicit Compressor (const EffectParams* initial)
     {
         for (auto& d : gainDelay)
@@ -1767,6 +1772,7 @@ private:
         double thr, rat, kn, rng, aA, relMs, rate, slowCoef, gainBlend, aP = 0.0;
         int holdSamples, window;
         bool autoRel;
+        bool fast = false; // round 190ok (D3): EffectSlot::engineRev 2: the detector's log10 / exp / log and dB-to-gain via FastMath
         // round 190v: two-way / vari-mu run their measured laws, set up once per chunk
         Curve curve = Curve::downward;
         const StyleDef* def = &styleDefs[0];
@@ -1869,6 +1875,7 @@ private:
     Ctx context (const EffectParams& p, double rate) const noexcept
     {
         Ctx c;
+        c.fast = engineRev >= 2;
         c.st = styleOf (p);
         const auto& sd = defOf (p);
         c.def = &sd;
@@ -2478,13 +2485,14 @@ private:
                 d.fe[k] = u > d.fe[k] ? d.fe[k] + x.fA[k] * (u - d.fe[k]) : d.fe[k] * x.fR[k];
                 cv += x.fWt[k] * d.fe[k];
             }
-            const auto g = fetLawDb (20.0 * std::log10 (cv + 1.0e-9), x.fT1, x.fW1, x.fS1, *x.fv, x.rng);
-            d.fg = std::exp (g * nepersPerDb);
+            const auto g = fetLawDb (20.0 * (x.fast ? fastmath::log10 (cv + 1.0e-9) : std::log10 (cv + 1.0e-9)), x.fT1, x.fW1, x.fS1, *x.fv, x.rng);
+            d.fg = x.fast ? fastmath::exp (g * nepersPerDb) : std::exp (g * nepersPerDb);
             return g;
         }
         if (x.curve == Curve::console) // round 190kt: the console law (feedback, RC ballistics); no hold / lift / blend
         {
-            const auto t = consoleTarget (std::log (std::min (1.0, level * std::exp (d.cs)) + consoleFloor) - x.cT, x.cK, x.cKnee);
+            const auto t = x.fast ? consoleTarget (fastmath::log (std::min (1.0, level * fastmath::exp (d.cs)) + consoleFloor) - x.cT, x.cK, x.cKnee)
+                                  : consoleTarget (std::log (std::min (1.0, level * std::exp (d.cs)) + consoleFloor) - x.cT, x.cK, x.cKnee);
             if (! x.autoRel)
                 d.cs = d.cs > t ? d.cs + x.cA * (t - d.cs) - x.cR * d.cs : std::min (d.cs * (1.0 - x.cR), t);
             else if (d.cs > t)
@@ -2502,7 +2510,7 @@ private:
             }
             return std::max (-x.rng, d.cs / nepersPerDb);
         }
-        const auto in = std::max (-120.0, 20.0 * std::log10 (level + 1e-12));
+        const auto in = std::max (-120.0, 20.0 * (x.fast ? fastmath::log10 (level + 1e-12) : std::log10 (level + 1e-12)));
         if (x.curve == Curve::twoWay) // round 190v: the follower works on the amplitude, not on its level in dB
         {
             if (level > d.lin)
@@ -2514,7 +2522,7 @@ private:
                 --d.holdLeft;
             else
                 d.lin = x.aRl * d.lin + (1.0 - x.aRl) * level;
-            d.env = std::max (-120.0, 20.0 * std::log10 (d.lin + 1e-12));
+            d.env = std::max (-120.0, 20.0 * (x.fast ? fastmath::log10 (d.lin + 1e-12) : std::log10 (d.lin + 1e-12)));
         }
         else if (in > d.env)
         {
@@ -2603,7 +2611,7 @@ private:
             // the signed sample scored lower on every block)
             const auto g0 = x.v2 > 0 ? detectV2 (0, link * m + (1.0 - link) * la, x, altA)
                                      : detect (0, link * m + (1.0 - link) * la, x);
-            g[0] = (float) dbToGain (g0);
+            g[0] = (float) (x.fast ? fastmath::exp2 (g0 * 0.16609640474436813) : dbToGain (g0)); // (round 190ok, D3)
             maxGr = std::max (maxGr, -g0);
             if (both)
                 g[1] = g[0];
@@ -2611,7 +2619,7 @@ private:
             {
                 const auto g1 = x.v2 > 0 ? detectV2 (1, link * m + (1.0 - link) * lb, x, altB)
                                          : detect (1, link * m + (1.0 - link) * lb, x);
-                g[1] = (float) dbToGain (g1);
+                g[1] = (float) (x.fast ? fastmath::exp2 (g1 * 0.16609640474436813) : dbToGain (g1));
                 maxGr = std::max (maxGr, -g1);
             }
             for (int c = 0; c < 2; ++c)
@@ -3206,22 +3214,38 @@ double softRange (double x, double range) noexcept
 }
 
 // gain change (dB) of a band for a detector level x (dB); round 150: `soft` = the measured detector's range knee
-double bandCurve (const EffectParams& p, int b, double x, bool soft = false) noexcept
+// round 190ok: what bandCurve takes from a band's parameters, worked out once per block (the detector asked for it on
+// every sample and band: a pow, an exp and a square root each time). The same values, so the same samples.
+struct CurveParams
+{
+    double thr = 0.0, r = 1.0, rng = 0.0, kn = 0.0, squeeze = 0.0;
+    bool expand = false;
+};
+
+CurveParams curveParams (const EffectParams& p, int b) noexcept
 {
     const auto at = [&] (int f) { return p[(std::size_t) param (b, f)]; };
-    const auto thr = thresholdDb (at (fThreshold));
-    const auto r = ratioOf (at (fRatio));
-    const auto rng = rangeDb (at (fRange));
-    const auto kn = kneeDb (at (fKnee));
-    if (std::abs (rng) < 0.01)
-        return 0.0;
-    const bool expand = on (at (fMode));
-    const auto limit = [&] (double v) { return soft ? softRange (v, std::abs (rng)) : std::min (std::abs (rng), v); };
+    CurveParams c;
+    c.thr = thresholdDb (at (fThreshold));
+    c.r = ratioOf (at (fRatio));
+    c.rng = rangeDb (at (fRange));
+    c.kn = kneeDb (at (fKnee));
+    c.expand = on (at (fMode));
     // round tp172b6 [EXEC] (Pro-MB, 1 kHz stair, threshold -30, knee 0: -6.01 / -12.01 / -18.01 / -24.01 dB at 6 ... 24 dB
     // over): the very top of the ratio is a true limit (slope 1, printed infinity : 1), whatever its parameter text
     // says; 0.99 is still 91.9 : 1 (-5.95 dB). Only the exact top changes here; every value below keeps its law. The
     // downward expander's top stays as it was: 54.8 : 1 and the top differ by under 0.1 dB on the same stair.
-    const auto squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / r;
+    c.squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / c.r;
+    return c;
+}
+
+double bandCurve (const CurveParams& c, double x, bool soft = false) noexcept
+{
+    const auto thr = c.thr, r = c.r, rng = c.rng, kn = c.kn, squeeze = c.squeeze;
+    if (std::abs (rng) < 0.01)
+        return 0.0;
+    const bool expand = c.expand;
+    const auto limit = [&] (double v) { return soft ? softRange (v, std::abs (rng)) : std::min (std::abs (rng), v); };
     if (! expand)
     {
         if (rng < 0.0) // downward compression above the threshold
@@ -3231,6 +3255,11 @@ double bandCurve (const EffectParams& p, int b, double x, bool soft = false) noe
     if (rng < 0.0) // downward expansion below the threshold
         return -limit (kneeCurve (thr - x, r - 1.0, kn));
     return limit (kneeCurve (x - thr, squeeze, kn)); // upward expansion above it
+}
+
+double bandCurve (const EffectParams& p, int b, double x, bool soft = false) noexcept
+{
+    return bandCurve (curveParams (p, b), x, soft);
 }
 
 // round 150 [EXEC] the measured detector's time constants (fitted to Pro-MB's gain on 1 kHz steps −30 → −6 → −30 →
@@ -4030,6 +4059,10 @@ private:
 class Multiband final : public Effect
 {
 public:
+    // round 190ok (D3): 2 = the detector's log10 / exp / log / dB-to-gain through core/FastMath.h (0 / 1: the C library)
+    void setEngineRev (int rev) noexcept override { engineRev = rev; }
+    int engineRev = 0;
+
     explicit Multiband (const EffectParams* initial)
     {
         if (initial != nullptr)
@@ -4253,6 +4286,12 @@ private:
         const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
         const bool msPan = on (p[panMode]);
         const bool measuredDet = measuredDetector (p);
+        // round 190ok: the bands' curve parameters once per block (exact), and revision 2's FastMath in the detector (D3)
+        std::array<CurveParams, (std::size_t) bands> curves {};
+        for (int b = 0; b < nb && b < bands; ++b)
+            curves[(std::size_t) b] = curveParams (p, b);
+        const bool fast = engineRev >= 2;
+        const auto toGain = [fast] (double db) noexcept { return fast ? fastmath::exp2 (db * 0.16609640474436813) : dbToGain (db); };
 
         std::array<double, bands> aA {}, aR {}, aR2 {}, aG {}, kG {}, level {};
         const bool gainAttack = measuredDet && on (p[rev152]);
@@ -4453,10 +4492,11 @@ private:
                                 extreme[(std::size_t) b] = gdb;
                             return gdb;
                         }
-                        const auto x = std::max (-120.0, 20.0 * std::log10 (m + 1e-12));
+                        // (round 190ok, D3: revision 2 takes FastMath's log10 / log / exp here)
+                        const auto x = std::max (-120.0, 20.0 * (fast ? fastmath::log10 (m + 1e-12) : std::log10 (m + 1e-12)));
                         e = x > e ? aA[(std::size_t) b] * e + (1.0 - aA[(std::size_t) b]) * x
                                   : aR[(std::size_t) b] * e + (1.0 - aR[(std::size_t) b]) * x;
-                        auto gdb = bandCurve (p, b, e, measuredDet);
+                        auto gdb = bandCurve (curves[(std::size_t) b], e, measuredDet);
                         if (measuredDet)
                         {
                             // round 150: the gain's own release after the curve and the range (the reference's
@@ -4466,7 +4506,9 @@ private:
                             {
                                 // round 152: the attack (instant before), in the 10^(k·|gain| / 20) domain
                                 const auto a = aG[(std::size_t) b], k = kG[(std::size_t) b];
-                                if (k > 1e-6)
+                                if (k > 1e-6 && fast)
+                                    hold = std::copysign (fastmath::log (a * fastmath::exp (k * std::abs (hold)) + (1.0 - a) * fastmath::exp (k * std::abs (gdb))) / k, gdb);
+                                else if (k > 1e-6)
                                     hold = std::copysign (std::log (a * std::exp (k * std::abs (hold)) + (1.0 - a) * std::exp (k * std::abs (gdb))) / k, gdb);
                                 else
                                     hold = a * hold + (1.0 - a) * gdb;
@@ -4482,13 +4524,13 @@ private:
                     const auto peak = (double) std::max (std::abs (cl), std::abs (cr));
                     const auto lev = level[(std::size_t) b];
                     if (fullLink[(std::size_t) b]) // 100 % linked: one detector on the louder channel (the old engine)
-                        g = g2 = (float) dbToGain (follow (env[(std::size_t) b], held[(std::size_t) b], peak) + lev);
+                        g = g2 = (float) toGain (follow (env[(std::size_t) b], held[(std::size_t) b], peak) + lev);
                     else if (linkM[(std::size_t) b] <= 0.0)
                     {
                         // [EXEC] partly linked: each channel's detector hears its own level moved towards the louder one
                         const auto k = linkA[(std::size_t) b];
-                        g = (float) dbToGain (follow (env[(std::size_t) b], held[(std::size_t) b], (1.0 - k) * std::abs (cl) + k * peak) + lev);
-                        g2 = (float) dbToGain (follow (env2[(std::size_t) b], held2[(std::size_t) b], (1.0 - k) * std::abs (cr) + k * peak) + lev);
+                        g = (float) toGain (follow (env[(std::size_t) b], held[(std::size_t) b], (1.0 - k) * std::abs (cl) + k * peak) + lev);
+                        g2 = (float) toGain (follow (env2[(std::size_t) b], held2[(std::size_t) b], (1.0 - k) * std::abs (cr) + k * peak) + lev);
                     }
                     else
                     {
@@ -4496,8 +4538,8 @@ private:
                         // (side) itself, the other part's gain from the linked one to unity
                         const auto u = linkM[(std::size_t) b];
                         const auto one = std::abs (0.5 * ((double) cl + (linkSide[(std::size_t) b] ? -(double) cr : (double) cr)));
-                        const auto gOne = dbToGain (follow (env2[(std::size_t) b], held2[(std::size_t) b], (1.0 - u) * peak + u * one));
-                        const auto gLinked = dbToGain (follow (env[(std::size_t) b], held[(std::size_t) b], peak));
+                        const auto gOne = toGain (follow (env2[(std::size_t) b], held2[(std::size_t) b], (1.0 - u) * peak + u * one));
+                        const auto gLinked = toGain (follow (env[(std::size_t) b], held[(std::size_t) b], peak));
                         const auto gOther = (1.0 - u) * gLinked + u;
                         const auto lg = dbToGain (lev);
                         g = (float) ((linkSide[(std::size_t) b] ? gOther : gOne) * lg);  // mid

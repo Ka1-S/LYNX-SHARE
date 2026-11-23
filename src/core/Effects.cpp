@@ -2796,6 +2796,9 @@ public:
         dsp.allNotesOff();
         sounding = {};
     }
+    // round 190oa (DP-81): the editor's input / output pitch strips, 1 + the pitch class (1 … 13 from C; 0 = none, as an
+    // unpublished meter reads)
+    float controlOutput (int output) const noexcept override { return 1.0f + (output == 0 ? dsp.inputClass() : output == 1 ? dsp.outputClass() : -1.0f); }
     // round 173d: the notes held on the Channel Rack reach the MIDI / Harmonize modes (before, nothing ever called
     // the DSP's noteOn: MIDI, Octaves, Vel and the four voice pans did nothing)
     void setHeldNotes (const NoteMask* channels, int count) noexcept override
@@ -3686,10 +3689,11 @@ const EffectInfo& effectInfoOf (EffectKind kind)
     static const EffectInfo newtimeInfo { "Newtime", { { "Slave to host playback", 0.0f } } };
     static const EffectInfo fruityFilterInfo { "Fruity Filter", { { "Cutoff", 1.0f }, { "Resonance", 205.0f / 1024.0f }, { "Low pass", 1.0f },
                                                                  { "Band pass", 0.0f }, { "High pass", 0.5f }, { "x2", 0.0f }, { "Center", 0.0f } } };
-    // FL's eight Gross Beat parameters (core/GrossBeat.h); the slots' envelopes travel in EffectSlot::state
+    // FL's nine Gross Beat parameters (core/GrossBeat.h; round 190oa: the scratch dial's offset, the 9th); the slots' envelopes travel in EffectSlot::state
     static const EffectInfo grossBeatInfo { "Gross Beat", { { "Time slot", 0.0f }, { "Volume slot", 0.0f }, { "Time mix", 1.0f },
                                                             { "Volume mix", 1.0f }, { "Attack", 0.1765f }, { "Release", 0.5f },
-                                                            { "Tension", 0.5f }, { "Hold", 0.0f } } };
+                                                            { "Tension", 0.5f }, { "Hold", 0.0f },
+                                                            { "Time offset (scratching)", 0.0f } } }; // (round 190oa: 0 = no offset)
     // FL's state travels in EffectSlot::state; the four global controls are the editable parameters (raw / 128)
     static const EffectInfo fruityDelayBankInfo { "Fruity Delay Bank", { { "Dry", 1.0f }, { "Output", 1.0f }, { "Input", 1.0f }, { "Feedback", 1.0f } } };
     // FL's raw controls normalised over their ranges (core/FruityMultiband.h); defaults = a new FL instance
@@ -5426,7 +5430,22 @@ std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)
     return std::make_unique<ParallelEffect> (slot);
 }
 
+namespace
+{
+std::unique_ptr<Effect> makeEffectOfSlot (const EffectSlot& slot);
+}
+
 std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
+{
+    auto effect = makeEffectOfSlot (slot);
+    if (effect != nullptr)
+        effect->setEngineRev (slot.engineRev); // (round 190ok, D3)
+    return effect;
+}
+
+namespace
+{
+std::unique_ptr<Effect> makeEffectOfSlot (const EffectSlot& slot)
 {
     if (slot.kind == EffectKind::parallel)
         return makeParallelEffect (slot);
@@ -5436,8 +5455,12 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     }
     if (slot.kind == EffectKind::formulaController)
         return formula::makeEffect (slot.state);
+    if (slot.kind == EffectKind::atrium) // round 190nr: the dense late tank only where it runs
+        return verbs::makeAtrium (verbs::atriumDense (slot.params));
     if (slot.kind == EffectKind::vocodex)
-        return vocodex::make (slot.state);
+        return vocodex::make (slot.state, slot.params); // (round 190pt: liveControls)
+    if (slot.kind == EffectKind::xyzController && slot.params[(std::size_t) xy::flInputCurves] >= 0.5f)
+        return xy::makeEffectWithCurves (slot); // (round 190pt: FL's input curves from the state)
     if (slot.kind == EffectKind::maximus)
         return maximusfx::make (slot.state, slot.engineRev);
     if (slot.kind == EffectKind::multibandDelay)
@@ -5451,7 +5474,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::distructor)
         return distructor::make (slot.state);
     if (slot.kind == EffectKind::effector && khsdsp::lawOf (slot.params[(std::size_t) khsdsp::lawParam]) != khsdsp::Law::none)
-        return effector::make (true); // round 190nb: a Kilohearts snapin law (core/KiloheartsDsp.h)
+        return effector::make (true, khsdsp::lawLatency (khsdsp::lawOf (slot.params[(std::size_t) khsdsp::lawParam]))); // round 190nb: a Kilohearts snapin law (core/KiloheartsDsp.h)
     if (slot.kind == EffectKind::fruityWaveShaper)
         return flshape::makeWaveShaper (slot.state);
     if (slot.kind == EffectKind::parametricEq && peq::flLaw (slot.params))
@@ -5510,6 +5533,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return slot.state.empty() ? flmb::make (&slot.params) : flmb::make (slot.state, &slot.params); // (#113: latency known at once)
     return makeEffect (slot.kind);
 }
+} // namespace
 
 std::unique_ptr<Effect> makeEffect (EffectKind kind)
 {

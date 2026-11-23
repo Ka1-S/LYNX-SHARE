@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHARE juga bisa berjalan tanpa membuka jendelanya. Satu opsi merender proyek menjadi audio, opsi lain mengonversinya ke proyek FL Studio atau set Ableton Live, dan beberapa lagi ada untuk pengujian. Pemeriksaan milik proyek ini sendiri memakai opsi yang sama.
 
@@ -18,7 +18,7 @@ Programnya adalah `LYNX.exe` di Windows dan `LYNX` di macOS dan Linux. Di macOS 
 LYNX.exe project.lynx
 ```
 
-Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima: `.lynx`, `.flp`, `.als`, `.flm`, dan `.mid`. Path relatif dihitung dari folder saat ini.
+Memulai LYNX SHARE dengan jendelanya dan membuka file itu. Format yang diterima: `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip`, dan `.mid`. Path relatif dihitung dari folder saat ini.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ Membuka proyek `.lynx` tanpa memuat plugin pihak ketiganya, seperti yang dilakuk
 
 | Opsi | Fungsinya |
 |---|---|
-| `--export <project> <out>` | Merender seluruh song beserta tail-nya, seperti jendela Ekspor. Ekstensi `<out>` menentukan format: `.wav` (24-bit), `.flac`, `.ogg`, atau `.mp3` (320 kbps) |
+| `--export <project> <out>` | Merender seluruh song beserta tail-nya, seperti jendela Ekspor. Ekstensi `<out>` menentukan format: `.wav` (24-bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24-bit), atau `.m4a` (192 kbps, tidak di Linux) |
 | `--export ... --pattern` | Hanya merender pattern saat ini |
 | `--export ... --insert N` | Hanya merender output insert Mixer N |
 | `--export ... --rate N` | Merender dengan sample rate lain, dalam Hz |
 | `--stems <project> <base.wav>` | Menulis satu WAV per insert Mixer yang punya channel: `base - 1.wav`, `base - 2.wav`, dan seterusnya |
 | `--export-flp <project> <out.flp>` | Menulis proyek FL Studio. Dengan `out.zip` menulis paket loop yang di-zip |
 | `--export-flp ... --substitute` | Menukar plugin khusus LYNX dengan plugin FL terdekat, bukan merendernya menjadi audio |
+| `--export-flm <project> <out.flm>` | Menulis proyek FL Studio Mobile dan menyalin sample ke folder `<name> Samples` di sebelahnya |
 | `--export-als <project> <folder>` | Menulis set Ableton Live ke `<folder>/<name> Project/<name>.als`, untuk Live 12 |
 | `--export-als ... --live11` | Menulis set untuk Live 11 |
 | `--export-bundle <project> <folder>` | Menulis paket dari `File › Ekspor › Untuk aplikasi lain...` ke dalam folder |

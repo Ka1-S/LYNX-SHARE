@@ -1,4 +1,5 @@
 #include "core/DawProject.h"
+#include "core/TrackVersions.h"
 
 #include <algorithm>
 #include <charconv>
@@ -28,6 +29,7 @@
 #include "core/MissingFiles.h"
 #include "core/NativeEngines.h"
 #include "core/PluginPresets.h"
+#include "core/Sections.h"
 #include "core/TempoMarkers.h"
 #include "core/XmlLite.h"
 #include "core/ZipLite.h"
@@ -1272,6 +1274,15 @@ struct Imp
                 r.mode = PlaylistTrackMode::audio;
                 r.mixerTrack = insert;
             }
+        }
+        // round 190op (P4): a track that is not loaded (DAWproject's Track "loaded" = false: deactivated, its plugins not
+        // loaded) comes in deactivated, its settings kept
+        if (t.attr ("loaded") == "false")
+        {
+            if (insert > 0)
+                song.mixer[(std::size_t) insert].deactivated = true;
+            if (notes && r.channel >= 0 && r.channel < (int) song.channels.size())
+                song.channels[(std::size_t) r.channel].deactivated = true;
         }
         song.playlistTracks.push_back (r);
         rowOfTrack[id] = (int) song.playlistTracks.size() - 1;
@@ -2676,9 +2687,18 @@ int depthOf (const Song& song, int row)
 }
 } // namespace
 
-DawProjectExportResult exportDawProject (const Song& song, const DawProjectExportOptions& opt)
+DawProjectExportResult exportDawProject (const Song& input, const DawProjectExportOptions& opt)
 {
     DawProjectExportResult res;
+    // track versions (round 190pe, a LYNX extra): DAWproject has none; each track goes over as the version it plays
+    std::optional<Song> stripped;
+    if (trackversions::any (input))
+    {
+        stripped = input;
+        const auto n = trackversions::keepActiveOnly (*stripped);
+        res.notes.push_back ("Track versions: " + std::to_string (n) + " version(s) that are not active left out (each track is written as the version it plays)");
+    }
+    const auto& song = stripped ? *stripped : input;
     Exp x (song, opt, res);
     const auto& clips = song.playlist;
 
@@ -2938,7 +2958,12 @@ DawProjectExportResult exportDawProject (const Song& song, const DawProjectExpor
                 content = "automation";
             if (content.empty())
                 content = "audio";
-            t.set ("id", n.trackId).set ("name", n.name).set ("contentType", content).set ("loaded", "true");
+            // round 190op (P4): a deactivated unit is a track that is not loaded (DAWproject's "loaded"; plugins unloaded,
+            // their states still written)
+            const auto off = (n.insert > 0 && n.insert < (int) song.mixer.size() && n.owns && song.mixer[(std::size_t) n.insert].deactivated)
+                             || (n.kind == TNode::Kind::notes && n.channel >= 0 && n.channel < (int) song.channels.size()
+                                 && song.channels[(std::size_t) n.channel].deactivated);
+            t.set ("id", n.trackId).set ("name", n.name).set ("contentType", content).set ("loaded", off ? "false" : "true");
             if (n.colour != 0)
                 t.set ("color", colourText (n.colour));
             if (! n.channelId.empty())
@@ -3255,8 +3280,12 @@ DawProjectExportResult exportDawProject (const Song& song, const DawProjectExpor
     }
     // markers, tempo and signature changes
     std::vector<const Marker*> plain, signatures;
-    for (const auto& m : song.markers())
+    // (round 190ol: DAWproject has no sections: a marker at each section's start, named after it)
+    const auto withSections = sections::markersWithSections (song.markers(), song.sections());
+    for (const auto& m : withSections)
         (m.isSignature() ? signatures : plain).push_back (&m);
+    if (! song.sections().empty())
+        x.note ("Song sections written as markers at their starts");
     if (! plain.empty())
     {
         auto& markers = arrangement.add ("Markers");

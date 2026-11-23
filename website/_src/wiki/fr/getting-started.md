@@ -1,7 +1,7 @@
 ---
-source: 0101adbb66
+source: f439a070b5
 ---
-LYNX SHARE est une DAW gratuite et open source pour Windows, macOS et Linux, avec trois flux de travail dans un seul programme. Par défaut, c'est le flux de FL Studio : vous programmez des patterns dans le Channel Rack et le Piano Roll, les arrangez dans la Playlist et les mixez dans le Mixer. Le flux par lancement de clips lance des clips et des scènes depuis une grille, dans le style d'Ableton Live, et le flux simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile. `Vue › Style de disposition` permet de passer de l'un à l'autre à tout moment. Elle ouvre les projets FL Studio (`.flp`), les sets Ableton Live (`.als`) et les projets FL Studio Mobile (`.flm`), et enregistre dans son propre format `.lynx`.
+LYNX SHARE est une DAW gratuite et open source pour Windows, macOS et Linux, avec trois dispositions dans un seul programme. Par défaut, c'est la disposition Pattern : vous programmez des patterns dans le Channel Rack et le Piano Roll, les arrangez dans la Playlist et les mixez dans le Mixer. La disposition par lancement de clips lance des clips et des scènes depuis une grille, dans le style d'Ableton Live, et la disposition simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile. `Vue › Style de disposition` permet de passer de l'un à l'autre à tout moment. Elle ouvre les projets FL Studio (`.flp`), les sets Ableton Live (`.als`), les projets FL Studio Mobile (`.flm`), les fichiers DAWproject, les projets GarageBand et BandLab et les modules tracker, exporte `.flp`, `.als`, `.dawproject` et `.flm`, et enregistre dans son propre format `.lynx`.
 
 C'est une alpha. Attendez-vous à des bugs, et enregistrez souvent.
 
@@ -9,7 +9,7 @@ C'est une alpha. Attendez-vous à des bugs, et enregistrez souvent.
 
 1. Consultez le tableau ci-dessous pour vérifier que votre système est pris en charge.
 2. Téléchargez-la et installez-la. [Installation](/wiki/install/) donne les étapes pour chaque système.
-3. Lancez-la. Un court assistant de configuration choisit la langue, teste la sortie audio, vous laisse choisir l'un des trois flux de travail et liste les dossiers de plugins, qui sont ensuite analysés en arrière-plan. Vous pouvez l'ignorer et le rouvrir plus tard avec `Options › Assistant de configuration (langue, audio, dossiers de plugins)...`.
+3. Lancez-la. Une carte de bienvenue demande d'où vous venez et ouvre la disposition correspondante en un clic. Elle règle aussi la langue, teste le son et demande s'il faut rechercher des mises à jour, pendant que les dossiers de plugins sont analysés en arrière-plan. `Plus de réglages (pilote audio, dossiers de plugins)...` ouvre l'assistant de configuration complet, également dans `Options › Assistant de configuration (langue, audio, dossiers de plugins)...`.
 4. Si vous n'entendez rien, allez à [Configuration audio](/wiki/audio-setup/).
 5. Lisez [Visite de la fenêtre](/wiki/tour/), puis faites [Votre premier morceau](/wiki/first-song/).
 
@@ -19,7 +19,7 @@ C'est une alpha. Attendez-vous à des bugs, et enregistrez souvent.
 |---|---|
 | Windows | Windows 10 ou 11, 64 bits |
 | macOS | macOS 11 Big Sur ou plus récent, Intel ou Apple silicon |
-| Linux | x86_64 avec glibc 2.35 ou plus récente (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch ou Manjaro à jour), X11 ou XWayland |
+| Linux | x86_64 ou arm64 avec glibc 2.35 ou plus récente (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch ou Manjaro à jour ; arm64 aussi sur un Raspberry Pi 4 ou 5 avec un système 64 bits), X11 ou XWayland |
 
 Vous n'avez pas besoin d'interface audio. LYNX SHARE joue par le périphérique audio que votre système utilise déjà. Vous n'avez pas besoin non plus de FL Studio. S'il est installé sur le même ordinateur, LYNX SHARE trouve ses samples et utilise les mêmes fichiers de plugins pour les projets `.flp`.
 
@@ -45,7 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | Vous voulez | Lisez |
 |---|---|
-| Choisir un flux de travail | [Dispositions](/wiki/layouts/), [Disposition simple](/wiki/simple-layout/) |
+| Choisir une disposition | [Dispositions](/wiki/layouts/), [Disposition simple](/wiki/simple-layout/) |
 | Apprendre chaque fenêtre | [Channel Rack](/wiki/channel-rack/), [Piano Roll](/wiki/piano-roll/), [Playlist](/wiki/playlist/), [Mixer](/wiki/mixer/), [Browser](/wiki/browser/) |
 | Ouvrir un projet d'un autre programme | [Venir de FL Studio](/wiki/coming-from-fl-studio/), [Venir d'Ableton Live](/wiki/coming-from-ableton/) |
 | Utiliser vos plugins VST, CLAP, LV2 ou AU | [Plugins](/wiki/plugins/) |

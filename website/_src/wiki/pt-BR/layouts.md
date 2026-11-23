@@ -1,15 +1,15 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
-![O fluxo por disparo de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
+![O layout de lançamento de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
 
-`Exibir › Estilo de layout` tem três entradas: `Fluxo por padrões (padrão)`, `Fluxo por disparo de clipes` e `Fluxo simples`. A mesma escolha está em `Opções › Configurações gerais`, em Fluxo de trabalho. A escolha é mantida quando você fecha o programa.
+`Exibir › Estilo de layout` tem três entradas: `Layout Pattern (padrão)`, `Layout de lançamento de clipes` e `Layout Simple`. A mesma escolha está em `Opções › Configurações gerais`, em Layout. A escolha é mantida quando você fecha o programa. Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem e escolhe o layout certo.
 
-O fluxo por padrões, o que abre de início, funciona como o FL Studio: o Channel Rack, os patterns, o Piano Roll, a Playlist e o Mixer. O fluxo por disparo de clipes, no estilo do Ableton Live, acrescenta uma grade de clipes com cenas ao lado da Playlist, um mixer da sessão e as visões de clipe e de dispositivo; os patterns e o Channel Rack continuam disponíveis. O fluxo simples mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile: faixas e linha do tempo, loops, pads e gravação rápida. Trocar de fluxo só muda as janelas: o projeto continua o mesmo.
+O layout Pattern, o que abre de início, funciona como o FL Studio: o Channel Rack, os patterns, o Piano Roll, a Playlist e o Mixer. O layout de lançamento de clipes, no estilo do Ableton Live, acrescenta uma grade de clipes com cenas ao lado da Playlist, um mixer da sessão e as visões de clipe e de dispositivo; os patterns e o Channel Rack continuam disponíveis. O layout Simple mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile: faixas e linha do tempo, loops, pads e gravação rápida. Trocar de layout só muda as janelas: o projeto continua o mesmo.
 
 ## Disparar clipes na grade
 
-1. Escolha `Exibir › Estilo de layout › Fluxo por disparo de clipes`. A grade de clipes aparece ao lado da Playlist.
+1. Escolha `Exibir › Estilo de layout › Layout de lançamento de clipes`. A grade de clipes aparece ao lado da Playlist.
 2. Clique com o botão direito em um slot vazio, escolha `Colocar um padrão aqui` e selecione um pattern. Dar um clique duplo em um slot vazio coloca ali o pattern atual.
 3. Clique no triângulo à esquerda do clipe para disparar. Se o transporte estiver parado, ele começa.
 4. Clique no triângulo de uma cena, na coluna `Cenas`, para disparar todos os clipes daquela linha.
@@ -60,30 +60,30 @@ O menu do slot também tem duas opções para a grade inteira: `Devolver as faix
 
 Quando você abre um set do Live, os clipes e cenas de Session dele vão para a grade de clipes, com as configurações de disparo. `Arquivo › Exportar › Set do Ableton Live (.als)` grava a grade de volta como clipes de Session. `Opções › Configurações gerais` tem `Clipes de sessão de sets do Live`, em que `Playlist, depois do arranjo` coloca esses clipes na Playlist.
 
-## O fluxo Simples
+## O layout Simple
 
-`Exibir › Estilo de layout › Fluxo simples` é uma janela só com as faixas e a linha do tempo, no estilo do BandLab e do FL Studio Mobile, e serve bem para uma primeira música. `Exibir › Painel da faixa` mostra um painel sob a linha do tempo para a faixa selecionada, com as abas `Efeitos`, `Instrumento`, `Teclado` e `Editor`. Neste fluxo, o menu `Ajuda` tem `Tour da primeira música` e `Tela de boas-vindas...`, que oferece uma primeira música em sete passos, uma música de demonstração ou um projeto vazio. Veja [Layout simples](/wiki/simple-layout/).
+`Exibir › Estilo de layout › Layout Simple` é uma janela só com as faixas e a linha do tempo, no estilo do BandLab e do FL Studio Mobile, e serve bem para uma primeira música. `Exibir › Painel da faixa` mostra um painel sob a linha do tempo para a faixa selecionada, com as abas `Efeitos`, `Instrumento`, `Teclado` e `Editor`. Neste layout, o menu `Ajuda` tem `Tour da primeira música` e `Tela de boas-vindas...`, que oferece uma primeira música em sete passos, uma música de demonstração ou um projeto vazio. Veja [Layout simples](/wiki/simple-layout/).
 
-`Letra e anotações` e `Igualar à referência...` no menu `Exibir`, e `Voz limpa` no menu de um insert do Mixer, existem em todos os layouts. No fluxo Simples, `Voz limpa` também está no menu de uma faixa.
+`Letra e anotações` e `Igualar à referência...` no menu `Exibir`, e `Voz limpa` no menu de um insert do Mixer, existem em todos os layouts. No layout Simple, `Voz limpa` também está no menu de uma faixa.
 
 ## Voltar
 
-Escolha `Exibir › Estilo de layout › Fluxo por padrões (padrão)`. O layout de janelas que você tinha no fluxo por padrões volta, e as faixas de automação retornam à configuração que tinham antes. Os clipes da grade ficam no projeto.
+Escolha `Exibir › Estilo de layout › Layout Pattern (padrão)`. O layout de janelas que você tinha no layout Pattern volta, e as faixas de automação retornam à configuração que tinham antes. Os clipes da grade ficam no projeto.
 
 ## Bom saber
 
 - Uma faixa que disparou um clipe fica em silêncio na Playlist até você apertar `Voltar à Playlist`. A opção `Devolver as faixas à Playlist quando o transporte parar` faz isso por você a cada parada.
-- As teclas novas da grade (`B`, `Q`, `Ctrl+M`, `Ctrl+K` e outras) agem assim só no fluxo por disparo de clipes. No fluxo por padrões elas mantêm o significado do FL Studio.
+- As teclas novas da grade (`B`, `Q`, `Ctrl+M`, `Ctrl+K` e outras) agem assim só no layout de lançamento de clipes. No layout Pattern elas mantêm o significado do FL Studio.
 - Uma cena em 6/8 toca um compasso de três beats, porque o compasso conta semínimas.
 - Existem ações seguintes para clipes, não para cenas.
-- As faixas de automação ligadas à mão no fluxo por disparo de clipes não são mantidas quando você volta.
-- Com o fluxo por padrões selecionado, nada da grade é carregado.
+- As faixas de automação ligadas à mão no layout de lançamento de clipes não são mantidas quando você volta.
+- Com o layout Pattern selecionado, nada da grade é carregado.
 
 ## Veja também
 
 - [Playlist](/wiki/playlist/)
 - [Vindo do Ableton Live](/wiki/coming-from-ableton/)
 - [Importar projetos](/wiki/importing-projects/)
-- [O que só o LYNX faz: fluxos de trabalho](/why/#workflows)
+- [O que só o LYNX faz: layouts](/why/#workflows)
 
 A terceira entrada é uma janela para a primeira música. Veja [Layout simples](/wiki/simple-layout/).

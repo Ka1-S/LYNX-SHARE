@@ -1,7 +1,7 @@
 ---
-source: 98a5eb9945
+source: e1ff018baf
 ---
-LYNX SHARE slaat projecten op als `.lynx`-bestanden. Het opent ook projecten van andere programma's, laadt de gangbare audiobestanden en exporteert audio, MIDI en projecten voor andere programma's. De tabel toont elk formaat van 0.1.30 alpha.
+LYNX SHARE slaat projecten op als `.lynx`-bestanden. Het opent ook projecten van andere programma's, laadt de gangbare audiobestanden en exporteert audio, MIDI en projecten voor andere programma's. De tabel toont elk formaat van 0.1.31 alpha.
 
 Een project dat uit het formaat van een ander programma is geopend, is een import. `Bestand › Opslaan` vraagt dan waar een `.lynx`-bestand moet komen, en het originele bestand wordt nooit gewijzigd.
 
@@ -16,16 +16,17 @@ Een project dat uit het formaat van een ander programma is geopend, is een impor
 
 | Formaat | Openen | Opslaan / Exporteren | Opmerkingen |
 |---|---|---|---|
-| `.lynx` | `Bestand › Openen...` | `Bestand › Opslaan`, met automatisch opslaan | Het eigen projectformaat van LYNX SHARE (JSON) |
-| `.zip` | `Bestand › Openen...` pakt het uit naar een map en opent het project erin | `Bestand › Exporteren › Project met samples (.zip)...` | Opent ook het gezipte looppakket van FL Studio |
+| `.lynx` | `Bestand › Openen...` | `Bestand › Opslaan`, met automatisch opslaan | Het eigen projectformaat van LYNX SHARE (JSON). `Bestand › Een kopie opslaan voor een oudere LYNX...` schrijft een kopie die 0.1.27 of 0.1.28 opent, en somt op wat die versie niet kan bewaren |
+| `.zip` | `Bestand › Openen...` pakt het uit naar een map en opent het project erin | `Bestand › Exporteren › Gezipt looppakket...` | Opent ook het gezipte looppakket van FL Studio |
 | `.lynxpack` | Opent na een samenvatting. Een deel wordt samengevoegd met het project van de host | `Bestand › Online sessie › Project versturen...` | Een project of een deel dat in een [online sessie](/wiki/online-sessions/) is verstuurd. Delen met plugins van derden reizen mee als audiorenders plus de plugininstellingen |
 | `.flp` | `Bestand › Openen...` | `Bestand › Exporteren › FL Studio-project...`, een FL Studio 2026-project of een gezipt looppakket | Native plugins spelen op nagebouwde engines van wisselende exactheid. FLEX-packs worden nooit geopend. Bij export worden instrumenten en effecten die alleen in LYNX bestaan naar audio gerenderd of vervangen door de dichtstbijzijnde FL-plugin, en modulators worden weggelaten. Zie [Overstappen van FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Bestand › Openen...` | Nee | FL Studio Mobile-project. Gedeeltelijk: andere instrumenten dan MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, de Slicer en DirectWave spelen de ingebouwde synth |
-| `.als` | `Bestand › Openen...`, sets van Live 11 en 12 | `Bestand › Exporteren › Ableton Live-set (.als)...`, voor Live 12 of Live 11 | Bij import worden devices van Live zonder equivalent in LYNX SHARE weggelaten. Bij export worden de eigen instrumenten en effecten van LYNX SHARE niet omgezet, en vervallen automatisering van effectparameters en routes van insert naar insert. Zie [Overstappen van Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `Bestand › Openen...` | `Bestand › Een kopie opslaan als FL Studio Mobile-project (.flm)...` | FL Studio Mobile-project. Gedeeltelijk: andere instrumenten dan MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, de Slicer en DirectWave spelen de ingebouwde synth. De export is een kopie: ze bewaart de noten, het tempo, de mixer, de eigen instrumenten van FL Studio Mobile, de DW Sampler, 3x Osc, drumkits, effecten en de automatisering van mixerniveau, panning, effecten, DW Sampler en GMSynth, met de samples ernaast. In de kopie houden andere instrumenten hun noten op de MiniSynth, en effecten zonder FLM-module en automatisering van andere doelen (de eigen knoppen van de synths, plugins van derden) vallen weg; een venster somt alles op voor het opslaan. |
+| `.als` | `Bestand › Openen...`, sets van Live 11 en 12 | `Bestand › Exporteren › Ableton Live-set (.als)...`, voor Live 12 of Live 11 | Bij import worden devices van Live zonder equivalent in LYNX SHARE weggelaten. Bij export worden de eigen instrumenten en effecten van LYNX SHARE niet omgezet (Helix wordt Wavetable), en vervallen automatisering van effectparameters en routes van insert naar insert. Zie [Overstappen van Ableton Live](/wiki/coming-from-ableton/) |
 | `.dawproject` | `Bestand › Openen...` | `Bestand › Exporteren › DAWproject (.dawproject)...` | Het open uitwisselingsformaat van Bitwig, Studio One, Cubase en andere apps: tracks, mappen, clips, noten, audio met zijn warpmarkers, automatisering, tempo, markers, de mixer met sends, en VST3-, VST2- en CLAP-plugins met hun status. Noteneffecten en MIDI-expressies worden bij import weggelaten; het clipraster, andere arrangementen en enkele details per noot bij export. Beide richtingen vermelden wat is weggelaten |
-| `.band` | `Bestand › Openen...` (het pakket, zijn `projectData`-bestand of een zip ervan) | Nee | GarageBand 10- of GarageBand voor iOS-project, als tracks van de Eenvoudige werkwijze. Gedeeltelijk: instrumenttracks spelen de ingebouwde synth en drums, behalve Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
-| `.blx` | `Bestand › Openen...`, of zijn map met de import `Map...` van de Eenvoudige werkwijze | Nee | BandLab-project dat door Cakewalk of Sonar is gedownload, als tracks van de Eenvoudige werkwijze met regio's, tempo, toonsoort, de mix, volume- en panautomatisering en de gebruikelijke effecten. Gedeeltelijk: de instrumentgeluiden en andere pedalen van BandLab staan in het importrapport |
+| `.band` | `Bestand › Openen...` (het pakket, zijn `projectData`-bestand of een zip ervan) | Nee | GarageBand 10- of GarageBand voor iOS-project, als tracks van de Eenvoudige lay-out. Gedeeltelijk: instrumenttracks spelen de ingebouwde synth en drums, behalve Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
+| `.blx` | `Bestand › Openen...`, of zijn map met de import `Map...` van de Eenvoudige lay-out | Nee | BandLab-project dat door Cakewalk of Sonar is gedownload, als tracks van de Eenvoudige lay-out met regio's, tempo, toonsoort, de mix, volume- en panautomatisering en de gebruikelijke effecten. Gedeeltelijk: de instrumentgeluiden en andere pedalen van BandLab staan in het importrapport |
 | `.mid`, `.midi` | `Bestand › Openen...` maakt een nieuw project. `Bestand › Importeren › MIDI-bestand...` en de Piano Roll importeren in het huidige | `Bestand › Exporteren › MIDI-bestand...` (`Ctrl+Shift+M`) | |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Bestand › Openen...` | Nee | Trackermodules (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). De instrumenten worden Sampler-kanalen met hun samples, het nummer wordt patternclips met zijn tempowisselingen, en `Beeld › Tracker` bewerkt de noten. Gedeeltelijk: effecten zoals slides, vibrato en arpeggio's, envelopes en volumewijzigingen op een klinkende noot staan in het importrapport |
 | `.wav` | Als sample of audioclip | `Bestand › Exporteren › Wave-bestand...`, 16-bit, 24-bit of 32-bit float | Optioneel dither, tempo-informatie, loopmarkeringen en Playlistmarkeringen |
 | `.mp3` | Als sample of audioclip | `Bestand › Exporteren › MP3-bestand...` | Constante bitrate |
 | `.ogg` | Als sample of audioclip | `Bestand › Exporteren › OGG-bestand...` | |
@@ -50,6 +51,7 @@ Een project dat uit het formaat van een ander programma is geopend, is een impor
 | `Bestand › Exporteren › Alle Playlist-tracks` | Eén bestand per Playlist-track |
 | `Bestand › Exporteren › Alle Playlist-trackgroepen` | Eén bestand per trackgroep |
 | `Bestand › Exporteren › Masteren...` | Rendert het project en masterd het op een loudnessdoel, op je eigen computer |
+| `Bestand › Exporteren › Voor andere apps...` | Eén map met stems, MIDI-bestanden, een Ableton Live-set, een FL Studio-project, de mixdown en een README, gezipt als je wilt |
 | `Bestand › Exporteren › Projectbotten...` | Schrijft kanaal- en effectpresets en scores naar een map |
 
 Het exportvenster rendert het nummer, het huidige pattern of de selectie in de Playlist.
@@ -59,8 +61,8 @@ Het exportvenster rendert het nummer, het huidige pattern of de selectie in de P
 Op Windows heet het programma `LYNX.exe`. Op macOS en Linux heet het `LYNX`.
 
 ```
-LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe project.lynx                       open a project (any file File › Open takes)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac, ogg, mp3, aif; m4a on Windows and macOS)
 LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
 LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ```

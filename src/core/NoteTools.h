@@ -79,6 +79,21 @@ const std::vector<FlReferenceScale>& flReferenceScales();
 // The scales() index with the same degrees as FL's reference scale `flIndex`; 0 = none (also FL's −1 Default,
 // −2 Black notes, −3 Automatic and the scales LYNX does not list)
 int scaleForFlReference (int flIndex) noexcept;
+// FL's own index of a reference scale (its menus' order: what .flp 0xF3 and a key marker's 0xA8 hold) for an index of
+// flReferenceScales(), and back (the same swap both ways; anything else unchanged). Rollup 0.1.31 step 3 (round 190ny),
+// measured with FL 2026 saves: FL lists "Other Blues" before "Other Blues Nonatonic" (17, 18), "Other Locrian" before
+// "Other Locrian Super" (27, 28) and "Other Phrygian" before "Other Phrygian Dominant" (32, 33); LYNX's list (and every
+// .lynx, which stores its index) has each pair the other way, so the .flp import / export convert at the file.
+constexpr int flMenuScaleIndex (int index) noexcept
+{
+    switch (index)
+    {
+        case 17: return 18; case 18: return 17;
+        case 27: return 28; case 28: return 27;
+        case 32: return 33; case 33: return 32;
+        default: return index;
+    }
+}
 bool inScale (int key, int root, int scale) noexcept;
 // The in-scale key nearest to `key` (a tie goes down); `key` itself without a scale. Stays in 0..127.
 int snapToScale (int key, int root, int scale) noexcept;

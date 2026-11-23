@@ -24,6 +24,7 @@
 #include "engine/ProjectFile.h"
 #include "ui/BrowserComponent.h"
 #include "ui/MapMode.h"
+#include "ui/Onboarding.h" // (round 190np)
 #include "ui/Icons.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
@@ -40,12 +41,15 @@
 #include "ui/Motion.h"
 #include "ui/Toolbar.h"
 #include "ui/Updater.h"
+#include "ui/WindowAudio.h" // issue #232 stage 2 (round 190nz)
 #include "ui/ValueControl.h"
 #include "ui/Workspace.h"
+#include "ui/ActionSearch.h" // round 190nq (#228)
 
 namespace lynx
 {
 class GamepadInput;
+struct SettingsHooks; // (ui/SettingsPages.h)
 namespace folderwatch
 {
 class Watcher;
@@ -109,6 +113,11 @@ public:
     // template as a new untitled project (nothing changes while it is LYNX's default), an empty project or the last one.
     void openStartupProject();
 
+    // issue #232 (round 190ns, LYNX extra, stage 1 of docs/design/PROJECT_TABS.md): File › Open in new window: another
+    // LYNX SHARE window (its own process, as a second start already is) with `file`, or with the start-up project when
+    // `file` is empty. False when it could not be started.
+    bool openInNewWindow (const juce::File& file);
+
     // For --snapshot mode: 0 = Channel Rack, 1 = Piano Roll (on the channel with the most notes), 2 = Playlist, 3 = Mixer,
     // each maximized on the workspace; showDesktopForSnapshot shows the default layout (with `extraPanels`, the
     // Piano Roll and Mixer floating too).
@@ -119,6 +128,9 @@ public:
     void toggleProjectPickerForSnapshot() { toggleProjectPicker(); }
     juce::Component* projectPickerForSnapshot() const noexcept { return projectPickerView.get(); }
     void showDesktopForSnapshot (bool extraPanels);
+    // View › Reset layout: the default window layout, then the layout style's own panels (applyStyleDefaultPanels)
+    void resetLayoutForStyle();
+    void startNewProjectForSnapshot (Song song) { startNewProject (std::move (song), {}); } // (round 190oj: File › New's path)
     // The Clip-launch workflow's layout (round 181a): the clip grid beside the Playlist, or flipped. Nothing exists until
     // it is first turned on. Moves panels only; the project does not change, except that it gets an (empty) grid.
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
@@ -178,6 +190,7 @@ public:
     // of the Song), and a project that has one opens with it (Settings › General › "Load the window layout saved with a
     // project")
     ProjectFile::WindowLayout currentWindowLayout() const;
+    void reopenProjectWindows (const std::vector<juce::String>& keys); // (round 190oa, DF-130)
     void applyProjectWindowLayout (const ProjectFile::WindowLayout& layout);
     bool layoutInSaves = false; // (--details190mrshot: the off-screen window keeps its layout in saves too)
     void warnIfProjectTooBig (const juce::File& file); // round 190mr (DF-147)
@@ -198,12 +211,49 @@ public:
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
     const keys::KeyMap& getKeyMapForSnapshot() const { return keyMap; }
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
+    // --- round 190np: first-run onboarding (core/Onboarding.h, ui/Onboarding.h, ui/MainOnboarding.cpp) ---------------------
+    // The welcome card ("Where are you coming from?"): at the first start of a fresh profile, and from Help › Welcome...
+    // in every layout. `firstRun`: the background plugin scan starts and the answer is what setup-done.txt records.
+    void showWelcomeCard (bool firstRun);
+    // Issue #252 (round 190oq, LYNX extra; core/StartPage.h): the start page over the window — recent projects and
+    // templates; at start-up when switched on (never over the welcome card), and File › Start page... at any time.
+    void showStartPage();
+    // A choice (Choice::none = Skip / × / Esc): its layout through the runtime switch (as View › Layout style), its starter,
+    // then the "Next: 3 things" card. Skip changes nothing (the Pattern layout).
+    void applyWelcomeChoice (onboarding::Choice choice);
+    void showGettingStarted(); // Help › Getting started: the Next-3 card of the remembered choice (or of this layout)
+    void hideGettingStarted();
+    void startFirstSongTourAnywhere(); // Help › First-song tour in every layout (the Simple layout first)
+    // A confusion signal: shows its tip beside `anchor` unless a tip was shown this session or tips are off
+    bool maybeShowTip (onboarding::Tip tip, juce::Component* anchor);
+    void closeTip();
+    // shots / tests: the cards and hints in an off-screen window (they are only made in the real window otherwise)
+    void setOnboardingForSnapshot (bool on);
+    onboardui::Next3Card* next3ForSnapshot() const noexcept { return next3Card.get(); }
+    onboardui::TipCard* tipForSnapshot() const noexcept { return tipCard.get(); }
+    onboardui::EmptyHintCard* emptyHintForSnapshot() const noexcept { return emptyHint.get(); }
+    const onboarding::State& onboardingStateForCheck() const noexcept { return onboard; }
+    bool welcomeUpdatesForCheck() const noexcept { return welcomeUpdates; } // (rollup 0.1.31 step 2, issue #233)
+    onboarding::Context& onboardingContextForCheck() noexcept { return onboardCtx; }
+    bool mixerShownForCheck() const { return workspace.isPanelVisible (workspace::Panel::mixer); }
+    void updateOnboarding(); // the song or the view changed: the Next-3 ticks and the empty-state hint
+    // --demo (ui/DemoMode.cpp): the Remote Control API's ui.* / session.* operations, run on the message thread
+    juce::var handleDemoOp (const juce::String& op, const juce::var& args);
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
     // --no-plugins project.lynx (round 190ap): the next .lynx project opens with its third-party plugins off
     void openNextWithoutPlugins (bool on) { nextOpenWithoutPlugins = on; }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
+    liveui::Context getLiveContextForSnapshot() { return liveContext(); } // (rollup 0.1.31 step 3: --rollup031s3shot)
+    // issue #232 stage 2 (round 190nz, --tabs2shot190nz): the Window menu and the audio device bar without other windows
+    juce::PopupMenu windowMenuForSnapshot() { return windowMenu(); }
+    void setProjectNameForSnapshot (const juce::String& name) { projectName = name; updateTitle(); }
+    void showWindowMenuForSnapshot (bool on) { windowMenuShown = on; menuItemsChanged(); resized(); }
+    windowaudio::Link* windowAudioForSnapshot() { return windowAudio.get(); }
+    juce::Component& windowAudioBarForSnapshot() { return windowAudioBar; }
+    // a message from another LYNX SHARE window (ui/LynxWindows.h): activate, the audio device's hand-over, hello / bye
+    void windowMessage (const juce::String& verb, int from);
     juce::PopupMenu getPanelMenuForSnapshot (workspace::Panel panel)
     {
         juce::PopupMenu menu;
@@ -247,6 +297,7 @@ public:
         hintBar.setHint (hint, live);
     }
     juce::Rectangle<int> getToolbarBoundsForSnapshot() const { return { 0, 0, getWidth(), toolbarHeight }; }
+    void switchSmartDisableForAllForSnapshot() { switchSmartDisableForAll(); } // (round 190ok)
     // every visible control with a quick tip (toolbar and panel title bars), in this component's coordinates
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> getQuickTipsForSnapshot();
     // --snapshot: a toolbar layout (icon size, hidden/reordered groups) without saving it
@@ -273,7 +324,9 @@ public:
     void openMasterAudioEditorForSnapshot (bool newOne) { openMasterAudioEditor (newOne); }
     toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
     ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
-    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
+    // `onManageShortcuts` (issue #234, round 190ns): the sheet's "Manage shortcuts..." link (none when empty)
+    static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr, // nullptr: the defaults
+                                                             std::function<void()> onManageShortcuts = {});
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
     // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI
     void startSupportNote (bool quietRun);
@@ -322,14 +375,27 @@ private:
     // round 190ap: "Open without third-party plugins" (File menu; --no-plugins on the command line): the project opens
     // with every hosted plugin switched off, its settings kept; the panel switches them back on
     void chooseFileToOpenWithoutPlugins();
+    void chooseFileToOpenInNewWindow();
     void showPluginsOff();
     // The "Missing files" window (ui/MissingFilesDialog.h) for the current project; `afterOpening`: shown by opening a
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
     void openSettings (int page); // ui/SettingsDialog.h SettingsPage: 0 Project, 1 Info, 2 Files, 3 General, 4 Audio, 5 MIDI
+    SettingsHooks settingsHooks(); // (round 190on: openSettings' hooks, the command palette's too)
     int lastSettingsPage = 3; // the page openSettings showed last (SettingsPage::general at first): Ctrl+, opens it (issue #181)
     void showPluginManager();
     void showShortcutManager();
+    void showActionSearch(); // #228 (round 190nq): "?"
+    std::vector<PaletteItem> commandPaletteItems(); // round 190on (P2): what the command palette lists
+    double lastPaletteOpenMs = 0.0;                 // (how long the last open took: --snapshot)
+    bool indexingMenusForPalette = false;           // (getMenuForIndex leaves the Add menu's generator tree out meanwhile)
+public:
+    ActionSearchOverlay* actionSearchForSnapshot() const { return actionSearch.get(); }
+    double paletteOpenMsForSnapshot() const noexcept { return lastPaletteOpenMs; }
+    juce::Component& paletteButtonForSnapshot() noexcept { return paletteButton; }
+    void closeActionSearchForSnapshot() { actionSearch = nullptr; } // (the box goes at once, not on the next message)
+private:
+    std::unique_ptr<ActionSearchOverlay> actionSearch;
     int scansSeen = 0; // background plugin scans already announced in the hint bar
     int pluginCrashesSeen = 0; // hosted plugins that crashed (engine/PluginHost.h) and were already announced
     int editorCrashesSeen = 0; // faults in plugin editor windows (ui/PluginWindow.h, issue #32) already announced
@@ -392,6 +458,7 @@ private:
     int fittedChannelCount = -1;
     void showPanel (Panel panel);
     void refreshPanelButtons();
+    void applyStyleDefaultPanels (layoutstyle::Style style); // (round 190oj)
     void showWindowsTip(); // the first starts name the window buttons in the hint bar (round 168t)
     void saveLayoutAs();
     juce::PopupMenu layoutsMenu();
@@ -440,6 +507,9 @@ private:
     void addLastTweakedItems (juce::PopupMenu& menu, const AutomationTarget& target);
     // File › Import › MIDI file... (REA round 143)
     void importMidiFile();
+    // round 190pe (P11, LYNX extra): File › Import › Tracks from another project (ui/TrackImportDialog.h, core/TrackImport.h)
+    void importTracksFromProject();
+    void importTracksFrom (const juce::File& file);
     void importMidiFile (const juce::File& file, const MidiFileIo::ImportOptions& options);
     static float& lastTweakedClipboard();
     void setTweakedValue (const AutomationTarget& target, float value);
@@ -501,6 +571,7 @@ private:
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
     void startNewProject (Song song, const juce::File& file);
+    static Song withClipLaunchStrips (Song song); // round 190oo (CS O-2)
     void saveAsTemplate();
     void saveCopyForOlder(); // round 190hq (B20): File › "Save a copy for an older LYNX..."
     void chooseFileToOpen();
@@ -512,6 +583,20 @@ private:
     void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
+    // Round 190ok (owner decision D1): after an .flp import, the stopped load is measured for a few seconds; a project with
+    // Smart disable off on most of its effects (as FL saved them) and a heavy stopped load gets the tip that points at
+    // the macro above: once in the hint bar (the first time ever), and in the CPU meter's hint while it holds
+    struct SmartTipWatch
+    {
+        bool armed = false;
+        double armedAt = 0.0, since = 0.0, loadSum = 0.0;
+        int samples = 0;
+    } smartTip;
+    void smartTipTick();
+public:
+    juce::String smartDisableNoticeText (int off, int total) const;
+    void showSmartDisableTip (int off, int total, bool firstTimeNotice);
+private:
     void autoCloseDevice(); // Settings › Audio › "Auto close" (round 190bx), from the timer
     bool deviceClosedByAutoClose = false;
     void confirmPrepareForMidiExport();
@@ -531,6 +616,10 @@ private:
     void showVersions();
     void openProjectAsCopy (const juce::File& file, const juce::String& name);
     void exportPackage();
+    // issue #251 (round 190oq): writes FL's zipped loop package `zip` (the project named after it, its files beside it)
+    void writePackage (const juce::File& zip);
+    void exportDataFiles();   // FL's File › Export › Project data files... (copies, nothing re-pointed)
+    void collectAllAndSave(); // Live's File › Collect All and Save (LYNX extra): the files into the project's folder
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     liveui::Context liveContext();       // the live session's (round 169b)
     void startLiveFromCommandLine();     // --live-host code.txt / --live-join CODE|@code.txt (scripted GUI checks)
@@ -620,6 +709,8 @@ private:
     // FL's toolbar "Open audio editor / New audio editor" (round 190mv, DF-35; capture 190mv A9): left = the Master's audio
     // editor (Edison into the Master's first empty slot, or the one there), right = a new one
     IconButton audioEditorButton { "audioEditor", Icon::scissors };
+    IconButton paletteButton { "commandPalette", Icon::search }; // round 190on (P2): beside the menus, opens the command palette
+    void placePaletteButton (juce::Rectangle<int>& row, bool atRight = false); // (takes its square from the row, or hides it)
     void openMasterAudioEditor (bool newOne);
     IconButton playButton { "play", Icon::play };
     IconButton stopButton { "stop", Icon::stop };
@@ -678,6 +769,9 @@ private:
         void mouseUp (const juce::MouseEvent& e) override;
         void mouseDoubleClick (const juce::MouseEvent& e) override;
         void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+        // round 190oa (DF-15, capture 190oa A7): FL's number display takes digits typed while the left button is held
+        // on it ("123" with the button down = 123 BPM at once); a plain click leaves the keys to the typing keyboard
+        bool keyPressed (const juce::KeyPress& key) override;
         ui::Hint hintAt (juce::Point<int> position) override;
         void showMenu();
         juce::PopupMenu buildMenu(); // (round 190mp: the shots read it)
@@ -690,6 +784,8 @@ private:
         AudioEngine& engine;
         double startBpm = 0.0;
         bool dragOnDecimals = false, dragging = false;
+        juce::String typed;                                      // (round 190oa: the digits typed while held)
+        juce::Component::SafePointer<juce::Component> focusBefore; // (the keys go back there on release)
         int decimalX = 0; // x of the decimal point, from the last paint
     };
     TempoDisplay tempoDisplay { engine };
@@ -802,6 +898,11 @@ private:
     IconButton snapToggleButton { "snapToggle", Icon::magnet };
     std::vector<int> dividers; // x positions of the toolbar panel separators
     juce::Rectangle<int> snapLabelArea, patternLabelArea, titleArea, transportArea;
+    // round 190oo (O-4, LYNX extra): the Simple top bar's centred project name (empty: off or no room) and its fitted
+    // text, made again only when the name or the room changes (no work in paint)
+    juce::Rectangle<int> simpleNameArea;
+    juce::String simpleNameFor, simpleNameFitted;
+    int simpleNameFitWidth = -1;
     std::unique_ptr<ui::QuickTipWindow> quickTips; // the tool names under the mouse (ui/HintBar.h)
     void setQuickTips();
     void showLanguageChoice (const juce::String& id);
@@ -871,7 +972,20 @@ private:
     double stoppedAtTicks = -1.0; // round 190ld (DL-66): where Space last stopped the song
     juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
     juce::PopupMenu makeWaitInputMenu();
+    // round 190pa (P21, core/AutomationModes.h): the automation write mode (Read = FL's Record automation, Touch, Latch,
+    // Write), its menu (the recording menus, Automation Arm's right-click) and its badge on Record / Automation Arm
+    juce::PopupMenu makeAutomationModeMenu();
+    void setAutomationWriteMode (int mode);
+    void refreshAutomationModeBadge();
+  public:
+    juce::PopupMenu automationModeMenuForSnapshot() { return makeAutomationModeMenu(); }
+    void setAutomationWriteModeForSnapshot (int mode) { setAutomationWriteMode (mode); }
+  private:
     IconButton captureButton { "captureMidi", Icon::capture };
+    // round 190oa (DL-58, capture 190oa L1): Live's Automation Arm (the recording filter's Automation) and Re-Enable
+    // Automation (lit while a moved control overrides its automation; a click hands them back)
+    IconButton automationArmButton { "automationArm", Icon::automationArm };
+    IconButton reEnableAutomationButton { "reEnableAutomation", Icon::reEnableAutomation };
     IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
     IconButton drawModeButton { "drawMode", Icon::draw };
     IconButton keyMapButton { "keyMap", Icon::none };
@@ -892,6 +1006,12 @@ private:
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();
     void setProjectKey (std::optional<projectkey::Key> key);
+    // Round 190oo (O-5, core/LiveScaleControl.h): Live's scale switch / root / mode in the Clip-launch control bar. The key
+    // the choosers show while the switch is off (the last one set; Major on C at first), not saved, as Live keeps them.
+    projectkey::Key scaleShown {};
+    bool scaleShownSet = false;
+    void showKeyPart (int part);
+    void setLiveScaleControl (bool on); // the LYNX extra's switch (Settings › LYNX extras, the Key menu)
     void showChordText();
     void addAudioLoggerMenu (juce::PopupMenu& menu);
     void dumpAudioLog();
@@ -965,6 +1085,7 @@ private:
     void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
+    void addLiveEditItems (juce::PopupMenu& menu); // round gap190og (deviceview-0012): Live's Cut / Copy / Paste / Duplicate / Delete
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
     // round 190ef: the map modes' overlay and Mapping Browser (made when a map mode is first switched on), and the
     // computer keys held that fired a key mapping (their release fires it again)
@@ -1017,9 +1138,16 @@ private:
     Workspace workspace; // after the panels' contents: it is destroyed first
     updater::UpdateBar updateBar; // "LYNX SHARE x.y.z is available" under the toolbar (round 166b)
     juce::Label remoteControlBar;
+    // issue #232 stage 2 (round 190nz): "<device> plays in another LYNX SHARE window" under the toolbar, with "Make this
+    // window the one that plays" (ui/WindowAudio.h); the Window menu while other LYNX SHARE windows are open
+    windowaudio::Bar windowAudioBar;
+    std::unique_ptr<windowaudio::Link> windowAudio;
+    bool windowMenuShown = false;
+    juce::PopupMenu windowMenu();
     std::unique_ptr<juce::Component> danceStage; // the dance channels' dancers over the workspace (ui/DanceView.h, round 165e)
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::File demoSaveTarget; // round 190pl (--demo file.save): the file the next Save as... writes without its file dialog
     juce::File currentFile;
     juce::File importedFlpFile; // the .flp the current project was imported from (until another project is opened)
     juce::String importedSuffix; // " (imported from FL Studio)" in the title until saved as .lynx
@@ -1031,6 +1159,26 @@ private:
     void readPluginDatabaseAgain();
     // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
     std::unique_ptr<LiveSessionManager> live;
+
+    // round 190np: onboarding (destroyed first: the hint is a child of the Playlist or the grid, the cards of the window)
+    onboarding::State onboard;
+    onboarding::Context onboardCtx;
+    onboarding::TipGate tipGate;
+    bool onboardingOn = false; // the real window (or a shot that asked for it)
+    int onboardingTicks = 0;
+    bool mixerAfterFirstTrack = false; // the timeline group's Mixer: shown with the first track
+    bool welcomeUpdates = true; // the welcome card's "Check for updates automatically" as last answered (issue #233)
+    std::unique_ptr<onboardui::Next3Card> next3Card;
+    std::unique_ptr<onboardui::TipCard> tipCard;
+    juce::Component::SafePointer<juce::Component> tipAnchor;
+    std::unique_ptr<onboardui::EmptyHintCard> emptyHint;
+    void loadOnboarding();
+    void saveOnboarding();
+    void placeOnboardingCards();
+    void updateEmptyHint();
+    void onboardingTick(); // (from the window's timer, only while the Next-3 card shows)
+    void next3Act (onboarding::Item item);
+    void checkRecordTip(); // Record (audio) with no input to record from: one tip
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

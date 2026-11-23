@@ -3,6 +3,7 @@
 
     python3 website/_src/check-links.py     exit 1 if something points nowhere
 """
+import json
 import re
 import sys
 from pathlib import Path
@@ -11,6 +12,8 @@ OUT = Path(__file__).resolve().parent.parent
 pages = {("/" + str(p.parent.relative_to(OUT)).replace(".", "") + "/").replace("//", "/"): p.read_text(encoding="utf-8")
          for p in sorted(OUT.glob("**/index.html")) if "_src" not in p.parts}
 ids = {u: set(re.findall(r'\bid="([^"]+)"', t)) for u, t in pages.items()}
+# the tutorial videos live on the `media` branch (scripts/site-media.sh puts them in place for a deploy): listed in media.json
+MEDIA = set(json.loads((OUT / "_src/learn/media.json").read_text(encoding="utf-8"))) if (OUT / "_src/learn/media.json").exists() else set()
 bad, n = [], 0
 for url, text in pages.items():
     for ref in set(re.findall(r'(?:href|src|poster)="([^"]+)"', text)):
@@ -24,7 +27,7 @@ for url, text in pages.items():
         elif path in pages:
             if frag and frag not in ids[path]:
                 bad.append(f"{url}: no #{frag} in {path}")
-        elif not (OUT / path.lstrip("/")).is_file():
+        elif not (OUT / path.lstrip("/")).is_file() and path.lstrip("/") not in MEDIA:
             bad.append(f"{url}: {ref} not found")
 for b in bad:
     print("error:", b)

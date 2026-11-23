@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHARE hostet Instrument- und Effekt-Plugins anderer Hersteller. Es findet s
 3. Drücke `F8` für die Plugin-Auswahl und tippe einen Teil des Plugin-Namens.
 4. Doppelklicke es oder drücke `Enter`. Ein Instrument wird ein neuer Kanal. Ein Effekt kommt in den gewählten Mixer-Insert.
 
-Beim ersten Start listet der Einrichtungsassistent die Plugin-Ordner auf und durchsucht sie im Hintergrund. `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...` öffnet ihn erneut. LYNX SHARE sucht außerdem einige Sekunden nach jedem Start nach neuen Plugins.
+Beim ersten Start durchsucht LYNX SHARE die Plugin-Ordner im Hintergrund, während die Willkommenskarte offen ist. `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...` zeigt die Ordner erneut. LYNX SHARE sucht außerdem einige Sekunden nach jedem Start nach neuen Plugins.
 
 ## Formate pro System
 
 | System | Gehostete Formate |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 VST2 wird unter macOS nicht gehostet. Unter Linux laufen Windows-Plugins über [yabridge](https://github.com/robbert-vdh/yabridge) und Wine, die du selbst installierst: Füge den Ordner, in den yabridge synchronisiert, als Plugin-Ordner hinzu.
+
+JSFX-Skripte, das Effekt- und Instrumentformat von REAPER, laufen auf jedem System: 31 freie Skripte (von chokehold, MIT-Lizenz) liegen LYNX SHARE bei, im Browser unter `Plugin-Datenbank › Effekte › JSFX` und `Plugin-Datenbank › Generatoren › JSFX` und in der Plugin-Auswahl. Skripte in `Documents/LYNX/JSFX` und in REAPERs Effects-Ordner werden ebenfalls gefunden, und `Einstellungen › Dateien › JSFX-Ordner` fügt weitere Ordner hinzu. LYNX SHARE zeigt die Slider eines Skripts in einem eigenen Panel; ein Skript, das seine eigene Anzeige zeichnet, zeigt nur seine Slider.
 
 ## Der Plugin-Manager
 
@@ -102,6 +104,18 @@ Die nativen Plugins von FL Studio, wie Sytrus, Harmor und Patcher, laufen nur in
 Was du in FL Studio aufbaust, wird mit dem LYNX-SHARE-Projekt gespeichert. `FL Studio VSTi (Multi)` hat 16 Stereoausgänge, die auf getrennten Inserts spielen können (siehe den Abschnitt oben). Deine FL-Studio-Lizenz entscheidet, welche FL-Plugins darin funktionieren. LYNX SHARE lädt die Plugin-Dateien von FL Studio nicht selbst.
 
 Wenn das FL-Studio-Plugin als `Ladefehler` aufgelistet ist, klicke es in `Optionen › Plugin-Manager...` mit der rechten Maustaste an und wähle `Erneut versuchen (diese Datei jetzt prüfen)`.
+
+## Die eigenen Plugins von LYNX in anderen DAWs
+
+Die eigenen Effekte und Instrumente von LYNX SHARE, etwa Facet EQ, Apex Limiter, LYNX Tune und LYNX Model, gibt es auch als Plugins für andere DAWs. Sie sind ein separater, optionaler Download auf der [Release-Seite](https://github.com/Ka1-S/LYNX-SHARE/releases): `LYNX-Plugins-<version>` für Windows, macOS und Linux.
+
+- Alle Plugins stecken in einer CLAP-Datei, `LYNX Plugins.clap`. Eine kurze Liste gibt es auch als VST3 und unter Linux als LV2.
+- Instrumente im Paket: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil und LYNX Duoloom.
+- Nimm unter Windows `LYNX-Plugins-<version>-win-x64.7z` (etwa 20 MB). Die `.zip` (etwa 195 MB) enthält dieselben Dateien.
+- Starte das Installationsskript im Archiv (`install.cmd` unter Windows, `install.sh` unter macOS und Linux) und lass deine DAW die Plugins neu suchen.
+- Ein Plugin öffnet denselben Editor wie in LYNX SHARE, und sein Zustand lässt sich in LYNX SHARE als Projekt öffnen.
+
+Die vollständige Liste steht in [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md).
 
 ## Der Ordner Plugin database
 

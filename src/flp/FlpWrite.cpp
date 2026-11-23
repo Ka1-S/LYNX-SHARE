@@ -126,6 +126,7 @@ enum : std::uint32_t
     evControlValues = 0xE1,
     evAutomationLink = 0xE3,
     evChannelTracking = 0xE4,
+    evLinkFormula = 0xE6, // round 190ov: a link's mapping formula, right after its 0xE3 record
     evChannelLevelAdjust = 0xE5,
     evFilterGroupName = 0xE7,
     evPlaylistItems = 0xE9,
@@ -291,6 +292,15 @@ void writeMarkers (Out& out, const std::vector<TimeMarker>& markers)
         {
             out.u8 (evMarkerNumerator, (std::uint32_t) std::clamp (m.numerator, 1, 32));
             out.u8 (evMarkerDenominator, (std::uint32_t) std::clamp (m.denominator, 1, 32));
+        }
+        if (m.type == 12) // round 190nu: a Key/Scale marker's key, as FL 2026 writes it (4/4, root, 0, scale, mask)
+        {
+            out.u8 (evMarkerNumerator, 4);
+            out.u8 (evMarkerDenominator, 4);
+            out.u8 (0x2E, (std::uint32_t) std::clamp (m.keyRoot, 0, 11));
+            out.u8 (0x2D, 0);
+            out.u32 (0xA8, (std::uint32_t) m.keyScale);
+            out.u16 (0x65, (std::uint32_t) (m.keyMask & 0xFFF));
         }
         out.text (evMarkerName, m.name);
     }
@@ -831,6 +841,8 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
             b.put<std::uint32_t> (8);
             b.put<std::uint32_t> (0x1D5);
             out.data (evAutomationLink, b.b);
+            if (! link.formula.empty()) // (FL writes none for its default "Input")
+                out.text (evLinkFormula, link.formula);
         }
         for (const auto& link : p.controllerLinks)
         {
@@ -889,16 +901,20 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
             out.u8 (evPlaylistTrackColourSet, (info.colour & 0xFFFFFF) != 0x485156 ? 1 : 0);
         }
     }
+    // the Playlist's view settings record FL writes after the arrangements, one per arrangement [DATA]: u32 index, f64
+    // scroll, f64 zoom, i32 vertical scroll, i32 vertical zoom (FL's row = 16 + 2·v px; FL 2026's new project writes 16
+    // = 48 px rows; round 190oo PAT-6: was 20 = 56 px, the row height now goes through)
+    for (std::size_t i = 0; i < std::max<std::size_t> (1, p.arrangements.size()); ++i)
     {
-        // the Playlist's view settings record FL writes after the arrangements [DATA]
+        const auto* a = i < p.arrangements.size() ? &p.arrangements[i] : nullptr;
         Blob v;
-        for (int k = 0; k < 2; ++k)
-            v.put<std::uint32_t> (0);
+        v.put<std::uint32_t> (a != nullptr ? (std::uint32_t) a->index : 0u);
+        v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0);
         v.put<std::uint32_t> (0x40200000u);
         v.put<std::uint32_t> (0);
-        v.put<std::uint32_t> (20);
+        v.put<std::uint32_t> (a != nullptr && a->rowZoom >= 0 ? (std::uint32_t) a->rowZoom : 16u);
         out.data (evPlaylistF2, v.b);
     }
     out.u16 (evCurrentArrangement, (std::uint32_t) std::max (0, p.currentArrangement));

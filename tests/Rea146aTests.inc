@@ -182,8 +182,8 @@ TEST (rea146a_wrapper_settings_page_options)
     // round 151 added the MIDI ones and two Compatibility ones; round 188d "Process inactive inputs and outputs" (index 4);
     // round 190bb (issue #108) "MPE" (index 8, a LYNX addition after the other per-note MIDI options); round 190ks
     // (GitHub #198) "Record notes from the plugin window" (index 10, a LYNX addition, on by default)
-    CHECK (o.size() == 16);
-    if (o.size() == 16)
+    CHECK (o.size() >= 16); // (round 190oh appended FL's Settings › GUI pair: Host190ohTests.inc)
+    if (o.size() >= 16)
     {
         CHECK (std::string (o[0].label) == "Notify about rendering mode" && o[0].member == &lynx::PluginRef::notifyRender && ! o[0].recreates);
         CHECK (std::string (o[4].label) == "Process inactive inputs and outputs" && o[4].member == &lynx::PluginRef::processInactive && ! o[4].recreates);

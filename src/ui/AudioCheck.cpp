@@ -3,6 +3,7 @@
 #include "core/AudioCheck.h"
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
@@ -369,8 +370,7 @@ public:
           })
     {
         title.setText (tr ("Test audio output"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::title + 3.0f, true));
-        title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
         addAndMakeVisible (panel);
         close.setButtonText (tr ("Close"));
@@ -387,13 +387,12 @@ public:
     Panel panel;
 
 private:
-    void fit() { setSize (getWidth(), 16 + 30 + 8 + panel.preferredHeight (getWidth() - 32) + 12 + 30 + 16); }
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+    void fit() { setSize (getWidth(), ui::dialog::titleRowHeight + 1 + 16 + panel.preferredHeight (getWidth() - 32) + 12 + 30 + 16); }
+    void paint (juce::Graphics& g) override { ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window); }
     void resized() override
     {
-        auto r = getLocalBounds().reduced (16);
-        title.setBounds (r.removeFromTop (30));
-        r.removeFromTop (8);
+        title.setBounds (ui::dialog::titleRow (getLocalBounds()));
+        auto r = ui::dialog::bodyOf (getLocalBounds()).reduced (16);
         close.setBounds (r.removeFromBottom (30).removeFromRight (100));
         r.removeFromBottom (12);
         panel.setBounds (r);

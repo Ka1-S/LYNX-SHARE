@@ -7,6 +7,7 @@ JavaScript; the script adds the language switch, direct download links and the s
 |---|---|---|
 | Home | `/` | `_src/pages/home.html` |
 | Features | `/features/` | `_src/pages/features.html` |
+| Learn | `/learn/`, `/learn/<tutorial>/` | `_src/learn/index.json`, `_src/learn/<tutorial>.md` (see "Tutorials" below) |
 | Why LYNX | `/why/` | `_src/pages/why.html` (what only LYNX SHARE does, each with its limits) |
 | What LYNX fixes | `/fixes/` | `_src/pages/fixes.html` (common complaints about DAWs and what the RELEASED version does about each; things only in the source go in its "Being built" list). Linked from Home and Why LYNX |
 | Instruments and effects | `/instruments-and-effects/` | `_src/catalog.json`, `_src/catalog-img.json` |
@@ -40,6 +41,31 @@ The server never serves `_src/` (`.htaccess`).
 
 Look at the result with `python3 -m http.server -d website 8000` (links are root-absolute, so open it through a
 server, not as files).
+
+## Tutorials (`/learn/`)
+
+`_src/learn/index.json` lists the tutorials in order: `slug`, `video` (file base name), `voices` (narration languages),
+`layout` (`simple`, `pattern`, `clipLaunch`, `any`), `level`, `length` (seconds), `chapters` ([seconds, English name]) and
+`youtube` ({language: URL}). `_src/learn/<slug>.md` has the title, the summary and the written steps (the wiki's
+markdown); translations are `_src/learn/<id>/<slug>.md` with the `source` digest, taken in with
+`scripts/check-site-i18n.py --bodies <id> DIR` from files named `learn.<slug>.md`, and checked like wiki bodies.
+
+- **Videos** are self-hosted: `assets/media/learn/<video>-<lang>-1080.mp4` and `-720.mp4` (H.264, at most 2.5 and 1.2
+  Mbit/s, 30 fps, AAC). They are NOT in this branch: they live on the repository's `media` branch under `site/learn/`,
+  listed with size and SHA-256 in `_src/learn/media.json`. `scripts/site-media.sh` puts them in place (`deploy-site.sh`
+  runs it and refuses to deploy without them); `check-links.py` accepts a file listed in `media.json`. A new or
+  re-rendered video: commit it to `media` under `site/learn/`, run `scripts/site-media.sh`, update `media.json`.
+- **Captions**: `assets/media/learn/<video>-<lang>.vtt` for all 15 languages (EN and pt-BR from the narration; the
+  others are translations on the English cue times). `assets/learn.js` plays the reader's narration when the video has
+  one (swapped at the first Play, so nothing loads before), and shows the reader's captions when the narration is in
+  another language. Posters: `assets/img/learn/<video>-<lang>.webp`.
+- **YouTube**: a URL in `youtube` adds a "Watch on YouTube" button; the youtube-nocookie player is created only after
+  that click. The fields are empty until the channel exists.
+- **Looping clips** on Home ("Pick how you like to work") and Features: `assets/media/loops/*.mp4` (8 s, muted, no audio
+  track, 76-205 KB) with a `.webp` poster. `assets/motion.js` plays them only while on screen; visitors who asked for
+  reduced motion see the poster.
+- The videos and loops are recorded by LYNX's `--demo` mode on a private X server (round 190nt:
+  `/mnt/e/lynx-work/site190nt/`, scripts in `video/`, tools in `tools/`).
 
 ## Adding a release to the Updates page (release step)
 

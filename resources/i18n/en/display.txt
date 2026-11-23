@@ -1,0 +1,23 @@
+language: English
+countries: 
+
+// The English display table (rollup 0.1.31 step 3, round 190ny). English is the source language: the code's tr() keys
+// stay as they are (every translation table is keyed by them), and these lines change only what English shows. The
+// three styles of View › Layout style are called layouts in English, as in that menu's own name.
+// Embedded by tools/make_i18n.py (src/ui/I18nEnglish.h); every key here must be a key of the translation tables.
+
+"Workflow" = "Layout"
+"Pattern workflow (default)" = "Pattern layout (default)"
+"Clip-launch workflow" = "Clip-launch layout"
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "Three layouts in one program. Switch any time in View › Layout style: the project stays the same, only the windows change."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "Pattern layout: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "Clip-launch layout: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away."
+"Simple workflow" = "Simple layout"
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "Simple layout: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too."
+"Clip-launch workflow: clip view" = "Clip-launch layout: clip view"
+"Clip-launch workflow: device view" = "Clip-launch layout: device view"
+"Clip-launch workflow: show or hide the detail view" = "Clip-launch layout: show or hide the detail view"
+"Clip-launch workflow: switch between clip view and device view" = "Clip-launch layout: switch between clip view and device view"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "The Simple layout: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?"
+"Simple workflow pad settings (mode, tone, release, group): {0}" = "Simple layout pad settings (mode, tone, release, group): {0}"
+"Clip-launch workflow: show or hide the Info View" = "Clip-launch layout: show or hide the Info View"

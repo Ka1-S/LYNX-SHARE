@@ -31,6 +31,7 @@
 #include "core/MiniSynth.h"
 #include "core/PocketSuperSaw.h"
 #include "core/FmSynth.h"
+#include "core/physmod/LynxModel.h"
 #include "core/WavetableSynth.h"
 #include "core/Braid.h"
 #include "core/SimSynth.h"
@@ -336,6 +337,7 @@ private:
             case InstrumentKind::tetra:
             case InstrumentKind::helix:
             case InstrumentKind::braid:
+            case InstrumentKind::lynxModel:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -2032,6 +2034,7 @@ struct SamplerVoice
     bool clipEndHard = false; // the clip's end is a sharp cut (FL: Disabled, a manual side, a seamless join, a fade out)
     int age = 0;
     int key = 60;
+    double noteSemitones = 0.0; // its note's pitch at the start (semitones from the sample's own; round 190pi: a chord slide)
     std::uint32_t noteId = 0; // the note that started it (round 190ej): only that note's end releases it
     float env = 1.0f;      // envelope
     float envStep = 0.0f;  // attack step (> 0) or release step (< 0)
@@ -2463,6 +2466,7 @@ public:
         target->envGain = target->envL = target->envR = 1.0f;
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
+        target->noteSemitones = semitones;
         target->reversed = backwards;
         if (asClip && data != nullptr && data->frames() > 0) // the DC a clip holds after its sample (a clip resumed past it)
         {
@@ -2919,7 +2923,11 @@ public:
                     voicePan (v.basePan, v.panL, v.panR);
                 }
                 else if (prop == (int) vfx::Prop::velocity)
+                {
                     v.velocity = flVelocityLaw.load (std::memory_order_relaxed) ? flInitVolume (value) : std::clamp (value, 0.0f, 1.0f);
+                    if (v.flVoice) // (issue #236: FL's native voice plays InitLevels.Vol · channel volume, the host's Final.Vol)
+                        v.initVol = flInitVolume (std::clamp (value, 0.0f, 1.0f));
+                }
                 else if (prop == (int) vfx::Prop::modX || prop == (int) vfx::Prop::modY) // issue #63: the note's filter
                 {
                     const auto offset = std::clamp (value, 0.0f, 1.0f) * 2.0f - 1.0f;
@@ -3048,13 +3056,17 @@ public:
         if (clipMode)
             return;
 
-        const auto semitones = (key - 60) + (double) pitch.load() + cents / 100.0;
+        const auto slideSemitones = (key - 60) + (double) pitch.load() + cents / 100.0;
         const auto steps = std::max (1, (int) samples);
         const auto stepped = HostSlide::pendingSteps(); // (round 190jv: FL's steps on its ticks)
+        const auto shift = HostSlide::pendingShift();   // (round 190pi: a chord moves by one interval)
 
         for (auto& v : voices)
             if (v.active && ! v.stolen && v.rate != 0.0 && v.data != nullptr)
             {
+                if (shift.on && ! shift.moves (v.key))
+                    continue; // (a note of another colour keeps its pitch, round 190pi)
+                const auto semitones = shift.on ? v.noteSemitones + (double) shift.cents / 100.0 : slideSemitones;
                 // a shifted voice (stretch keeping pitch) glides its transposition, not its speed (round 162)
                 if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on)
                 {
@@ -4592,6 +4604,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeHelixInstrument();
     if (kind == InstrumentKind::braid) // round 190ko
         return makeBraidInstrument();
+    if (kind == InstrumentKind::lynxModel) // round 190ni
+        return makeLynxModelInstrument();
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

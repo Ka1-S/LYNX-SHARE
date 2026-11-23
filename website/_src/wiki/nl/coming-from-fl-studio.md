@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: f6f0977999
 ---
 LYNX SHARE behoudt de workflow die je kent: een Channel Rack, patterns, een Playlist en een Mixer, op dezelfde toetsen. Het opent `.flp`-projecten rechtstreeks en kan er ook een terugschrijven.
 
 LYNX SHARE is een onafhankelijk programma. Het is niet verbonden aan Image-Line, wordt niet door Image-Line goedgekeurd of gesponsord, en bevat geen code van Image-Line. FL Studio is een gedeponeerd handelsmerk van Image-Line Software.
+
+## Je eerste stappen
+
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt. Klik op `FL Studio`: je krijgt de Patroonlay-out, de standaard, met het Channel Rack, de Piano Roll, de Playlist en de Mixer. Skip op de kaart doet hetzelfde.
+2. **Open een project.** Open een van je `.flp`-projecten (hieronder), of klik op stappen in het Channel Rack om een beat te maken.
+3. **Vind je plugins.** LYNX SHARE scant de gebruikelijke pluginmappen op de achtergrond. Voor een eigen map open je `Opties › Pluginbeheer...`, klik je op `Pluginmappen...`, voeg je de map toe en klik je op `Nieuwe plugins zoeken`.
+
+Wat anders is dan in FL Studio:
+
+- De eigen plugins van FL Studio spelen op engines die LYNX SHARE heeft nagebouwd, elk met een kwaliteitsniveau (hieronder). FL Studio zelf is niet nodig om een `.flp` te openen.
+- De eigen toevoegingen van LYNX SHARE staan uit totdat je ze aanzet in `Opties › LYNX-extra's...`.
+- Twee andere lay-outs werken op hetzelfde project: Clipstart (een clipraster met scènes) en Eenvoudig (één venster met tracks, loops en snel opnemen).
+- Een [online sessie](/learn/online-session/) zet tot 4 mensen live in één project.
 
 ## Een .flp-project openen
 
@@ -79,7 +92,7 @@ Het bestand is een FL Studio 2026-project. Samplers, audioclips, de eigen genera
 ## Goed om te weten
 
 - FLEX-packs zijn versleuteld en worden nooit geopend. Een FLEX-kanaal krijgt een synthpatch die op de naam van zijn preset wordt gekozen.
-- Modulators worden bij een `.flp`-export weggelaten, en het exportrapport zegt dat.
+- Bij een `.flp`-export worden modulators die de songpositie volgen automatiseringsclips (een gesynchroniseerde LFO wordt de clip-LFO van FL Studio). Followers, envelopes, keytrack en velocity worden weggelaten, en het exportrapport zegt dat.
 - Het importrapport toont wat door de ingebouwde synth is benaderd, wat geen equivalent had, welke plugins gevonden zijn of niet geïnstalleerd zijn, welke effecten zijn weggelaten of gedeeltelijk nagebouwd, en hoeveel samples ontbreken.
 - Een niet-geïnstalleerd effect van derden wordt vervangen door een LYNX SHARE-effect met dezelfde rol. Het origineel blijft in het project.
 
@@ -90,3 +103,4 @@ Het bestand is een FL Studio 2026-project. Samplers, audioclips, de eigen genera
 - [Bestandsformaten](/wiki/file-formats/)
 - [Sneltoetsen](/wiki/shortcuts/)
 - [Wat alleen LYNX SHARE met FL-instellingen doet](/why/#fl-settings)
+- [Leren: tutorials](/learn/)

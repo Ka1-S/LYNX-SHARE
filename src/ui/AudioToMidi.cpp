@@ -468,6 +468,46 @@ void convertClip (AudioEngine& engine, int clipIndex, const Request& request, st
     });
 }
 
+// round 190pf: the clip's notes in song ticks (a2m::addClipPattern's mapping), for the Chord lane
+void detectClip (AudioEngine& engine, int clipIndex, std::function<void (std::vector<chordlane::TimedNote>, std::int64_t, std::int64_t)> done)
+{
+    Request request;
+    request.mode = a2m::Mode::harmony;
+    auto work = prepareClip (engine, clipIndex, request);
+    if (! work)
+        return;
+    auto mono = std::move (work->mono);
+    const auto rate = work->rate;
+    startJob (std::move (mono), rate, request, [&engine, clipIndex, w = std::move (*work), done] (std::vector<a2m::Note> notes) {
+        const auto& song = engine.getSong();
+        if (clipIndex < 0 || clipIndex >= (int) song.playlist.size() || ! done)
+            return;
+        const auto& clip = song.playlist[(std::size_t) clipIndex];
+        const auto tickOf = [&] (double seconds) {
+            const auto frame = (double) w.range.first + seconds * w.timing.sampleRate;
+            const auto fromZero = w.timing.backwards ? w.timing.spanFrames - (frame - w.timing.zeroFrame) : frame - w.timing.zeroFrame;
+            return (double) clip.start + fromZero / w.timing.framesPerTick - (double) clip.offset;
+        };
+        std::vector<chordlane::TimedNote> out;
+        for (const auto& n : notes)
+        {
+            auto a = tickOf (n.start), b = tickOf (n.end);
+            if (a > b)
+                std::swap (a, b);
+            chordlane::TimedNote t;
+            t.start = std::max (clip.start, (std::int64_t) std::llround (a));
+            t.end = std::min (clip.end(), (std::int64_t) std::llround (b));
+            t.key = std::clamp (n.key + w.transpose, 0, 127);
+            if (t.end > t.start)
+                out.push_back (t);
+        }
+        if (out.empty())
+            noNotes();
+        else
+            done (std::move (out), clip.start, clip.end());
+    });
+}
+
 void convertAudio (AudioEngine& engine, std::vector<float> mono, double sampleRate, const Request& request, const juce::String& name,
                    std::function<void (int)> done)
 {
@@ -638,6 +678,11 @@ private:
     std::vector<int> channels; // the channel combo's items after the first: song channel indices
 };
 } // namespace
+
+void detectClipNotes (AudioEngine& engine, int clipIndex, std::function<void (std::vector<chordlane::TimedNote>, std::int64_t, std::int64_t)> done)
+{
+    detectClip (engine, clipIndex, std::move (done));
+}
 
 a2m::ConvertOptions& lastConvertOptions()
 {

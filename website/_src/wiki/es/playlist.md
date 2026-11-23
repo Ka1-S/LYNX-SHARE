@@ -1,5 +1,5 @@
 ---
-source: 1b54c6493f
+source: cab9a0b0d1
 ---
 ![La Playlist con clips en pistas](/assets/img/playlist.webp)
 
@@ -115,7 +115,7 @@ El cuadro de arreglo de la barra de herramientas cambia entre arreglos. Un proye
 ## Conviene saber
 
 - La Playlist solo se oye en el modo Canción. En el modo Patrón, `Space` reproduce el patrón actual, sea lo que sea lo que haya en las pistas.
-- `Ver › Estilo de diseño › Flujo por lanzamiento de clips` añade una cuadrícula de clips y escenas junto a la Playlist. Es opcional. Consulta [Disposiciones](/wiki/layouts/).
+- `Ver › Estilo de diseño › Diseño de lanzamiento de clips` añade una cuadrícula de clips y escenas junto a la Playlist. Es opcional. Consulta [Disposiciones](/wiki/layouts/).
 - Con varios clips de automatización superpuestos en un mismo control, la elección de cuál suena puede diferir de la de FL Studio (notas de la versión 0.1.25).
 - Como en FL Studio, un patrón suena desde un solo clip a la vez. Cuando empieza un clip posterior del mismo patrón, en cualquier pista, el clip anterior deja de iniciar notas desde ahí. Los clips de patrones distintos suenan juntos. Esto vale en proyectos nuevos y en proyectos de FL Studio. Un proyecto .lynx guardado antes de la 0.1.27 sigue tocando cada clip completo.
 - Un tempo movido por un controlador MIDI vinculado no cambia el tamaño de los clips de audio.

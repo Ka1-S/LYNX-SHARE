@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![片段启动布局：播放列表旁边是带有场景的片段网格](/assets/img/cliplaunch.webp)
 
 LYNX SHARE 默认以模式工作流程启动：通道机架、样式和播放列表。片段启动工作流程是可选的，它会在播放列表旁边增加一个带有场景的片段网格。LYNX SHARE 可以读取和写入 `.als` 套装。它与 Ableton 没有任何关联。
+
+这一页也适合 Bitwig Studio 用户：片段网格的用法相同，Bitwig 的 DAWproject 文件（`.dawproject`）可用 `文件 › 打开...` 打开，并由 `文件 › 导出 › DAWproject (.dawproject)...` 写出。
+
+## 你的第一步
+
+1. **选择布局。** 第一次启动 LYNX SHARE 时，欢迎卡片会问你从哪里转过来。点击 `Ableton Live 或 Bitwig`：片段启动布局会打开。之后，`视图 › 布局样式 › 片段启动工作流程` 可随时切换到它。
+2. **填一个槽位。** 把一个采样或样式从浏览器拖到槽位里，或右键单击空槽并选择 `在此放置模式`。
+3. **启动。** 点击片段左侧的三角形，或点击 `场景` 列中某个场景的三角形来启动整行。也可以打开你的某个 `.als` 套装（见下文）。
+
+与 Live 的不同之处：
+
+- 播放列表就是编排，它的轨道就是网格的各列。启动过片段的轨道会一直留在网格上，直到你按 `返回播放列表`。
+- 网格之外的按键沿用 FL Studio。`Ctrl+Z` 撤销一步，再按一次则重做。
+- 只有 Live 的部分自带设备会被转换（见须知）。第三方插件会连同状态一起带过来。
+- 模式布局，也就是 FL Studio 带通道机架和样式的工作方式，可以处理同一个工程。
 
 ## 打开 Live 套装
 
@@ -59,7 +74,7 @@ LYNX SHARE 默认以模式工作流程启动：通道机架、样式和播放列
 
 | 会写入 | 不会写入 |
 |---|---|
-| 每个通道一条 MIDI 轨道，其音符作为 MIDI 片段 | LYNX SHARE 自己的乐器和效果器。它们的轨道和音符会保留 |
+| 每个通道一条 MIDI 轨道，其音符作为 MIDI 片段 | LYNX SHARE 自己的乐器和效果器，但 Helix 会变成 Wavetable。它们的轨道和音符会保留 |
 | 带有拉伸、移调、增益、淡化和扭曲模式的音频轨道 | 效果器参数的自动化 |
 | 编组、返回轨道和发送 | 插入轨到插入轨的路由 |
 | 带状态的 VST2 和 VST3 插件 | |
@@ -70,9 +85,11 @@ LYNX SHARE 默认以模式工作流程启动：通道机架、样式和播放列
 
 ## 须知
 
-- Live 自己的许多设备会作为 LYNX SHARE 自己的设备导入，连同设置和自动化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift 和 Operator（不含 FM）。其余的会被丢弃并列在导入报告中。
-- Instrument Rack 和 Audio Effect Rack 会连同链、区域和宏一起导入，Drum Rack 会变成 LYNX SHARE 的 Drum Rack。Live 的 MIDI Effect Rack 还不能转换，会列在导入报告中。
+- Live 自己的许多设备会作为 LYNX SHARE 自己的设备导入，连同设置和自动化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Hybrid Reverb、Delay、Echo、Grain Delay、Auto Filter、Saturator、Overdrive、Roar、Erosion、Vinyl Distortion、Corpus、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Spectral Time、Spectral Resonator、Looper、Simpler、Sampler、Drift、Operator、Wavetable 和 Meld。其余的会被丢弃并列在导入报告中。
+- Instrument Rack 和 Audio Effect Rack 会连同链、区域和宏一起导入，Drum Rack 会变成 LYNX SHARE 的 Drum Rack。Live 的 Arpeggiator 会变成通道的琶音器。Pitch、Velocity、Chord、Note Length 和 MIDI Effect Rack 会写入音符。
 - 导入报告会列出被略去的内容。
+- 在设备视图中，机架会内联显示其链中的设备，宏映射模式（机架的 `映射` 按钮）会把设备参数交给宏，与 Live 一样。
+- 会话混音器有 Live 的独奏 / Cue 开关，带给耳机用的 `Cue Out` 和 `监听音量`。
 - 在导出的套装中，Live 会修剪相互重叠的音频片段。
 - Live 套装中的扭曲标记在导入时保留，导出时写回。
 
@@ -83,3 +100,4 @@ LYNX SHARE 默认以模式工作流程启动：通道机架、样式和播放列
 - [导入工程](/wiki/importing-projects/)
 - [文件格式](/wiki/file-formats/)
 - [一个程序，两种工作流程](/why/#workflows)
+- [学习：教程](/learn/)

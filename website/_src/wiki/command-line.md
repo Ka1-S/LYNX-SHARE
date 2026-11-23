@@ -20,7 +20,7 @@ The program is `LYNX.exe` on Windows and `LYNX` on macOS and Linux. On macOS the
 LYNX.exe project.lynx
 ```
 
-Starts LYNX SHARE with the window and opens the file. It accepts `.lynx`, `.flp`, `.als`, `.flm` and `.mid`. A relative path is taken from the current folder.
+Starts LYNX SHARE with the window and opens the file. It accepts `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip` and `.mid`. A relative path is taken from the current folder.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -32,13 +32,14 @@ Opens a `.lynx` project without loading its third-party plugins, as `File › Op
 
 | Option | What it does |
 |---|---|
-| `--export <project> <out>` | Renders the whole song with its tail, as the Export window does. The extension of `<out>` picks the format: `.wav` (24-bit), `.flac`, `.ogg` or `.mp3` (320 kbps) |
+| `--export <project> <out>` | Renders the whole song with its tail, as the Export window does. The extension of `<out>` picks the format: `.wav` (24-bit), `.flac`, `.ogg`, `.mp3` (320 kbps), `.aif` / `.aiff` (24-bit) or `.m4a` (192 kbps, not on Linux) |
 | `--export ... --pattern` | Renders the current pattern only |
 | `--export ... --insert N` | Renders the output of Mixer insert N only |
 | `--export ... --rate N` | Renders at another sample rate, in Hz |
 | `--stems <project> <base.wav>` | Writes one WAV per Mixer insert that has channels: `base - 1.wav`, `base - 2.wav` and so on |
 | `--export-flp <project> <out.flp>` | Writes an FL Studio project. With `out.zip` it writes a zipped loop package |
 | `--export-flp ... --substitute` | Swaps LYNX-only plugins for the nearest FL plugin instead of rendering them to audio |
+| `--export-flm <project> <out.flm>` | Writes an FL Studio Mobile project, and copies the samples into a `<name> Samples` folder beside it |
 | `--export-als <project> <folder>` | Writes an Ableton Live set to `<folder>/<name> Project/<name>.als`, for Live 12 |
 | `--export-als ... --live11` | Writes the set for Live 11 |
 | `--export-bundle <project> <folder>` | Writes the package of `File › Export › For other apps...` into the folder |

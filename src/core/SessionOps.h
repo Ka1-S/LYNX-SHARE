@@ -69,6 +69,9 @@ struct SlotClip
 {
     Clip clip;
     ClipGridSlot settings;
+    // round 190ne (core/TrackClips.h): a track clip's pattern travels with the copy (cutting the last clip deletes the
+    // pattern); a paste makes a unique copy of it, as every copy of a track clip
+    std::optional<Pattern> trackClip;
 };
 std::optional<SlotClip> copyOf (const Song& song, int track, int scene);
 // Puts a copied clip into (track, scene), replacing what is there; it keeps its name, colour, launch settings, follow

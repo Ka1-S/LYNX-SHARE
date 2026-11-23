@@ -1,0 +1,19 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+L'automation fait bouger un bouton dans le temps, toute seule, chaque fois que le morceau joue.
+
+00:00:09.000 --> 00:00:14.600
+Clic droit sur n'importe quel bouton, ici le Cutoff du synthé, et choisissez Créer un clip d'automation.
+
+00:00:15.000 --> 00:00:20.600
+Le clip va dans la Playlist, et son éditeur s'ouvre avec la courbe.
+
+00:00:21.000 --> 00:00:26.600
+Faites glisser les points : le Cutoff démarre haut et descend au fil de la mesure.
+
+00:00:27.000 --> 00:00:33.000
+Appuyez sur Play en mode Song : le bouton suit la courbe.
+
+00:00:33.400 --> 00:00:39.800
+Dans la disposition Simple, le bouton Automation affiche une ligne sous chaque piste.

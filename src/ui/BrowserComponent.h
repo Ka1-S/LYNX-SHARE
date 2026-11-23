@@ -191,6 +191,7 @@ public:
     void paintOverChildren (juce::Graphics& g) override; // the outline while a folder is dragged over
     bool folderDragOver = false;
     void reloadUserFolders() { rebuildRoots(); } // after the list changed elsewhere (Settings > Files)
+    juce::Viewport* treeViewForTests() const noexcept { return treeView.get(); } // (round 190ou: --hwheel254test)
     void setSearchForSnapshot (const juce::String& text);
     // For snapshots: selects (and "previews" without sound) the first audio file under the first folder,
     // and puts the mouse over the row after it.
@@ -201,6 +202,9 @@ public:
     // round 190my (DF-143, FL's Project picker: a right-click on a pattern tile): Current project › Patterns opened, that
     // pattern selected and in view; false when it isn't listed
     bool revealProjectPattern (int pattern);
+    // round 190oa (DF-120): Current project › Effects (`effect`: insert `index`, slot `slot`) or › Generators (channel
+    // `index`) with the entry open on its parameters, selected and in view
+    bool revealProjectParameters (bool effect, int index, int slot);
     bool historyShownForCheck() const;
     // round 190ke (--simplegb190keshot): "LYNX content" with these folders open ("lynx-content", "lynx-content/Beats"...),
     // and the rows listed now (tree / tag-filter results)
@@ -211,6 +215,7 @@ public:
     std::size_t loopInfoQueuedForCheck();             // round 190kx: files the loop analysis still has to do
     juce::StringArray resultLabelsForCheck() const;
     void showPluginDatabaseForSnapshot();
+    void showJsfxForSnapshot(); // round 190pj: the Plugin database's JSFX categories (Generators and Effects) open
     std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
     // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
     // the file, its row selected; false (and a note) when no folder the Browser shows holds it
@@ -306,6 +311,10 @@ public:
     // Pattern workflow keeps the "Collections" sub-menu). Set by the main window with the workflow.
     void setLiveItemMenus (bool on) noexcept { liveItemMenus = on; }
     void selectRowForSnapshot (const juce::String& label);   // --shots: the first row with this name
+    // round 190nq (#218 follow-up): the folder tree's rows, by index
+    int rowCountForSnapshot() const;
+    int selectedRowForSnapshot() const;
+    void selectRowIndexForSnapshot (int row);
     juce::PopupMenu collectionsMenuForSnapshot (const std::string& item);
 
     // The automatic preview (the reference's headphone switch, its menu "browser pre-hear"): off = selecting a file

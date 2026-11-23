@@ -220,18 +220,69 @@ inline bool hasStemWildcard (std::string_view text)
     return false;
 }
 
-// The file name (without extension) a template gives. `stems`: "$track" / "$insert" stay for the per-stem files. The
-// take is the first number from 1 whose name `c.exists` doesn't report (at most 9999).
+// Issue #215 follow-up (round 190qb): a "/" (or a backslash) in the template puts the file in folders, made inside the folder the
+// export goes to ("BOUNCE/$project_$date" or "/BOUNCE/..." -> "BOUNCE/MySong_2026-11-20", as in
+// REAPER's render file name). The template is split before the wildcards are filled, so a "/" in a value (a project named
+// "AC/DC") still becomes "_". Each folder is made safe like a file name; empty, "." and ".." folders are dropped, so a
+// name never leaves the export folder. Folders take the one-file values ("$track" = "Master").
+inline std::vector<std::string_view> splitFolders (std::string_view templ)
+{
+    std::vector<std::string_view> parts;
+    std::size_t from = 0;
+    for (std::size_t i = 0; i <= templ.size(); ++i)
+        if (i == templ.size() || templ[i] == '/' || templ[i] == '\\')
+        {
+            parts.push_back (templ.substr (from, i - from));
+            from = i + 1;
+        }
+    return parts;
+}
+
+inline bool hasFolders (std::string_view templ)
+{
+    return templ.find_first_of ("/\\") != std::string_view::npos;
+}
+
+// The file name (without extension) a template gives, with its folders before it ("BOUNCE/Mixes/MySong", always "/"
+// between them). `stems`: "$track" / "$insert" stay in the file's own name for the per-stem files. The take is the first
+// number from 1 whose name (folders included) `c.exists` doesn't report (at most 9999).
 inline std::string resolve (std::string_view templ, const Context& c, bool stems = false)
 {
-    const auto t = templ.find_first_not_of (' ') == std::string_view::npos ? std::string_view (defaultTemplate) : templ;
+    const auto blank = [] (std::string_view t) { return t.find_first_not_of (' ') == std::string_view::npos; };
+    auto parts = splitFolders (blank (templ) ? std::string_view (defaultTemplate) : templ);
+    auto fileTemplate = parts.back();
+    parts.pop_back();
+    if (blank (fileTemplate))
+        fileTemplate = defaultTemplate; // ("BOUNCE/": the project's name in that folder)
     const std::vector<std::string_view> keep = stems ? std::vector<std::string_view> { "$track", "$insert" } : std::vector<std::string_view> {};
-    auto name = sanitise (substitute (t, c, 1, keep));
-    if (t.find ("$take") == std::string_view::npos && t.find ("$TAKE") == std::string_view::npos)
+    const auto anyTake = [] (std::string_view t) {
+        std::string lower;
+        for (const auto ch : t)
+            lower += (char) ((ch >= 'A' && ch <= 'Z') ? ch - 'A' + 'a' : ch);
+        return lower.find ("$take") != std::string::npos;
+    };
+    const auto build = [&] (int take) {
+        std::string path;
+        for (const auto part : parts)
+        {
+            if (blank (part))
+                continue;
+            const auto folder = sanitise (substitute (part, c, take));
+            if (folder == "Untitled" && (part.find_first_not_of (". ") == std::string_view::npos))
+                continue; // ("." / ".." / dots only: never a step out of the export folder)
+            path += folder + "/";
+        }
+        return path + sanitise (substitute (fileTemplate, c, take, keep));
+    };
+    auto name = build (1);
+    bool takes = anyTake (fileTemplate);
+    for (const auto part : parts)
+        takes = takes || anyTake (part);
+    if (! takes)
         return name;
     for (int take = 1; take < 10000; ++take)
     {
-        name = sanitise (substitute (t, c, take, keep));
+        name = build (take);
         if (c.exists == nullptr || ! c.exists (name))
             break;
     }

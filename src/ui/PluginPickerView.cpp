@@ -4,6 +4,7 @@
 #include "core/PluginCatalog.h"
 #include "ui/AutomationUi.h"
 #include "ui/BrowserComponent.h"
+#include "ui/DemoMode.h"
 #include "ui/I18n.h"
 #include "ui/PickerLook.h"
 #include "ui/PluginThumbs.h"
@@ -107,11 +108,39 @@ void brighten (juce::Image& image)
 // along the bottom.
 class PluginPickerView final : public juce::Component,
                                public ui::HintSource,
+                               public demo::CellSource,
                                private juce::Timer
 {
 public:
+    // round 190pl (--demo, ID pluginPicker): row 0 = a tile (column: its place in the list's order; "name": by its name),
+    // row 1 = a category tab (column = its place)
+    juce::Rectangle<int> demoCellBounds (int row, int column) const override
+    {
+        if (row == 0)
+        {
+            const auto order = shownInOrder();
+            return juce::isPositiveAndBelow (column, (int) order.size()) ? tiles[(std::size_t) order[(std::size_t) column]].bounds : juce::Rectangle<int>();
+        }
+        if (row == 1 && juce::isPositiveAndBelow (column, (int) tabRects.size()))
+            return tabRects[(std::size_t) column];
+        return {};
+    }
+    juce::Rectangle<int> demoCellNamed (int row, const juce::String& name) const override
+    {
+        if (row == 0)
+            for (const auto& t : tiles)
+                if (t.name == name && ! t.bounds.isEmpty())
+                    return t.bounds;
+        if (row == 1)
+            for (int i = 0; i < tabs.count() && i < (int) tabRects.size(); ++i)
+                if (juce::String::fromUTF8 (tabs.name (i).c_str()) == name || tr (juce::String::fromUTF8 (tabs.name (i).c_str())) == name)
+                    return tabRects[(std::size_t) i];
+        return {};
+    }
+
     PluginPickerView (AudioEngine& e, PluginPickerTargets t) : engine (e), targets (std::move (t))
     {
+        setComponentID ("pluginPicker");
         const auto t0 = juce::Time::getMillisecondCounterHiRes();
         setWantsKeyboardFocus (true);
         setOpaque (true);

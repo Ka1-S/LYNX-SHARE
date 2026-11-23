@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![Strona Ogólne okna Ustawienia, z kartami stron na górze](/assets/img/wiki/settings-general.webp)
 
@@ -47,7 +47,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 
 | Ustawienie | Co robi |
 |---|---|
-| `Styl układu` | Praca na wzorcach (domyślnie), praca z uruchamianiem klipów albo praca uproszczona |
+| `Styl układu` | Układ Pattern (domyślnie), układ z uruchamianiem klipów albo układ prosty |
 | `Domyślny szablon`, `Projekt przy starcie` | Szablon, który otwiera `Plik › Nowy`, i to, co otwiera się przy starcie: `Pusty projekt`, `Domyślny szablon` albo `Ostatnio używany projekt`. `Plik › Zapisz jako szablon...` dodaje twoje własne |
 | `Klipy sesji z zestawów Live` | Dokąd trafiają klipy sesji z zaimportowanego setu Live: do siatki klipów albo na Playlistę po aranżacji |
 | `Język`, `Czcionka interfejsu` | Zastosowane przy następnym uruchomieniu |

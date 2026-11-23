@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Das Hauptfenster mit dem Demo-Projekt: Werkzeugleiste oben, Browser links, dahinter die Playlist und darüber das schwebende Channel Rack](/assets/img/wiki/desktop.webp)
 

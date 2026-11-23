@@ -551,16 +551,17 @@ Method methodFor (Flavour f)
     return Method::none;
 }
 
-int assetFor (Flavour f, const std::vector<Asset>& assets)
+int assetFor (Flavour f, const std::vector<Asset>& assets, const char* linuxArch)
 {
-    const char* suffix = nullptr;
+    const std::string arch = linuxArch != nullptr ? linuxArch : "x86_64";
+    std::string suffix;
     switch (f)
     {
         case Flavour::windowsInstaller: suffix = "-setup-x64.exe"; break;
         case Flavour::windowsPortable: suffix = "-windows-x64.zip"; break;
         case Flavour::macos: suffix = ".dmg"; break;
-        case Flavour::linuxAppImage: suffix = "-x86_64.AppImage"; break;
-        case Flavour::linuxTarball: suffix = "-linux-x86_64.tar.gz"; break;
+        case Flavour::linuxAppImage: suffix = "-" + arch + ".AppImage"; break;
+        case Flavour::linuxTarball: suffix = "-linux-" + arch + ".tar.gz"; break;
         case Flavour::store:
         case Flavour::unknown: return -1;
     }
@@ -1002,6 +1003,26 @@ std::string formatInstalling (const InstallingNote& note)
         out += "from=" + note.from + "\n";
     out += "rollback=" + std::string (note.rollback ? "1" : "0") + "\n";
     return out + "version=" + note.version + "\n"; // (last: see the header)
+}
+
+const std::vector<InstallEntry>& installEntries()
+{
+    static const std::vector<InstallEntry> entries {
+        { "licenses", "0.1.30" },           // third-party licence texts (round 190nk)
+        { "installed-files.txt", "0.1.31" } // the installer's own list of what it wrote (round 190nr)
+    };
+    return entries;
+}
+
+std::vector<std::string> entriesNewerThan (const Version& installed)
+{
+    std::vector<std::string> out;
+    if (! installed.valid)
+        return out;
+    for (const auto& e : installEntries())
+        if (compare (installed, parseVersion (e.since)) < 0)
+            out.emplace_back (e.name);
+    return out;
 }
 
 InstallingNote parseInstalling (const std::string& text)

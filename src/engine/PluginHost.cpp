@@ -1,4 +1,6 @@
 #include "engine/PluginHost.h"
+#include "core/FlSettings.h"
+#include "platform/PrefaultMemory.h"
 #include "platform/Paths.h"
 
 #include <algorithm>
@@ -20,6 +22,7 @@
 
 #include "engine/ClapFormat.h"
 #include "engine/Vst2Format.h"
+#include "engine/JsfxFormat.h"
 #include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
 #include "engine/TimedParameters.h"
@@ -488,7 +491,7 @@ std::uint32_t flushParameters (juce::AudioPluginInstance& plugin, HostedParamete
 void audioParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
                      std::atomic<bool>& crashed, const std::string& name, int index, float value) noexcept
 {
-    if (! changes.contains (index)) return;
+    if (! changes.contains (index) || changes.held()) return; // (round 190ox: a capture at the base values runs)
     const juce::CriticalSection::ScopedTryLockType lock (plugin.getCallbackLock());
     if (! lock.isLocked())
     {
@@ -499,6 +502,30 @@ void audioParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& 
     changes.clear (index); // a later successful automation value supersedes the queued one
     if (const auto code = crashguard::run ([&] { applyParameter (plugin, changes, index, value); }); code != 0)
         recordCrashOnce (crashed, name, code);
+}
+
+std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name);
+
+// round 190ox: the state with these parameters at the given values (a modulated parameter's base)
+std::optional<std::string> stateAtBases (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes, std::atomic<bool>& crashed,
+                                         const std::string& name, const std::vector<std::pair<int, float>>& bases)
+{
+    if (bases.empty() || crashed.load())
+        return guardedState (plugin, crashed, name);
+    changes.hold (true);
+    if (const auto code = crashguard::run ([&] {
+            for (const auto& [index, value] : bases)
+                if (changes.contains (index))
+                    setPluginParameter (plugin, index, value);
+        }); code != 0)
+    {
+        changes.hold (false);
+        recordCrashOnce (crashed, name, code);
+        return std::nullopt;
+    }
+    auto state = guardedState (plugin, crashed, name);
+    changes.hold (false);
+    return state;
 }
 
 std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name)
@@ -586,13 +613,8 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
         routeOffset[k].store (0);
         routeActive[k].store (k >= outs.size() || outs[k].activeByDefault);
     }
-    if (! outs.empty())
-    {
-        aux.resize (outs.size());
-        for (auto& a : aux)
-            for (auto& side : a)
-                side.assign ((std::size_t) auxCapacity, 0.0f);
-    }
+    // (the outputs' own buffers, 128 KiB per output, are made by configure() once an output plays on another insert:
+    // round 190of — a 16-output plugin held 2 MiB for them whether or not anything was routed)
     if (fixedBlock > 0)
     {
         // (every output channel goes through the fixed blocks: the other outputs keep their place too)
@@ -773,6 +795,11 @@ void PluginInstrument::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginInstrument::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+std::optional<std::string> PluginInstrument::captureState (const std::vector<std::pair<int, float>>& bases)
+{
+    return stateAtBases (*plugin, parameterChanges, crashed, name, bases);
 }
 
 bool PluginInstrument::restoreState (const std::string& state)
@@ -1203,13 +1230,17 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             if (! crashed.load (std::memory_order_relaxed))
             {
                 rememberMidi (pending);
+                const auto hadEvents = ! pending.isEmpty(); // (round 190ok: generator smart disable)
                 if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }, crashed, name); code != 0)
                 {
                     failed (code);
                     view.clear(); // silent from here on
                 }
                 else
+                {
+                    noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
                     collectMidiOutput (pending);
+                }
             }
             pending.clear();
             const auto channels = (int) (scratch.size() / (std::size_t) blockSize);
@@ -1247,6 +1278,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         hardwareBlockAt = chunkOffset + done; // (round 190jl)
         hardwarePositions = true;
         rememberMidi (midi);
+        const auto hadEvents = ! midi.isEmpty(); // (round 190ok: generator smart disable)
         const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
@@ -1254,6 +1286,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             failed (code);
             return;
         }
+        noteSmartBlock (count, hadEvents, view.getArrayOfReadPointers(), view.getNumChannels());
         collectMidiOutput (midi);
         midi.clear();
         recoveryMidi = false;
@@ -1281,7 +1314,7 @@ void PluginInstrument::mixOutputs (const float* const* ch, int numChannels, int 
         }
         return;
     }
-    const auto viaAux = anyAux.load (std::memory_order_relaxed) && ! aux.empty();
+    const auto viaAux = anyAux.load (std::memory_order_acquire) && ! aux.empty();
     for (std::size_t k = 0; k < outs.size(); ++k)
     {
         const auto& o = outs[k];
@@ -1313,6 +1346,9 @@ void PluginInstrument::mixOutputs (const float* const* ch, int numChannels, int 
 void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
 {
     channelTrack.store (channel.mixerTrack, std::memory_order_relaxed);
+    // round 190ok (D2): FL's generator smart disable, with the wrapper's "Allow smart disable"
+    smartHold.store (gensmart::holdSamples (plugin->getSampleRate()), std::memory_order_relaxed);
+    smartOn.store (channel.smartDisable && channel.plugin.allowSmartDisable, std::memory_order_relaxed);
     bool elsewhere = false;
     for (std::size_t k = 0; k < outs.size(); ++k)
     {
@@ -1323,13 +1359,42 @@ void PluginInstrument::configure (const ChannelDef& channel, double) noexcept
         routeActive[k].store (on, std::memory_order_relaxed);
         elsewhere = elsewhere || (on && route.offset != 0);
     }
-    anyAux.store (elsewhere && ! aux.empty(), std::memory_order_relaxed);
+    // round 190of: the outputs' buffers on first use. Never on the audio thread (the rack's build); the audio thread
+    // reads `aux` only after it sees anyAux, which is stored after them (and they are never made smaller)
+    if (elsewhere && aux.empty() && ! outs.empty())
+    {
+        std::vector<std::array<std::vector<float>, 2>> made (outs.size());
+        for (auto& a : made)
+            for (auto& side : a)
+                side.assign ((std::size_t) auxCapacity, 0.0f);
+        aux = std::move (made);
+    }
+    anyAux.store (elsewhere && ! aux.empty(), std::memory_order_release);
+}
+
+bool PluginInstrument::idle() const noexcept
+{
+    // (round 190ok, D2) asleep: 4 s of silent output with nothing sent to it; anything queued for it (a note, a MIDI
+    // message, a reset) wakes it, and so does switching smart disable off here or globally
+    return smartOn.load (std::memory_order_relaxed) && flsettings::options().smartDisable.load (std::memory_order_relaxed)
+           && smart.asleep (smartHold.load (std::memory_order_relaxed)) && midi.isEmpty() && pending.isEmpty()
+           && ! resetPending.load (std::memory_order_relaxed) && ! crashed.load (std::memory_order_relaxed);
+}
+
+void PluginInstrument::noteSmartBlock (int n, bool events, const float* const* channels, int numChannels) noexcept
+{
+    if (! smartOn.load (std::memory_order_relaxed))
+    {
+        smart.wake();
+        return;
+    }
+    smart.rendered (n, events, ! events && gensmart::silent (channels, numChannels, n));
 }
 
 void PluginInstrument::beginChunk (int n) noexcept
 {
     auxCursor = 0;
-    if (! anyAux.load (std::memory_order_relaxed))
+    if (! anyAux.load (std::memory_order_acquire))
         return;
     for (auto& a : aux)
         for (auto& side : a)
@@ -1439,6 +1504,11 @@ void PluginEffect::failed (std::uint32_t code) noexcept
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+std::optional<std::string> PluginEffect::captureState (const std::vector<std::pair<int, float>>& bases)
+{
+    return stateAtBases (*plugin, parameterChanges, crashed, name, bases);
 }
 
 bool PluginEffect::restoreState (const std::string& state)
@@ -1955,6 +2025,118 @@ juce::String pluginStateContentionSelfTest()
     catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
 }
 
+// Round 190ok (owner decision D2): FL's generator smart disable through PluginInstrument, with an in-process probe synth
+// (a held note plays a constant level; it counts its blocks). The rack skips a channel while idle() says so (and no note
+// comes): here the same loop.
+juce::String generatorSmartDisableSelfTest()
+{
+    struct Synth final : juce::AudioPluginInstance
+    {
+        Synth() : AudioPluginInstance (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)) {}
+        const juce::String getName() const override { return "Smart disable probe"; }
+        void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = getName(); d.isInstrument = true; }
+        void prepareToPlay (double, int) override {}
+        void releaseResources() override {}
+        void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& messages) override
+        {
+            ++blocks;
+            for (const auto event : messages)
+                if (event.numBytes >= 3 && (event.data[0] & 0xf0) == 0x90 && event.data[2] != 0)
+                    held = true;
+                else if (event.numBytes >= 3 && ((event.data[0] & 0xf0) == 0x80 || (event.data[0] & 0xf0) == 0x90))
+                    held = false;
+            for (int ch = 0; ch < audio.getNumChannels(); ++ch)
+                std::fill_n (audio.getWritePointer (ch), audio.getNumSamples(), held ? 0.25f : 0.0f);
+        }
+        double getTailLengthSeconds() const override { return 0.0; }
+        bool acceptsMidi() const override { return true; }
+        bool producesMidi() const override { return false; }
+        bool hasEditor() const override { return false; }
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram (int) override {}
+        const juce::String getProgramName (int) override { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock&) override {}
+        void setStateInformation (const void*, int) override {}
+        std::atomic<int> blocks { 0 };
+        bool held = false;
+    };
+    try
+    {
+        constexpr int block = 256;
+        constexpr double rate = 48000.0;
+        auto made = std::make_unique<Synth>();
+        auto* probe = made.get();
+        preparePlugin (*made, rate, block);
+        PluginInstrument inst (std::move (made), block);
+        ChannelDef channel;
+        channel.instrument = InstrumentKind::plugin;
+        auto& global = flsettings::options().smartDisable;
+        const auto globalBefore = global.load();
+        const juce::ScopeGuard restore { [&global, globalBefore] { global.store (globalBefore); } };
+        global.store (true);
+        std::vector<float> l (block), r (block);
+        // the rack's loop: a channel that is idle and gets no note is not called
+        const auto run = [&] (double seconds) {
+            for (int i = 0; i < (int) (seconds * rate / block); ++i)
+                if (! inst.idle())
+                {
+                    std::fill (l.begin(), l.end(), 0.0f);
+                    std::fill (r.begin(), r.end(), 0.0f);
+                    inst.render (l.data(), r.data(), block, 1.0f, 1.0f);
+                }
+        };
+        // off (FL's default, every old project): called all the time
+        inst.configure (channel, 120.0);
+        run (6.0);
+        const auto offBlocks = probe->blocks.load();
+        if (inst.idle() || offBlocks < (int) (5.9 * rate / block))
+            return "ERROR off: the plugin was not called all the time";
+        // on: asleep after 4 s of silence, not called any more
+        channel.setSmartDisable (true);
+        inst.configure (channel, 120.0);
+        probe->blocks = 0;
+        run (3.9);
+        if (inst.idle())
+            return "ERROR asleep before 4 s";
+        run (0.2);
+        if (! inst.idle())
+            return "ERROR not asleep after 4 s of silence";
+        const auto asleepAt = probe->blocks.load();
+        run (5.0);
+        if (probe->blocks.load() != asleepAt)
+            return "ERROR called while asleep";
+        // a note wakes it at once, and it plays; a held note keeps it awake (its output is audible)
+        inst.noteOn (60, 0.8f);
+        if (inst.idle())
+            return "ERROR a note did not wake it";
+        run (6.0);
+        if (inst.idle() || probe->blocks.load() < asleepAt + (int) (5.9 * rate / block) || l[0] < 0.2f)
+            return "ERROR a held note did not keep it awake";
+        // released: asleep again 4 s later
+        inst.noteOff (60);
+        run (4.2);
+        if (! inst.idle())
+            return "ERROR not asleep again after the release";
+        // the global switch (Settings › Audio › CPU › Smart disable) and the wrapper's "Allow smart disable" wake it
+        global.store (false);
+        if (inst.idle())
+            return "ERROR the global switch did not wake it";
+        global.store (true);
+        channel.plugin.allowSmartDisable = false;
+        inst.configure (channel, 120.0);
+        if (inst.idle())
+            return "ERROR Allow smart disable off did not wake it";
+        return "OK (" + juce::String (offBlocks) + " blocks off, asleep after " + juce::String (asleepAt) + ")";
+    }
+    catch (const std::exception& e)
+    {
+        return "ERROR " + juce::String (e.what());
+    }
+}
+
 void PluginEffect::setConnections (const SlotConnections& c)
 {
     for (int o = 0; o < maxPluginConnections; ++o)
@@ -2193,7 +2375,11 @@ juce::StringArray listPluginFiles (juce::AudioPluginFormatManager& formats, cons
     juce::StringArray files;
     for (auto* format : formats.getFormats())
         if (format->canScanForPlugins() && (withLv2 || format->getName() != "LV2"))
-            files.addArray (format->searchPathsForPlugins (format->getName() == "LV2" ? lv2Folders (paths) : paths, true, false));
+            // (JSFX scripts: in the JSFX roots only, Settings › File › JSFX folders; round 190pj)
+            files.addArray (format->searchPathsForPlugins (format->getName() == "LV2"                       ? lv2Folders (paths)
+                                                           : format->getName() == JsfxPluginFormat::formatName ? jsfx::roots()
+                                                                                                               : paths,
+                                                           true, false));
     return files;
 }
 
@@ -2297,6 +2483,8 @@ PluginHost::PluginHost (bool keep)
                 std::this_thread::sleep_for (std::chrono::milliseconds (50));
             if (! warmupQuit)
                 flPluginDatabase();
+            if (! warmupQuit)
+                scanJsfx(); // (round 190pj: the bundled pack and the JSFX folders are listed without a full scan)
         });
 }
 
@@ -2646,6 +2834,8 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
 int PluginHost::scan (const juce::FileSearchPath& paths, const std::function<bool (float, const juce::String&)>& progress)
 {
     const auto before = known.getNumTypes();
+    if (persistent)
+        jsfx::installPack(); // (the bundled JSFX scripts, written once per pack version)
     auto lv2Done = false;
     {
         const std::scoped_lock lock (scanLock);
@@ -2727,6 +2917,30 @@ bool PluginHost::sameModule (const juce::PluginDescription& d, const juce::Strin
             && juce::File (d.fileOrIdentifier).isAChildOf (juce::File (file)));
 }
 
+int PluginHost::scanJsfx()
+{
+    if (persistent)
+        jsfx::installPack();
+    for (auto* format : formats.getFormats())
+        if (format->getName() == JsfxPluginFormat::formatName)
+        {
+            const auto files = format->searchPathsForPlugins (jsfx::roots(), true, false);
+            auto removed = false;
+            // scripts that are gone from the roots leave the list (a moved or deleted script)
+            for (const auto& d : known.getTypes())
+                if (d.pluginFormatName == JsfxPluginFormat::formatName && ! files.contains (d.fileOrIdentifier))
+                {
+                    known.removeType (d);
+                    removed = true;
+                }
+            const auto found = scanFiles (files, {});
+            if (removed && found == 0)
+                save();
+            return found;
+        }
+    return 0;
+}
+
 int PluginHost::scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress)
 {
     const std::scoped_lock lock (scanLock);
@@ -2749,7 +2963,18 @@ int PluginHost::scanFiles (const juce::StringArray& files, const std::function<b
                 continue;
             if (! known.isListingUpToDate (file, *format) && ! listedInside (known, *format, file) && ! emptyScanIsCurrent (file))
             {
-                scanOne (*format, file);
+                // JSFX (round 190pj): only a text header is read, nothing is loaded or run: in this process. By name, not
+                // isTrivialToScan(): JUCE's LV2 format says it is trivial too, and LV2's plugin-by-plugin scan after a failed
+                // batch must stay in children (a bad bundle can crash; rollup 0.1.31 step 7, --lv2scantest)
+                if (format->getName() == JsfxPluginFormat::formatName)
+                {
+                    juce::OwnedArray<juce::PluginDescription> found;
+                    known.scanAndAddFile (file, false, found, *format);
+                    if (found.isEmpty())
+                        rememberEmptyScan (file);
+                }
+                else
+                    scanOne (*format, file);
                 unsaved = true;
             }
             break;
@@ -3109,7 +3334,10 @@ void PluginHost::findLv2Plugins()
 
 std::unique_ptr<juce::PluginDescription> PluginHost::find (const juce::String& id) const
 {
-    return known.getTypeForIdentifierString (id);
+    if (auto d = known.getTypeForIdentifierString (id))
+        return d;
+    // a JSFX script saved on another computer (or moved to another JSFX root): found by its relative path (round 190pj)
+    return jsfx::findPortable (known, id);
 }
 
 std::string PluginHost::bitnessKey (const juce::PluginDescription& d)
@@ -4017,7 +4245,10 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
         const auto own = ref.separateProcess || pluginAlwaysSeparate (description->name);
         const auto group = own ? juce::String() : sandboxGroupFor (*description, pluginSandboxMode());
         if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message, group))
+        {
+            setSandboxedEditorScaling (*remote, ref.dpiAware, ref.scaleEditorDimensions); // (round 190oh, P3)
             return remote;
+        }
         if (error != nullptr)
             *error = juce::String::fromUTF8 (ref.name.c_str()) + ": " + message;
         return nullptr;
@@ -4025,7 +4256,17 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
 
     crashguard::note (("loading plugin " + description->name + " (" + description->pluginFormatName + ", "
                        + juce::File (description->fileOrIdentifier).getFileName() + ")").toStdString());
+    // FL's wrapper "DPI aware" off (round 190oh, P3; Windows): the plugin is made in a DPI-unaware context (some query
+    // the scale or make hidden windows while loading), as its editor later is (ui/PluginWindow.cpp)
+    std::optional<juce::ScopedDPIAwarenessDisabler> dpiUnaware;
+    if (! ref.dpiAware)
+        dpiUnaware.emplace();
+    // round 190ok: the memory the plugin maps while it loads, prepares and takes its settings is faulted in here, off the
+    // audio thread (platform/PrefaultMemory.h; Linux; LYNX_PREFAULT=0 leaves it out)
+    static const bool prefaultOn = juce::SystemStats::getEnvironmentVariable ("LYNX_PREFAULT", "1") != "0";
+    const auto mapsBefore = prefaultOn ? prefault::mappings() : std::vector<prefault::Region> {};
     auto instance = createRightInstance (formats, *description, sampleRate, maxBlockSize, message);
+    dpiUnaware.reset();
     crashguard::note (("loaded plugin " + description->name + (instance == nullptr ? juce::String (" (failed)") : juce::String())).toStdString());
 
     if (instance == nullptr)
@@ -4061,6 +4302,8 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
             }
         }
     }
+    if (prefaultOn)
+        (void) prefault::populateNew (mapsBefore);
 
     return instance;
 }

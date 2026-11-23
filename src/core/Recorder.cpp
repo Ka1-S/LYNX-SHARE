@@ -1,4 +1,5 @@
 #include "core/Recorder.h"
+#include "core/AutomationModes.h"
 #include "core/LayoutStyle.h"
 #include "core/MidiControls.h"
 #include "core/PlaylistOps.h"
@@ -560,6 +561,9 @@ void writeRecordedStretch (Automation& a, std::vector<AutomationPoint> fresh, Au
     const auto hasAfter = std::any_of (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick > l1 + 1; });
     const auto oldAtFrom = a.valueAt ((double) from - 1.0);
     const auto oldAfter = a.valueAt ((double) l1 + 1.0);
+    if (! continuing) // (round 190pa: what Touch glides back to)
+        w.hadCurve = ! a.points.empty();
+    w.returnValue = oldAfter;
 
     // what lay under the gesture is replaced; the curve before and after it stays
     a.points.erase (std::remove_if (a.points.begin(), a.points.end(), [&] (const AutomationPoint& p) { return p.tick >= from && p.tick <= l1 + 1; }),
@@ -572,6 +576,37 @@ void writeRecordedStretch (Automation& a, std::vector<AutomationPoint> fresh, Au
     std::stable_sort (a.points.begin(), a.points.end(), [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
     thinAutomation (a.points, from, l1);
     w.lastLocal = l1;
+}
+
+bool automationTakeFrame (int mode, bool held, double msSinceMove, double tick, float value, double takeStart, bool& started,
+                          std::vector<RecordedValue>& pending)
+{
+    const auto m = automodes::fromInt (mode);
+    if (! automodes::stillWriting (m, held, msSinceMove))
+        return false;
+    if (automodes::writesFromStart (m) && ! started && takeStart >= 0.0 && takeStart < tick)
+        pending.push_back ({ takeStart, value });
+    started = true;
+    pending.push_back ({ tick, value });
+    return true;
+}
+
+bool glideBackToCurve (Automation& a, const AutomationWrite& w, std::int64_t ticks)
+{
+    if (w.lastLocal < 0 || ! w.hadCurve || ticks <= 1)
+        return false;
+    const auto t0 = w.lastLocal, target = t0 + ticks;
+    // the curve that was there: the points after the stretch's return point are the old ones; with none, the old curve
+    // held the value it had after the stretch
+    const auto later = std::any_of (a.points.begin(), a.points.end(), [t0] (const AutomationPoint& p) { return p.tick > t0 + 1; });
+    const auto value = later ? a.valueAt ((double) target) : w.returnValue;
+    if (value < 0.0f)
+        return false;
+    a.points.erase (std::remove_if (a.points.begin(), a.points.end(), [=] (const AutomationPoint& p) { return p.tick > t0 && p.tick <= target; }),
+                    a.points.end());
+    a.points.push_back ({ target, std::clamp (value, 0.0f, 1.0f), 0.0f });
+    std::stable_sort (a.points.begin(), a.points.end(), [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
+    return true;
 }
 
 void thinRecordedCurve (std::vector<AutomationPoint>& points, float tolerance)

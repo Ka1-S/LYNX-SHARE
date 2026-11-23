@@ -1,15 +1,15 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
-![De Clipstart-werkwijze: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
+![De Clipstart-lay-out: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
 
-`Beeld › Lay-outstijl` heeft drie items: `Patroonwerkwijze (standaard)`, `Clipstart-werkwijze` en `Eenvoudige werkwijze`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Werkwijze. De keuze blijft bewaard als je het programma sluit.
+`Beeld › Lay-outstijl` heeft drie items: `Pattern-lay-out (standaard)`, `Clipstart-lay-out` en `Eenvoudige lay-out`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Lay-out. De keuze blijft bewaard als je het programma sluit. De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt en kiest de lay-out die past.
 
-De Patroonwerkwijze, de standaard, werkt zoals FL Studio: het Channel Rack, patterns, de Piano Roll, de Playlist en de Mixer. De Clipstart-werkwijze, in de stijl van Ableton Live, voegt naast de Playlist een clipraster met scènes toe, een sessiemixer en de clip- en apparaatweergave; patterns en het Channel Rack blijven beschikbaar. De Eenvoudige werkwijze brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile: tracks en een tijdlijn, loops, pads en snel opnemen. Wisselen verplaatst alleen de vensters: het project blijft hetzelfde.
+De Pattern-lay-out, de standaard, werkt zoals FL Studio: het Channel Rack, patterns, de Piano Roll, de Playlist en de Mixer. De Clipstart-lay-out, in de stijl van Ableton Live, voegt naast de Playlist een clipraster met scènes toe, een sessiemixer en de clip- en apparaatweergave; patterns en het Channel Rack blijven beschikbaar. De Eenvoudige lay-out brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile: tracks en een tijdlijn, loops, pads en snel opnemen. Wisselen verplaatst alleen de vensters: het project blijft hetzelfde.
 
 ## Clips lanceren in het raster
 
-1. Kies `Beeld › Lay-outstijl › Clipstart-werkwijze`. Het clipraster verschijnt naast de Playlist.
+1. Kies `Beeld › Lay-outstijl › Clipstart-lay-out`. Het clipraster verschijnt naast de Playlist.
 2. Klik met rechts op een leeg slot, kies `Patroon hier plaatsen` en kies een pattern. Dubbelklikken op een leeg slot zet het huidige pattern erin.
 3. Klik op de driehoek links van de clip om hem te lanceren. Staat het transport stil, dan start het.
 4. Klik op de driehoek van een scène, in de kolom `Scènes`, om elke clip in die rij te lanceren.
@@ -60,24 +60,24 @@ Het slotmenu heeft ook twee opties voor het hele raster: `Sporen teruggeven aan 
 
 Als je een Live-set opent, komen de Session-clips en scènes ervan met hun lanceerinstellingen in het clipraster. `Bestand › Exporteren › Ableton Live-set (.als)` schrijft het raster terug als Session-clips. `Opties › Algemene instellingen` heeft `Sessieclips uit Live-sets`, waar `Playlist, na het arrangement` ze in plaats daarvan op de Playlist zet.
 
-## De Simple-werkwijze
+## De Simple-lay-out
 
-`Beeld › Lay-outstijl › Eenvoudige werkwijze` is één venster met de tracks en de tijdlijn, in de stijl van BandLab en FL Studio Mobile, en past goed bij een eerste song. `Beeld › Spoordock` toont onder de tijdlijn een dock voor de geselecteerde track, met de tabs `Effecten`, `Instrument`, `Klavier` en `Editor`. In deze werkwijze heeft het menu `Help` de items `Tour van het eerste nummer` en `Welkomstscherm...`, dat een eerste song in zeven stappen, een demosong of een leeg project aanbiedt. Zie [Simple-lay-out](/wiki/simple-layout/).
+`Beeld › Lay-outstijl › Eenvoudige lay-out` is één venster met de tracks en de tijdlijn, in de stijl van BandLab en FL Studio Mobile, en past goed bij een eerste song. `Beeld › Spoordock` toont onder de tijdlijn een dock voor de geselecteerde track, met de tabs `Effecten`, `Instrument`, `Klavier` en `Editor`. In deze lay-out heeft het menu `Help` de items `Tour van het eerste nummer` en `Welkomstscherm...`, dat een eerste song in zeven stappen, een demosong of een leeg project aanbiedt. Zie [Simple-lay-out](/wiki/simple-layout/).
 
-`Songtekst en notities` en `Referentie-afstemming...` in het menu `Beeld`, en `Heldere stem` in het menu van een Mixer-insert, zijn er in elke lay-out. In de Simple-werkwijze zit `Heldere stem` ook in het menu van een track.
+`Songtekst en notities` en `Referentie-afstemming...` in het menu `Beeld`, en `Heldere stem` in het menu van een Mixer-insert, zijn er in elke lay-out. In de Simple-lay-out zit `Heldere stem` ook in het menu van een track.
 
 ## Terugschakelen
 
-Kies `Beeld › Lay-outstijl › Patroonwerkwijze (standaard)`. De vensterindeling die je in de Patroonwerkwijze had komt terug, en de automatiseringsbanen keren terug naar hun vorige instelling. De clips in het raster blijven in het project.
+Kies `Beeld › Lay-outstijl › Pattern-lay-out (standaard)`. De vensterindeling die je in de Pattern-lay-out had komt terug, en de automatiseringsbanen keren terug naar hun vorige instelling. De clips in het raster blijven in het project.
 
 ## Goed om te weten
 
 - Een track die een clip lanceerde blijft in de Playlist stil tot je op `Terug naar Playlist` drukt. De optie `Sporen teruggeven aan de Playlist wanneer het transport stopt` doet dat bij elke stop voor je.
-- De nieuwe toetsen van het raster (`B`, `Q`, `Ctrl+M`, `Ctrl+K` en andere) werken zo alleen in de Clip-launch-werkwijze. In de Pattern-werkwijze behouden ze de betekenis van FL Studio.
+- De nieuwe toetsen van het raster (`B`, `Q`, `Ctrl+M`, `Ctrl+K` en andere) werken zo alleen in de Clipstart-lay-out. In de Pattern-lay-out behouden ze de betekenis van FL Studio.
 - Een scene in 6/8 speelt een maat van drie tellen, omdat de maatsoort kwartnoten telt.
 - Vervolgacties bestaan voor clips, niet voor scènes.
-- Automatiseringsbanen die je in de Clipstart-werkwijze met de hand inschakelt blijven niet behouden als je teruggaat.
-- Als de Patroonwerkwijze is gekozen, wordt niets van het raster geladen.
+- Automatiseringsbanen die je in de Clipstart-lay-out met de hand inschakelt blijven niet behouden als je teruggaat.
+- Als de Pattern-lay-out is gekozen, wordt niets van het raster geladen.
 
 ## Gerelateerd
 

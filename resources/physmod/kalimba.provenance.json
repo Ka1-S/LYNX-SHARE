@@ -1,0 +1,273 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 1281556,
+   "git_blob_sha1": "25a2f3ecd4903a02ae0de586dab851fe3c65d2c1",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G1_k12_50_100_rr2.wav",
+   "sha256": "6cfea58f2b7fc1112bdd05431822080b1c578a7a6637dd1f8af8384c0d0780d3",
+   "sounding_key": 43,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 2159638,
+   "git_blob_sha1": "f7fc23788c2866b00e1d7b65eb3a62b22b6de277",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G#1_k11_50_100_rr2.wav",
+   "sha256": "0b5d7ed7a2435ecb8245c95bf07348e1f9ca5474ad19e2d41171a7a3aac67be8",
+   "sounding_key": 44,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1567306,
+   "git_blob_sha1": "1a3bea0fa7ba9a8d2390f45fcc8c10081f5c95d7",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_B1_k13_50_100_rr2.wav",
+   "sha256": "ce548b5b3cb20b0306dfee89d0c6ef87cb912b898c5314bc3e19ab512e7d0c7b",
+   "sounding_key": 47,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1720294,
+   "git_blob_sha1": "3d3582a2ac15ad9e7386e3d6a079e92c93ae43a4",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_C#2_k10_50_100_rr2.wav",
+   "sha256": "b83ae7fbeec7691e6b6dbfe3c753bca1e21dc79cc7b3379b2d3756e55846e400",
+   "sounding_key": 49,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1285486,
+   "git_blob_sha1": "e8f675d22789818c60c6c4606de7e72300537c18",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_D#2_k14_50_100_rr2.wav",
+   "sha256": "5228eeeab0af256d8943b0facb0bc1ad61f3454654b6f2c7a6c8fe30c1ba367e",
+   "sounding_key": 51,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1038820,
+   "git_blob_sha1": "5a6025b16973ceeec511e7da85993e7068d509f0",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_F2_k9alt_50_100_rr2.wav",
+   "sha256": "7d287dc67cccfd0fa319a9c944997999ced2a0ef8143b74f1f2e4b1fcf1a8028",
+   "sounding_key": 53,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1562464,
+   "git_blob_sha1": "1cdcb20c88f8dada72cc63fa0513851499a0c342",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G2_k15_50_100_rr2.wav",
+   "sha256": "eb0b02df1951277ccccefdfdf7689e360c4303cbbdafce9880ddc7d1d7735c4e",
+   "sounding_key": 55,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1519282,
+   "git_blob_sha1": "8b9b4129e30bb2d5dc5eb622141cbdf8c44548af",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_A#2_k8_50_100_rr2.wav",
+   "sha256": "35df63d5f879097273978f00c4554d82e6c3126c0572077eebd8319d01640414",
+   "sounding_key": 58,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 925192,
+   "git_blob_sha1": "2f54d3673ff420cf68a3e033852794cc4198d938",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_C#3_k16_50_100_rr2.wav",
+   "sha256": "8bf3cbb5812176bd37529babb994123667fa410a837159549795e573e59b8906",
+   "sounding_key": 61,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 1234402,
+   "git_blob_sha1": "624a4f6c77b36bc1d2acce60c251f08ea9d139ac",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_D#3_k7_50_100_rr2.wav",
+   "sha256": "fa56975960f9dc2dce8b092cf80fd77a18c8273e4a880d62996576a95176a7af",
+   "sounding_key": 63,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 927430,
+   "git_blob_sha1": "2921df361d187efbfbac9fe19ef0bc57d9ddeef5",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_F3_k17_50_100_rr2.wav",
+   "sha256": "1dd82312d3202a7cb8e28efe0cbe9e8c1bb3bc65b6a9916da709d169e2491b14",
+   "sounding_key": 65,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 962998,
+   "git_blob_sha1": "d6d1dcfda468ee43bd403160401102c634929c81",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G3_k6_50_100_rr2.wav",
+   "sha256": "f66bcdf337dec1ef6a73aad8dc3e3345a91e37e27679aaa60b640b26f5be1c4c",
+   "sounding_key": 67,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 675160,
+   "git_blob_sha1": "3a75aef8c53eb1cc305d8ef7a3712822b64d8b1f",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_A#3_k18_50_100_rr2.wav",
+   "sha256": "4982936107dca7fbe370c1f78e3a8c2c609e0700938ff4a391fc7ecdf7c3523d",
+   "sounding_key": 70,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 716518,
+   "git_blob_sha1": "d5609bd3ca8d16fff82e4c380c189122a0d00484",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_C#4_k5_50_100_rr2.wav",
+   "sha256": "2d2be2152d784f8013ded81ff863f4d0c5775d546bc1d61723d0c04f25426e45",
+   "sounding_key": 73,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 605566,
+   "git_blob_sha1": "244fccedb259602964ebfaef12477c6fc3692922",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_D4_k19_50_100_rr2.wav",
+   "sha256": "c9b6034cec0ad70c483ac0db87f48f33a5421e2cf594ed590e405a126cfd43c5",
+   "sounding_key": 74,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 488326,
+   "git_blob_sha1": "311b202242d5c9cc873a93fa911672600900f701",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_D#4_k20_50_100_rr2.wav",
+   "sha256": "1436da47f7a0416302c0cc423328dd08303cd850df2a4b6457de6440a270ba06",
+   "sounding_key": 75,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 481162,
+   "git_blob_sha1": "6d8ff6b6bc8f9096e95a3a301798aeb7423d3b5a",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_F4_k21_50_100_rr2.wav",
+   "sha256": "f241c9d2a2b97561f63c455744f9ea99f70a1e7a0cc7c500a8d9161b9d5f5ab2",
+   "sounding_key": 77,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 554566,
+   "git_blob_sha1": "d24779b58dcdb149b750dd82535087a0ab194248",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G4_k22_50_100_rr2.wav",
+   "sha256": "59fef12af5bf667cd7b3d12454e62377ac47f6893de416fc9f6e12f30043495b",
+   "sounding_key": 79,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 401296,
+   "git_blob_sha1": "45be8dfa5dff17d049a9878a16dc8f9130430ba8",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_A#4_k2_50_100_rr2.wav",
+   "sha256": "8b536bc1941c6a674c59cb3d6f4a3c0c1581b22df0948fa140165aaa0b8abf49",
+   "sounding_key": 82,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 318232,
+   "git_blob_sha1": "746cf96eda13dc2a35a423bd254c6720ba33d816",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_B4_k23_50_100_rr2.wav",
+   "sha256": "ae7d7acce2ea9a222f8105542ba940bb546876c3cbaa23fec790cbc9c7731fc1",
+   "sounding_key": 83,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 566284,
+   "git_blob_sha1": "af397239194031376122e9115b184336e6820709",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_C#5_k24_50_100_rr2.wav",
+   "sha256": "81cad929b42f5177bbe5d09da860725d2cf5304d2d0fe32443523ef09e508ef3",
+   "sounding_key": 85,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 600946,
+   "git_blob_sha1": "3a322a3a34ba264a6cc9b8fb956d251d38edc471",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_E5_k25_50_100_rr2.wav",
+   "sha256": "becb36f0ad9f00ffab16f70bed644e40eada202dc839eee29bc7012953ab5bb9",
+   "sounding_key": 88,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 508924,
+   "git_blob_sha1": "e3412a5fe3e0a6019fba477d144b00fbb223a8a7",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_F#5_k1_50_100_rr2.wav",
+   "sha256": "9f9a138e1e771db5c9a00f26955ed0b011af47cbe8c5ecf4fb24b82f2bc0e07a",
+   "sounding_key": 90,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 487948,
+   "git_blob_sha1": "282be6a47cfac2222c9b2d5731c4c3eaf1eea57e",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_G#5_k26_50_100_rr2.wav",
+   "sha256": "f16705ce5ccd540c53a2c2d88ce7c4a20b0c04cea54c003fa3ccbea4c2215f15",
+   "sounding_key": 92,
+   "velocity": 0.8
+  },
+  {
+   "bytes": 543886,
+   "git_blob_sha1": "0fb035cdae41a655ce50f2207fce100f4629ddff",
+   "layer": null,
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Plucked Idiophones/Kalimba, Tanzania/MBira3_pluck_Main_C#6_k27_50_100_rr2.wav",
+   "sha256": "a97b6a33a266f15c387ac47e138e35f396bbfb0a407f7e01ec6e90c03c3b12cb",
+   "sounding_key": 97,
+   "velocity": 0.8
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "kalimba",
+ "not_used_extra_takes": [
+  "MBira3_pluck_Main_D#4_k4_50_100_rr2.wav",
+  "MBira3_pluck_Main_F4_k3_50_100_rr2.wav"
+ ],
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts; round 190nm: then each anchor's level matched through the engine, --level); rounds 190nl, 190nm, 190nn",
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "kalimba.lpm",
+ "tool": "tools/physmod/calibrate.py 190nn-1"
+}

@@ -11,6 +11,7 @@
 #include "core/HeldNotes.h"
 
 #include "core/RackOps.h"
+#include "core/RackAutomation.h"
 #include "core/RackZip.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
@@ -60,6 +61,10 @@ public:
     void visibilityChanged() override;
 
     std::function<void()> onOpenPianoRoll;
+    // round 190ob: the channel menu's "Edit in tracker" (the main window opens the Tracker on the channel's track) and
+    // the key an action has now, for the menu's items ("" = none)
+    std::function<void (int channel)> onOpenTracker;
+    std::function<juce::String (const char* actionId)> actionKeyText;
     // FL's piano roll preview (manual "Channel Rack › Piano roll preview", round 190mk DE-33): "Left-click the preview to
     // show/hide the Piano roll window"; "Right-Click to open the Piano roll centered on the notes clicked" (the tick)
     std::function<void (int row)> onPreviewClick;
@@ -112,12 +117,19 @@ public:
     void selectRelative (int delta, bool extend);
     void selectAll();
     bool moveSelected (int delta);
+    const std::vector<int>& selectedAutomationRows() const noexcept { return autoSelected; } // (round 190ow; tests, routes)
+    void clickAutomationSelectorForSnapshot (int automation, bool add); // (round 190ow: the shot route's selection)
     void cloneSelected();
     void deleteSelected();
     // FL's Cut / Copy / Paste of the selected channels' steps and notes in the current pattern (Ctrl+X / C / V)
     void cutSelected();
     void copySelected();
     void pasteSelected();
+    // issue #232 stage 2 (round 190nz, LYNX extra): the selected channels themselves (instrument, plugin state, sample)
+    // copied, also for another LYNX SHARE window, and pasted as new channels below the selection
+    void copyChannels();
+    void pasteChannels();
+    static bool canPasteChannels();
     void sendSelectedToInserts();
     void toggleMute (int channel);
     void toggleSoloLock (int channel); // FL: Shift+click on the mute switch (round 190ih)
@@ -223,9 +235,19 @@ public:
     void setButtonWidth (int percent); // 0 = size to fit the longest name
     static constexpr int selectWidth = 12;
     static constexpr int stepWidth = 18; // (round 190io, FM-11: FL's keycap pitch is 16, LYNX 18; was 22)
+    void openChannelPluginWindow (int channel) { openPluginWindow (channel); } // (round 190oa: a project's windows reopened)
 
 private:
-    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped };
+    // autoName / autoRow (round 190oo, PAT-7): an automation clip row's button / the rest of it; `row` is then the
+    // automation's index (Song::automations), never a channel
+    // round 190ow (DE-123): its mute light, MIN / MAX knobs, selector and steps
+    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped, autoName, autoRow,
+                      autoMute, autoMin, autoMax, autoSelect, autoStep };
+    static bool isAutomationArea (Area a) noexcept
+    {
+        return a == Area::autoName || a == Area::autoRow || a == Area::autoMute || a == Area::autoMin || a == Area::autoMax
+               || a == Area::autoSelect || a == Area::autoStep;
+    }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
@@ -256,7 +278,56 @@ private:
     int gridLeft() const noexcept { return selectLeft() + selectWidth + 8; }
     juce::Rectangle<int> rowBounds (int row) const;
     juce::Rectangle<int> previewMuteBounds (int row) const; // (round 190mk: the preview's round mute button)
-    int rowY (int row) const;       // top of a row (rows below the graph lane shift down)
+    int rowY (int row) const;       // top of a row (rows below the graph lane and the automation clip rows shift down)
+    int baseRowY (int row) const;   // the same without the automation clip rows (round 190oo)
+    // FL's automation clip channels (round 190oo, design review 2 PAT-7; core/RackAutomation.h): the automation clips' rows
+    // between the channel rows, in the rack's order, while the filter shows them (empty: none, the code paths as before);
+    // autoBefore[k] = how many of them sit above channel row k (k = the channel count: the "add channel" row)
+    std::vector<rackauto::Row> autoRows;
+    std::vector<int> autoBefore;
+    void refreshAutomationRows();
+    int automationRowTop (int i) const; // i: index into autoRows
+    int automationRowAt (int y) const;  // index into autoRows of the row under y, -1 none
+    juce::Rectangle<int> automationRowBounds (int automation) const;
+    void paintAutomationSteps (juce::Graphics& g, juce::Rectangle<int> clip);
+    void paintAutomationButtons (juce::Graphics& g, juce::Rectangle<int> column);
+    // one row's controls and button at row top `y` (round 190pb: also into the row's cached picture, at y 0). `curves`:
+    // the mute light, the curve glyph and the name (ellipses and squeezed glyphs: their outlines depend on where they are
+    // drawn in float precision, so they are drawn straight over the picture); `rest`: the knobs, the button's plate and
+    // the selector's slot
+    void paintAutomationButton (juce::Graphics& g, int automation, int y, bool curves, bool rest);
+    void paintAutomationSlot (juce::Graphics& g, int automation, int y); // (drawn straight: selected / hovered / playing, round 190ow)
+    // Round 190pb (rollup 0.1.31 step-5 paint regression: Patience's Channel rack +44 % instructions a frame, its automation
+    // clip rows): each row's controls column as one opaque picture on the column's background, made again when anything
+    // it shows changes (the key: the name, the colour, the hover, the layout, the palette, the font, the display scale);
+    // a frame copies it and draws the mute light and the curve glyph over it. Drawn straight where the display scale is
+    // not whole (as the idle step strips).
+    struct AutoRowPicture
+    {
+        std::uint64_t key = 0;
+        juce::Image image;
+    };
+    std::vector<AutoRowPicture> autoRowPictures; // [index into autoRows]
+    // (round 190pb) the automation rows' idle steps, the same in every row: one picture of the row's strips on the rack's
+    // background, copied once a row (it was ~13 strip blits a row on Patience's 100-step patterns)
+    AutoRowPicture autoStepsPicture;
+    void showAutomationMenu (int automation);
+    // round 190ow (PAT-7 rest, DE-123): the automation clip rows in the rack's selection, their steps, mute light and
+    // knobs. The selected rows (Song::automations indices, sorted); `autoOnly`: a plain click on an automation row's
+    // selector selected it alone, so the channels show as not selected (the engine keeps its primary channel for the
+    // Piano roll and the keyboard). A channel selection clears both, except a Ctrl / right click that adds a channel.
+    std::vector<int> autoSelected;
+    bool autoOnly = false;
+    bool keepAutoSelection = false;
+    bool automationSelected (int automation) const noexcept { return std::binary_search (autoSelected.begin(), autoSelected.end(), automation); }
+    void clickAutomationSelector (int automation, const juce::ModifierKeys& mods);
+    bool moveSelectedAutomations (int delta);
+    void deleteSelectedAutomations();
+    void toggleAutomationMute (int automation);
+    void applyAutoPaint (const juce::MouseEvent& e);
+    int autoPaintRow = -1;  // the automation whose steps a drag paints
+    int autoNameDown = -1;  // an automation row's button pressed: opens on release, a drag moves the row
+    bool autoNameDragged = false;
     // round 190mk (DE-38): the rows' places while any channel is zipped (empty: none is, FL's fixed 30 px rows)
     rackzip::Layout zipLayout;
     void refreshZipLayout();
@@ -266,6 +337,7 @@ private:
     void paintZipStrips (juce::Graphics& g);
     int filterGroup = -1;
     static inline ChannelStepsClipboard stepClipboard; // Cut / Copy / Paste (Ctrl+X / C / V, the channel menu)
+    static inline Song copiedChannels; // Copy channels (round 190nz: a fragment, core/CrossPaste.h)
     int visibleIndex (int row) const; // the row's place among the shown rows
     int shownCount() const;
     int rowAtY (int y) const;       // row under y (the lane counts as its channel's row)

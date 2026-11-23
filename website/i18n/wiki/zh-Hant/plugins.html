@@ -2,10 +2,11 @@
 <p>LYNX SHARE 可以代管其他廠商的樂器和效果器外掛。它透過掃描外掛資料夾來找到它們，<code>選項 › 外掛管理器...</code> 會顯示找到的內容。LYNX SHARE 自己的樂器和效果器，在<a href="/wiki/built-in/">內建樂器與效果器</a>中說明。</p>
 <h2 id="scan-and-add-a-plugin">掃描並新增外掛</h2>
 <ol><li>選擇 <code>選項 › 掃描外掛</code>。進度會顯示在提示列中，你可以繼續工作。</li><li>如果外掛在它自己的資料夾裡，請開啟 <code>選項 › 外掛管理器...</code>，點擊 <code>外掛資料夾...</code>，加入該資料夾，然後點擊 <code>尋找新外掛</code>。</li><li>按 <code>F8</code> 開啟外掛選擇器，輸入外掛名稱的一部分。</li><li>對它按兩下或按 <code>Enter</code>。樂器會成為新通道。效果器會放入所選的混音插入軌。</li></ol>
-<p>第一次啟動時，設定精靈會列出外掛資料夾，並在背景掃描它們。<code>選項 › 設定精靈（語言、音訊、外掛資料夾）...</code> 可以再次開啟它。LYNX SHARE 也會在每次啟動幾秒後尋找新外掛。</p>
+<p>第一次啟動時，LYNX SHARE 會在歡迎卡片開啟期間於背景掃描外掛資料夾。<code>選項 › 設定精靈（語言、音訊、外掛資料夾）...</code> 會再次顯示這些資料夾。LYNX SHARE 也會在每次啟動幾秒後尋找新外掛。</p>
 <h2 id="formats-per-system">各系統的格式</h2>
-<div class="tablewrap"><table><thead><tr><th>系統</th><th>代管的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>系統</th><th>代管的格式</th></tr></thead><tbody><tr><td>Windows</td><td>VST3、CLAP、VST2、JSFX</td></tr><tr><td>macOS</td><td>VST3、CLAP、Audio Units、JSFX</td></tr><tr><td>Linux</td><td>VST3、CLAP、LV2、VST2、JSFX</td></tr></tbody></table></div>
 <p>macOS 上不代管 VST2。在 Linux 上，Windows 外掛可透過 <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> 和 Wine 運作，這兩者需要你自行安裝：請把 yabridge 同步的資料夾加為外掛資料夾。</p>
+<p>JSFX 腳本是 REAPER 的效果器和樂器格式，可在所有系統上執行：LYNX SHARE 內附 31 個免費腳本（來自 chokehold，MIT 授權），位於瀏覽器的 <code>外掛資料庫 › 效果器 › JSFX</code> 和 <code>外掛資料庫 › 產生器 › JSFX</code>，也可在外掛選擇器中找到。<code>Documents/LYNX/JSFX</code> 和 REAPER 的 Effects 資料夾中的腳本也會被找到，<code>設定 › 檔案 › JSFX 資料夾</code> 可新增更多資料夾。LYNX SHARE 在自己的面板中顯示腳本的滑桿；自行繪製介面的腳本只顯示其滑桿。</p>
 <h2 id="the-plugin-manager">外掛管理器</h2>
 <div class="tablewrap"><table><thead><tr><th>控制項</th><th>作用</th></tr></thead><tbody><tr><td>搜尋框</td><td>依名稱、廠商、格式或檔案篩選</td></tr><tr><td><code>全部</code>、<code>樂器</code>、<code>效果器</code>、<code>我的最愛</code>、<code>失敗</code></td><td>選擇要列出哪些外掛</td></tr><tr><td>星號欄</td><td>標記為我的最愛</td></tr><tr><td><code>位數</code> 欄</td><td>32、64 或 32+64（Windows）</td></tr><tr><td><code>狀態</code> 欄</td><td><code>確定</code>、<code>未找到檔案</code> 或 <code>載入失敗</code></td></tr><tr><td><code>尋找新外掛</code></td><td>掃描清單中還沒有的檔案</td></tr><tr><td><code>全部重新掃描...</code></td><td>忘記失敗的檔案，並重新檢查每個檔案</td></tr><tr><td><code>外掛資料夾...</code></td><td>編輯要掃描的資料夾</td></tr><tr><td><code>新增外掛檔案...</code></td><td>新增單一外掛檔案</td></tr></tbody></table></div>
 <p>每個外掛檔案都在獨立的處理程序中檢查。當機或停止回應 30 秒的檔案會被標記為失敗，之後會略過。在 Windows 上，失敗的檔案及原因列在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</p>
@@ -24,7 +25,7 @@
 <h2 id="32-bit-plugins-windows-only">32 位元外掛（僅限 Windows）</h2>
 <p>在 Windows 上，32 位元的 VST2 和 VST3 外掛透過橋接程式（<code>LYNX-bridge32.exe</code>）執行。橋接程式不增加延遲。在其中當掉的外掛會自行停止，LYNX SHARE 則繼續播放。橋接外掛的編輯器會在自己的視窗中開啟，無法停靠或固定。當同一個外掛同時安裝了 32 位元和 64 位元版本時，外掛視窗 <code>封裝器設定</code> 中的 <code>位元數</code> 決定載入哪一個。</p>
 <h2 id="plugin-performance-monitor">外掛效能監視器</h2>
-<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="外掛效能監視器：每個樂器和效果器一列，顯示其佔用的處理時間比例" loading="lazy" width="720" height="380"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="外掛效能監視器：每個樂器和效果器一列，顯示其佔用的處理時間比例" loading="lazy" width="840" height="380"></a></figure>
 <p><code>工具 › 外掛效能監視器...</code> 會列出每個樂器和效果器所花的處理時間：目前值、平均值和峰值。100% 表示在音訊持續的整段時間裡，一個處理器核心都處於忙碌狀態。</p>
 <div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>尋找</code></td><td>依外掛、通道或插入軌篩選</td></tr><tr><td><code>僅外掛</code></td><td>隱藏 LYNX SHARE 自己的樂器和效果器</td></tr><tr><td><code>凍結</code></td><td>停止更新數字</td></tr><tr><td><code>播放時重設</code></td><td>每次開始播放時，重新計算平均值和峰值</td></tr><tr><td><code>重設</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
 <h2 id="send-an-instrument-s-outputs-to-separate-inserts">把樂器的輸出送到各別的插入軌</h2>
@@ -34,6 +35,10 @@
 <ol><li>掃描外掛。兩者都會作為樂器出現，廠商是 Image-Line。第一次掃描可能要一些時間，因為整個 FL Studio 都會在外掛內啟動。</li><li>把 <code>FL Studio VSTi</code> 新增到一個通道並開啟它的視窗。按一下 FL Studio 標誌可開啟 FL Studio 自己的視窗，裡面有它的通道機架、混音器和瀏覽器。</li><li>在 FL Studio 的通道機架中新增一個樂器。新的 FL Studio 外掛開始時只有一個空的取樣器，在你新增樂器之前不會發聲。來自 LYNX SHARE 的音符會播放 FL Studio 通道機架中選取的通道。</li><li>LYNX SHARE 播放時，FL Studio 自己的樣式也會播放，速度跟隨 LYNX SHARE 的速度。</li></ol>
 <p>你在 FL Studio 內部建立的內容會隨 LYNX SHARE 專案一起儲存。<code>FL Studio VSTi (Multi)</code> 有 16 路立體聲輸出，可以在各自獨立的插入軌上播放（見上一節）。你的 FL Studio 授權決定哪些 FL 外掛能在其中使用。LYNX SHARE 自己不會載入 FL Studio 的外掛檔案。</p>
 <p>如果 FL Studio 外掛被列為 <code>載入失敗</code>，請在 <code>選項 › 外掛管理器...</code> 中對它按右鍵，選擇 <code>重試（立即掃描此檔案）</code>。</p>
+<h2 id="lynx-s-own-plugins-in-other-daws">在其他 DAW 中使用 LYNX 自己的外掛</h2>
+<p>LYNX SHARE 自己的效果器與樂器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供給其他 DAW 使用的外掛版本。它們是<a href="https://github.com/Ka1-S/LYNX-SHARE/releases">發佈頁面</a>上另外的選用下載：適用於 Windows、macOS 和 Linux 的 <code>LYNX-Plugins-&lt;version&gt;</code>。</p>
+<ul><li>所有外掛都在一個 CLAP 檔案 <code>LYNX Plugins.clap</code> 裡。其中一小部分也提供 VST3 版本，在 Linux 上還提供 LV2 版本。</li><li>套件中的樂器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。</li><li>在 Windows 上，請選 <code>LYNX-Plugins-&lt;version&gt;-win-x64.7z</code>（約 20 MB）。<code>.zip</code>（約 195 MB）裡的檔案完全相同。</li><li>執行壓縮檔裡的安裝腳本（Windows 用 <code>install.cmd</code>，macOS 和 Linux 用 <code>install.sh</code>），然後在你的 DAW 裡重新掃描外掛。</li><li>外掛開啟的編輯器和 LYNX SHARE 裡的一樣，它的狀態可以在 LYNX SHARE 中當作專案開啟。</li></ul>
+<p>完整清單請見 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md">PLUGINS-PACK.md</a>。</p>
 <h2 id="the-plugin-database-folder">外掛資料庫資料夾</h2>
 <p><a href="/wiki/browser/">瀏覽器</a>的外掛資料庫、外掛選擇器和外掛選單中的資料夾，對應磁碟上的一個資料夾：文件資料夾中的 <code>LYNX/Plugin database</code>。要開啟它，在瀏覽器中對 <code>外掛資料庫</code> 按右鍵並選擇 <code>開啟</code>。</p>
 <ul><li><code>效果器</code> 和 <code>產生器</code> 中每個外掛有一個 <code>.lynxplugin</code> 檔案。可以建立資料夾和子資料夾（最多 4 層），再把檔案移進去。</li><li>重新命名檔案，就會改變外掛在選單中的名稱。刪除檔案，就會把外掛從選單中拿掉，但不會解除安裝。</li><li><code>已安裝</code> 裡有每個外掛的項目。把其中一個複製到 <code>效果器</code> 或 <code>產生器</code>，就能把外掛找回來。</li></ul>

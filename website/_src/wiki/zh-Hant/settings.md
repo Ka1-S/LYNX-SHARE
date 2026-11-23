@@ -1,5 +1,5 @@
 ---
-source: ab2c2f14eb
+source: 69754c6d42
 ---
 ![設定視窗的一般頁面，頂部有各頁面的分頁](/assets/img/wiki/settings-general.webp)
 

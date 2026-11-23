@@ -1,9 +1,9 @@
 ---
-source: 4ac6a04fd7
+source: 54ebedc064
 ---
 ![Il Clip-launch workflow: una griglia di clip e scene a sinistra, il Selettore e la Playlist a destra](/assets/img/cliplaunch.webp)
 
-`Vista › Stile del layout` ha tre voci: `Flusso a pattern (predefinito)`, `Flusso a lancio di clip` e `Flusso semplice`. La stessa scelta è in `Opzioni › Impostazioni generali`, sotto Flusso di lavoro. La scelta si mantiene quando chiudi il programma.
+`Vista › Stile del layout` ha tre voci: `Flusso a pattern (predefinito)`, `Flusso a lancio di clip` e `Flusso semplice`. La stessa scelta è in `Opzioni › Impostazioni generali`, sotto Flusso di lavoro. La scelta si mantiene quando chiudi il programma. La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni e sceglie il layout adatto.
 
 Il flusso a pattern, quello predefinito, funziona come FL Studio: il Channel Rack, i pattern, il Piano Roll, la Playlist e il Mixer. Il flusso a lancio di clip, nello stile di Ableton Live, aggiunge una griglia di clip con scene accanto alla Playlist, un mixer della sessione e le viste clip e dispositivo; i pattern e il Channel Rack restano disponibili. Il flusso semplice unisce lo stile accessibile a finestra unica di BandLab al modo di lavorare di FL Studio Mobile: tracce e timeline, loop, pad e registrazione rapida. Cambiare flusso sposta solo le finestre: il progetto resta lo stesso.
 

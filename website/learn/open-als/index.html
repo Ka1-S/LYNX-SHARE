@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="lt.open-als.t" data-desc="lt.open-als.s" data-wt="zh-Hans zh-Hant nl fr de id it ja ko pl pt-BR ru es tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open an Ableton Live set · LYNX SHARE</title>
+<meta name="description" content="Open a .als in the Clip-launch layout: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live.">
+<meta property="og:title" content="Open an Ableton Live set · LYNX SHARE">
+<meta property="og:description" content="Open a .als in the Clip-launch layout: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
+<meta property="og:url" content="https://lynx-share.com/learn/open-als/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/learn/open-als/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/learn/open-als/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/learn/open-als/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/learn/open-als/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/learn/open-als/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/learn/open-als/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/learn/open-als/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/learn/open-als/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/learn/open-als/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/learn/open-als/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/learn/open-als/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/learn/open-als/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/learn/open-als/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/learn/open-als/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/learn/open-als/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/learn/open-als/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/learn/open-als/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="d90fb3e6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v=0.1.26-logo2">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=0.1.26-logo2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=d90fb3e6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" aria-current="page" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.open-als.t">Open an Ableton Live set</h1><p data-i18n="lt.open-als.s">Open a .als in the Clip-launch layout: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live.</p><p class="tmeta"><span data-i18n="lr.l.clip">Clip-launch layout</span> · <span>0:45</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="open-als"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/open-als-en.webp"><source src="/assets/media/learn/open-als-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/open-als-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/open-als-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/open-als-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/open-als-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/open-als-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/open-als-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/open-als-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/open-als-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/open-als-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/open-als-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/open-als-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/open-als-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/open-als-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/open-als-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/open-als-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/open-als-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/open-als-en-720.mp4" download>720p, 1.5 MB</a> · <a href="/assets/media/learn/open-als-en-1080.mp4" download>1080p, 2.4 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.open-als.c0">Open the .als</span></button></li><li><button type="button" data-seek="14.2"><b>0:14</b> <span data-i18n="lt.open-als.c1">Play and devices</span></button></li><li><button type="button" data-seek="25.4"><b>0:25</b> <span data-i18n="lt.open-als.c2">Import report and export</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="open-the-als">Open the .als</h2>
+<figure><a class="shot" href="/assets/img/learn/open-als-1.webp"><img src="/assets/img/learn/open-als-1.webp" alt="File › Open..." loading="lazy" width="520" height="520"></a></figure>
+<ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the set's <code>.als</code> file, inside its project folder.</li><li>LYNX SHARE opens it in the Clip-launch layout. Ableton Live itself is not needed, and the <code>.als</code> is never changed.</li></ol>
+<h2 id="what-comes-over">What comes over</h2>
+<figure><a class="shot" href="/assets/img/learn/open-als-2.webp"><img src="/assets/img/learn/open-als-2.webp" alt="The set in the Clip-launch layout" loading="lazy" width="1100" height="321"></a></figure>
+<ul><li>MIDI, audio, group and return tracks, the tempo, the time signature, locators and the loop.</li><li>The arrangement, and session clips and scenes into the clip grid, with their launch settings.</li><li>The mixer: volume, pan, mute, solo, sends and their automation. Live's colours stay.</li><li>VST2 and VST3 plugins with their state, when the same plugin is installed.</li></ul>
+<h2 id="play-and-look-at-the-devices">Play and look at the devices</h2>
+<figure><a class="shot" href="/assets/img/learn/open-als-3.webp"><img src="/assets/img/learn/open-als-3.webp" alt="The Device view" loading="lazy" width="1100" height="596"></a></figure>
+<ol><li>Press Play to hear the arrangement, or launch clips and scenes in the grid.</li><li>Click a track's title in the grid, then <code>View › Device view</code> (<code>Ctrl+Alt+4</code>) shows its devices.</li></ol>
+<h2 id="import-report-and-export">Import report and export</h2>
+<figure><a class="shot" href="/assets/img/learn/open-als-4.webp"><img src="/assets/img/learn/open-als-4.webp" alt="Help › Last project import report" loading="lazy" width="500" height="220"></a></figure>
+<ol><li>When something had to change, a report opens with the set. <code>Help › Last project import report</code> shows it again: what was approximated or left out.</li><li><code>File › Export › Ableton Live set (.als)...</code> writes a set for Live 12 or Live 11.</li></ol>
+<p>See also <a href="/wiki/coming-from-ableton/">Coming from Ableton Live</a> and <a href="/wiki/file-formats/">File formats</a>.</p></div><nav class="wpn"><a href="/learn/clip-launch-tour/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.clip-launch-tour.t">Tour the Clip-launch layout</b></a><a href="/learn/open-mobile/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.open-mobile.t">Bring your phone songs</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=d90fb3e6" defer></script>
+<script src="/assets/learn.js?v=d90fb3e6" defer></script>
+<script src="/assets/motion.js?v=d90fb3e6" defer></script>
+</body>
+</html>

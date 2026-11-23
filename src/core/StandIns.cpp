@@ -1005,7 +1005,8 @@ bool flatten (Song& song, int channel)
         if (c.kind != ClipKind::pattern || c.gridSlot >= 0 || c.pattern < 0 || c.pattern >= (int) song.patterns.size())
             return false;
         const auto& p = song.patterns[(std::size_t) c.pattern];
-        return p.notes.empty() && std::none_of (p.events.begin(), p.events.end(), [] (const PatternEvents& lane) { return lane.target.kind != AutomationTargetKind::none; });
+        return p.notes.empty() && p.autoNotes.empty() // (round 190ow: steps that start automation clips play too)
+               && std::none_of (p.events.begin(), p.events.end(), [] (const PatternEvents& lane) { return lane.target.kind != AutomationTargetKind::none; });
     };
     song.playlist.erase (std::remove_if (song.playlist.begin(), song.playlist.end(), silent), song.playlist.end());
     for (const auto& c : audio)

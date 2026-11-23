@@ -295,7 +295,7 @@ juce::String withMarkup (const juce::String& text)
 void HintBar::setHint (const Hint& hint, bool isLive)
 {
     if (hint.text != current.text || hint.value != current.value || hint.automatable != current.automatable || hint.hasMenu != current.hasMenu
-        || isLive != live)
+        || hint.mark != current.mark || isLive != live)
     {
         current = hint;
         live = isLive;
@@ -335,12 +335,20 @@ void InfoView::paint (juce::Graphics& g)
     const auto bar = r.removeFromTop (17);
     g.setColour (ll::raised);
     g.fillRect (bar);
+    // round 190oo (CS-17, Live's Info View): before anything has been pointed at, its own title and a line saying what it
+    // is for, not an empty box
+    const auto idle = title.isEmpty() && body.isEmpty();
     g.setColour (ll::text);
     g.setFont (theme::font (theme::type::small, true));
-    g.drawText (title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
+    textcache::drawText (g, idle ? tr ("Info View") : title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true); // (cached glyphs: paint gate)
     g.setFont (theme::font (theme::type::small));
     // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
     const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
+    if (idle) // (one line from the text cache: a TextLayout draws its glyphs again every frame, +1.8 % of the clip grid's frame)
+    {
+        textcache::drawText (g, tr ("Point at anything to read about it here."), area.withHeight (15.0f), juce::Justification::centredLeft, true);
+        return;
+    }
     if (area.getWidth() != layoutWidth)
     {
         juce::AttributedString text;
@@ -386,6 +394,7 @@ struct HintBar::LaidOut
     juce::Font big { juce::FontOptions() }, bigKey { juce::FontOptions() }, small { juce::FontOptions() }, smallKey { juce::FontOptions() };
     bool larger = false;
     bool oneLine = false, fits = false;
+    bool tiny = false; // round 190nr: the two lines in the next smaller font (a long hint that the small font cut)
     std::vector<std::vector<Item>> lines;
 };
 
@@ -393,6 +402,24 @@ void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;
     auto r = getLocalBounds().toFloat().reduced (6.0f, 1.0f);
+
+    // round 190oa (DF-45, capture 190oa A3): FL's status icons — a red (239,65,64) circle with a white "!" on a hint
+    // that asks for attention, a piano keyboard on a played note's
+    if (current.mark == Hint::Mark::warning)
+    {
+        const auto box = r.removeFromLeft (16.0f).withSizeKeepingCentre (13.0f, 13.0f);
+        g.setColour (juce::Colour (0xffef4140));
+        g.fillEllipse (box);
+        g.setColour (juce::Colours::white);
+        g.fillRect (juce::Rectangle<float> (1.6f, 5.0f).withCentre ({ box.getCentreX(), box.getY() + 5.2f }));
+        g.fillRect (juce::Rectangle<float> (1.6f, 1.6f).withCentre ({ box.getCentreX(), box.getBottom() - 3.0f }));
+        r.removeFromLeft (6.0f);
+    }
+    else if (current.mark == Hint::Mark::note)
+    {
+        icons::draw (g, Icon::keyboard, r.removeFromLeft (16.0f).withSizeKeepingCentre (14.0f, 14.0f), colour::textSecondary);
+        r.removeFromLeft (6.0f);
+    }
 
     // capability markers (dim when not applicable, so the text does not jump)
     if (current.automatable || current.hasMenu)
@@ -433,6 +460,8 @@ void HintBar::paint (juce::Graphics& g)
     const auto bigGlyph = larger ? 16.0f : 15.0f;
     const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
     const auto smallGlyph = larger ? 13.0f : 12.0f;
+    const juce::Font tinyFont (font (larger ? type::caption : type::caption - 1.0f)), tinyKey (font (larger ? type::caption - 2.0f : type::caption - 3.0f, true));
+    const auto tinyGlyph = smallGlyph - 1.0f;
     if (laidOut == nullptr)
         laidOut = std::make_shared<LaidOut>();
     auto& laid = *laidOut;
@@ -448,6 +477,18 @@ void HintBar::paint (juce::Graphics& g)
         laid.smallKey = smallKey;
         laid.oneLine = layOut (makeItems (text, big, bigKey, bigGlyph), r.getWidth(), 1, laid.lines);
         laid.fits = laid.oneLine || layOut (makeItems (text, smallFont, smallKey, smallGlyph), r.getWidth(), 2, laid.lines);
+        // round 190nr (0.1.30 release QA, 1920 px on Windows): a long hint that needs a third line in the small font gets
+        // two lines one step smaller before it is cut (the line pitch stays)
+        laid.tiny = false;
+        if (! laid.fits)
+        {
+            std::vector<std::vector<Item>> tinyLines;
+            if (layOut (makeItems (text, tinyFont, tinyKey, tinyGlyph), r.getWidth(), 2, tinyLines))
+            {
+                laid.lines = std::move (tinyLines);
+                laid.fits = laid.tiny = true;
+            }
+        }
     }
     const auto& lines = laid.lines;
     if (laid.oneLine)
@@ -461,7 +502,8 @@ void HintBar::paint (juce::Graphics& g)
     auto area = r.withSizeKeepingCentre (r.getWidth(), lineHeight * 2.0f);
 
     for (std::size_t i = 0; i < lines.size() && i < 2; ++i)
-        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, smallGlyph, plain);
+        drawLine (g, lines[i], area.removeFromTop (lineHeight), laid.tiny ? tinyFont : smallFont, laid.tiny ? tinyKey : smallKey,
+                  laid.tiny ? tinyGlyph : smallGlyph, plain);
 
     if (! fits) // the rest did not fit: a fade at the end of the second line says so
     {

@@ -56,10 +56,18 @@ inline juce::StringArray takeArguments (juce::StringArray args)
     return args;
 }
 
+// a route's own second scale for the pictures it composes (rollup 0.1.31 step 3: menus at 100 % and @150 in one run);
+// 0 = none (the asked scale)
+inline float& scaleOverride()
+{
+    static float s = 0.0f;
+    return s;
+}
+
 // pixels per logical pixel of the pictures (1 unless asked)
 inline float scale()
 {
-    return detail::choice().scale;
+    return scaleOverride() > 0.0f ? scaleOverride() : detail::choice().scale;
 }
 // whether a scale was asked for at all (even "1")
 inline bool given()

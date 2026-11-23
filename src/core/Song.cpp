@@ -24,6 +24,37 @@ namespace lynx
 void Pattern::sortNotes()
 {
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+    if (! autoNotes.empty()) // (round 190ow)
+        std::stable_sort (autoNotes.begin(), autoNotes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+}
+
+// round 190ow (DE-123): FL's steps on an automation clip row, the way toggleStep does them for a channel
+bool Pattern::hasAutoStep (int automation, int step) const noexcept
+{
+    const auto from = (std::int64_t) step * ticksPerStep, to = from + ticksPerStep;
+    for (const auto& n : autoNotes)
+        if (n.channel == automation && n.start >= from && n.start < to && ! n.muted)
+            return true;
+    return false;
+}
+
+void Pattern::toggleAutoStep (int automation, int step)
+{
+    if (step < 0 || automation < 0)
+        return;
+    const auto from = (std::int64_t) step * ticksPerStep, to = from + ticksPerStep;
+    const auto on = hasAutoStep (automation, step);
+    autoNotes.erase (std::remove_if (autoNotes.begin(), autoNotes.end(),
+                                     [&] (const Note& n) { return n.channel == automation && n.start >= from && n.start < to; }),
+                     autoNotes.end());
+    if (on)
+        return;
+    Note n;
+    n.start = from;
+    n.length = 0; // (FL's step of no length, as FL writes a step it sets on an automation clip channel: the clip plays once)
+    n.channel = automation;
+    autoNotes.push_back (n);
+    sortNotes();
 }
 
 std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
@@ -35,6 +66,8 @@ std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
     std::int64_t end = 0;
 
     for (auto& n : notes)
+        end = std::max (end, n.start + std::max<std::int64_t> (n.length, 1));
+    for (auto& n : autoNotes) // (round 190ow: FL's pattern length counts the automation clip channels' notes too)
         end = std::max (end, n.start + std::max<std::int64_t> (n.length, 1));
 
     return std::max<std::int64_t> (bar, (end + bar - 1) / bar * bar);
@@ -426,6 +459,10 @@ void Song::removeChannel (int index)
             automation.source.channel = -1, automation.target.kind = AutomationTargetKind::none;
         else if (automation.source.channel > index)
             --automation.source.channel;
+
+    for (auto& automation : automations) // round 190oo (PAT-7): the automation clip rows keep their place in the rack
+        if (automation.rackSlot > index)
+            --automation.rackSlot;
 
     for (auto& c : channels) // Layer children (round 164)
     {
@@ -1018,6 +1055,16 @@ void Song::removeAutomation (int index)
 
     automations.erase (automations.begin() + index);
 
+    for (auto& p : patterns) // round 190ow (DE-123): its steps / notes go, the later automations' follow
+        if (! p.autoNotes.empty())
+        {
+            p.autoNotes.erase (std::remove_if (p.autoNotes.begin(), p.autoNotes.end(), [index] (const Note& n) { return n.channel == index; }),
+                               p.autoNotes.end());
+            for (auto& n : p.autoNotes)
+                if (n.channel > index)
+                    --n.channel;
+        }
+
     for (auto& track : playlistTracks) // round 177b: lanes follow the renumbering; the removed one's lane goes
     {
         track.lanes.erase (std::remove_if (track.lanes.begin(), track.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
@@ -1025,6 +1072,14 @@ void Song::removeAutomation (int index)
         for (auto& l : track.lanes)
             if (l.automation > index)
                 --l.automation;
+        for (auto& v : track.versions) // round 190pe: the lanes kept by a track's versions too
+        {
+            v.lanes.erase (std::remove_if (v.lanes.begin(), v.lanes.end(), [index] (const AutomationLane& l) { return l.automation == index; }),
+                           v.lanes.end());
+            for (auto& l : v.lanes)
+                if (l.automation > index)
+                    --l.automation;
+        }
     }
 
     forEachClipList ([index] (std::vector<Clip>& clips) {
@@ -1050,6 +1105,34 @@ const std::vector<Marker>& Song::markers() const
 {
     static const std::vector<Marker> none;
     return arrangements.empty() ? none : arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].markers;
+}
+
+std::vector<SongSection>& Song::sections()
+{
+    if (arrangements.empty())
+        arrangements.push_back ({ "Arrangement 1", {}, 0, 0, {} });
+
+    return arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].sections;
+}
+
+const std::vector<SongSection>& Song::sections() const
+{
+    static const std::vector<SongSection> none;
+    return arrangements.empty() ? none : arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].sections;
+}
+
+std::vector<SongChord>& Song::chords()
+{
+    if (arrangements.empty())
+        arrangements.push_back ({ "Arrangement 1", {}, 0, 0, {} });
+
+    return arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].chords;
+}
+
+const std::vector<SongChord>& Song::chords() const
+{
+    static const std::vector<SongChord> none;
+    return arrangements.empty() ? none : arrangements[(std::size_t) std::clamp (currentArrangement, 0, (int) arrangements.size() - 1)].chords;
 }
 
 void Song::addMarker (Marker marker)
@@ -1130,6 +1213,7 @@ void Song::selectArrangement (int index)
     to.blocks.clear();
     loopStart = to.loopStart;
     loopEnd = to.loopEnd;
+    trackRange = {}; // (round 190pa: a range on tracks belongs to the arrangement it was drawn in)
     currentArrangement = index;
 }
 
@@ -1145,6 +1229,8 @@ int Song::addArrangement (const std::string& name, bool copyCurrent)
         a.loopStart = loopStart;
         a.loopEnd = loopEnd;
         a.markers = markers();
+        a.sections = sections(); // (round 190ol)
+        a.chords = chords();     // (round 190pf)
     }
 
     arrangements.push_back (std::move (a));
@@ -1164,6 +1250,21 @@ void Song::removeArrangement (int index)
 
     if (currentArrangement > index)
         --currentArrangement;
+
+    // round 190pe (track versions): the versions made in the removed arrangement go (each track keeps its active one,
+    // which is in no other arrangement); later ones follow the renumbering
+    for (auto& t : playlistTracks)
+        if (! t.versions.empty())
+        {
+            if (t.versionArrangement == index)
+            {
+                t.versions.clear();
+                t.activeVersion = 0;
+                t.versionArrangement = 0;
+            }
+            else if (t.versionArrangement > index)
+                --t.versionArrangement;
+        }
 }
 
 namespace
@@ -1340,12 +1441,31 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
         case AutomationTargetKind::crossfader: return std::clamp ((crossfader + 1.0f) * 0.5f, 0.0f, 1.0f); // (round 190kc)
+        case AutomationTargetKind::modulatorMacro: // (round 190ox: a Macro modulator's knob)
+            return t.index >= 0 && t.index < (int) modulators.size() && modulators[(std::size_t) t.index].kind == ModKind::macro
+                       ? modulators[(std::size_t) t.index].macro
+                       : -1.0f;
         case AutomationTargetKind::vcaLevel:
             return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
     }
 
     return -1.0f;
+}
+
+void Song::removeModulator (int index)
+{
+    if (index < 0 || index >= (int) modulators.size())
+        return;
+    modulators.erase (modulators.begin() + index);
+    forEachTarget ([index] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::modulatorMacro)
+            return;
+        if (t.index == index)
+            t = AutomationTarget {};
+        else if (t.index > index)
+            --t.index;
+    });
 }
 
 float Song::modulationBase (const AutomationTarget& t) const noexcept
@@ -1378,6 +1498,11 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
         case AutomationTargetKind::crossfader: crossfader = v * 2.0f - 1.0f; return true; // (round 190kc)
+        case AutomationTargetKind::modulatorMacro: // (round 190ox)
+            if (t.index < 0 || t.index >= (int) modulators.size() || modulators[(std::size_t) t.index].kind != ModKind::macro)
+                return false;
+            modulators[(std::size_t) t.index].macro = v;
+            return true;
         case AutomationTargetKind::vcaLevel:
             if (t.index < 0 || t.index >= (int) vcas.size())
                 return false;
@@ -1529,6 +1654,17 @@ float Automation::mapLive (float v) const noexcept
     return std::clamp (curve[i] + (curve[i + 1] - curve[i]) * f, 0.0f, 1.0f);
 }
 
+float Automation::Link::scaled (float v) const noexcept
+{
+    v = std::clamp (v, 0.0f, 1.0f);
+    if (scale.size() < 2)
+        return v;
+    const auto x = v * (float) (scale.size() - 1);
+    const auto i = std::min ((std::size_t) x, scale.size() - 2);
+    const auto f = x - (float) i;
+    return std::clamp (scale[i] + (scale[i + 1] - scale[i]) * f, 0.0f, 1.0f);
+}
+
 float PatternEvents::valueAt (double tick) const noexcept
 {
     if (events.empty())
@@ -1537,6 +1673,13 @@ float PatternEvents::valueAt (double tick) const noexcept
     // the last event at or before `tick`
     auto it = std::upper_bound (events.begin(), events.end(), tick, [] (double t, const PatternEvent& e) { return t < (double) e.tick; });
     return it == events.begin() ? events.front().value : std::prev (it)->value;
+}
+
+float Automation::rerange (float v) const noexcept
+{
+    const auto span = pointsMax - pointsMin;
+    const auto x = std::abs (span) > 1.0e-9f ? (v - pointsMin) / span : 0.0f;
+    return std::clamp (rangeMin + (rangeMax - rangeMin) * x, 0.0f, 1.0f);
 }
 
 float Automation::valueAt (double tick) const noexcept
@@ -1792,9 +1935,179 @@ float Modulator::output (double cycles) const noexcept
     return unipolar ? (y + 1.0f) * 0.5f : y;
 }
 
+float Modulator::stepOutput (double stepsIn) const noexcept
+{
+    const auto c = stepsIn + (double) phase;
+    const auto whole = std::floor (c);
+    const auto f = (float) (c - whole); // 0..1 within the step
+    float y = 0.0f;
+    if (kind == ModKind::steps)
+    {
+        const auto count = (std::int64_t) steps.size();
+        if (count == 0)
+            return 0.0f;
+        const auto at = [&] (std::int64_t k) { return std::clamp (steps[(std::size_t) (((k % count) + count) % count)], -1.0f, 1.0f); };
+        const auto a = at ((std::int64_t) whole);
+        y = a;
+        // glide: the last `glide` of the step slides to the next value (an S curve, no click at either end)
+        if (glide > 0.0f && f > 1.0f - glide)
+        {
+            const auto u = (f - (1.0f - glide)) / glide;
+            const auto s = u * u * (3.0f - 2.0f * u);
+            y = a + (at ((std::int64_t) whole + 1) - a) * s;
+        }
+    }
+    else // random: sample and hold, `smooth` of each step spent moving to the next value (1 = a smooth curve)
+    {
+        const auto a = modNoise (seed, (std::int64_t) whole);
+        y = a;
+        if (smooth > 0.0f && f > 1.0f - smooth)
+        {
+            const auto u = (f - (1.0f - smooth)) / smooth;
+            const auto s = u * u * (3.0f - 2.0f * u);
+            y = a + (modNoise (seed, (std::int64_t) whole + 1) - a) * s;
+        }
+    }
+    return unipolar ? (y + 1.0f) * 0.5f : y;
+}
+
+bool Modulator::deterministic() const noexcept
+{
+    switch (kind)
+    {
+        case ModKind::lfo: return sync;
+        case ModKind::steps:
+        case ModKind::random: return sync;
+        case ModKind::macro: return true;
+        case ModKind::follower:
+        case ModKind::envelope:
+        case ModKind::keytrack:
+        case ModKind::velocity: break;
+    }
+    return false;
+}
+
+const char* Modulator::kindName (ModKind kind) noexcept
+{
+    switch (kind)
+    {
+        case ModKind::lfo: return "LFO";
+        case ModKind::follower: return "Envelope follower";
+        case ModKind::envelope: return "ADSR envelope";
+        case ModKind::steps: return "Steps";
+        case ModKind::random: return "Random";
+        case ModKind::macro: return "Macro";
+        case ModKind::keytrack: return "Keytrack";
+        case ModKind::velocity: return "Velocity";
+    }
+    return "LFO";
+}
+
+Modulator Modulator::make (ModKind kind)
+{
+    Modulator m;
+    m.kind = kind;
+    switch (kind)
+    {
+        case ModKind::lfo: break;
+        case ModKind::follower: m.unipolar = true; break;
+        case ModKind::envelope: m.unipolar = true; break;
+        case ModKind::steps:
+            m.beats = 0.25; // 1/16 per step
+            m.steps = { 1.0f, -0.5f, 0.5f, -1.0f, 0.75f, -0.25f, 0.25f, -0.75f };
+            break;
+        case ModKind::random: m.beats = 0.25; break;
+        case ModKind::macro: m.unipolar = true; break;
+        case ModKind::keytrack: break;
+        case ModKind::velocity: m.unipolar = true; break;
+    }
+    return m;
+}
+
+namespace modenv
+{
+namespace
+{
+// a one-pole's share of the way to its target after `seconds` with time constant `ms` (0 ms: all of it)
+float approach (float ms, double seconds) noexcept
+{
+    return ms <= 0.05f ? 1.0f : (float) (1.0 - std::exp (-seconds * 1000.0 / (double) ms));
+}
+} // namespace
+
+void envelope (const Modulator& m, State& s, bool gate, bool trigger, double seconds) noexcept
+{
+    if (trigger)
+        s.stage = 1;
+    else if (! gate && s.stage >= 1 && s.stage <= 3)
+        s.stage = 4;
+    // linear attack (to 1 in `attack` ms), exponential decay and release (time constants), as the synths' own
+    switch (s.stage)
+    {
+        case 1:
+        {
+            const auto step = m.attack <= 0.05f ? 1.0f : (float) (seconds * 1000.0 / (double) m.attack);
+            s.level = std::min (1.0f, s.level + step);
+            if (s.level >= 1.0f)
+                s.stage = 2;
+            break;
+        }
+        case 2:
+        case 3:
+        {
+            const auto target = std::clamp (m.sustain, 0.0f, 1.0f);
+            s.level += (target - s.level) * approach (m.decay, seconds);
+            if (std::abs (s.level - target) < 1.0e-4f)
+                s.level = target, s.stage = 3;
+            break;
+        }
+        case 4:
+            s.level += (0.0f - s.level) * approach (m.release, seconds);
+            if (s.level < 1.0e-5f)
+                s.level = 0.0f, s.stage = 0;
+            break;
+        default: break;
+    }
+}
+
+void follow (const Modulator& m, State& s, float peak, double seconds) noexcept
+{
+    const auto in = std::clamp (peak * std::pow (10.0f, m.gain / 20.0f), 0.0f, 1.0f);
+    s.level += (in - s.level) * approach (in > s.level ? m.attack : m.release, seconds);
+}
+} // namespace modenv
+
+bool Modulator::isHostedTarget (const Song& song, const AutomationTarget& t) noexcept
+{
+    if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0
+        && t.slot < (int) song.mixer[(std::size_t) t.index].effects.size())
+    {
+        const auto kind = song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind;
+        return kind == EffectKind::plugin || kind == EffectKind::patcher;
+    }
+    if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size())
+    {
+        const auto kind = song.channels[(std::size_t) t.index].instrument;
+        return kind == InstrumentKind::plugin || kind == InstrumentKind::patcher;
+    }
+    return false;
+}
+
 bool Modulator::canModulate (const Song& song, const AutomationTarget& t) noexcept
 {
-    // LYNX's own controls: not the tempo, not a plugin's parameters (their value lives in the plugin)
+    // round 190ox: a hosted plugin's parameters too (the base is kept host-side, ModRoute::base); not their MIDI
+    // controls (a CC per block), not a missing plugin's stand-in, not a macro (a modulator does not drive another)
+    if (t.kind == AutomationTargetKind::modulatorMacro)
+        return false;
+    if (isHostedTarget (song, t))
+    {
+        if (t.param < 0 || midictl::isMidiParam (t.param))
+            return false;
+        if (t.kind == AutomationTargetKind::effectParam && song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].isSubstitute())
+            return false;
+        return true;
+    }
+    // LYNX's own controls: not the tempo
     if (t.kind == AutomationTargetKind::none || t.kind == AutomationTargetKind::tempo || song.targetValue (t) < 0.0f)
         return false;
     if (t.kind == AutomationTargetKind::effectParam && t.index >= 0 && t.index < (int) song.mixer.size() && t.slot >= 0
@@ -1875,7 +2188,7 @@ bool EffectSlot::operator== (const EffectSlot& o) const
         || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
         || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row || look != o.look || goal != o.goal
-        || goalAmount != o.goalAmount || displayView != o.displayView || lockState != o.lockState || ! (flOrigin == o.flOrigin) || engineRev != o.engineRev)
+        || goalAmount != o.goalAmount || displayView != o.displayView || lockState != o.lockState || ara != o.ara || ! (flOrigin == o.flOrigin) || engineRev != o.engineRev)
         return false;
     for (std::size_t i = 0; i < branches.size(); ++i)
         if (branches[i].gain != o.branches[i].gain || branches[i].chain != o.branches[i].chain)

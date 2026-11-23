@@ -11,6 +11,7 @@
 #include "core/PolyEdit.h"
 #include "engine/Text.h"
 #include "ui/BasicPitchSession.h"
+#include "ui/DemoMode.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/Theme.h"
@@ -145,9 +146,19 @@ private:
 };
 
 class PolyEditor final : public juce::Component,
+                         public demo::CellSource,
                          private juce::Timer
 {
 public:
+    // round 190pg (--demo, docs/DEMO_MODE.md): a note's blob by its number (column; the row is unused), as the editor
+    // draws it now; empty for a note that is not shown
+    juce::Rectangle<int> demoCellBounds (int, int column) const override
+    {
+        if (column < 0 || column >= (int) model.notes.size() || ! model.notes[(std::size_t) column].active || ! shown (column))
+            return {};
+        return boundsOf (column).toNearestInt().getIntersection (notesArea());
+    }
+
     // Round 190lo: buffer mode (Edison's Tools › Analysis entry): the editor works on `buffer` instead of a channel's sample,
     // keeps its own undo (Ctrl+Z / Ctrl+Y here), and Apply hands the render to `apply`
     using Apply = std::function<void (std::shared_ptr<const SampleData>)>;
@@ -156,6 +167,9 @@ public:
         : engine (e), channel (ch), apply (std::move (applyTo))
     {
         setWantsKeyboardFocus (true);
+        setComponentID ("polyEditor"); // (round 190pg: --demo)
+        playButton.setComponentID ("polyEditor.play");
+        originalButton.setComponentID ("polyEditor.original");
         for (auto* b : { &playButton, &originalButton, &resetButton, &cancelButton, &assignButton, &applyButton, &optionsButton })
             addAndMakeVisible (b);
         optionsButton.onClick = [this] { showOptions(); };
@@ -1771,6 +1785,14 @@ void open (AudioEngine& engine, int channel)
         return;
     const auto name = juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str());
     open[channel] = std::make_unique<PolyEditorWindow> (engine, channel, tr ("Edit notes (polyphonic)") + (name.isNotEmpty() ? " - " + name : juce::String()));
+}
+
+juce::Rectangle<int> boundsOf (int channel)
+{
+    auto& open = windows();
+    if (auto it = open.find (channel); it != open.end())
+        return it->second->getScreenBounds();
+    return {};
 }
 
 void openBuffer (AudioEngine& engine, std::shared_ptr<const SampleData> buffer, const juce::String& title,

@@ -1,16 +1,29 @@
 #include "ui/WorkflowExtras.h"
+
+#include <utility>
 #include "core/EscClose.h"
+#include "core/RulerGestures.h" // round 190nq (#227)
+#include "core/Sections.h"      // round 190ol (P1)
+#include "core/ChordLane.h"     // round 190pf (P13)
+
+#include "core/TrackClips.h"
+#include "core/TrackStates.h"
+#include "core/TrackVersions.h" // round 190pe (P20)
 
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
+#include "core/LiveScaleControl.h" // round 190oo (O-5)
 #include "core/MidiDrop.h"
 #include "core/LoopAnalysis.h" // round 190kx
 #include "core/PlaylistViewOptions.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
 #include "core/TransportEdit.h"
+#include "core/MuteKeys.h"
+#include "core/StartPage.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
+#include "core/RangeEdit.h" // round 190pa (P14)
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -42,18 +55,29 @@ void offerTracksForEveryInstrument()
 
 void bind (AudioEngine* engine) { boundEngine = engine; }
 
-bool refusesChannelRack()
+bool channelRackOpened()
 {
-    if (! trackonly::active())
+    // issue #246 (round 190oq): the Channel rack opens in Track-only mode too (FL keeps an instrument track's channel in
+    // its Channel rack); a hint says what it lists, once per session
+    static bool told = false;
+    if (! trackonly::active() || std::exchange (told, true))
         return false;
-    ui::postHint ({ tr ("Track-only mode: the Channel rack is off. Each instrument has its own Playlist track (View › Layout style)"), {} }, 3000);
+    ui::postHint ({ tr ("Track-only mode: the Channel rack lists the instruments of the instrument tracks; each plays through its track's mixer track"), {} }, 4000);
     return true;
+}
+
+bool trackOnlySwitchedOn()
+{
+    // (the rack is hidden when the mode comes on, not again at every other switch)
+    static bool last = false;
+    const auto now = trackonly::active();
+    return now && ! std::exchange (last, now);
 }
 
 void addLayoutItems (juce::PopupMenu& menu, bool patternLayout)
 {
     menu.addSeparator();
-    menu.addItem (tr ("Track-only mode (no Channel rack: 1 track = 1 instrument)"), patternLayout, trackonly::enabled(),
+    menu.addItem (tr ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"), patternLayout, trackonly::enabled(),
                   [] { setExtra ("layout.trackOnly", ! trackonly::enabled()); });
 }
 
@@ -84,6 +108,30 @@ bool readUiOption (const juce::String& key, bool on)
         loopanalysis::dropDetects() = on;
     else if (key == "escClosesWindows") // issue #217 (round 190ng): FL's Esc closes the focused window
         escclose::enabled() = on;
+    else if (key == "trackClipsShown") // round 190ne: track clips listed in the pattern selector too (the Picker group's switch)
+        trackclips::setShownInSelector (on);
+    else if (key == "rulerSeeksAnyTool") // issue #227 (round 190nq, LYNX extra)
+        ruler::seekWithAnyTool() = on;
+    else if (key == "sectionsLane") // round 190ol (P1): the Pattern layout's Sections lane
+        sections::patternLaneOn() = on;
+    else if (key == "chordLane") // round 190pf (P13): the Chord lane, every layout
+        chordlane::laneOn() = on;
+    else if (key == "prChordHighlight") // round 190pf (P13): the Piano roll lights the Chord lane's chord
+        chordlane::pianoRollHighlight() = on;
+    else if (key == "clipLanesFoldedLive") // round 190oo (CS O-3, LYNX extra)
+        cliplanes::foldedOnOpen = on;
+    else if (key == "liveScaleControl") // round 190oo (O-5, LYNX extra)
+        livescale::shown = on;
+    else if (key == "trackStates") // round 190op (P4, LYNX extra): Hide / Deactivate in the Pattern layout's menus
+        trackstates::patternMenus() = on;
+    else if (key == "trackVersions") // round 190pe (P20, LYNX extra): Track versions in the Pattern layout's track menu
+        trackversions::patternMenus() = on;
+    else if (key == "muteKeyToggles") // issue #249 (round 190oq, LYNX extra)
+        mutekeys::setToggles (on);
+    else if (key == "startPage") // issue #252 (round 190oq; on by default, FL-exact)
+        startpage::setEnabled (on);
+    else if (key == "rangeEdits") // round 190pa (P14, LYNX extra): Ctrl+Alt+drag ranges in the Pattern layout
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     return true;
@@ -107,7 +155,19 @@ juce::String uiOptionsText()
            + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
            + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
            + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0) // (round 190kx)
-           + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0); // (round 190ng, issue #217)
+           + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
+           + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
+           + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
+           + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
+           + "\nchordLane=" + juce::String (chordlane::laneOn() ? 1 : 0) // (round 190pf, P13)
+           + "\nprChordHighlight=" + juce::String (chordlane::pianoRollHighlight() ? 1 : 0) // (round 190pf, P13)
+           + "\nclipLanesFoldedLive=" + juce::String (cliplanes::foldedOnOpen ? 1 : 0) // (round 190oo, CS O-3)
+           + "\nliveScaleControl=" + juce::String (livescale::shown ? 1 : 0) // (round 190oo, O-5)
+           + "\ntrackStates=" + juce::String (trackstates::patternMenus() ? 1 : 0) // (round 190op, P4)
+           + "\ntrackVersions=" + juce::String (trackversions::patternMenus() ? 1 : 0) // (round 190pe, P20)
+           + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
+           + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0) // (round 190oq, issue #252)
+           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -132,6 +192,28 @@ std::optional<bool> extraOn (std::string_view id)
         return loopanalysis::dropDetects().load();
     if (id == "general.escCloses") // round 190ng (issue #217)
         return escclose::enabled();
+    if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
+        return ruler::seekWithAnyTool();
+    if (id == "playlist.sectionsLane") // round 190ol (P1)
+        return sections::patternLaneOn();
+    if (id == "playlist.chordLane") // round 190pf (P13)
+        return chordlane::laneOn();
+    if (id == "pianoRoll.chordHighlight") // round 190pf (P13)
+        return chordlane::pianoRollHighlight();
+    if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3)
+        return cliplanes::foldedOnOpen;
+    if (id == "controlBar.liveScale") // round 190oo (O-5)
+        return livescale::shown;
+    if (id == "playlist.trackStates") // round 190op (P4)
+        return trackstates::patternMenus();
+    if (id == "playlist.trackVersions") // round 190pe (P20)
+        return trackversions::patternMenus();
+    if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        return mutekeys::toggles();
+    if (id == "general.startPage") // round 190oq (issue #252)
+        return startpage::enabled();
+    if (id == "playlist.rangeEdits") // round 190pa (P14)
+        return rangeedit::patternLayoutOn();
     return std::nullopt;
 }
 
@@ -161,6 +243,28 @@ bool setExtra (std::string_view id, bool on)
         loopanalysis::dropDetects() = on;
     else if (id == "general.escCloses") // round 190ng (issue #217)
         escclose::enabled() = on;
+    else if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
+        ruler::seekWithAnyTool() = on;
+    else if (id == "playlist.sectionsLane") // round 190ol (P1)
+        sections::patternLaneOn() = on;
+    else if (id == "playlist.chordLane") // round 190pf (P13)
+        chordlane::laneOn() = on;
+    else if (id == "pianoRoll.chordHighlight") // round 190pf (P13)
+        chordlane::pianoRollHighlight() = on;
+    else if (id == "playlist.clipLanesFolded") // round 190oo (CS O-3: from the next project opened)
+        cliplanes::foldedOnOpen = on;
+    else if (id == "controlBar.liveScale") // round 190oo (O-5)
+        livescale::shown = on;
+    else if (id == "playlist.trackStates") // round 190op (P4)
+        trackstates::patternMenus() = on;
+    else if (id == "playlist.trackVersions") // round 190pe (P20)
+        trackversions::patternMenus() = on;
+    else if (id == "editing.muteKeyToggles") // round 190oq (issue #249)
+        mutekeys::setToggles (on);
+    else if (id == "general.startPage") // round 190oq (issue #252)
+        startpage::setEnabled (on);
+    else if (id == "playlist.rangeEdits") // round 190pa (P14)
+        rangeedit::patternLayoutOn() = on;
     else
         return false;
     if (onChanged)
@@ -172,7 +276,8 @@ bool setExtra (std::string_view id, bool on)
 
 bool runAction (const std::string& id)
 {
-    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth")
+    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth"
+        || id == "playlist.clipLanesFolded" || id == "controlBar.liveScale") // (round 190oo: CS O-3, O-5)
         return setExtra (id, ! extraOn (id).value_or (true));
     // round 190jq: the pointer-click switch itself (toolbar button, menu, key); on also shows its button
     if (id == "playlist.pointerClick")
@@ -219,6 +324,8 @@ void addPlaylistMenuItems (const std::function<void (const char*, const juce::St
         const auto style = layoutstyle::current();
         add ("playlist.clipLanes", tr ("Automation clips as lanes under their tracks"), style != layoutstyle::Style::simple,
              cliplanes::shownIn (style == layoutstyle::Style::clipLaunch, style == layoutstyle::Style::simple));
+        if (style == layoutstyle::Style::clipLaunch) // round 190oo (CS O-3, LYNX extra: Live folds its automation lanes)
+            add ("playlist.clipLanesFolded", tr ("Automation lanes start folded when a project opens (Clip-launch layout)"), true, cliplanes::foldedOnOpen);
         add ("playlist.pointerClick", tr ("Click on an empty spot selects and moves the song position (pointer click)"), style != layoutstyle::Style::simple, pointerclick::on);
         add ("playlist.headerWidth", tr ("Drag the track header column's right edge to widen it"), style != layoutstyle::Style::simple, headerwidth::draggable);
     }

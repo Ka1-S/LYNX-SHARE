@@ -1,0 +1,200 @@
+{
+ "data_policy": "CC0 only; fitted parameters ship, no audio; synthesised attack (no recorded transient)",
+ "date": "2026-11-20",
+ "files": [
+  {
+   "bytes": 706962,
+   "git_blob_sha1": "0fb4b3e2baea5685fa4bb29aba340781c0ab0077",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G4_01.wav",
+   "sha256": "cd92f9402c28d3e951dc8d575ce61f0a550b7e316cb6427b1b455ac3aab09000",
+   "sounding_key": 79,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1271310,
+   "git_blob_sha1": "a7d9ca6c68e4c56327d83f0653ee3e16e4810265",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G4_01.wav",
+   "sha256": "6c4649b13e24fa01e4634edad8fe8edf18aef33facc5d49fe53097b376bac4da",
+   "sounding_key": 79,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1323482,
+   "git_blob_sha1": "741d607d19f0b9ca9c449391d332946bd89d4fa5",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G4_01.wav",
+   "sha256": "be0bf94731720c0094276fea5646e75ff3a8a646b3c828258e9aaab6a8ef6c49",
+   "sounding_key": 79,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 709206,
+   "git_blob_sha1": "b68621c4f4fc482284bc8e848ea2d2654366d49e",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_C5_02.wav",
+   "sha256": "4fa149e6f224557df5fab98ad660a8f192bc6fbf2556077dd1089509bf4424e2",
+   "sounding_key": 84,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1271310,
+   "git_blob_sha1": "db079c70946137f543820b6a6ac023d0afaac47c",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C5_01.wav",
+   "sha256": "635f898e0bcb6975b96b18efd9c896f6f1b97ff12174a339ada4814e49675660",
+   "sounding_key": 84,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1323482,
+   "git_blob_sha1": "25185183d6a23973dcb245843b86c33108098381",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C5_01.wav",
+   "sha256": "b28baea01b6028e061e5cc978fca70f9062af6a59d155b0fe55e54ec89f42c07",
+   "sounding_key": 84,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 706962,
+   "git_blob_sha1": "2de4932c129eaacdb2ec9e6e9795cdf00e112cf7",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G5_01.wav",
+   "sha256": "73f6a6de89291d0292b303d641444de5e6e1561881f09f6cf20d77f245f7bec3",
+   "sounding_key": 91,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1226714,
+   "git_blob_sha1": "dbaf80bc3975016095de3a611a202b581931311c",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G5_01.wav",
+   "sha256": "7045c0ef7260e2f1ad11a64406cf7575ed898d1207a91104d33d78caefac63e4",
+   "sounding_key": 91,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1323482,
+   "git_blob_sha1": "5a74c7a1c297fc67ddd6f1ba3e829f59478ce05a",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G5_01.wav",
+   "sha256": "8aaf97481ef2582c14ef0382ec54c17c1b0a2f901a42976c332bac20fadd74a2",
+   "sounding_key": 91,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 706962,
+   "git_blob_sha1": "d3c777e9470ee9d4b1821817585967500fc34362",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_C6_01.wav",
+   "sha256": "e0fdb3a134ee828530c654db7f94b04f94272984938875b0d5535ec40c658324",
+   "sounding_key": 96,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 1271310,
+   "git_blob_sha1": "c02ff721d10eb3551372806653368f45ea5dc367",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C6_01.wav",
+   "sha256": "e942cbf502cf6731df2925945fe3234c876cb63f047d91007b6929887f9e4904",
+   "sounding_key": 96,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 1323482,
+   "git_blob_sha1": "f15847a111ce01f6d1bf285c835c941a22c9a38b",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C6_01.wav",
+   "sha256": "7ca228de549d54770f90bb125e23edcd1dc06cec2b9e1f452661720262f0ecd0",
+   "sounding_key": 96,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 585962,
+   "git_blob_sha1": "36c308a3c51796da6754a53373787e818830de5b",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G6_01.wav",
+   "sha256": "b4407b60c2dff43a3a80fe5231beed95caad4d9b8f3f9cdbd80a27642207f35d",
+   "sounding_key": 103,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 843122,
+   "git_blob_sha1": "e95738492bdc207b11ad32891a9a1ea090b6719e",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G6_01.wav",
+   "sha256": "a2ba94e59119cd5272c1161fc8b8fbfb94c7b44de45a9a6cc5973b1c332103af",
+   "sounding_key": 103,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 931630,
+   "git_blob_sha1": "c0da4e02db0fb6a394223dc3b6cb2d25d402499c",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G#6_01.wav",
+   "sha256": "7649dda2c67decfcf7a8b98b5225c1b2693a191713d4bb83d4e0afa8b88e51c6",
+   "sounding_key": 104,
+   "velocity": 1.0
+  },
+  {
+   "bytes": 706962,
+   "git_blob_sha1": "058b6acda9c40c9df19d8a911e79c0c4a60c3111",
+   "layer": "soft",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_soft_C7_03.wav",
+   "sha256": "68d823a0deffef138d4ed583bd027b9932643a630064274e73d67a644385be4c",
+   "sounding_key": 108,
+   "velocity": 0.3333333333333333
+  },
+  {
+   "bytes": 492418,
+   "git_blob_sha1": "a0f4aff9ef7d73e49a16f4054ead1369a78572b0",
+   "layer": "medium",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C7_01.wav",
+   "sha256": "b2ecbe0e60c983bbfaa49a1f45f8a11559f7dba27b8c8a032eb2cb7366a36910",
+   "sounding_key": 108,
+   "velocity": 0.6666666666666666
+  },
+  {
+   "bytes": 464710,
+   "git_blob_sha1": "7e4bc7ee61184e7d3171eeca26d1f95c2f8de3c2",
+   "layer": "loud",
+   "licence": "CC0-1.0",
+   "path": "Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C7_01.wav",
+   "sha256": "d9410b4cd52c1b5eb458098d9f8e7685d6dc12d512ee32db378f19d04f2b1f4b",
+   "sounding_key": 108,
+   "velocity": 1.0
+  }
+ ],
+ "held_out_keys": [],
+ "instrument": "glockenspiel",
+ "not_used_extra_takes": [],
+ "pipeline": "calibrate.py fit (modes, tuning, strike first guess), then refine.py (the strike refined through the engine against the timbre score's attack and spectro-temporal parts); round 190nl",
+ "source": {
+  "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+  "library": "Versilian Community Sample Library (VCSL)",
+  "licence": "CC0 1.0 Universal (repository LICENSE)",
+  "licence_check": "Repository LICENSE read on 2026-11-19 at commit c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e: Creative Commons CC0 1.0 Universal; README: \"This collection is under a Creative Commons 0 license\"; the repository tree holds no other licence or notice file in the six instrument folders (non-WAV files listed: none there)",
+  "licence_sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "url": "https://github.com/sgossner/VCSL"
+ },
+ "table": "glockenspiel.lpm",
+ "tool": "tools/physmod/calibrate.py 190nl-1"
+}

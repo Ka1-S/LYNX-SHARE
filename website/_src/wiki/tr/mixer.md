@@ -1,11 +1,11 @@
 ---
-source: b6e9ef0dd0
+source: 6d9e90a4d1
 ---
 ![Mixer](/assets/img/mixer.webp)
 
 Her kanal bir Mixer insert'i üzerinden çalar. Her insert'in bir fader'ı, pan'ı, mute ve solo düğmeleri, bir tepe ölçeri, her biri kendi dry/wet miktarına sahip on efekt yuvası ve dahili bir EQ'su vardır. Başka yere yönlendirmedikçe bütün insert'ler Master'da buluşur. Mixer'ı göstermek veya gizlemek için `F9` tuşuna basın.
 
-Bir projede en fazla 127 insert olabilir. Mixer'da yeni bir tane için ekleme şeridi vardır. Mixer'ın başlık çubuğundaki kutu, `Kompakt` ile `Çok büyük` arasında sekiz kanal şeridi düzeninden birini seçer.
+Bir projede en fazla 500 insert olabilir. Mixer'da yeni bir tane için ekleme şeridi vardır. Mixer'ın başlık çubuğundaki kutu, `Kompakt` ile `Çok büyük` arasında sekiz kanal şeridi düzeninden birini seçer.
 
 ## Bir kanala efekt koymak
 
@@ -115,7 +115,7 @@ Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYN
 - Birden fazla çıkışı olan bir enstrüman plugin'i her çıkışını kendi insert'inde çalabilir. Bkz. [Üçüncü taraf plugin'ler](/wiki/plugins/).
 - `Ctrl+L` Channel Rack'te ve Mixer'da farklı işler yapar. Rack'te boş insert'leri seçer. Mixer'da seçili insert'i kullanır.
 - Yönlendirme anahtarları seçili şeridde değil, diğer şeritlerde görünür.
-- Sınır, proje başına 127 insert ve insert başına on efekt yuvasıdır.
+- Sınır, proje başına 500 insert ve insert başına on efekt yuvasıdır.
 - Edison'ın kaydı, proje dosyasının içinde değil, projenin klasöründe bir WAV dosyası olarak saklanır.
 - Klip gridinin altındaki Session mixer yalnızca Klip başlatma iş akışına aittir. Bu Mixer'daki insert'lerin aynısını gösterir. Bkz. [Düzenler](/wiki/layouts/).
 

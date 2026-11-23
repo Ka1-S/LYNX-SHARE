@@ -230,6 +230,12 @@ void RenderAhead::setOverriddenSlots (const std::vector<int>& slots) noexcept
     ahead->setOverriddenSlots (slots);
 }
 
+void RenderAhead::setKeepReleasedOnPlay (bool keep) noexcept
+{
+    live.setKeepReleasedOnPlay (keep);
+    ahead->setKeepReleasedOnPlay (keep);
+}
+
 void RenderAhead::setReleasedSlots (const std::vector<int>& slots) noexcept
 {
     live.setReleasedSlots (slots);
@@ -432,6 +438,23 @@ bool RenderAhead::computePartition (const RackState& state, const Block& block, 
             if (route.source == a && route.slot >= 0 && (std::size_t) route.slot < song.automations.size())
                 for (int k = 0, n = unitOf (song.automations[(std::size_t) route.slot].target, units); k < n; ++k)
                     unite (source, units[k]);
+    }
+
+    // round 190ox: a follower's insert / an envelope's channel and what the modulator drives stay on one side (the state
+    // lives in the renderer that runs the source)
+    for (const auto& route : state.modRoutes)
+    {
+        if ((std::size_t) route.modulator >= state.modFeeds.size() || (std::size_t) route.modulator >= song.modulators.size())
+            continue;
+        const auto& feed = state.modFeeds[(std::size_t) route.modulator];
+        const auto source = feed.track >= 0 ? (okTrack (feed.track) ? track (feed.track) : -1) : (feed.channel >= 0 && okChannel (feed.channel) ? feed.channel : -1);
+        if (source < 0)
+            continue;
+        int units[2] {};
+        const auto& mod = song.modulators[(std::size_t) route.modulator];
+        for (const auto& r : mod.routes)
+            for (int k = 0, n = unitOf (r.target, units); k < n; ++k)
+                unite (source, units[k]);
     }
 
     // --- the closure: a group with a live member is live; whatever a live unit feeds is live
@@ -795,6 +818,7 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         const auto jobNs = ProcessTimes::now() - jobStart;
         aheadCpuNs.fetch_add (WorkerPool::threadCpuNs() - jobCpu, std::memory_order_relaxed);
         aheadBusyNs.fetch_add (jobNs, std::memory_order_relaxed);
+        counters.aheadNs.fetch_add (jobNs, std::memory_order_relaxed); // (round 190of: the split CPU meter)
         if (useWorkers)
             ++jobsSinceSerial;
         else if (sb.samples > 0 && model.sampleRate > 0.0)
@@ -949,6 +973,12 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
     processBlock (exchange, b, left, right, liveQueue, meters, moreLive);
     const auto cpu = (double) (WorkerPool::threadCpuNs() - cpu0);
     account ((double) (ProcessTimes::now() - wall0), cpu, b.samples, b.playing, liveState);
+    // round 190of (P24): the live part's share (the callback's own time here) for the split CPU meter
+    if (b.model != nullptr && b.samples > 0 && sampleRate > 0.0)
+    {
+        counters.liveNs.fetch_add (ProcessTimes::now() - wall0, std::memory_order_relaxed);
+        counters.audioNs.fetch_add ((std::uint64_t) ((double) b.samples / sampleRate * 1.0e9), std::memory_order_relaxed);
+    }
 }
 
 bool RenderAhead::renderAheadAllowed() const noexcept

@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: f6f0977999
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
 LYNX SHARE bağımsız bir programdır. Image-Line ile bağlantısı yoktur, Image-Line tarafından onaylanmamış veya desteklenmemiştir ve içinde Image-Line kodu bulunmaz. FL Studio, Image-Line Software'in tescilli ticari markasıdır.
+
+## İlk adımlarınız
+
+1. **Yerleşimi seçin.** LYNX SHARE ilk açıldığında bir karşılama kartı nereden geldiğinizi sorar. `FL Studio` düğmesine tıklayın: Channel Rack, Piano roll, Playlist ve Mixer ile varsayılan olan Pattern yerleşimini alırsınız. Kartta Skip da aynı sonucu verir.
+2. **Bir proje açın.** `.flp` projelerinizden birini açın (aşağıda) ya da bir beat yapmak için Channel Rack'teki adımlara tıklayın.
+3. **Plugin'lerinizi bulun.** LYNX SHARE alışılmış plugin klasörlerini arka planda tarar. Kendi klasörünüz için `Seçenekler › Plugin yöneticisi...` açın, `Plugin klasörleri...` düğmesine tıklayın, klasörü ekleyin ve `Yeni plugin bul` düğmesine tıklayın.
+
+FL Studio'dan farklı olanlar:
+
+- FL Studio'nun kendi plugin'leri LYNX SHARE'in yeniden oluşturduğu motorlarda çalar ve her birinin bir kalite seviyesi vardır (aşağıda). Bir `.flp` açmak için FL Studio'nun kendisi gerekmez.
+- LYNX SHARE'in kendi eklentileri, `Seçenekler › LYNX ekstraları...` içinde açana kadar kapalıdır.
+- Aynı proje üzerinde iki yerleşim daha çalışır: Klip başlatma (sahneli bir klip ızgarası) ve Basit (izler, loop'lar ve hızlı kayıt olan tek bir pencere).
+- Bir [çevrimiçi oturum](/learn/online-session/) en fazla 4 kişiyi tek bir projede canlı olarak buluşturur.
 
 ## Bir .flp projesini açmak
 
@@ -17,7 +30,7 @@ LYNX SHARE bağımsız bir programdır. Image-Line ile bağlantısı yoktur, Ima
 
 | FL Studio'da | LYNX SHARE'de |
 |---|---|
-| Playlist, Channel Rack, Piano Roll, Mixer | Aynı adlar, `F5`, `F6`, `F7` ve `F9` tuşlarında |
+| Playlist, Channel rack, Piano roll, Mixer | Aynı adlar, `F5`, `F6`, `F7` ve `F9` tuşlarında |
 | Plugin seçici | `F8` |
 | Browser | `Alt+F8` |
 | Pattern / Song modu | `L` |
@@ -79,7 +92,7 @@ Dosya bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL'nin kendi jen
 ## Bilmekte fayda var
 
 - FLEX paketleri şifrelidir ve asla açılmaz. Bir FLEX kanalına, preset adına göre seçilen bir synth patch'i verilir.
-- Modülatörler `.flp` dışa aktarmasında dışarıda bırakılır ve dışa aktarma raporu bunu belirtir.
+- Bir `.flp` dışa aktarmasında, şarkı konumunu izleyen modülatörler otomasyon klipleri olur (senkronlu bir LFO, FL Studio'nun klip LFO'su olur). Takipçiler, zarflar, keytrack ve velocity dışarıda bırakılır ve dışa aktarma raporu bunu belirtir.
 - İçe aktarma raporu, dahili synth ile nelerin yaklaştırıldığını, nelerin karşılığı olmadığını, hangi plugin'lerin bulunduğunu ya da kurulu olmadığını, hangi efektlerin dışarıda bırakıldığını veya kısmen yeniden üretildiğini ve kaç sample'ın eksik olduğunu listeler.
 - Kurulu olmayan bir üçüncü taraf efekt, aynı role sahip bir LYNX SHARE efektiyle değiştirilir. Asıl efekt projede kalır.
 
@@ -90,3 +103,4 @@ Dosya bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL'nin kendi jen
 - [Dosya formatları](/wiki/file-formats/)
 - [Kısayollar](/wiki/shortcuts/)
 - [Yalnızca LYNX SHARE'in FL ayarlarıyla yaptıkları](/why/#fl-settings)
+- [Learn: eğitimler](/learn/)

@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![Jendela utama dengan proyek demo: toolbar di atas, Browser di kiri, Playlist di belakang, dan Channel Rack mengambang di atasnya](/assets/img/wiki/desktop.webp)
 

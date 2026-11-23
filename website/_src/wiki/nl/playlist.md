@@ -1,5 +1,5 @@
 ---
-source: 1b54c6493f
+source: cab9a0b0d1
 ---
 ![De Playlist met clips op tracks](/assets/img/playlist.webp)
 
@@ -115,7 +115,7 @@ Het arrangementvak in de werkbalk wisselt tussen arrangementen. Een project kan 
 ## Goed om te weten
 
 - De Playlist hoor je alleen in de Song-modus. In de Pattern-modus speelt `Space` het huidige pattern, wat er ook op de tracks staat.
-- `Beeld › Lay-outstijl › Clipstart-werkwijze` voegt naast de Playlist een raster van clips en scènes toe. Het is optioneel. Zie [Lay-outs](/wiki/layouts/).
+- `Beeld › Lay-outstijl › Clipstart-lay-out` voegt naast de Playlist een raster van clips en scènes toe. Het is optioneel. Zie [Lay-outs](/wiki/layouts/).
 - Bij meerdere overlappende automatiseringsclips op één regelaar kan de keuze welke speelt afwijken van die van FL Studio (releasenotities van 0.1.25).
 - Zoals in FL Studio speelt een pattern vanuit één clip tegelijk. Wanneer een latere clip van hetzelfde pattern begint, op welke track dan ook, start de eerdere clip vanaf daar geen noten meer. Clips van verschillende patterns spelen samen. Dit geldt in nieuwe projecten en FL Studio-projecten. Een .lynx-project dat vóór 0.1.27 is opgeslagen, blijft elke clip volledig afspelen.
 - Een tempo dat door een gekoppelde MIDI-controller wordt verschoven, wijzigt de grootte van audioclips niet.

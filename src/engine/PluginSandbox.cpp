@@ -924,6 +924,7 @@ public:
     const bool bits32;
     const int pid;
     const juce::String group;
+    bool dpiAware = true, scaleEditorDimensions = false; // FL's wrapper Settings › GUI (round 190oh)
     void hangForTest() { session->tell (juce::ValueTree ("hang")); }
     void crashForTest() { session->tell (juce::ValueTree ("crash")); }
 
@@ -948,7 +949,9 @@ public:
     juce::AudioProcessorEditor* createEditor() override
     {
         return new RemoteEditor (
-            *this, [this] (juce::int64 owner) { session->tell (juce::ValueTree ("showEditor").setProperty ("owner", owner, nullptr)); },
+            *this, [this] (juce::int64 owner) { session->tell (juce::ValueTree ("showEditor").setProperty ("owner", owner, nullptr)
+                                                                 .setProperty ("dpiAware", dpiAware, nullptr)
+                                                                 .setProperty ("scaleDims", scaleEditorDimensions, nullptr)); },
             [this] { session->tell (juce::ValueTree ("hideEditor")); });
     }
     int getNumPrograms() override { return 1; }
@@ -1206,6 +1209,12 @@ bool isSandboxedPlugin (const juce::AudioPluginInstance& plugin)
     return dynamic_cast<const RemotePlugin*> (&plugin) != nullptr;
 }
 
+void setSandboxedEditorScaling (juce::AudioPluginInstance& plugin, bool dpiAware, bool scaleEditorDimensions)
+{
+    if (auto* remote = dynamic_cast<RemotePlugin*> (&plugin))
+        remote->dpiAware = dpiAware, remote->scaleEditorDimensions = scaleEditorDimensions;
+}
+
 int sandboxedPluginProcessId (const juce::AudioPluginInstance& plugin)
 {
     const auto* remote = dynamic_cast<const RemotePlugin*> (&plugin);
@@ -1227,6 +1236,7 @@ int sandboxTeardownsRunning() { return 0; }
 bool isBridged32 (const juce::AudioPluginInstance&) { return false; }
 int sandboxedPluginProcessId (const juce::AudioPluginInstance&) { return 0; }
 bool isSandboxedPlugin (const juce::AudioPluginInstance&) { return false; }
+void setSandboxedEditorScaling (juce::AudioPluginInstance&, bool, bool) {}
 int sandboxProcessCount() { return 0; }
 juce::String sandboxGroupOf (const juce::AudioPluginInstance&) { return {}; }
 void hangSandboxedPluginForTest (juce::AudioPluginInstance&) {}

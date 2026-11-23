@@ -1,4 +1,4 @@
-// plugexporttest <plugin.vst3 | plugin.clap> <report.txt> [editor picture prefix]
+// plugexporttest <plugin.vst3 | plugin.clap | plugin.lv2 (Linux, rounds 190ov and 190pk)> <report.txt> [editor picture prefix]
 // Loads LYNX's exported plugins the way a host does (round 180b, docs/PLUGIN_EXPORT.md) and checks, with no window on screen:
 // the scan, the sound against the same engine run directly in this process (null test), automation, the state (a new
 // instance sounds the same; the state opens as a .lynx project), the editor, memory per instance and CPU.
@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -15,6 +16,7 @@
 
 #include "core/Effects.h"
 #include "core/LynxBanks.h"
+#include "core/ModelParams.h"
 #include "core/RackRenderer.h"
 #include "engine/ClapFormat.h"
 #include "engine/ProjectFile.h"
@@ -190,9 +192,11 @@ Audio directInstrument (const Entry& entry)
     song.mixer.resize (2);
     song.mixer[0].effects.clear();
     song.mixer[1].effects.clear();
-    auto channel = banks::defaultChannel (entry.synth, entry.name);
-    channel->mixerTrack = 0;
-    song.channels.push_back (*channel);
+    // the plugin's own starting channel (round 190pq): Tetra and Braid have no preset bank, and dereferencing the empty
+    // banks::defaultChannel copied a ChannelDef from garbage (CI plugins run 44975814572: std::length_error in the CLAP)
+    auto channel = plugexport::instrumentChannel (entry);
+    channel.mixerTrack = 0;
+    song.channels.push_back (std::move (channel));
     auto state = RackState::build (song, nullptr, rate);
     auto renderer = std::make_unique<RackRenderer>();
     renderer->prepare (rate, block);
@@ -353,6 +357,8 @@ struct RawClapHost
 
 void clapStateLoadIsSilent (const juce::File& file, const Entry& entry)
 {
+    std::fprintf (stderr, "plugexporttest: CLAP state in a plain host: %s\n", entry.name); // (the report is written at the end; this says where a crash was)
+    std::fflush (stderr);
     // a state with moved parameters, from the same engine in this process
     std::unique_ptr<juce::AudioProcessor> source (plugexport::makeProcessor (entry));
     for (auto* p : source->getParameters())
@@ -436,6 +442,8 @@ const Entry* entryNamed (const juce::String& name)
 
 void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription& description, const juce::String& picturePrefix)
 {
+    std::fprintf (stderr, "plugexporttest: %s (%s)\n", description.name.toRawUTF8(), format.getName().toRawUTF8());
+    std::fflush (stderr);
     const auto* entry = entryNamed (description.name);
     check (entry != nullptr, "known name: " + description.name);
     if (entry == nullptr)
@@ -451,6 +459,23 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     if (instance == nullptr)
         return;
     report << "  first instance: +" << juce::String (memoryMb() - base, 1) << " MB\n";
+    // the effect engine's parameter i in the host's list. JUCE's LV2 host lists the plugin's lv2:Parameter properties in
+    // an order of its own and adds the lv2:enabled port as "Bypass": there it is the one whose id ends in ":p<i>" (the
+    // plugin's parameter id, round 190pk); the VST3 and CLAP hosts keep the plugin's order
+    const auto lv2 = format.getName() == "LV2";
+    auto engineParameter = [&] (int i) -> juce::AudioProcessorParameter*
+    {
+        const auto& all = instance->getParameters();
+        if (lv2)
+        {
+            for (auto* p : all)
+                if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (p))
+                    if (hosted->getParameterID().endsWith (":p" + juce::String (i)))
+                        return p;
+            return nullptr;
+        }
+        return juce::isPositiveAndBelow (i, all.size()) ? all[i] : nullptr;
+    };
     check (instance->getParameters().size() > 0, "parameters: " + juce::String (instance->getParameters().size()));
 
     double seconds = 0.0;
@@ -474,15 +499,15 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         {
             // its external side chain on: a loud side signal compresses the main input
             const auto& names = effectInfo (entry->effect).params;
-            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
-                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
-                    instance->getParameters()[i]->setValue (1.0f);
+            for (int i = 0; i < (int) names.size(); ++i)
+                if (auto* p = engineParameter (i); p != nullptr && juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    p->setValue (1.0f);
             const auto quiet = renderWithSide (*instance, 0.0f), loud = renderWithSide (*instance, 0.9f);
             const auto energy = [] (const Audio& a) { double e = 0.0; for (auto v : a.l) e += (double) v * v; return e; };
             check (energy (loud) < 0.7 * energy (quiet), "external side chain through the bus compresses: " + juce::String (energy (loud) / juce::jmax (1.0e-12, energy (quiet)), 3));
-            for (int i = 0; i < (int) names.size() && i < instance->getParameters().size(); ++i)
-                if (juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
-                    instance->getParameters()[i]->setValue (0.0f);
+            for (int i = 0; i < (int) names.size(); ++i)
+                if (auto* p = engineParameter (i); p != nullptr && juce::String::fromUTF8 (names[(std::size_t) i].name) == "External SC")
+                    p->setValue (0.0f);
         }
     }
 
@@ -493,12 +518,16 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
         // defaults are flat (its output is its input), so this is the null test that says something.
         auto params = makeEffectSlot (entry->effect).params;
         const auto named = (int) effectInfo (entry->effect).params.size();
-        for (int i = 0; i < named && i < parameters.size(); ++i)
-        {
-            const auto v = 0.5f + 0.45f * (float) std::sin ((double) i * 0.7);
-            parameters[i]->setValue (v);
-            params[(std::size_t) i] = parameters[i]->getValue();
-        }
+        int found = 0;
+        for (int i = 0; i < named; ++i)
+            if (auto* p = engineParameter (i))
+            {
+                const auto v = 0.5f + 0.45f * (float) std::sin ((double) i * 0.7);
+                p->setValue (v);
+                params[(std::size_t) i] = p->getValue();
+                ++found;
+            }
+        check (found == juce::jmin (named, parameters.size()), "the host lists the engine's parameters: " + juce::String (found) + " of " + juce::String (named));
         const auto wet = render (*instance, false);
         const auto d = wet.difference (direct = directEffect (entry->effect, params));
         check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8)
@@ -507,11 +536,23 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     }
     else
     {
-        const auto was = parameters[1]->getValue();
-        parameters[1]->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
-        report << "  moved '" << parameters[1]->getName (64) << "' " << was << " -> " << parameters[1]->getValue() << "\n";
-        const auto changed = render (*instance, true);
-        check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
+        // the engine's first continuous parameter after its first one (VST3 / CLAP: the host's parameter 1, as before). JUCE's
+        // LV2 host lists them in an order of its own: there it is found by its id (round 190pq: its parameter 1 was Fourfold's
+        // stepped "A On" switch, which a move of 0.3 leaves as it was)
+        juce::AudioProcessorParameter* moved = nullptr;
+        if (const auto* table = modelparams::tableOf (entry->synth); table != nullptr && table->params != nullptr)
+            for (std::size_t k = 1; moved == nullptr && k < table->params->size(); ++k)
+                if (const auto& e = (*table->params)[k]; ! (e.stepped && e.high > e.low && e.high - e.low <= 4096.0f)) // (the plugin's rule for a discrete parameter)
+                    moved = lv2 ? engineParameter (e.index) : engineParameter ((int) k);
+        check (moved != nullptr, "the host lists a continuous parameter of the engine");
+        if (moved != nullptr)
+        {
+            const auto was = moved->getValue();
+            moved->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
+            report << "  moved '" << moved->getName (64) << "' " << was << " -> " << moved->getValue() << "\n";
+            const auto changed = render (*instance, true);
+            check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
+        }
     }
 
     // state: a new instance of what we just heard sounds the same
@@ -529,6 +570,30 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
                                + (d < 1.0e-3 ? juce::String() : ", first at sample " + juce::String (restored.firstDifference (first, 1.0e-3))));
     }
     stateLoadIsSilent (format, description, state);
+
+    // round 190pq: every parameter moved (as a host's randomizer does), the state loaded into a new instance saves back
+    // byte for byte (clap-validator's state-reproducibility-binary failed on Fourfold and Wavecoil: values written back
+    // through their range moved by a float step)
+    if (auto third = make())
+    {
+        for (int i = 0; i < parameters.size(); ++i)
+            parameters[i]->setValue (0.5f + 0.49f * (float) std::sin ((double) i * 1.37 + 0.3));
+        juce::MemoryBlock saved, again;
+        instance->getStateInformation (saved);
+        third->setStateInformation (saved.getData(), (int) saved.getSize());
+        third->getStateInformation (again);
+        auto at = -1;
+        for (size_t i = 0; at < 0 && i < juce::jmin (again.getSize(), saved.getSize()); ++i)
+            if (again[i] != saved[i])
+                at = (int) i;
+        if (at < 0 && again.getSize() != saved.getSize())
+            at = (int) juce::jmin (again.getSize(), saved.getSize());
+        check (at < 0, "a loaded state saves back byte for byte with " + juce::String (parameters.size()) + " parameters moved"
+                           + (at < 0 ? juce::String() : ": " + juce::String ((int) again.getSize()) + " vs " + juce::String ((int) saved.getSize())
+                                                            + " bytes, first difference at byte " + juce::String (at)));
+    }
+    else
+        check (false, "third instance");
 
     // hosted editor object (never put on the screen)
     if (auto* editor = instance->createEditorIfNeeded())
@@ -562,7 +627,15 @@ int main (int argc, char** argv)
 
     juce::VST3PluginFormat vst3;
     ClapPluginFormat clap;
-    juce::AudioPluginFormat& format = plugin.hasFileExtension ("clap") ? static_cast<juce::AudioPluginFormat&> (clap) : vst3;
+    juce::AudioPluginFormat* chosen = &vst3;
+    if (plugin.hasFileExtension ("clap"))
+        chosen = &clap;
+   #if JUCE_PLUGINHOST_LV2 && JUCE_LINUX
+    juce::LV2PluginFormat lv2; // (round 190ov: a bundle folder; JUCE's LV2 host loads it with lilv)
+    if (plugin.hasFileExtension ("lv2"))
+        chosen = &lv2;
+   #endif
+    juce::AudioPluginFormat& format = *chosen;
     juce::OwnedArray<juce::PluginDescription> found;
     format.findAllTypesForFile (found, plugin.getFullPathName());
     report << "plugin " << plugin.getFileName() << ": " << found.size() << " found\n";

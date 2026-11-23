@@ -385,8 +385,8 @@ Channel readChannel (Bytes body)
             ch.hue = f.f32 (-1.0f); // (round 190fn: the channel's colour as a hue, PROVEN-REA FLM 5.0.3 CSeqChannel::SetState)
             f.f64();
             f.f64();
-            f.u32();
-            f.u32();
+            ch.headerFlags[0] = f.u32(); // (round 190og: kept for the writer)
+            ch.headerFlags[1] = f.u32();
             f.pos += 16; // the channel's GUID
             ch.channelId = f.i32 (-1);
             ch.typeName = f.lp32();
@@ -412,15 +412,15 @@ void readHead (Bytes body, Project& p)
     r.u32();
     p.title = r.fixed (256);
     p.tempo = r.f64 (120.0);
-    r.f64();
-    r.f64();
+    p.loopStart = r.f64(); // (round 190og: kept for the writer; FLM_FORMAT §2)
+    p.loopEnd = r.f64();
     r.f64();                 // (a legacy field the app skips)
     r.pos += 4 * 8 + 16;     // view state and the project GUID
     if (! r.has (8))
         return;
     p.root = r.u32(); // (round 190ds: +344 is the root 0..11, +348 the scale index; every file on disk agrees)
     p.scale = r.u32();
-    r.u8();
+    p.keySharps = r.u8() != 0;
     r.u8();
     r.u32(); // the channel-id counter
     if (r.has (4))
@@ -598,3 +598,361 @@ std::optional<Project> parse (Bytes bytes, std::string* error, bool racksOnly)
     return p;
 }
 } // namespace lynx::flm
+
+// --- round 190og: the writer (FLM_FORMAT §1–6; the reader above is its inverse) ------------------------------------
+namespace lynx::flm
+{
+namespace
+{
+struct Writer
+{
+    std::vector<std::uint8_t> out;
+
+    template <typename T>
+    void raw (T v)
+    {
+        const auto at = out.size();
+        out.resize (at + sizeof (T));
+        std::memcpy (out.data() + at, &v, sizeof (T)); // (little-endian targets, as the files)
+    }
+    void u8 (std::uint8_t v) { out.push_back (v); }
+    void u16 (std::uint16_t v) { raw (v); }
+    void u32 (std::uint32_t v) { raw (v); }
+    void i32 (std::int32_t v) { raw (v); }
+    void f32 (float v) { raw (v); }
+    void f64 (double v) { raw (v); }
+    void bytes (const void* p, std::size_t n)
+    {
+        const auto* b = static_cast<const std::uint8_t*> (p);
+        out.insert (out.end(), b, b + n);
+    }
+    void text (const char* four) { bytes (four, 4); }
+    // a NUL-padded field of `size` bytes (the text cut to size − 1, so it always ends with a NUL)
+    void fixed (const std::string& s, std::size_t size)
+    {
+        const auto n = std::min (s.size(), size - 1);
+        bytes (s.data(), n);
+        out.insert (out.end(), size - n, 0);
+    }
+    void lp32 (const std::string& s)
+    {
+        u32 ((std::uint32_t) s.size());
+        bytes (s.data(), s.size());
+    }
+    void floats (const std::vector<float>& v) { bytes (v.data(), v.size() * 4); }
+
+    // a chunk: the tag, a size placeholder, the body, then the size patched (as FLM's own writers do)
+    template <typename Body>
+    void chunk (const char* tag, Body&& body)
+    {
+        text (tag);
+        const auto at = out.size();
+        u32 (0);
+        body();
+        const auto size = (std::uint32_t) (out.size() - at - 4);
+        std::memcpy (out.data() + at, &size, 4);
+    }
+};
+
+// 16 bytes from a text (FNV-1a, four rounds): the GUIDs FLM keeps per song and channel, made reproducible
+void guid (Writer& w, const std::string& seed)
+{
+    std::uint32_t h = 2166136261u;
+    for (int k = 0; k < 4; ++k)
+    {
+        for (const auto c : seed)
+            h = (h ^ (std::uint8_t) c) * 16777619u;
+        h = (h ^ (std::uint32_t) k) * 16777619u;
+        w.u32 (h);
+    }
+}
+
+std::string backslashes (std::string s)
+{
+    std::replace (s.begin(), s.end(), '/', '\\');
+    return s;
+}
+
+// `index`: the sample's place in its drum set (0, 1, 2…), −1 for an audio clip's sample (FLM writes the place in MAIN's
+// first f64: every kit of FLM's own files counts 0, 1, 2…, every clip sample has −1; round 190og, PROVEN-FILE)
+void writeSample (Writer& w, const SampleRef& s, int slot, int index)
+{
+    w.text ("20LS");
+    w.chunk ("MAIN", [&] {
+        w.u32 (0xFFFFFFFFu);
+        w.f64 ((double) index);
+        w.fixed (s.name, 512);
+        w.fixed ({}, 512);
+        w.u8 (s.reverse ? 1 : 0);
+        w.f64 (s.timeShift);
+        w.f32 (0.5f);
+        w.u8 ((std::uint8_t) std::clamp (s.cutGroup, 0, 3));
+        w.u8 (s.polyphonic ? 1 : 0);
+    });
+    w.chunk ("LINk", [&] {
+        w.i32 (s.slotId >= 0 ? s.slotId : slot);
+        w.i32 (-1);
+        w.u16 (0xFFFF);
+        w.i32 (s.outputChannel);
+    });
+    // the legacy stretch first (FLM 5 still writes both; STR1 wins on read)
+    w.chunk ("STRC", [&] {
+        w.u8 ((std::uint8_t) s.stretchMode);
+        w.f64 (s.stretch);
+        w.f64 (std::exp2 (s.pitch / 12.0));
+        w.f32 ((float) (s.pitch / 48.0 + 0.5));
+        w.f32 (0.5f);
+    });
+    w.chunk ("STR1", [&] {
+        w.u8 ((std::uint8_t) s.stretchMode);
+        w.f64 (s.stretch);
+        w.f64 (s.pitch);
+    });
+    if (! s.path.empty() || ! s.root.empty())
+        w.chunk ("PTH1", [&] {
+            std::string t = s.root;
+            t.push_back ('\0');
+            t += backslashes (s.path);
+            w.u16 ((std::uint16_t) std::min<std::size_t> (t.size(), 0xFFFF));
+            w.bytes (t.data(), std::min<std::size_t> (t.size(), 0xFFFF));
+        });
+    w.chunk ("PRST", [&] {
+        w.lp32 (s.savedPath);
+        w.lp32 (backslashes (s.relName));
+    });
+    std::vector<float> p (samplepad::defaults, samplepad::defaults + samplepad::count);
+    for (std::size_t k = 0; k < p.size() && k < s.params.size(); ++k)
+        p[k] = s.params[k];
+    w.chunk ("PRMS", [&] { w.floats (p); });
+}
+
+void writeModule (Writer& w, const Module& m)
+{
+    w.u32 (m.type);
+    w.u32 (m.instanceId);
+    w.chunk ("HEAD", [&] {
+        w.u32 (m.type);
+        w.u32 (0);
+        w.u8 (1);
+    });
+    w.chunk ("DESC", [&] {
+        w.fixed (m.descName.empty() ? std::string ("Default") : m.descName, 256);
+        w.fixed (m.descFolder.empty() ? std::string ("Default") : m.descFolder, 256);
+        w.u32 (0);
+    });
+    w.chunk ("PRST", [&] {
+        w.lp32 (m.presetFile);
+        w.lp32 (backslashes (m.presetName.empty() ? std::string ("Default/Default") : m.presetName));
+    });
+    w.chunk ("ADD1", [&] {
+        w.u8 (m.bypassFlag ? 1 : 0);
+        w.u8 ((std::uint8_t) std::clamp (m.keyLow, 0, 127));
+        w.u8 ((std::uint8_t) std::clamp (m.keyHigh, 0, 127));
+    });
+    w.chunk ("PRMS", [&] { w.floats (m.params); });
+    std::vector<float> reserved { 0.5f, 1.0f, 0.5f };
+    for (std::size_t k = 0; k < reserved.size() && k < m.reserved.size(); ++k)
+        reserved[k] = m.reserved[k];
+    w.chunk ("SMPR", [&] { w.floats (reserved); });
+    if (! m.custom.empty())
+        w.chunk ("CSTM", [&] { w.bytes (m.custom.data(), m.custom.size()); });
+}
+
+void writeRack (Writer& w, const Rack& rack)
+{
+    w.u32 (rack.kind);
+    w.text ("10KR");
+    std::uint32_t next = 1;
+    for (const auto& m : rack.modules)
+        next = std::max (next, m.instanceId + 1);
+    w.chunk ("RHED", [&] {
+        w.u32 (0xFFFFFFFFu);
+        w.u32 (next);
+        w.u32 (0);
+        w.i32 (-1);
+    });
+    std::vector<float> params { 0.853125f, 0.5f, 0.0f, 0.0f, 0.5f, 0.0f };
+    for (std::size_t k = 0; k < params.size() && k < rack.params.size(); ++k)
+        params[k] = rack.params[k];
+    w.chunk ("RPRM", [&] { w.floats (params); });
+    w.chunk ("RSMP", [&] {
+        w.text ("10MS");
+        w.u32 ((std::uint32_t) rack.kit.size());
+        w.chunk ("PADS", [&] {
+            for (int k = 0; k < 22; ++k)
+                w.u8 (k < (int) rack.pads.size() ? rack.pads[(std::size_t) k] : (std::uint8_t) k);
+        });
+        for (std::size_t k = 0; k < rack.kit.size(); ++k)
+            w.chunk ("SMPl", [&] { writeSample (w, rack.kit[k], (int) k + 1, (int) k); });
+    });
+    for (const auto& m : rack.modules)
+        w.chunk ("RMOd", [&] { writeModule (w, m); });
+    if (! rack.ccLinks.empty())
+        w.chunk ("CCLK", [&] {
+            for (const auto& l : rack.ccLinks)
+            {
+                w.i32 (l.cc);
+                w.i32 (l.module);
+                w.i32 (l.param);
+            }
+        });
+}
+
+void writeClip (Writer& w, const Clip& clip)
+{
+    w.u32 (clip.startTick);
+    w.text ("20LC");
+    w.chunk ("CLHd", [&] {
+        w.f64 (clip.length);
+        w.f64 (clip.loopLength);
+        w.f64 (clip.offset);
+        w.u32 (clip.contentId);
+        w.f64 (clip.sourceLength);
+        w.u8 (clip.flag);
+    });
+    w.chunk ("ZOOM", [&] {
+        for (int k = 0; k < 4; ++k)
+            w.f64 (0.0);
+    });
+    if (clip.sample)
+        w.chunk ("CLSm", [&] { writeSample (w, *clip.sample, 1, -1); });
+    w.chunk ("EVN2", [&] {
+        w.u16 (20);
+        for (const auto& e : clip.events)
+        {
+            w.u32 (e.tick);
+            w.f64 (e.length);
+            w.u16 ((std::uint16_t) (std::int16_t) e.key);
+            w.u8 (e.velocity);
+            w.u8 (e.pan);
+            w.u16 (e.value);
+            w.u8 ((std::uint8_t) e.repeat);
+            w.u8 (e.slide);
+        }
+    });
+}
+
+void writeChannel (Writer& w, const Channel& ch, const std::string& songSeed, std::size_t index)
+{
+    w.u32 (ch.kind);
+    w.text ("20HC");
+    w.chunk ("CHHD", [&] {
+        w.fixed (ch.name, 1024);
+        w.u32 (0);
+        w.f64 (ch.order);
+        w.f32 (ch.hue >= 0.0f ? std::clamp (ch.hue, 0.0f, 1.0f) : 0.0f);
+        // (INFERRED view values; FLM 4.7's templates hold these on the master and zeros elsewhere)
+        w.f64 (ch.kind == kindMaster ? 0.0125 : 0.0);
+        w.f64 (ch.kind == kindMaster ? 28.0 : 0.0);
+        w.u32 (ch.headerFlags[0]);
+        w.u32 (ch.headerFlags[1]);
+        guid (w, songSeed + "|channel|" + std::to_string (index) + "|" + ch.name);
+        w.i32 (ch.channelId);
+        w.lp32 (ch.typeName);
+        w.lp32 (ch.userName);
+        w.lp32 ({});
+    });
+    for (const auto& words : ch.sends)
+        w.chunk ("SEND", [&] {
+            for (const auto x : words)
+                w.u32 (x);
+        });
+    for (const auto& lane : ch.lanes)
+        w.chunk ("TRKH", [&] {
+            w.chunk ("DESc", [&] {
+                w.u32 (lane.rawKind);
+                w.i32 (lane.targetModule);
+                w.i32 (lane.targetParam);
+                w.f64 (lane.swing);
+                w.u32 (0);
+                w.u32 (0);
+                w.fixed (lane.name, 1024);
+            });
+            for (const auto& clip : lane.clips)
+                w.chunk ("CLIP", [&] { writeClip (w, clip); });
+        });
+}
+} // namespace
+
+std::vector<std::uint8_t> write (const Project& p)
+{
+    Writer w;
+    w.text ("10LF");
+    const auto seed = p.title + "|" + p.created;
+    int maxId = 0;
+    for (const auto& c : p.channels)
+        maxId = std::max (maxId, c.channelId);
+    w.chunk ("HEAD", [&] {
+        w.u32 (1);
+        w.u32 (0);
+        w.fixed (p.title, 256);
+        w.f64 (p.tempo);
+        w.f64 (std::min (p.loopStart, p.loopEnd));
+        w.f64 (std::max (p.loopStart, p.loopEnd));
+        w.f64 (0.0);
+        // the view (INFERRED: the playlist's scroll and zoom): a template's zoom, so the song opens framed
+        w.f64 (0.0);
+        w.f64 (0.0);
+        w.f64 (0.00909978337585926);
+        w.f64 (0.007574860006570816);
+        guid (w, seed + "|song");
+        w.u32 (p.root);
+        w.u32 (p.scale);
+        w.u8 (p.keySharps ? 1 : 0);
+        w.u8 (1);
+        w.u32 ((std::uint32_t) std::clamp (maxId + 1, 1, 0xFFF));
+        w.lp32 (p.appVersion.empty() ? std::string ("5.0.4") : p.appVersion);
+    });
+    if (! p.chordSetJson.empty())
+        w.chunk ("KEYB", [&] { w.lp32 (p.chordSetJson); });
+    w.chunk ("META", [&] {
+        w.fixed (p.created, 256);
+        w.f64 (p.editSeconds);
+        w.fixed (p.author, 256);
+        w.fixed (p.originalName.empty() ? p.title : p.originalName, 256);
+        w.u8 (0);
+        w.fixed (p.notes, 2048);
+        w.fixed (p.saved, 256);
+    });
+    w.chunk ("TDIV", [&] {
+        w.u8 ((std::uint8_t) std::clamp (p.numerator, 1, 32));
+        w.u8 ((std::uint8_t) std::clamp (p.denominator, 1, 32));
+    });
+    for (const auto& [tag, body] : p.extraChunks)
+        if (tag.size() == 4)
+            w.chunk (tag.c_str(), [&] { w.bytes (body.data(), body.size()); });
+    for (const auto& rack : p.racks)
+        w.chunk ("RACK", [&] { writeRack (w, rack); });
+    for (std::size_t i = 0; i < p.channels.size(); ++i)
+        w.chunk ("CHNL", [&] { writeChannel (w, p.channels[i], seed, i); });
+    return w.out;
+}
+
+float hueOfColour (std::uint32_t colour) noexcept
+{
+    if (colour == 0)
+        return -1.0f;
+    const auto dist = [colour] (std::uint32_t c) {
+        int d = 0;
+        for (int k = 0; k < 3; ++k)
+        {
+            const auto a = (int) ((colour >> (8 * k)) & 0xFF), b = (int) ((c >> (8 * k)) & 0xFF);
+            d += (a - b) * (a - b);
+        }
+        return d;
+    };
+    float best = 0.0f;
+    int bestDist = dist (channelColour (0.0f));
+    for (int k = 1; k <= 1000; ++k)
+    {
+        const auto h = (float) k / 1000.0f;
+        if (const auto d = dist (channelColour (h)); d < bestDist)
+        {
+            bestDist = d;
+            best = h;
+        }
+    }
+    return best;
+}
+} // namespace lynx::flm
+// --- end of round 190og

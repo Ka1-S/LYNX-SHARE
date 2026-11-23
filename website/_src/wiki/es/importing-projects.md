@@ -1,11 +1,11 @@
 ---
-source: c4e89e7e72
+source: 532b2eee04
 ---
-`Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
+`Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
 
 ## Abrir un proyecto de otro programa
 
-1. Elige `Archivo › Abrir...` y selecciona el archivo `.flp`, `.als`, `.flm` o `.mid`.
+1. Elige `Archivo › Abrir...` y selecciona el archivo `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid`, `.zip` o de módulo de tracker (`.mod`, `.xm`, `.s3m`, `.it`).
 2. Espera mientras LYNX SHARE busca los plugins y samples del proyecto.
 3. Si no se encontró algo, se abre la ventana `Archivos que faltan`. Indícale dónde están tus samples, o ciérrala.
 4. La barra de título muestra ahora de dónde viene el proyecto, por ejemplo "(importado de FL Studio)".
@@ -16,11 +16,16 @@ source: c4e89e7e72
 | Formato | Se convierte | No se convierte |
 |---|---|---|
 | `.flp` (FL Studio) | Canales, samples, patrones, notas slide y porta, todos los arreglos, marcadores, cambios de compás, automatización, vínculos a controladores, el Mixer con su enrutado, sidechains, EQ de pista y efectos nativos | Los paquetes FLEX están cifrados y nunca se abren. Un canal FLEX recibe un patch de sintetizador elegido según el nombre de su preset |
-| `.als` (Live 11 y 12) | Pistas MIDI, de audio, de grupo y de retorno, tempo, compás, locators, el bucle, volumen, pan, silencio, solo y envíos con su automatización, clips de sesión y escenas, marcadores de warp, racks y Drum Racks, y muchos de los dispositivos propios de Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift y más) como propios de LYNX SHARE | Los dispositivos de Live sin equivalente en LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, parches de FM Operator y otros) se descartan y se listan. Los MIDI Effect Racks no se convierten |
+| `.als` (Live 11 y 12) | Pistas MIDI, de audio, de grupo y de retorno, tempo, compás, locators, el bucle, volumen, pan, silencio, solo y envíos con su automatización, clips de sesión y escenas, marcadores de warp, racks y Drum Racks, y muchos de los dispositivos propios de Live (EQ Eight, Compressor, Glue Compressor, Reverb, Hybrid Reverb, Delay, Grain Delay, Auto Filter, Saturator, Roar, Utility, Simpler, Drift, Operator, Wavetable y más) como propios de LYNX SHARE | Los dispositivos de Live sin equivalente en LYNX SHARE (Amp, Cabinet, Beat Repeat, Vocoder y otros) se descartan y se listan |
 | `.flm` (FL Studio Mobile) | Tempo, compás, un insert del Mixer por canal, una pista de la Playlist por carril, patrones, clips de audio con desfase y tono, kits de batería, DW Sampler y programas `.dwp`, el Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth y SuperSaw, los efectos, la automatización y los sets de acordes | Los demás generadores de FLM suenan con el sintetizador integrado |
+| `.dawproject` (Bitwig Studio, Studio One, Cubase y otras apps) | Pistas, carpetas, clips, notas, audio con sus marcadores de warp, automatización, tempo, marcadores, el mezclador con envíos, escenas en la cuadrícula de clips y plugins VST3, VST2 y CLAP con su estado. El EQ, el compresor, la puerta y el limitador del formato pasan a ser los propios de LYNX SHARE | Los efectos de notas, las expresiones por nota y los dispositivos propios de la otra app se listan en el informe de importación |
+| `.band` (GarageBand 10, GarageBand para iOS) | Pistas, regiones MIDI y de audio, tempo, compás, tonalidad, secciones como marcadores, nivel, pan y silencio, como pistas del diseño simple. Instrumentos Sampler hechos en GarageBand para iOS | Las pistas de instrumento suenan con el sintetizador integrado y la batería. Las regiones de Drummer, las carpetas de tomas y los cambios de tempo se listan. Los proyectos de GarageBand 11 y anteriores no se pueden leer |
+| `.blx` (BandLab) | Pistas, regiones MIDI y de audio con sus bucles, tempo, compás, tonalidad, volumen, pan y silencio, automatización de volumen y pan, y los efectos comunes, como pistas del diseño simple | Las pistas de instrumento suenan con el sintetizador integrado y la batería. Los demás efectos y el preset de Mastering se dejan fuera y se listan. Probado solo con proyectos inventados |
 | `.mid` | Notas, compases y todos los cambios de tempo | Un archivo MIDI no lleva sonidos: los canales reciben el sintetizador de LYNX SHARE o un canal MIDI Out |
+| `.mod`, `.xm`, `.s3m`, `.it` (módulos de tracker) | Instrumentos como canales Sampler con sus samples, patrones, la lista de orden como Playlist, velocidad y tempo, volumen de nota, panorama, retardo y corte; los cambios de volumen y panorama como eventos del canal (MOD y XM), y los slides, el vibrato, los arpegios y las envolventes de tono como curvas de tono de las notas | Los demás efectos y las envolventes de instrumento se cuentan en el informe de importación. `Ver › Tracker` edita las notas a la manera de un tracker |
+| `.zip` | El paquete de loops comprimido de FL Studio, o un proyecto exportado con sus samples: se descomprime en una carpeta propia y luego se abre el proyecto de dentro con sus samples | |
 
-Los plugins VST2, VST3 y CLAP de terceros de un `.flp`, y los VST2 y VST3 de un `.als`, se cargan con su estado guardado si el mismo plugin está instalado en tu ordenador.
+Los plugins VST2, VST3 y CLAP de terceros de un `.flp` o de un `.dawproject`, y los VST2 y VST3 de un `.als`, se cargan con su estado guardado si el mismo plugin está instalado en tu ordenador.
 
 ## Los plugins propios de FL Studio
 
@@ -84,9 +89,18 @@ Para recuperar el plugin real, instálalo, elige `Opciones › Buscar plugins` y
 
 `Ctrl+M` en el [Piano Roll](/wiki/piano-roll/) importa un archivo MIDI en el canal actual.
 
+## Importar pistas de otro proyecto
+
+`Archivo › Importar › Pistas de otro proyecto...` trae pistas de otro proyecto al que tienes abierto, sin cerrarlo. Lee todos los formatos que lee `Archivo › Abrir...`.
+
+1. Elige el proyecto. Una ventana lista sus pistas de la Playlist y lo que contiene cada una.
+2. Marca las pistas que quieres.
+3. Elige si vienen también `Con inserts del mezclador y efectos` y `Con automatización`, y `Colocarlas en` el inicio de la canción o el inicio de la selección de tiempo.
+4. Haz clic para importar. Las pistas, canales, patrones e inserts nuevos llegan como un solo paso, así que un solo deshacer los quita todos.
+
 ## Conviene saber
 
-- `Ayuda › Archivos que faltan...` vuelve a abrir la ventana más tarde. `Ayuda › Last FL Studio import report` lista lo que se aproximó, se dejó fuera o no estaba instalado.
+- `Ayuda › Archivos que faltan...` vuelve a abrir la ventana más tarde. `Ayuda › Último informe de importación de proyecto` lista lo que se aproximó, se dejó fuera o no estaba instalado.
 - Los clips de sesión de un set de Live van a la cuadrícula de clips del diseño de lanzamiento de clips. `Clips de sesión de sets de Live` en `Opciones › Configuración general...` los coloca en la Playlist en su lugar.
 
 ## Relacionado

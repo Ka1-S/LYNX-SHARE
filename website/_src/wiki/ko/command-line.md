@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHARE는 창을 열지 않고도 실행할 수 있습니다. 옵션 하나는 프로젝트를 오디오로 렌더링하고, 다른 옵션들은 FL Studio 프로젝트나 Ableton Live 세트로 변환하며, 테스트용 옵션도 여러 개 있습니다. 프로젝트 자체의 검사에도 같은 옵션을 씁니다.
 
@@ -18,7 +18,7 @@ LYNX SHARE는 창을 열지 않고도 실행할 수 있습니다. 옵션 하나�
 LYNX.exe project.lynx
 ```
 
-창과 함께 LYNX SHARE를 시작하고 파일을 엽니다. `.lynx`, `.flp`, `.als`, `.flm`, `.mid`를 받습니다. 상대 경로는 현재 폴더 기준입니다.
+창과 함께 LYNX SHARE를 시작하고 파일을 엽니다. `.lynx`, `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.zip`, `.mid`를 받습니다. 상대 경로는 현재 폴더 기준입니다.
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ LYNX.exe --no-plugins project.lynx
 
 | 옵션 | 동작 |
 |---|---|
-| `--export <project> <out>` | 꼬리까지 포함해 곡 전체를 렌더링하며, 내보내기 창과 같은 방식입니다. `<out>`의 확장자가 형식을 정합니다. `.wav`(24비트), `.flac`, `.ogg`, `.mp3`(320 kbps) |
+| `--export <project> <out>` | 꼬리까지 포함해 곡 전체를 렌더링하며, 내보내기 창과 같은 방식입니다. `<out>`의 확장자가 형식을 정합니다. `.wav`(24비트), `.flac`, `.ogg`, `.mp3`(320 kbps), `.aif` / `.aiff`(24비트), `.m4a`(192 kbps, Linux에서는 불가) |
 | `--export ... --pattern` | 현재 패턴만 렌더링합니다 |
 | `--export ... --insert N` | 믹서 인서트 N의 출력만 렌더링합니다 |
 | `--export ... --rate N` | 다른 샘플 레이트(Hz)로 렌더링합니다 |
 | `--stems <project> <base.wav>` | 채널이 있는 믹서 인서트마다 WAV 하나를 씁니다. `base - 1.wav`, `base - 2.wav` 등입니다 |
 | `--export-flp <project> <out.flp>` | FL Studio 프로젝트를 씁니다. `out.zip`을 주면 압축된 루프 패키지를 씁니다 |
 | `--export-flp ... --substitute` | LYNX 전용 플러그인을 오디오로 렌더링하지 않고 가장 비슷한 FL 플러그인으로 바꿉니다 |
+| `--export-flm <project> <out.flm>` | FL Studio Mobile 프로젝트를 쓰고, 샘플을 옆의 `<name> Samples` 폴더에 복사합니다 |
 | `--export-als <project> <folder>` | Live 12용 Ableton Live 세트를 `<folder>/<name> Project/<name>.als`에 씁니다 |
 | `--export-als ... --live11` | Live 11용 세트를 씁니다 |
 | `--export-bundle <project> <folder>` | `파일 › 내보내기 › 다른 앱용...`의 패키지를 폴더에 씁니다 |

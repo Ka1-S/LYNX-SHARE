@@ -4,7 +4,8 @@
     scripts/check-site-i18n.py                    check every language; lists the missing keys per language; exit 1 on an error
     scripts/check-site-i18n.py --todo ID FILE     write what language ID still lacks: {"ui": {key: English}, "updates": {...}, "catalog": {...}, "insp": {...}}
     scripts/check-site-i18n.py --merge ID FILE    merge a translated --todo file into the language's files and drop keys the site no longer uses
-    scripts/check-site-i18n.py --bodies ID DIR    take translated wiki bodies from DIR: <page>.md (the article's body, no front matter) and
+    scripts/check-site-i18n.py --bodies ID DIR    take translated wiki bodies from DIR: <page>.md (the article's body, no front matter),
+                                                  learn.<slug>.md (a tutorial page's written steps) and
                                                   *.json ({plugin id: {"intro", "does": [one per control], "tips"}}); see "Wiki bodies" below
 
 The site speaks the same 15 languages as the app (src/ui/I18n.cpp: ids and native names must match). English lives in
@@ -72,6 +73,12 @@ def app_dict(lid):
     un = lambda x: re.sub(r"\\(.)", lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), x)
     for m in re.finditer(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"', f.read_text(encoding="utf-8") if f.exists() else "", re.M):
         out[un(m.group(1))] = un(m.group(2))
+    # English shows a few keys differently (its display table, resources/i18n/en/display.txt): a page quoting the English
+    # label ("Simple layout") gets the translation of its key ("Simple workflow")
+    en = ROOT / "resources/i18n/en/display.txt"
+    for m in re.finditer(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"', en.read_text(encoding="utf-8") if en.exists() and out else "", re.M):
+        if un(m.group(1)) in out:
+            out.setdefault(un(m.group(2)), out[un(m.group(1))])
     return out
 
 
@@ -170,9 +177,16 @@ def body_sources(b):
     return arts, plugs, cat
 
 
+def learn_sources(b):
+    """The English written steps of the tutorial pages: {slug: (digest, html)}."""
+    _, pages = b.learn_data()
+    return {s: (b.digest(p["body"]), p["prose"]) for s, p in pages.items()}
+
+
 def check_bodies(b, langs, errors, warnings):
     """Returns {language: words of English it has bodies for}."""
     arts, plugs, cat = body_sources(b)
+    learn = learn_sources(b)
     done = {}
     for lid, _ in langs:
         if lid == "en":
@@ -206,6 +220,20 @@ def check_bodies(b, langs, errors, warnings):
             if [label(a, app) for a, _ in en.get("controls", [])] != [a for a, _ in w.get("controls", [])]:
                 warnings.append(f"{lid}: plugin page '{pid}': control names differ from the app's")
             pairs.append((pid, plugs[pid][1], b.plugin_prose(plugs[pid][2], cat, w)[0]))
+        # the written steps of the tutorial pages (_src/learn/<id>/<slug>.md, round 190nt): the same rules
+        ld = SITE / "_src/learn" / lid
+        lhave = {p.stem for p in ld.glob("*.md")} if ld.is_dir() else set()
+        for extra in sorted(lhave - set(learn)):
+            warnings.append(f"{lid}: tutorial body '{extra}' has no English page")
+        if sorted(set(learn) - lhave):
+            errors.append(f"{lid}: {len(set(learn) - lhave)} tutorial bodies missing: " + ", ".join(sorted(set(learn) - lhave)))
+        for s in sorted(lhave & set(learn)):
+            meta, body = b.front(ld / f"{s}.md")
+            if meta.get("source") != learn[s][0]:
+                errors.append(f"{lid}: tutorial body '{s}' was made from an older English text")
+                continue
+            ids = re.findall(r'<h[23] id="([^"]+)"', learn[s][1])
+            pairs.append(("learn/" + s, learn[s][1], b.markdown(body, iter(ids))))
         words = 0
         for name, en, tr in pairs:
             eb, ec, ecode = body_shape(en, app)
@@ -232,7 +260,20 @@ def bodies(lid, src):
     arts, plugs, _ = body_sources(b)
     app = app_dict(lid)
     n = 0
+    learn = learn_sources(b)
+    for f in sorted(Path(src).glob("learn.*.md")):
+        slug = f.stem[len("learn."):]
+        if slug not in learn:
+            print(f"check-site-i18n: {f.name}: no such tutorial, skipped")
+            continue
+        text = re.sub(r"\A---\n.*?\n---\n", "", f.read_text(encoding="utf-8"), flags=re.S).strip("\n")
+        out = SITE / "_src/learn" / lid / f"{slug}.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("---\nsource: %s\n---\n%s\n" % (learn[slug][0], code_labels(text, app)), encoding="utf-8")
+        n += 1
     for f in sorted(Path(src).glob("*.md")):
+        if f.stem.startswith("learn."):
+            continue
         if f.stem not in arts:
             print(f"check-site-i18n: {f.name}: no such wiki page, skipped")
             continue

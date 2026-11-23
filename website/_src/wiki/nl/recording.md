@@ -1,5 +1,5 @@
 ---
-source: 094cbefd18
+source: 896ead3e2d
 ---
 ![Het venster Opname vraagt wat er opgenomen moet worden: audio, noten en automatisering, alles, of audio in de audio-editor](/assets/img/wiki/record-dialog.webp)
 
@@ -87,7 +87,7 @@ De opties staan in `Opties › Opname` en in het rechtsklikmenu van de opnamekno
 
 ## Opnemen in clipslots
 
-In de [Clip-launch-werkwijze](/wiki/layouts/) kunnen takes in het clipraster in plaats van de Playlist, zoals in Ableton Live.
+In de [Clipstart-lay-out](/wiki/layouts/) kunnen takes in het clipraster in plaats van de Playlist, zoals in Ableton Live.
 
 - Armeer een track met zijn arm-knop in de Sessiemixer. Zijn lege slots tonen dan een ronde opnameknop in plaats van het stopvierkant. Klik erop om in dat slot op te nemen.
 - `Sessie-opname`, onder het raster, neemt de gearmeerde tracks op in de geselecteerde scene. Terwijl hun clips spelen, worden nieuwe noten eraan toegevoegd (overdub).

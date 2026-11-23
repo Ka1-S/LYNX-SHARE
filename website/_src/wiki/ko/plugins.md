@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHARE는 다른 제작사의 악기와 이펙트 플러그인을 호스팅�
 3. `F8` 키를 눌러 플러그인 선택기를 열고 플러그인 이름의 일부를 입력합니다.
 4. 더블 클릭하거나 `Enter` 키를 누릅니다. 악기는 새 채널이 되고, 이펙트는 선택한 믹서 인서트에 들어갑니다.
 
-처음 시작할 때 설정 마법사가 플러그인 폴더를 나열하고 백그라운드에서 스캔합니다. `옵션 › 설정 마법사(언어, 오디오, 플러그인 폴더)...` 메뉴에서 다시 열 수 있습니다. LYNX SHARE는 시작하고 몇 초 뒤에도 새 플러그인을 찾아봅니다.
+처음 시작할 때 환영 카드가 열려 있는 동안 LYNX SHARE가 플러그인 폴더를 백그라운드에서 스캔합니다. `옵션 › 설정 마법사(언어, 오디오, 플러그인 폴더)...`에서 폴더를 다시 볼 수 있습니다. LYNX SHARE는 시작하고 몇 초 뒤에도 새 플러그인을 찾아봅니다.
 
 ## 시스템별 형식
 
 | 시스템 | 호스팅하는 형식 |
 |---|---|
-| Windows | VST3, CLAP, VST2 |
-| macOS | VST3, CLAP, Audio Units |
-| Linux | VST3, CLAP, LV2, VST2 |
+| Windows | VST3, CLAP, VST2, JSFX |
+| macOS | VST3, CLAP, Audio Units, JSFX |
+| Linux | VST3, CLAP, LV2, VST2, JSFX |
 
 macOS에서는 VST2를 호스팅하지 않습니다. Linux에서는 직접 설치하는 [yabridge](https://github.com/robbert-vdh/yabridge)와 Wine을 통해 Windows 플러그인이 동작합니다. yabridge가 동기화하는 폴더를 플러그인 폴더로 추가하세요.
+
+REAPER의 이펙트·악기 형식인 JSFX 스크립트는 모든 시스템에서 실행됩니다. LYNX SHARE에는 무료 스크립트 31개(chokehold 제작, MIT 라이선스)가 함께 들어 있으며, 브라우저의 `플러그인 데이터베이스 › 이펙트 › JSFX`와 `플러그인 데이터베이스 › 제너레이터 › JSFX`, 플러그인 선택기에서 찾을 수 있습니다. `Documents/LYNX/JSFX`와 REAPER의 Effects 폴더에 있는 스크립트도 찾아내며, `설정 › 파일 › JSFX 폴더`에서 폴더를 더 추가할 수 있습니다. LYNX SHARE는 스크립트의 슬라이더를 자체 패널에 보여 줍니다. 자체 화면을 그리는 스크립트는 슬라이더만 보여 줍니다.
 
 ## 플러그인 관리자
 
@@ -102,6 +104,18 @@ Sytrus, Harmor, Patcher 같은 FL Studio의 네이티브 플러그인은 FL Stud
 FL Studio 안에서 만든 내용은 LYNX SHARE 프로젝트와 함께 저장됩니다. `FL Studio VSTi (Multi)`에는 스테레오 출력이 16개 있으며, 각각 다른 인서트에서 재생할 수 있습니다(앞 섹션 참고). FL Studio 안에서 어떤 FL 플러그인이 작동하는지는 사용 중인 FL Studio 라이선스가 정합니다. LYNX SHARE가 FL Studio의 플러그인 파일을 단독으로 불러오지는 않습니다.
 
 FL Studio 플러그인이 `불러오기 실패`로 표시되면 `옵션 › 플러그인 관리자...`에서 마우스 오른쪽 버튼으로 눌러 `다시 시도(지금 이 파일 스캔)`를 선택하세요.
+
+## 다른 DAW에서 쓰는 LYNX 자체 플러그인
+
+Facet EQ, Apex Limiter, LYNX Tune, LYNX Model 같은 LYNX SHARE 자체 이펙트와 악기는 다른 DAW용 플러그인으로도 제공됩니다. [릴리스 페이지](https://github.com/Ka1-S/LYNX-SHARE/releases)에서 따로 받는 선택 사항이며, Windows, macOS, Linux용 `LYNX-Plugins-<version>`입니다.
+
+- 모든 플러그인이 CLAP 파일 하나, `LYNX Plugins.clap`에 들어 있습니다. 일부는 VST3로도, Linux에서는 LV2로도 제공됩니다.
+- 팩에 든 악기: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil, LYNX Duoloom.
+- Windows에서는 `LYNX-Plugins-<version>-win-x64.7z`(약 20 MB)를 받으세요. `.zip`(약 195 MB)에도 같은 파일이 들어 있습니다.
+- 압축 파일 안의 설치 스크립트(Windows는 `install.cmd`, macOS와 Linux는 `install.sh`)를 실행한 다음 DAW에서 플러그인을 다시 스캔하세요.
+- 플러그인은 LYNX SHARE 안에서와 같은 에디터를 열고, 그 상태는 LYNX SHARE에서 프로젝트로 열립니다.
+
+전체 목록은 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)에 있습니다.
 
 ## Plugin database 폴더
 

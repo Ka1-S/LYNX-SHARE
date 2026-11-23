@@ -1,9 +1,9 @@
 ---
-source: da5e41c322
+source: b05790879f
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
-Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP3, OGG, dan FLAC) memakai satu jendela ekspor. MIDI, proyek FL Studio, set Ableton Live, dan proyek zip punya entri sendiri di menu yang sama.
+Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP3, OGG, FLAC, AIFF, dan M4A) memakai satu jendela ekspor. MIDI, proyek FL Studio, set Ableton Live, file DAWproject, dan proyek zip punya entri sendiri di menu yang sama.
 
 ## Mengekspor lagu sebagai WAV
 
@@ -28,7 +28,7 @@ Semua yang keluar dari LYNX SHARE lewat `File › Ekspor`. Format audio (WAV, MP
 
 ## Format output
 
-Empat tombol memilih formatnya. `Simpan juga` menulis format lain dari render yang sama, dengan nama yang sama.
+Tombol-tombolnya memilih format. M4A hanya tersedia kalau sistem punya encoder AAC: di Windows dan macOS, tidak di Linux. `Simpan juga` menulis format lain dari render yang sama, dengan nama yang sama.
 
 | Format | Opsi |
 |---|---|
@@ -36,6 +36,8 @@ Empat tombol memilih formatnya. `Simpan juga` menulis format lain dari render ya
 | MP3 | `Bitrate`, konstan |
 | OGG | Bitrate |
 | FLAC | `Bit depth`, `Kompresi` dari `0 (tercepat)` sampai `8 (terkecil)`, `Dither`. Lossless di setiap level |
+| AIFF | `Bit depth`: 16 bit atau 24 bit. `Dither` |
+| M4A | `Bitrate`: 96, 128, 160, atau 192 kbps. AAC, ditulis oleh encoder sistem |
 
 `Sample rate` dan `Channel` berlaku untuk semua format. `Channel` adalah `Stereo`, `Mono (kedua sisi dicampur)`, `Mono (kiri saja)`, atau `Mono (kanan saja)`.
 
@@ -65,6 +67,8 @@ Empat tombol memilih formatnya. `Simpan juga` menulis format lain dari render ya
 
 Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian bawah menunjukkan berapa file yang akan ditulis.
 
+Ketika lagu punya bagian di jalur Sections, `Satu file per bagian` memotongnya pada bagian-bagian itu dan menamai setiap file sesuai bagiannya. Dengan stem, setiap bagian mendapat set sendiri.
+
 `File › Ekspor › Semua track Playlist` dan `Semua grup track Playlist` menulis satu file per track atau per grup Playlist. Di menu Mixer, `Perekaman ke disk › Render track yang disiagakan ke file wave...` (`Alt+R`) membuka jendela ekspor hanya untuk insert yang disiagakan.
 
 ## Entri lain di menu Ekspor
@@ -73,20 +77,27 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 |---|---|---|
 | `File MIDI...` | `Ctrl+Shift+M` | Menulis not sebagai file MIDI standar (`.mid`) |
 | `Master...` | `Ctrl+Alt+M` | Me-render proyek dan me-master-nya ke target loudness dalam LUFS, di komputermu |
-| `Proyek beserta sample (.zip)...` | tidak ada | Proyek beserta sample-nya dalam satu arsip |
+| `Paket loop zip...` | tidak ada | Proyek beserta semua sample yang dipakainya dalam satu `.zip`, sebagai paket loop zip FL Studio |
+| `File data proyek...` | tidak ada | Menyalin semua file yang dipakai proyek ke folder pilihanmu; proyek tetap memakai file-nya sendiri |
 | `Proyek FL Studio...` | tidak ada | Sebuah `.flp`, atau paket loop zip dengan semua sample |
 | `Set Ableton Live (.als)...` | tidak ada | Set untuk Live 12 atau Live 11 |
+| `DAWproject (.dawproject)...` | tidak ada | Proyek untuk Bitwig Studio, Studio One, Cubase, dan aplikasi lain yang membaca DAWproject |
+| `Untuk aplikasi lain...` | tidak ada | Satu folder berisi stem, file MIDI, set Live, proyek FL Studio, mixdown, dan README, di-zip kalau kamu mau |
 | `Tulang proyek...` | tidak ada | Preset dan skor channel dan efek, dalam sebuah folder |
 
-## Mengekspor ke FL Studio dan Ableton Live
+## Mengekspor ke FL Studio, Ableton Live, dan DAWproject
 
-`.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator selalu dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
+`.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator yang mengikuti posisi lagu menjadi clip otomasi: LFO yang tersinkron menjadi LFO clip milik FL Studio, dan step, sumber acak, serta makro menjadi titik. Follower, envelope, keytrack, dan velocity dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
 
-`.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
+`.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Helix adalah pengecualian: ia menjadi Wavetable milik Live. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
+
+`.dawproject` berisi track, folder, clip, not, audio beserta penanda warp-nya, otomasi, tempo, marker, mixer dengan send, dan plugin VST3, VST2, dan CLAP beserta state-nya. Instrumen dan efek bawaan LYNX SHARE ditulis sedemikian rupa sehingga LYNX SHARE bisa membukanya lagi. Grid clip, aransemen lain, dan beberapa detail per not dilewati, dan sebuah laporan mencantumkannya.
+
+`File › Simpan salinan sebagai proyek FL Studio Mobile (.flm)...` menulis file `.flm` untuk FL Studio Mobile dan menyalin sample ke folder `<name> Samples` di sebelahnya. Sebelum menyimpan, sebuah jendela mencantumkan apa yang hilang dari salinan, seperti pada `File › Simpan salinan untuk LYNX yang lebih lama...`. File `.flm` mempertahankan not dan pattern (FL Studio Mobile punya satu pattern per track), tempo, ketukan per birama, tangga nada dan set akor, level, panning, mute, dan solo mixer serta send ke bus, instrumen milik FL Studio Mobile (MiniSynth, SuperSaw, GMSynth, dan Transistor Bass, serta MiniSynth dan Transistor Bass dari FL Studio), sampler drum sebagai drum kit, Layer sebagai rack dengan beberapa instrumen, setiap efek Pocket (FLM) dengan mix-nya, dan klip audio dengan level, panning, pitch, dan reverse-nya. File ini juga menulis DW Sampler (beserta zonanya) dan 3x Osc, serta klip otomasi untuk level dan panning mixer, efek Pocket (FLM), dan nilai milik DW Sampler dan GMSynth. Instrumen lain (untuk sementara termasuk Slicer dan SoundFont Player milik FL Studio Mobile) mempertahankan notnya di MiniSynth milik FL Studio Mobile, sedangkan efek tanpa modul FLM dan otomasi target lain, seperti kenop milik synth dan plugin pihak ketiga, dibuang; semuanya dicantumkan.
 
 ## Baik diketahui
 
-- `Dither` tampil abu-abu untuk MP3, dan opsi tempo serta marker tampil abu-abu untuk semua format selain WAV.
+- `Dither` tampil abu-abu untuk MP3, OGG, M4A, dan WAV 32-bit, dan opsi tempo serta marker tampil abu-abu untuk semua format selain WAV.
 - Dengan `Pilihan Playlist` dan tanpa seleksi di Playlist, seluruh lagu di-render. Jendela memperingatkanmu.
 - Kalau insert Master di-mute, jendela memperingatkan bahwa file-nya akan senyap.
 - `Tulis juga video dengan mix ini` hanya muncul saat proyek punya track video, dan membutuhkan FFmpeg.

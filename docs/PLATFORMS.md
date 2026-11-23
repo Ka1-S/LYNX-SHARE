@@ -8,7 +8,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 |---|---|---|---|
 | Builds | Zig cross build from Linux/WSL (`scripts/build-windows-zig.sh`, used for releases) or CMake + MSVC | CMake + Apple clang, universal arm64 + x86_64 | CMake + GCC or Clang |
 | Package | per-user installer (NSIS) + portable .zip | .dmg (ad-hoc signed, **not notarized**) | AppImage + .tar.gz (`install.sh`) |
-| Minimum | Windows 10 x64 | macOS 11 Big Sur | x86_64, glibc 2.35 (Ubuntu 22.04, Debian 12, Fedora 36), X11 or XWayland |
+| Minimum | Windows 10 x64 | macOS 11 Big Sur | x86_64 or arm64 (aarch64, from 0.1.31), glibc 2.35 (Ubuntu 22.04, Debian 12, Fedora 36), X11 or XWayland |
 | Audio drivers | Windows Audio (WASAPI shared / low-latency / exclusive), DirectSound, ASIO, built-in LYNX ASIO | Core Audio | PipeWire (LYNX SHARE's own client, loaded at run time), JACK, ALSA ([LINUX.md](LINUX.md)) |
 | Plugin formats | VST3, CLAP, VST2 | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
 | Plugin sandbox (separate process) | yes (opt-in) | yes (opt-in, since 0.1.25) | yes (opt-in) |
@@ -19,7 +19,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 | FL Studio installation (factory samples, plugin database) | registry, else `Program Files\Image-Line\FL Studio*` | `/Applications/FL Studio*.app/Contents/Resources/FL` (layout not confirmed) | a Windows FL Studio under Wine: `$WINEPREFIX` or `~/.wine`, `drive_c/Program Files/Image-Line/FL Studio*` |
 
 `LYNX_FL_INSTALL=<folder>` points LYNX SHARE at an FL Studio installation anywhere (the folder that contains `Data`).
-Importing `.flp`, `.als` and `.flm` projects works everywhere; the FL Studio installation only adds FL's factory samples and plugin database.
+Importing `.flp`, `.als` and `.flm` projects and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) works everywhere; the FL Studio installation only adds FL's factory samples and plugin database.
 
 ## Platform helpers (`src/platform/`)
 
@@ -76,11 +76,62 @@ round 117 notes (`docs/analise/REA_rodada117.md`) list the measured differences.
   checks that (highest GLIBC_ symbol version, no system libstdc++) and `scripts/check-appimage-start.sh <AppImage>`
   starts the AppImage offline on Xvfb like the AppImage catalog test does; `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build --target LYNX`,
   then `scripts/package-linux.sh build/LYNX_artefacts/Release/LYNX <label> dist`.
+- Linux arm64: the same commands on an arm64 machine; see "Linux arm64" below.
 - macOS: `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" && cmake --build build --target LYNX`,
   then `scripts/package-macos.sh build/LYNX_artefacts/Release/LYNX.app <label> dist`.
 - CI: `.github/workflows/tests.yml` runs the core tests on Linux (GCC, Clang) and macOS and builds + self-tests the
   app on Linux and macOS; `release.yml` builds all three platforms on a tag and attaches the packages and
   `SHA256SUMS.txt` to the draft release.
+
+## Linux arm64
+
+Round 190oy (asked for on Discord: Raspberry Pi 5 / Ubuntu arm64). From 0.1.31 every release has
+`LYNX-<v>-aarch64.AppImage` (+ `.zsync`) and `LYNX-<v>-linux-aarch64.tar.gz`, built natively by
+`.github/workflows/linux-arm64.yml` on GitHub's `ubuntu-24.04-arm` runners (free for public repositories) in the same
+Ubuntu 22.04 container with GCC 13 as the x86_64 package, so they need glibc 2.35 and no system libstdc++. The job runs
+the self-test, the open test, the demo project and both AppImage start checks; `release.yml` calls it, and `publish`
+takes its files when it passed (a failure there doesn't hold back the other platforms). A push to a `ci-arm64/**`
+branch (or a manual run) also runs the core test suite on the arm runner and `tools/perfbench` on an arm64 and an
+x86_64 runner side by side.
+
+- **SIMD.** The exact FL engines' SSE code goes through `core/Simd.h`: on ARM64 the SSE subset is sse2neon (NEON) with
+  its precise min/max/div/sqrt options, and MXCSR (rounding, FTZ/DAZ) maps onto FPCR. The AVX / AVX2 / SSE4.1 variants
+  (`core/CpuFeatures.h`: ModalBank, Helix, the fast maths) are compiled only on x86; on ARM64 `cpu::level()` is
+  `baseline` and the portable loops run. `<cpuid.h>`, `__rdtsc` and the x87 control word are all behind x86 guards.
+- **`char` is signed** (`-fsigned-char` from CMake and `scripts/build-local.sh`): Linux on ARM makes plain `char`
+  unsigned, x86 and Apple arm64 signed, and the format readers were written and tested with a signed one.
+- **`long double`** is IEEE quad precision on Linux arm64, done in software (on Apple arm64 it is a `double`). The FL
+  engines that run on the x87 in 80-bit precision (3x Osc's mixers, FL's voice filters, the legacy Fruity effects...)
+  use it, so they should cost more there than on x86 (not measured on their own yet) and can't match the x87 bits
+  anyway. The engines that pick their type with an x86 test (`FlResampler`) use `double` on ARM64.
+- **Tests** (round 190oy, GitHub's arm64 runner): the whole core suite passes, 7.64 million checks, with the release's
+  GCC 13.4 and with clang 18 (`linux-arm64.yml`; `tests.yml` runs the clang one on every push). Ubuntu 24.04's own
+  g++ 13.3 fails 5 of them (range-for loops over braced lists of enum values; 13.4 and clang pass the same source), so
+  don't build arm64 with GCC 13.3. The app's self-test, open test and both AppImage start checks pass.
+- **Speed** (`tools/perfbench`, same scenarios, GitHub's 4-vCPU runners): arm64 needs 1.3-1.6x the CPU of the x86_64
+  runner (synth100 68 % vs 51 % of a core, inserts50 28 % vs 22 %, demo 1.8 % vs 1.2 %); a Raspberry Pi 5 is slower
+  than that server-class arm64 CPU. The output is bit-identical to x86_64 in demo, stream, inserts50, idle and
+  automation; the synth scenarios differ in the last bits (each system's maths library).
+- **ONNX Runtime** ("Extract stems"): Microsoft's 1.23.2 `runtimes/linux-arm64` library from the NuGet package
+  (`scripts/fetch-onnxruntime.sh linux-aarch64`, pinned hash).
+- **Plugins**: VST3 (`Contents/aarch64-linux`), CLAP and LV2 plugins built for arm64; x86_64 plugins can't load.
+- **Updates**: an arm64 build only takes the arm64 files (`update::assetFor`, `buildLinuxArch()`); the AppImage asks
+  `https://lynx-share.com/update/LYNX-aarch64.AppImage.zsync`, which `scripts/publish-appimage-update.sh` points at a
+  release that has an arm64 AppImage.
+
+Cross build from x86_64 (no root): GCC 13's aarch64 cross compiler from Ubuntu's packages
+(`apt-get download g++-13-aarch64-linux-gnu gcc-13-aarch64-linux-gnu cpp-13-aarch64-linux-gnu
+gcc-13-aarch64-linux-gnu-base binutils-aarch64-linux-gnu libstdc++-13-dev-arm64-cross libgcc-13-dev-arm64-cross
+libc6-dev-arm64-cross libc6-arm64-cross linux-libc-dev-arm64-cross libstdc++6-arm64-cross libgcc-s1-arm64-cross`, each
+`dpkg-deb -x` into one folder), called with `--sysroot=<that folder>` and `LD_LIBRARY_PATH=<folder>/usr/lib/x86_64-linux-gnu`
+(binutils' own libraries) through a small wrapper. Then
+
+```
+CXX=<wrapper>/aarch64-linux-gnu-g++ LYNX_TESTS_RUN=0 scripts/build-local.sh   # builds, runs nothing
+qemu-aarch64 -L <folder>/usr/aarch64-linux-gnu build-local/lynx_tests --filter <tests>
+```
+
+with `qemu-aarch64` from Ubuntu's `qemu-user` package (static). Under emulation the suite is slow: run a selection.
 
 ## Release optimisation
 

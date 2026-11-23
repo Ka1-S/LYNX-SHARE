@@ -29,6 +29,7 @@
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
 #include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
+#include "core/ModulatorExport.h"
 #include "core/Multilink.h"
 #include "core/Simd.h"
 #endif
@@ -199,6 +200,7 @@
 #include "core/Templates.h"
 #include "flp/Flp.h"
 #include "ui/I18nData.h"
+#include "ui/I18nEnglish.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
 #include "core/RenderAhead.h"
@@ -6916,6 +6918,55 @@ TEST (translations_embedded_table_is_up_to_date)
     CHECK (files == (int) std::size (lynx::i18n::data::tables));
 }
 
+TEST (translations_english_display_table)
+{
+    // rollup 0.1.31 step 3 (round 190ny): English shows the three styles of View › Layout style as layouts through its
+    // display table (resources/i18n/en/display.txt, embedded as ui/I18nEnglish.h); the tr() keys stay, so every key of
+    // the table is a key of the translation tables, keeps its placeholders, and the embedded copy is up to date
+    using namespace i18ntest;
+    const auto text = readFile ("resources/i18n/en/display.txt");
+    CHECK (text == std::string (lynx::i18n::data::englishDisplay));
+    if (text != std::string (lynx::i18n::data::englishDisplay))
+        std::printf ("  resources/i18n/en/display.txt changed since the last python3 tools/make_i18n.py\n");
+    std::vector<std::string> duplicates, unused;
+    const auto table = parseTable (text, duplicates);
+    const auto reference = parseTable (readFile ("resources/i18n/pt-BR.txt"), unused);
+    CHECK (duplicates.empty());
+    CHECK (table.size() >= 15);
+    const auto placeholders = [] (const std::string& s) {
+        std::multiset<std::string> out;
+        for (auto at = s.find ('{'); at != std::string::npos; at = s.find ('{', at + 1))
+            if (const auto end = s.find ('}', at); end != std::string::npos)
+                out.insert (s.substr (at, end - at + 1));
+        return out;
+    };
+    int notKeys = 0, workflow = 0;
+    for (const auto& [key, value] : table)
+    {
+        if (reference.count (key) == 0)
+        {
+            ++notKeys;
+            std::printf ("  English display key \"%s\" is not a key of the translation tables\n", key.c_str());
+        }
+        CHECK (placeholders (key) == placeholders (value));
+        workflow += value.find ("orkflow") != std::string::npos ? 1 : 0;
+    }
+    CHECK (notKeys == 0);
+    CHECK (workflow == 0);
+    CHECK (table.count ("Pattern workflow (default)") == 1 && table.at ("Pattern workflow (default)") == "Pattern layout (default)");
+    CHECK (table.count ("Clip-launch workflow") == 1 && table.at ("Clip-launch workflow") == "Clip-launch layout");
+    CHECK (table.count ("Simple workflow") == 1 && table.at ("Simple workflow") == "Simple layout");
+    // every key with "workflow" that English shows is in it
+    int missing = 0;
+    for (const auto& [key, value] : reference)
+        if (key.find ("orkflow") != std::string::npos && table.count (key) == 0)
+        {
+            ++missing;
+            std::printf ("  \"%s\" still shows \"workflow\" in English\n", key.c_str());
+        }
+    CHECK (missing == 0);
+}
+
 TEST (translations_no_value_is_a_python_dict)
 {
     // a value written as a Python dict ("{'de': '...', 'es': ...}", 177a's menu slice) reaches the users verbatim:
@@ -10584,7 +10635,10 @@ TEST (autogun_template_channels)
         opt.autogun = true;
         opt.sgState = sgState;
         opt.tempo = 120.0; // the instrument is configured at 120 BPM
-        const auto ref = lynx::ogun::renderReference (c.pluginState, { { 0, 60, 0.75, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 6144 } }, 44100.0, 16384, opt);
+        // (round 190pi: FL's host hands a velocity-linked voice Final.Vol = Init.Vol, (11^(1.28·v) − 1)/10 — Autogun's
+        // default patch scales with the velocity in FL 2026's renders, REA_rodada190pi §3; this state links it)
+        const auto finalVol = (std::pow (11.0, 1.28 * 0.75) - 1.0) / 10.0;
+        const auto ref = lynx::ogun::renderReference (c.pluginState, { { 0, 60, 0.75, finalVol, 0.0, 0.0, 0.0, 0.0, 0.5, 6144 } }, 44100.0, 16384, opt);
         auto inst = lynx::makeInstrument (lynx::InstrumentKind::autogun);
         inst->configure (c, 120.0);
         inst->prepare (44100.0);
@@ -14943,6 +14997,7 @@ TEST (simsynth_engine)
     lynx::ChannelDef c;
     c.instrument = lynx::InstrumentKind::simsynth;
     c.pluginState = blobA;
+    c.engineRev = 1; // (round 190om: the revision before the velocity law, every note at Final.Vol 1)
     auto inst = lynx::makeInstrument (lynx::InstrumentKind::simsynth);
     inst->prepare (44100.0);
     inst->configure (c, 120.0);
@@ -17644,11 +17699,16 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Meld190koTests.inc" // round 190ko: Meld → Braid, Spectral Time → Timeprism, Spectral Resonator → Harmonia (uses als190cf::)
 #include "AlsDevices190ekTests.inc"
 #include "Tetra190hsTests.inc" // round 190hs
+#include "LynxModel190niTests.inc" // round 190ni
+#include "LynxModel190nlTests.inc" // round 190nl
+#include "LynxModel190nmTests.inc" // round 190nm
+#include "LynxModel190nnTests.inc" // round 190nn
 #include "Tetra190ixTests.inc" // round 190ix
 #include "Helix190jaTests.inc" // round 190ja
 #include "Helix190miTests.inc" // round 190mi
 #include "Helix190mlTests.inc" // round 190ml
 #include "Helix190mtTests.inc" // round 190mt
+#include "Helix190ocTests.inc" // round 190oc: Helix round 4 (grain / spectral unison, reverse grains)
 #include "AlsDevices190fmTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
@@ -17680,6 +17740,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Lfo177bTests.inc"
 #include "Curves190bwTests.inc"
 #include "Mod177bTests.inc"
+#include "Mod190oxTests.inc" // round 190ox: modulators stage 2
 #include "UiFont179aTests.inc"
 #include "Multilink177bTests.inc"
 #include "Issue97Tests.inc"
@@ -17789,6 +17850,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleGate190dgTests.inc"
 #include "SimpleNext190dsTests.inc"
 #include "FirstSongTour190dvTests.inc"
+#include "Onboarding190npTests.inc" // round 190np: first-run onboarding (core/Onboarding.h)
+#include "Offline190nxTests.inc" // round 190nx: offline mode (core/Offline.h)
 #include "SimplePads190foTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"
@@ -17863,6 +17926,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lnTests.inc" // round 190ln: Eiosis AirEQ / Slate Infinity EQ translated onto Facet EQ in physical units
 #include "Parity190lnKhsTests.inc" // round 190ln: Kilohearts states (kHs snapins, Faturator, Disperser) on LYNX stand-ins
 #include "Parity190nbKhsTests.inc" // round 190nb: Kilohearts laws on Effector (Ring Mod, Reverser, Resonator, Phase Distortion, Shaper) + measured maps
+#include "Parity190nhKhsTests.inc" // round 190nh: Kilohearts part 2 (Comb Filter, Chorus, Trance Gate, Phaser, Distortion, Bitcrush, Frequency Shifter, Ensemble)
+#include "Parity190ocKhsTests.inc" // round 190oc: Kilohearts Nonlinear Filter
 #include "Parity190kwR2Tests.inc" // round 190kw: Pro-R 2 → LuxeVerb Space, the Space engine's revision 1 (recovered laws)
 #include "Parity190lpR2Tests.inc" // round 190lp: Pro-R 2 → LuxeVerb Space revision 1, the reference's fixed early taps (after Parity190kwR2: its helpers)
 #include "Parity190mgC4Tests.inc" // round 190mg: Prism's hidden C4 law (REA of the Waves C4), C4 on it
@@ -17947,6 +18012,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pr190jvTests.inc" // round 190jv: Piano roll Scale highlighting › Automatic (FL's key guess)
 #include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
 #include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)
+#include "FlmExport190ogTests.inc" // round 190og: Save a copy as FL Studio Mobile project (.flm), the writer, the LYNX chunk
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
 #include "Beat190krTests.inc" // round 190kr: the worker pool wakes only the workers a chunk's work needs; the same samples
 #include "Lighter190laTests.inc" // round 190la: timed waits without the sub-millisecond spin (platform/CvWait.h)
@@ -17985,13 +18051,60 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue208Tests.inc" // round 190ma: issue #208, the graph editor's Note pitch, Shift and Repeat (FL note repeat)
 #include "Details190mfTests.inc" // round details5_190mf: FL normal meter law (Pattern default), Channel rack "+" menu cache, details pass 5
 #include "Modal190mcTests.inc" // round 190mc: the Piano roll's Chord helper (discussion #105) and Transistor Bass's program row (discussion #202)
+#include "KeyRegions190nuTests.inc" // round chord2_190nu: key regions (FL key markers), the Scale degree chord, pinned Chord helper relationships (discussion #105)
 #include "Details190mkTests.inc" // round details6_190mk: Live insert marker, rack zip, details pass 6
 #include "Details190mpTests.inc" // round details7_190mp: FL Half speed, Auto name clips, Restretch all, details pass 7
 #include "Issues190mqTests.inc" // round 190mq: issues #211 / #212 / #213 (paste per layout, key-row shading, ruler double click)
 #include "core/Details190mr.h"
 #include "Details190mrTests.inc" // round details8_190mr: click-and-hold, rack Auto Select, undo / warning / layout options, details pass 8
 #include "core/Details190mv.h"
+#include "core/PluginHelp.h" // (round 190oa)
 #include "Details190mvTests.inc" // round details9_190mv: undo knob tweaks and the rest of details pass 9
 #include "Details190myTests.inc" // round details10_190my: the Current track follow-ups and details pass 10
+#include "Details190oaTests.inc" // round details11_190oa: details pass 11 (the audit's last open rows)
 #include "Mixer221_190ngTests.inc" // round 190ng: issue #221 (Del with only the used inserts shown)
 #include "Issues190ngTests.inc" // round 190ng: issues #215, #217, #219, #220, #222
+#include "Rack190ncTests.inc" // round 190nc (0.1.31): Live's Solo / Cue (DL-110) and the Macro Map pick (DL-95)
+#include "TrackClips190neTests.inc" // round 190ne (0.1.31): track clips, "Clips own their notes" (core/TrackClips.h)
+#include "Leftovers190nrTests.inc" // round 190nr: leftovers of the 0.1.30 release
+#include "Bugs190nqTests.inc" // round 190nq: issues #229, #193, #223, #226 (bugs)
+#include "Issues190nqTests.inc" // round 190nq: issues #225, #227, #228, #230
+#include "Issues190nsTests.inc" // round 190ns: issues #231, #233, #234, #235
+#include "Tracker190nwTests.inc" // round 190nw (0.1.31): the built-in tracker, stage 1 (core/TrackerGrid.h, core/ModuleImport.h)
+#include "CrossPaste190nzTests.inc" // round 190nz: issue #232 stage 2 (copy and paste between windows)
+#include "Issues190odTests.inc" // round 190od: issues #236, #238, #239, #240
+#include "Issues190oqTests.inc" // round 190oq: issues #243 (ARA insert, tempo map), #252 (start page)
+#include "Perf190ofTests.inc" // round 190of: the monitor's Longest / Spikes, the split CPU meter (P24), latency check
+#include "Tracker190obTests.inc" // round 190ob (0.1.31): tracker follow-ups (module volume automation, the default key)
+#include "Gap190ogTests.inc" // round gap190og (0.1.31): Live Duplicate Loop, Crop Clip, velocity Randomize, mappable transport, Edit menu on devices
+#include "Host190ohTests.inc" // round 190oh: plugin host review, FL's wrapper Settings › GUI (P3)
+#include "Sections190olTests.inc" // round 190ol (0.1.31): the Sections lane (P1) and Simple time signature changes (P6)
+#include "ChordLane190pfTests.inc" // round 190pf (0.1.32): the Chord lane (P13) and Smart Tempo (P12)
+#include "Research190onTests.inc" // round 190on: command palette (P2), Tab to transient (P8), stacked lanes (P10), removing a guest
+#include "Perf190okTests.inc" // round 190ok: safe overloads (P24), generator smart disable (D2), the smart-disable tip (D1), fast maths (D3)
+#include "Design190ooTests.inc" // round 190oo (0.1.31): design review 2, the owner's options with rules in core
+#include "Lanes190ooTests.inc" // round 190oo (design review 2, lanes): Live envelope lanes (CS-19), lanes folded on open (CS O-3), Live scale control (O-5)
+#include "SimpleFl190ooTests.inc" // round 190oo (design review 2, CS-24): S / volume / pan on an FL project's tracks in Simple
+#include "Pat6_190ooTests.inc" // round 190oo (design review 2): PAT-6, the Playlist row from FL's vertical zoom (event 0xF2)
+#include "DialogRules190ooTests.inc" // round 190oo: the one dialog system's button order and pixel bands (core/DialogRules.h)
+#include "RackAutomation190ooTests.inc" // round 190oo (design review 2, PAT-7): FL's automation clip channels in the Channel rack
+#include "RackAutomation190owTests.inc" // round 190ow (PAT-7 rest, DE-123): triggered automation clips, MIN / MAX, mute, rack order export
+#include "TextFit190ooTests.inc" // round 190oo (design review 2, fit): translated menu titles give up width before toolbar panels drop, knob captions
+#include "OldSteps190ozTests.inc" // round 190oz: FL <= 11 step grids (0x41 + 0x5B / 0x48 ... in a channel) become step notes
+#include "HeldSteps190ozTests.inc" // round 190oz: FL step notes on generators are held (no note-off)
+#include "FlParity190piTests.inc" // round 190pi: Sytrus slide velocity, arpeggio glides, chord slides, Ogun link velocity, FL 11 parameters
+#include "FlParity190prTests.inc" // round 190pr: Harmor automation, FL song-start values of Harmor / Sytrus / FL effects
+#include "PatcherXyz190ptTests.inc" // round 190pt: Patcher Control Surface / X-Y-Z links, Vocodex controls under automation
+#include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
+#include "Tracker190omTests.inc" // round 190om (0.1.31): tracker stage 2 (pattern events, pitch curves, Bxx / Vxx), SimSynth velocity
+#include "Rollup031s6Tests.inc" // rollup 0.1.31 step 6: gold sweep for 190om decisions 4-5 (LYNX_SWEEP_DIR)
+#include "TrackStates190opTests.inc" // round 190op (0.1.31): Hide / Deactivate tracks (P4), Capture automation (P7)
+#include "SimpleDuck190otTests.inc" // round 190ot (0.1.31): Simple "Duck under..." (sidechain in one pick) and the shared Echo send (P5)
+#include "HWheel254Tests.inc" // round 190ou: issue #254, the horizontal wheel
+#include "AutoLinks190ovTests.inc" // round 190ov (0.1.31): FL automation clips linked to several controls
+#include "PluginPack190ovTests.inc" // round 190ov (0.1.31): the later LYNX-own engines in the plugin pack
+#include "AutoModes190paTests.inc" // round 190pa (0.1.31): automation write modes (P21), range edits on chosen tracks (P14)
+#include "Tracks190peTests.inc" // round 190pe (0.1.31): track versions (P20) and the import of tracks from another project (P11)
+#include "Jsfx190pjTests.inc" // round 190pj (0.1.32): JSFX support stages 1-2 (issue #241)
+#include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
+#include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)

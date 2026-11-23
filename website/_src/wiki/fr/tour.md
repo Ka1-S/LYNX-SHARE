@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![La fenêtre principale avec le projet de démonstration : barre d'outils en haut, Browser à gauche, Playlist derrière et Channel Rack flottant par-dessus](/assets/img/wiki/desktop.webp)
 
@@ -79,7 +79,7 @@ Le Browser est l'arrière-plan du bureau : il reste ancré sur le côté et les 
 - Tant que vous ne déplacez, ne redimensionnez ni ne détachez rien, les fenêtres reprennent leurs places par défaut chaque fois que la fenêtre principale change de taille. Ensuite, votre disposition est mémorisé et suit la taille de la fenêtre.
 - `F12` ferme les fenêtres de plugins, de réglages de canal et d'outils. Il ne ferme pas les cinq fenêtres principales.
 - Tant que le piano du clavier de saisie est activé (`Ctrl+T`), les touches de lettres jouent des notes et la plupart des raccourcis à une lettre sont suspendus.
-- `Vue › Style de disposition` passe du flux par patterns (par défaut) au flux par lancement de clips, qui ajoute une grille de clips à côté de la Playlist.
+- `Vue › Style de disposition` passe de la disposition Pattern (par défaut) à la disposition par lancement de clips, qui ajoute une grille de clips à côté de la Playlist.
 
 ## Voir aussi
 

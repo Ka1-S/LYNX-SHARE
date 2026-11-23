@@ -37,6 +37,10 @@ public:
     // extra title-bar buttons (e.g. a rack's Rand / Map), placed left of the window button; nullptr = none
     virtual juce::Component* titleAccessory() { return nullptr; }
     virtual int titleAccessoryWidth() const { return 0; }
+    // Round 190nc (DL-95, Live's rack with its chain's devices inline): > 0 = the shared title bar spans only this many px
+    // from the card's left (its buttons at its right end), and the body takes the card's whole height; the body keeps the
+    // title strip over that width free (no paint, no clicks) and draws its own title bars to the right of it
+    virtual int titleBarWidth() const { return 0; }
     std::function<void()> onPreferredWidthChanged; // set by the Device View: call it when the card grows or shrinks
     // Set by the Device View before preferredWidth: the room from the card's place to the chain's right edge with the
     // chain scrolled to its start (0 = no limit). A wide card may keep to it so its title bar stays in view (round 183c-card).
@@ -120,13 +124,22 @@ public:
     hotswap::Target selectedDeviceTarget() const;
     void hotSwapChanged(); // the Browser's link began, moved or ended: the cards' buttons are drawn again
 
+    // Round gap190og (deviceview-0012): Live's Edit menu commands (the Clip-launch layout's Edit menu) on the Device View's
+    // selected device. `devicesHaveFocus`: the keyboard focus lies in the device chain (the menu then acts on it).
+    enum class EditCommand { cut, copy, paste, duplicate, remove };
+    bool devicesHaveFocus (const juce::Component* focused) const;
+    bool canEditDevice (EditCommand command) const;
+    bool editDevice (EditCommand command);
+
     // tests and --snapshot
+    bool duplicateLoopForCheck(); // (round gap190og, detail-019: the Clip page's Duplicate button pressed)
     void selectCardForCheck (int card);
     bool duplicateCardForCheck (int card);
     bool groupCardForCheck (int card, bool ungroup); // (round 190hr: Ctrl+G / Ctrl+Shift+G on the instrument card)
     juce::PopupMenu cardMenuForSnapshot (int card); // an effect card's right-click menu
     int cardCountForCheck() const;
     juce::Rectangle<int> windowButtonForCheck (int card) const; // (issue #191: in this component's coordinates)
+    bool pressWindowButtonForCheck (int card); // (--zorder191test: the button's action when an editor covers it on screen)
     int chainInsertForCheck() const;
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;

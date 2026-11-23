@@ -9,15 +9,15 @@ Yes. It is free software under the GNU Affero General Public License v3.0 (AGPL-
 
 ## Which systems does it run on?
 
-Windows 10 and 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel) and Linux x86_64 with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer). The files are on the [download page](/download/).
+Windows 10 and 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel) and Linux x86_64 or arm64 with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or newer; arm64 also on a Raspberry Pi 4 or 5 with a 64-bit OS). The files are on the [download page](/download/).
 
 ## Is this FL Studio, or made by Image-Line?
 
-No. LYNX SHARE is an independent program. Its default workflow works the way FL Studio does, next to a Clip-launch workflow in the style of Ableton Live and a Simple workflow in the style of BandLab and FL Studio Mobile. FL Studio's behaviour and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
+No. LYNX SHARE is an independent program. Its default layout works the way FL Studio does, next to a Clip-launch layout in the style of Ableton Live and a Simple layout in the style of BandLab and FL Studio Mobile. FL Studio's behaviour and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
 
 ## Does it open my FL Studio projects, and what is lost?
 
-`File › Open...` reads `.flp` files: channels, samples, patterns, arrangements, automation, the Mixer and third-party plugins you have installed. FL Studio's native plugins play on recreated engines, most of them exact or near-exact and a few approximate. FLEX packs are never opened. An import report lists what was approximated or left out. See [Coming from FL Studio](/wiki/coming-from-fl-studio/).
+`File › Open...` reads `.flp` files, and FL Studio's zipped loop packages (`.zip`): channels, samples, patterns, arrangements, automation, the Mixer and third-party plugins you have installed. FL Studio's native plugins play on recreated engines, most of them exact or near-exact and a few approximate. FLEX packs are never opened. An import report lists what was approximated or left out. See [Coming from FL Studio](/wiki/coming-from-fl-studio/).
 
 ## Does it open Ableton Live sets?
 
@@ -29,11 +29,13 @@ Partly. A `.flm` opens with its arrangement, samples, drum kits, DW Sampler and 
 
 ## Can I send a project back to FL Studio or Live?
 
-Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11, and `File › Export › DAWproject (.dawproject)...` writes a file that Bitwig, Studio One, Cubase and other apps open. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
+Yes. `File › Export › FL Studio project...` writes a `.flp`, `File › Export › Ableton Live set (.als)...` writes a set for Live 12 or Live 11, and `File › Export › DAWproject (.dawproject)...` writes a file that Bitwig, Studio One, Cubase and other apps open. `File › Save a copy as FL Studio Mobile project (.flm)...` writes a copy for FL Studio Mobile, with its samples in a folder beside it. What the other program does not have is rendered to audio or left out, and a report says which. The limits are on the [File formats](/wiki/file-formats/) page.
 
 ## Do my VST plugins work?
 
 VST3 and CLAP plugins load on every system. VST2 loads on Windows and Linux, Audio Units on macOS and LV2 on Linux. On Windows, 32-bit VST2 and VST3 plugins run through a bridge. See [Plugins](/wiki/plugins/).
+
+JSFX scripts, REAPER's effect and instrument format, run on every system too; 31 free scripts come with LYNX SHARE.
 
 ## Is it stable?
 
@@ -45,7 +47,7 @@ The Windows executable is not code-signed yet, so SmartScreen may warn: click `M
 
 ## Does it send any data?
 
-There is no telemetry, analytics, account or licence check. It checks GitHub for a new version (you can turn this off in `Settings › General › Updates`), and it sends a crash report only if you agree each time or set it to always send. It also connects when you ask for a stem model download or take part in a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) has the details.
+There is no telemetry, analytics, account or licence check. By itself LYNX SHARE makes one connection: a few seconds after start-up it asks GitHub for the newest version number, which you can switch off on the first start or in `Settings › General › Updates`. Everything else goes online only when you ask for it: a crash report you agree to send, the stem model download, or a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) lists every address it contacts.
 
 ## How do updates arrive?
 
@@ -59,9 +61,9 @@ Fifteen: English, Simplified Chinese, Traditional Chinese, Dutch, French, German
 
 Open an issue at [github.com/Ka1-S/LYNX-SHARE/issues](https://github.com/Ka1-S/LYNX-SHARE/issues), or use `Help › Report a problem...` inside the program. The source code is in the same repository, and pull requests from contributors have been merged in past releases.
 
-## What are the three workflows?
+## What are the three layouts?
 
-LYNX SHARE has three ways of working in one program, and `View › Layout style` switches between them at any time without changing the project. The Pattern workflow, the default, is the FL Studio workflow: Channel rack, Piano roll, Playlist and Mixer. The Clip-launch workflow, in the style of Ableton Live, adds a grid of clips and scenes, a Session mixer and the clip and device views. The Simple workflow mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording, which makes it a good place for a first song. The setup wizard offers all three at the first start. See [Layouts](/wiki/layouts/) and [Simple layout](/wiki/simple-layout/).
+LYNX SHARE has three ways of working in one program, and `View › Layout style` switches between them at any time without changing the project. The Pattern layout, the default, is the FL Studio workflow: Channel rack, Piano roll, Playlist and Mixer. The Clip-launch layout, in the style of Ableton Live, adds a grid of clips and scenes, a Session mixer and the clip and device views. The Simple layout mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording, which makes it a good place for a first song. At the first start LYNX SHARE asks where you are coming from and opens the matching layout. See [Layouts](/wiki/layouts/) and [Simple layout](/wiki/simple-layout/).
 
 ## Will an update change how my projects sound?
 
@@ -71,6 +73,20 @@ No, not on purpose. When one of LYNX SHARE's effects is refitted to sound closer
 
 Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs itself as a plugin too: `FL Studio VSTi` and `FL Studio VSTi (Multi)` (VST2) on Windows, and an Audio Unit on macOS. Put it on a channel in LYNX SHARE and FL Studio runs inside it, with its Channel rack, Patcher, Sytrus, Harmor and the other plugins your FL Studio licence covers. It needs FL Studio installed and your own licence. LYNX SHARE does not load FL Studio's plugin files directly, because they are made to run only inside FL Studio. If an older version of LYNX SHARE listed the FL Studio plugin as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
 
-## Does it open GarageBand, BandLab or DAWproject files?
+## Does it open GarageBand, BandLab, DAWproject or tracker files?
 
-Yes. `File › Open...` reads DAWproject files (`.dawproject`) with their tracks, folders, clips, automation, mixer and plugins, and can write them back. GarageBand projects (`.band`, from GarageBand 10 or GarageBand for iOS) and BandLab projects downloaded by Cakewalk or Sonar (`.blx`) open as Simple-workflow tracks with their regions, tempo, key and mix; their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums. Sampler instruments also open: DirectWave programs (`.dwp`, `.dwb`), `.gig` instruments and Kontakt's `.ncw` samples.
+Yes. `File › Open...` reads DAWproject files (`.dawproject`) with their tracks, folders, clips, automation, mixer and plugins, and can write them back. GarageBand projects (`.band`, from GarageBand 10 or GarageBand for iOS) and BandLab projects downloaded by Cakewalk or Sonar (`.blx`) open as Simple-layout tracks with their regions, tempo, key and mix; their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums. Sampler instruments also open: DirectWave programs (`.dwp`, `.dwb`), `.gig` instruments and Kontakt's `.ncw` samples.
+
+Tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) open too: their instruments become Sampler channels with their samples, the song becomes patterns in the Playlist with its tempo changes, and `View › Tracker` edits the notes. Volume and pan changes, slides, vibrato and arpeggios come in as the channel's events or the notes' pitch curves, and what is left out is listed in the import report.
+
+## Does it work without an internet connection?
+
+Yes. LYNX SHARE starts and works fully offline, also in a sandbox without network access such as `firejail --net=none`, with nothing waiting for the network. The plugin scan never uses the internet: it reads the plugin files on your computer and looks only at files that are new or changed since the last scan. Third-party plugins are other programs and may try to connect by themselves, for example to check their licence. For sandboxes and packagers, the environment variable `LYNX_OFFLINE=1` or the `--offline` option turns off every connection of LYNX SHARE's own.
+
+## Can I use LYNX SHARE's own effects in another DAW?
+
+Yes. The LYNX plugin pack has 39 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, as plugins for other DAWs on Windows, macOS and Linux: every one in a single CLAP file, and a short list also as VST3 and, on Linux, LV2. It is a separate, optional download (`LYNX-Plugins`) on the [releases page](https://github.com/Ka1-S/LYNX-SHARE/releases). FL Studio's native plugins that LYNX SHARE recreates are not in it. See [Plugins](/wiki/plugins/#lynx-s-own-plugins-in-other-daws).
+
+## Can several people work on one project?
+
+Yes. `File › Online session` sends a project to a friend as one file with its samples, or starts a live session for up to four people who edit the same project at once, end-to-end encrypted. The host decides what each guest may change, and can share plugins with guests who do not have them. See [Online sessions](/wiki/online-sessions/) and the [tutorial](/learn/online-session/).

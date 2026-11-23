@@ -1,0 +1,25 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+LYNX draait VST3- en CLAP-plugins. Opties, Pluginbeheer toont ze.
+
+00:00:09.000 --> 00:00:14.400
+Pluginmappen toont waar LYNX zoekt: de standaardmappen, en alle die je toevoegt.
+
+00:00:14.800 --> 00:00:20.400
+Nieuwe plugins zoeken controleert elk bestand in een apart proces, dus een slechte plugin kan LYNX niet laten crashen.
+
+00:00:20.800 --> 00:00:26.000
+Hier: gratis plugins zoals Dragonfly Reverb en de LSP-collectie.
+
+00:00:26.400 --> 00:00:31.600
+Om er een te gebruiken selecteer je een Mixer-track en klik je op een leeg slot...
+
+00:00:32.000 --> 00:00:37.600
+...Plugin, Meer plugins, en zoek hem op naam.
+
+00:00:38.000 --> 00:00:43.000
+Toevoegen opent het eigen venster van de plugin.
+
+00:00:43.400 --> 00:00:49.000
+Druk op Afspelen: de akkoorden klinken nu in de zaalreverb.

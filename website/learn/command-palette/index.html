@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="lt.command-palette.t" data-desc="lt.command-palette.s" data-wt="zh-Hans zh-Hant nl fr de id it ja ko pl pt-BR ru es tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find any command, keep the CPU low · LYNX SHARE</title>
+<meta name="description" content="Press ? and type to run any menu item, shortcut or setting; then watch the CPU, find the heavy plugins and let silent plugins rest.">
+<meta property="og:title" content="Find any command, keep the CPU low · LYNX SHARE">
+<meta property="og:description" content="Press ? and type to run any menu item, shortcut or setting; then watch the CPU, find the heavy plugins and let silent plugins rest.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
+<meta property="og:url" content="https://lynx-share.com/learn/command-palette/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/learn/command-palette/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/learn/command-palette/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/learn/command-palette/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/learn/command-palette/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/learn/command-palette/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/learn/command-palette/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/learn/command-palette/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/learn/command-palette/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/learn/command-palette/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/learn/command-palette/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/learn/command-palette/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/learn/command-palette/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/learn/command-palette/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/learn/command-palette/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/learn/command-palette/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/learn/command-palette/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/learn/command-palette/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="d90fb3e6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v=0.1.26-logo2">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=0.1.26-logo2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=d90fb3e6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" aria-current="page" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.command-palette.t">Find any command, keep the CPU low</h1><p data-i18n="lt.command-palette.s">Press ? and type to run any menu item, shortcut or setting; then watch the CPU, find the heavy plugins and let silent plugins rest.</p><p class="tmeta"><span data-i18n="lr.l.any">Any layout</span> · <span>0:46</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="command-palette"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/command-palette-en.webp"><source src="/assets/media/learn/command-palette-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/command-palette-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/command-palette-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/command-palette-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/command-palette-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/command-palette-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/command-palette-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/command-palette-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/command-palette-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/command-palette-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/command-palette-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/command-palette-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/command-palette-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/command-palette-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/command-palette-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/command-palette-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/command-palette-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/command-palette-en-720.mp4" download>720p, 2.2 MB</a> · <a href="/assets/media/learn/command-palette-en-1080.mp4" download>1080p, 3.8 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.command-palette.c0">Command palette</span></button></li><li><button type="button" data-seek="19.4"><b>0:19</b> <span data-i18n="lt.command-palette.c1">CPU meter and monitor</span></button></li><li><button type="button" data-seek="30.6"><b>0:31</b> <span data-i18n="lt.command-palette.c2">Smart disable</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="the-command-palette">The command palette</h2>
+<figure><a class="shot" href="/assets/img/learn/command-palette-1.webp"><img src="/assets/img/learn/command-palette-1.webp" alt="The command palette with &quot;tracker&quot; typed" loading="lazy" width="1000" height="492"></a></figure>
+<ol><li>Press <code>?</code> (or <code>Ctrl+Shift+Y</code>, or click the magnifier in the toolbar).</li><li>Type a few letters of what you want. The list holds every action with its shortcut, every menu item with its place, the LYNX extras' switches, the Settings pages and your recent projects. Actions are found by their English names in every language too.</li><li>Pick a row with the arrow keys and press <code>Enter</code>, or double-click it. <code>Esc</code> closes the palette.</li></ol>
+<h2 id="watch-the-cpu">Watch the CPU</h2>
+<figure><a class="shot" href="/assets/img/learn/command-palette-2.webp"><img src="/assets/img/learn/command-palette-2.webp" alt="The CPU meter in the toolbar" loading="lazy" width="420" height="80"></a></figure>
+<ol><li>The CPU meter in the toolbar shows how much of the audio time the project uses while it plays.</li><li>Double-click it to open the Plugin performance monitor: the load of every plugin and channel, now, on average and at its peak.</li></ol>
+<figure><a class="shot" href="/assets/img/learn/command-palette-3.webp"><img src="/assets/img/learn/command-palette-3.webp" alt="The Plugin performance monitor" loading="lazy" width="1100" height="619"></a></figure>
+<h2 id="let-plugins-rest">Let plugins rest</h2>
+<ul><li><code>Tools › Switch smart disable for all plugins</code> lets every plugin pause while it gets silence and makes no sound, as FL Studio's Smart disable does.</li><li>In the Clip-launch layout, right-click a track's title and choose <code>Deactivate Track</code> to unload its devices until you need them again.</li></ul>
+<p>See also <a href="/wiki/shortcuts/">Keyboard shortcuts</a>.</p></div><nav class="wpn"><a href="/learn/song-sections/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.song-sections.t">Build a song with sections</b></a><a href="/learn/first-song-tour/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.first-song-tour.t">Your first song in five minutes</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=d90fb3e6" defer></script>
+<script src="/assets/learn.js?v=d90fb3e6" defer></script>
+<script src="/assets/motion.js?v=d90fb3e6" defer></script>
+</body>
+</html>

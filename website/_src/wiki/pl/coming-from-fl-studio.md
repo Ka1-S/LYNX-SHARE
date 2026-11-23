@@ -1,9 +1,22 @@
 ---
-source: 3bf7e0c0ab
+source: f6f0977999
 ---
 LYNX SHARE zachowuje workflow, który znasz: Channel Rack, patterny, Playlist i Mixer, na tych samych klawiszach. Otwiera projekty `.flp` bezpośrednio i potrafi je zapisać z powrotem.
 
 LYNX SHARE to niezależny program. Nie jest powiązany z Image-Line, przez nią popierany ani sponsorowany i nie zawiera kodu Image-Line. FL Studio jest zastrzeżonym znakiem towarowym Image-Line Software.
+
+## Pierwsze kroki
+
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz. Kliknij `FL Studio`: otwiera się układ Pattern, domyślny, z Channel Rack, Piano Roll, Playlistą i Mixerem. Skip na karcie robi to samo.
+2. **Otwórz projekt.** Otwórz jeden ze swoich projektów `.flp` (niżej) albo klikaj kroki w Channel Rack, żeby zrobić beat.
+3. **Znajdź swoje pluginy.** LYNX SHARE skanuje zwykłe foldery z pluginami w tle. Własny folder dodasz tak: otwórz `Opcje › Menedżer pluginów...`, kliknij `Foldery pluginów...`, dodaj go i kliknij `Znajdź nowe pluginy`.
+
+Czym różni się od FL Studio:
+
+- Własne pluginy FL Studio grają na silnikach odtworzonych przez LYNX SHARE, każdy z poziomem jakości (niżej). Do otwarcia pliku `.flp` sam FL Studio nie jest potrzebny.
+- Własne dodatki LYNX SHARE są wyłączone, dopóki nie włączysz ich w `Opcje › Dodatki LYNX...`.
+- Dwa dalsze układy działają na tym samym projekcie: Clip-launch (siatka klipów ze scenami) i Prosty (jedno okno ze ścieżkami, pętlami i szybkim nagrywaniem).
+- [Sesja online](/learn/online-session/) pozwala czterem osobom pracować na żywo w jednym projekcie.
 
 ## Otwórz projekt .flp
 
@@ -79,7 +92,7 @@ Plik to projekt FL Studio 2026. Samplery, klipy audio, własne generatory i efek
 ## Warto wiedzieć
 
 - Paczki FLEX są zaszyfrowane i nigdy nie są otwierane. Kanał FLEX dostaje patch syntezatora dobrany po nazwie presetu.
-- Modulatory są pomijane w eksporcie `.flp`, a raport eksportu o tym informuje.
+- Przy eksporcie do `.flp` modulatory, które podążają za pozycją w utworze, stają się klipami automatyki (zsynchronizowane LFO staje się klipowym LFO FL Studio). Followery, obwiednie, keytrack i velocity są pomijane, a raport eksportu o tym informuje.
 - Raport importu wylicza, co przybliżył wbudowany syntezator, co nie miało odpowiednika, które pluginy znaleziono lub nie są zainstalowane, które efekty pominięto lub odtworzono częściowo i ile sampli brakuje.
 - Niezainstalowany efekt zewnętrzny jest zastępowany efektem LYNX SHARE o tej samej roli. Oryginał zostaje w projekcie.
 
@@ -90,3 +103,4 @@ Plik to projekt FL Studio 2026. Samplery, klipy audio, własne generatory i efek
 - [Formaty plików](/wiki/file-formats/)
 - [Skróty](/wiki/shortcuts/)
 - [Co robi tylko LYNX SHARE z ustawieniami FL](/why/#fl-settings)
+- [Nauka: samouczki](/learn/)

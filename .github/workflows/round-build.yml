@@ -44,7 +44,9 @@ jobs:
         run: |
           ulimit -s 1048576 || true
           if [[ "$RELEASE_OPT" == true ]]; then export LYNX_WIN_OPT="-O2 -Xclang -O3" LYNX_WIN_LTO=thin; fi
-          ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS="$(nproc)" scripts/build-windows-zig.sh
+          # JOBS=2 (rollup 0.1.31 step 4; round 190of): with one compile per core the hosted runner kept losing
+          # communication at ~50 min; two compiles at a time passed
+          ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS=2 scripts/build-windows-zig.sh
 
       - uses: actions/upload-artifact@v4
         with:

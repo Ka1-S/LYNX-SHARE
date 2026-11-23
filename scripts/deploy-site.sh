@@ -9,6 +9,7 @@ DRY=0; [[ "${1:-}" == "--dry-run" ]] && DRY=1
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/appimage-update-lib.sh
 . "$SCRIPTS/appimage-update-lib.sh"
+"$SCRIPTS/site-media.sh" || { echo "deploy-site: the tutorial videos (media branch, website/_src/learn/media.json) are not in place: not deploying" >&2; exit 1; }
 cd "$SCRIPTS/../website"
 TARGET="$(update_target)" || { echo "deploy-site: can't read the update address $UPDATE_ADDRESS: not deploying, try again" >&2; exit 1; }
 [[ -d update ]] && echo "deploy-site: leaving website/update out of the archive (the live target stays)"

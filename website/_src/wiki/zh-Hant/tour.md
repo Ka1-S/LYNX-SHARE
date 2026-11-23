@@ -1,5 +1,5 @@
 ---
-source: edf15b371e
+source: 2f9287257f
 ---
 ![載入展示專案的主視窗：頂部是工具列，左側是瀏覽器，後面是播放清單，通道機架浮在上方](/assets/img/wiki/desktop.webp)
 

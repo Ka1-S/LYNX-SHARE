@@ -1,5 +1,5 @@
 ---
-source: a5c1d056c8
+source: ca313fc42b
 ---
 LYNX SHAREは、ウィンドウを開かずに実行することもできます。プロジェクトをオーディオにレンダリングするオプション、FL StudioプロジェクトやAbleton Liveセットに変換するオプション、テスト用のオプションがいくつかあります。プロジェクト自身のチェックも、同じオプションを使っています。
 
@@ -18,7 +18,7 @@ LYNX SHAREは、ウィンドウを開かずに実行することもできます�
 LYNX.exe project.lynx
 ```
 
-ウィンドウつきでLYNX SHAREを起動し、そのファイルを開きます。受け付けるのは `.lynx`、`.flp`、`.als`、`.flm`、`.mid` です。相対パスは、現在のフォルダーを基準にします。
+ウィンドウつきでLYNX SHAREを起動し、そのファイルを開きます。受け付けるのは `.lynx`、`.flp`、`.als`、`.flm`、`.dawproject`、`.band`、`.blx`、`.zip`、`.mid` です。相対パスは、現在のフォルダーを基準にします。
 
 ```
 LYNX.exe --no-plugins project.lynx
@@ -30,13 +30,14 @@ LYNX.exe --no-plugins project.lynx
 
 | オプション | 働き |
 |---|---|
-| `--export <project> <out>` | エクスポートウィンドウと同じように、テールを含む曲全体をレンダリングする。`<out>` の拡張子で形式が決まる: `.wav` (24ビット)、`.flac`、`.ogg`、`.mp3` (320 kbps) |
+| `--export <project> <out>` | エクスポートウィンドウと同じように、テールを含む曲全体をレンダリングする。`<out>` の拡張子で形式が決まる: `.wav` (24ビット)、`.flac`、`.ogg`、`.mp3` (320 kbps)、`.aif` / `.aiff` (24ビット)、`.m4a` (192 kbps、Linuxでは使えません) |
 | `--export ... --pattern` | 現在のパターンだけをレンダリングする |
 | `--export ... --insert N` | ミキサーのインサートNの出力だけをレンダリングする |
 | `--export ... --rate N` | 別のサンプルレート (Hz) でレンダリングする |
 | `--stems <project> <base.wav>` | チャンネルのあるミキサーのインサートごとに1つのWAVを書き出す: `base - 1.wav`、`base - 2.wav` のように続く |
 | `--export-flp <project> <out.flp>` | FL Studioプロジェクトを書き出す。`out.zip` を指定すると、zip形式のループパッケージを書き出す |
 | `--export-flp ... --substitute` | LYNX専用のプラグインを、オーディオにレンダリングする代わりに、最も近いFLのプラグインに置き換える |
+| `--export-flm <project> <out.flm>` | FL Studio Mobileのプロジェクトを書き出し、サンプルを隣の `<name> Samples` フォルダーにコピーする |
 | `--export-als <project> <folder>` | Live 12向けに、Ableton Liveセットを `<folder>/<name> Project/<name>.als` に書き出す |
 | `--export-als ... --live11` | Live 11向けのセットを書き出す |
 | `--export-bundle <project> <folder>` | `ファイル › エクスポート › 他のアプリ用...` のパッケージを、フォルダーに書き出します |

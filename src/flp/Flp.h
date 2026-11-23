@@ -243,6 +243,7 @@ struct ControlId
     static constexpr int mixerEqBase = 0x1FD0;  // track EQ: + group·8 + band (REA_rodada6 §1)
     static constexpr int mixerSendBase = 0x2000; // + destination track
     static constexpr int pluginParamBase = 0x8000;
+    static constexpr std::uint32_t mainVolume = 0x40000000; // the toolbar's main volume, 0…16000 (12800 = 0 dB; round 190oa)
     static constexpr std::uint32_t tempo = 0x40000005; // tempo automation: 0..1 = 60..180 BPM (checked against the demos)
 
     bool isTempo() const noexcept { return raw == tempo; }
@@ -270,6 +271,7 @@ struct AutomationLink
 {
     int channel = 0;
     ControlId target;
+    std::string formula; // round 190ov: the link's mapping formula (event 0xE6 after the record); "" = FL's default "Input"
 };
 
 // Links a controller's output (Peak Controller in a mixer slot, Envelope Controller in a channel...)
@@ -312,6 +314,9 @@ struct TimeMarker
     int type = 0;
     int numerator = 4, denominator = 4;
     std::string name;
+    // round 190nu: a Key/Scale marker's (type 12) key, in FL 2026's events after the 0x94: 0x2E root (0 = C), 0xA8 FL's
+    // reference-scale index, 0x65 the out-of-scale keys (bit 11 − pitch class; 0 = none written)
+    int keyRoot = 0, keyScale = -1, keyMask = 0;
 };
 
 struct Pattern
@@ -402,6 +407,11 @@ struct Arrangement
     std::vector<PlaylistItem> items;
     std::vector<PlaylistTrackInfo> tracks; // only the ones the file describes
     std::vector<TimeMarker> markers;
+    // Event 0xF2 (28 B, one per arrangement after all of them; FL's saver FUN_00f40840 / loader, REA round 190oo PAT-6):
+    // u32 arrangement index, f64 horizontal scroll, f64 horizontal zoom, i32 vertical scroll, i32 vertical zoom. The
+    // vertical zoom `v` sets FL's Playlist row: 16 + 2·v px at 100 % UI scale (FL 2026's new project 16 → 48 px, Ookay -
+    // Thief 5 → 26 px). −1 = not in the file.
+    int rowZoom = -1;
 };
 
 struct MixerInsert

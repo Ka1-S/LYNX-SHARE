@@ -1,5 +1,5 @@
 ---
-source: 1c440a7810
+source: 933ca35b0b
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -12,17 +12,19 @@ LYNX SHARE 可以代管其他廠商的樂器和效果器外掛。它透過掃描
 3. 按 `F8` 開啟外掛選擇器，輸入外掛名稱的一部分。
 4. 對它按兩下或按 `Enter`。樂器會成為新通道。效果器會放入所選的混音插入軌。
 
-第一次啟動時，設定精靈會列出外掛資料夾，並在背景掃描它們。`選項 › 設定精靈（語言、音訊、外掛資料夾）...` 可以再次開啟它。LYNX SHARE 也會在每次啟動幾秒後尋找新外掛。
+第一次啟動時，LYNX SHARE 會在歡迎卡片開啟期間於背景掃描外掛資料夾。`選項 › 設定精靈（語言、音訊、外掛資料夾）...` 會再次顯示這些資料夾。LYNX SHARE 也會在每次啟動幾秒後尋找新外掛。
 
 ## 各系統的格式
 
 | 系統 | 代管的格式 |
 |---|---|
-| Windows | VST3、CLAP、VST2 |
-| macOS | VST3、CLAP、Audio Units |
-| Linux | VST3、CLAP、LV2、VST2 |
+| Windows | VST3、CLAP、VST2、JSFX |
+| macOS | VST3、CLAP、Audio Units、JSFX |
+| Linux | VST3、CLAP、LV2、VST2、JSFX |
 
 macOS 上不代管 VST2。在 Linux 上，Windows 外掛可透過 [yabridge](https://github.com/robbert-vdh/yabridge) 和 Wine 運作，這兩者需要你自行安裝：請把 yabridge 同步的資料夾加為外掛資料夾。
+
+JSFX 腳本是 REAPER 的效果器和樂器格式，可在所有系統上執行：LYNX SHARE 內附 31 個免費腳本（來自 chokehold，MIT 授權），位於瀏覽器的 `外掛資料庫 › 效果器 › JSFX` 和 `外掛資料庫 › 產生器 › JSFX`，也可在外掛選擇器中找到。`Documents/LYNX/JSFX` 和 REAPER 的 Effects 資料夾中的腳本也會被找到，`設定 › 檔案 › JSFX 資料夾` 可新增更多資料夾。LYNX SHARE 在自己的面板中顯示腳本的滑桿；自行繪製介面的腳本只顯示其滑桿。
 
 ## 外掛管理器
 
@@ -102,6 +104,18 @@ FL Studio 的原生外掛，例如 Sytrus、Harmor 和 Patcher，只能在 FL St
 你在 FL Studio 內部建立的內容會隨 LYNX SHARE 專案一起儲存。`FL Studio VSTi (Multi)` 有 16 路立體聲輸出，可以在各自獨立的插入軌上播放（見上一節）。你的 FL Studio 授權決定哪些 FL 外掛能在其中使用。LYNX SHARE 自己不會載入 FL Studio 的外掛檔案。
 
 如果 FL Studio 外掛被列為 `載入失敗`，請在 `選項 › 外掛管理器...` 中對它按右鍵，選擇 `重試（立即掃描此檔案）`。
+
+## 在其他 DAW 中使用 LYNX 自己的外掛
+
+LYNX SHARE 自己的效果器與樂器，例如 Facet EQ、Apex Limiter、LYNX Tune 和 LYNX Model，也提供給其他 DAW 使用的外掛版本。它們是[發佈頁面](https://github.com/Ka1-S/LYNX-SHARE/releases)上另外的選用下載：適用於 Windows、macOS 和 Linux 的 `LYNX-Plugins-<version>`。
+
+- 所有外掛都在一個 CLAP 檔案 `LYNX Plugins.clap` 裡。其中一小部分也提供 VST3 版本，在 Linux 上還提供 LV2 版本。
+- 套件中的樂器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。
+- 在 Windows 上，請選 `LYNX-Plugins-<version>-win-x64.7z`（約 20 MB）。`.zip`（約 195 MB）裡的檔案完全相同。
+- 執行壓縮檔裡的安裝腳本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然後在你的 DAW 裡重新掃描外掛。
+- 外掛開啟的編輯器和 LYNX SHARE 裡的一樣，它的狀態可以在 LYNX SHARE 中當作專案開啟。
+
+完整清單請見 [PLUGINS-PACK.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS-PACK.md)。
 
 ## 外掛資料庫資料夾
 

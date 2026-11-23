@@ -9,6 +9,7 @@
 #include "core/SearchIndex.h"
 
 #include "engine/PluginHost.h"
+#include "ui/DialogFrame.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -135,7 +136,7 @@ public:
     MissingFilesPanel (MissingFilesInfo i, bool live) : info (std::move (i)), persistent (live)
     {
         title.setText (tr ("Missing files"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::display, true));
+        ui::dialog::styleTitle (title); // (round 190oo, WG-6: the one dialog title row, centred, 44 px)
         addAndMakeVisible (title);
         summary.setFont (theme::font (theme::type::body));
         summary.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -178,8 +179,7 @@ public:
         rememberToggle.setToggleState (true, juce::dontSendNotification);
         addAndMakeVisible (rememberToggle);
 
-        applyButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-        applyButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
+        ui::dialog::styleButton (applyButton, true);
         applyButton.onClick = [this] { apply(); };
         closeButton.onClick = [this] { close(); };
         addAndMakeVisible (applyButton);
@@ -248,12 +248,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg2);
-        // header band with the accent mark
+        // (round 190oo, WG-6: the one dialog frame: the strip and the title row; the summary band under it, inside the
+        // frame's border, without the old accent side bar)
+        ui::dialog::paintFrame (g, getLocalBounds().toFloat(), ui::dialog::Kind::window);
         g.setColour (theme::colour::bg3);
-        g.fillRect (header);
-        g.setColour (theme::colour::accent);
-        g.fillRect (header.withWidth (4));
+        g.fillRect (header.reduced (1, 0));
         g.setColour (theme::colour::border);
         g.drawHorizontalLine (header.getBottom(), 0.0f, (float) getWidth());
         g.drawHorizontalLine (footer.getY() - 1, 0.0f, (float) getWidth());
@@ -262,19 +261,17 @@ public:
     void resized() override
     {
         auto area = getLocalBounds();
-        header = area.removeFromTop (56 + 18 * juce::jmax (1, summaryLines));
-        {
-            auto h = header.reduced (20, 12);
-            h.removeFromLeft (4);
-            title.setBounds (h.removeFromTop (28));
-            summary.setBounds (h);
-        }
+        title.setBounds (ui::dialog::titleRow (area));
+        area.removeFromTop (ui::dialog::titleRowHeight + 1);
+        header = area.removeFromTop (28 + 18 * juce::jmax (1, summaryLines));
+        summary.setBounds (header.reduced (20, 12));
         footer = area.removeFromBottom (54);
         {
+            // (WG-6: LYNX's one order: Close, then Apply in the accent at the far right)
             auto f = footer.reduced (16, 12);
-            closeButton.setBounds (f.removeFromRight (150));
-            f.removeFromRight (8);
             applyButton.setBounds (f.removeFromRight (150));
+            f.removeFromRight (8);
+            closeButton.setBounds (f.removeFromRight (150));
             rememberToggle.setBounds (f.removeFromLeft (280));
         }
         area.reduce (16, 12);
@@ -321,8 +318,12 @@ private:
             lines.add (tr ("{0} sample(s) used by {1} could not be found on this PC.",
                            { juce::String ((int) info.files.size()), info.projectName.isNotEmpty() ? info.projectName : tr ("this project") }));
         if (! info.plugins.empty())
-            lines.add (tr ("{0} plugin(s) will not sound as in FL Studio (not installed, not loaded, or without their settings): see what LYNX SHARE did with each.",
-                           { juce::String ((int) info.plugins.size()) }));
+            lines.add (info.fromFlStudio
+                           ? tr ("{0} plugin(s) will not sound as in FL Studio (not installed, not loaded, or without their settings): see what LYNX SHARE did with each.",
+                                 { juce::String ((int) info.plugins.size()) })
+                           // (round 190nq: a LYNX project, a Live set... said "as in FL Studio" too)
+                           : tr ("{0} plugin(s) will not sound as they did when the project was saved (not installed, not loaded, or without their settings): see what LYNX SHARE did with each.",
+                                 { juce::String ((int) info.plugins.size()) }));
         if (! info.autoRelocated.empty())
             lines.add (tr ("{0} file(s) were found automatically in another folder.", { juce::String ((int) info.autoRelocated.size()) }));
         if (lines.isEmpty())
@@ -459,7 +460,8 @@ private:
         g.setFont (theme::font (theme::type::small));
         g.setColour (theme::colour::textSecondary);
         g.drawText (right, width - 12 - rightWidth, 5, rightWidth, 18, juce::Justification::centredRight, true);
-        g.setColour (detailColour);
+        // (round 190oj WG-7: the grey path read 2.84:1 on the selected row's red; there it takes the secondary text)
+        g.setColour (selected && detailColour == theme::colour::textDisabled ? theme::colour::textSecondary : detailColour);
         g.drawText (detail, 32, 24, width - 44, 16, juce::Justification::centredLeft, true);
     }
 
@@ -815,6 +817,7 @@ MissingFilesInfo missingFilesSnapshotInfo()
 {
     MissingFilesInfo info;
     info.projectName = "Night Drive";
+    info.fromFlStudio = true; // (the sample is an FL project: the text as before)
     info.files = {
         { "C:\\Users\\Producer\\Samples\\Drums\\Kicks\\Kick Punchy 04.wav", { "Kick" }, "D:\\Library\\Drums\\Kicks\\Kick Punchy 04.wav", false },
         { "C:\\Users\\Producer\\Samples\\Drums\\Snares\\Snare Tight 12.wav", { "Snare", "Snare 2" }, {}, false },

@@ -1,16 +1,21 @@
 #pragma once
 
+#include "core/ChordLane.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
+#include "ui/LiveClipLook.h"
+#include "core/KeyRegions.h"
 #include "core/LiveGrid.h"
 #include "core/MagicLasso.h"
 #include "core/MpeTab.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
+#include "core/StackedLanes.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/DeleteFade.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
 #include "ui/MotionOverlay.h"
@@ -64,6 +69,7 @@ public:
     ~PianoRollComponent() override;
 
     void paint (juce::Graphics& g) override;
+    void paintOverChildren (juce::Graphics& g) override; // (round 190oq, issue #250: deleted notes fading)
     void resized() override;
     void setTitleBarInsets (int left, int right) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -144,9 +150,23 @@ public:
     static inline bool blackKeyRows = true;
     // View › Keyboard style (round 190j, discussion #136; LYNX's own): flat = FL's keyboard (the default), piano = a
     // traditional keyboard with a line between every two white keys (core/PianoKeys.h). Saved with the UI options.
-    static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
+    static inline pianokeys::Style keyStyle = pianokeys::defaultStyle; // (round 190oo O-2: FL's keys)
     void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
+    // Round 190on (research190oe P10, core/StackedLanes.h): stacked controller lanes. The LYNX extra's switch (Pattern and
+    // Simple layouts; the Clip-launch layout always offers them) and the lane set, both kept in ui-options.txt
+    // (prStackedLanesExtra, prStackedLanes). The "+" beside the bottom lane's chooser adds a lane above it.
+    static inline bool stackedLanesExtra = false;
+    static inline std::string stackedLanesSaved;
+    bool stackingEnabled() const;
+    void stackedLanesChanged();            // the switch or the layout changed: the lanes shown follow
+    // tests / --snapshot: add a lane (a note property, or a pattern event lane), the lanes' areas (added ones top to
+    // bottom, then the bottom lane) and their ids, and a drag inside lane `lane` from value `from` to `to` (0..1) at x
+    void addStackedLaneForSnapshot (int property, std::optional<AutomationTarget> target = std::nullopt);
+    void removeStackedLaneForSnapshot (int index) { removeStackedLane (index); }
+    int stackedLaneCount() const noexcept { return (int) stacked.size(); }
+    std::vector<std::pair<juce::Rectangle<int>, int>> laneAreasForTests() const;
+    void dragInLaneForSnapshot (int lane, int fromX, int toX, float from, float to);
     // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
     // without Shift (noteedit::monophonicPaint). Saved with the UI options.
     static inline bool monophonicPainting = false;
@@ -168,6 +188,10 @@ public:
     bool saveScore (const juce::File& file) const;
     // File › Copy to / Paste from MIDI clipboard (a Standard MIDI File of the channel's notes; Ctrl+Shift+V pastes)
     bool copyToMidiClipboard() const;
+    // Round 190nr: notes made elsewhere (Transistor Bass's "Copy as MIDI") on the note clipboard: Ctrl+V pastes them
+    static void setNoteClipboard (std::vector<Note> notes);
+    // issue #232 stage 2 (round 190nz, ui/WindowClipboard.h): the note clipboard on the system clipboard too
+    static void publishNotes();
     void pasteFromMidiClipboard();
     // File › Browse scores: the main window opens the Browser at FL's score folder
     std::function<void()> onBrowseScores;
@@ -229,6 +253,12 @@ public:
     double playheadForSnapshot() const noexcept { return playheadTick; }
     EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
+    // issue #242 (round 190od): the toolbar scale box as a click opens it (JUCE's ComboBox marks the popup active first)
+    juce::ComboBox& scaleBoxForTests() noexcept { return scaleBox; }
+    ui::DeleteFade& deleteFadeForSnapshot() noexcept { return deleteFade; } // (round 190oq, issue #250)
+    void deleteSelectionForSnapshot() { deleteSelection(); }
+    juce::Rectangle<int> gridAreaForSnapshot() const { return gridArea(); }
+    juce::ComboBox& chordBoxForTests() noexcept { return chordBox; } // (rollup 0.1.31 step 4: #242 with 190nu's stamp box)
     // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
     void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
     bool isAutoScaleForTests() const { return isAutoScale(); }
@@ -298,6 +328,8 @@ public:
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
     // --undogesture190jv (round 190jv): the middle of the row of `key` at `tick`, in this component's coordinates
     // round 190mq (issues #211, #212, #213): the view and the time selection, for --issueshot190mq
+    double scrollTicksForTests() const noexcept { return scrollTicks; } // (round 190ou: --hwheel254test)
+    double pixelsPerTickForTests() const noexcept { return pixelsPerTick; }
     void setViewForTests (double firstTick, int rowPixels, int centreKey)
     {
         scrollTicks = firstTick;
@@ -342,6 +374,16 @@ public:
     // (ableton190o live-01-clipview-notes.png); transparent = LYNX's note colours. Only the dock sets it.
     juce::Colour liveNoteColour { juce::Colours::transparentBlack };
     bool liveNotes() const;
+    // Round gap190og (coverage live1:detail-047): Live's Velocity Controls under the lanes of the docked Clip View (Live
+    // look): the Randomize button and its Randomization Amount slider (1…127; typed digits + Enter randomize too)
+    // [DOC Live 12 manual 10.5.12; SHOT /mnt/e/lynx-work/ableton187c/shots/live-01-velocity-lane.png]. The amount is a UI
+    // setting of the session (100: the capture's value), not saved.
+    static inline int liveRandomizeAmount = 100;
+    static constexpr int liveFooterBar = 18; // Live: a 1 px #242424 line + 17 px of #363636 (the capture's y 977…994)
+    int liveFooterHeight() const;
+    void liveFooterCheck(); // (the dock, after a change liveNotes() depends on: lays the footer out when it comes or goes)
+    void liveRandomizeVelocity();
+    juce::Rectangle<int> liveRandomizeBoundsForCheck() const { return liveRandomize.getBounds(); }
     // Round 190hr (detail-055, miditools-098): docked in the Clip-launch detail view, the editor uses the reference's
     // grid (core/LiveGrid.h: adaptive / fixed, narrower / wider, triplet, snap; its value at the toolbar's grid place)
     // and its Quantize (Ctrl+U) / Quantize Settings (Ctrl+Shift+U), which the Clip View's MIDI Tools Quantize tool does
@@ -384,7 +426,8 @@ private:
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
-    juce::Rectangle<int> velocityArea() const;
+    juce::Rectangle<int> velocityArea() const; // the lane the code works on now (round 190on: the bottom one, or a stacked one in scope)
+    juce::Rectangle<int> eventPaneArea() const; // every lane of the event editor
     double tickToX (double tick) const;
     double xToTick (int x) const;
     int keyToY (int key) const;
@@ -486,13 +529,45 @@ private:
     IconButton followButton { "follow", Icon::follow }; // Follow (auto scrolling) on/off, EditorGlobals (round 162)
     void quantizeOperation (int kind); // 0 = starts, 1 = starts and lengths (quick quantize), 2 = starts 50% toward the grid
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
-    IconComboBox chordBox { Icon::chord }; // chord created on each click (like FL's "stamp")
-    IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
-    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
-    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
-    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
-    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
-    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
+    // round gap190og (detail-047): Live's Velocity Controls footer (docked, Live look, the Velocity lane shown)
+    class LiveAmountBox;
+    liveclip::PillButton liveRandomize { "liveRandomize" };
+    std::unique_ptr<LiveAmountBox> liveRandomAmount;
+    int laidFooter = 0; // the footer height the last layout gave
+    // --- round 190on (P10): the stacked lanes above the bottom one (core/StackedLanes.h) ---------------------------------
+    struct StackedLane
+    {
+        stackedlanes::Lane spec;
+        juce::ComboBox box;
+        juce::TextButton close { juce::String::fromUTF8 ("\xc3\x97") };
+    };
+    std::vector<std::unique_ptr<StackedLane>> stacked;
+    float bottomWeight = 1.0f;
+    bool stackingWas = false;
+    juce::TextButton addLaneButton { "+" };
+    // what the lane handlers and the lane painting act on: a stacked lane while a gesture or a paint pass is in it
+    int laneOverride = 0, paintingLane = -1, heldLane = -1, boundaryDrag = -1, boundaryLastY = 0;
+    juce::Rectangle<int> laneAreaOverride;
+    struct LaneScope
+    {
+        LaneScope (PianoRollComponent& o, int index);
+        ~LaneScope();
+        PianoRollComponent& owner;
+        int savedId, savedPainting;
+        juce::Rectangle<int> savedArea;
+    };
+    std::vector<juce::Rectangle<int>> laneAreas() const; // stacked lanes top to bottom, then the bottom lane
+    int laneId() const noexcept { return laneOverride != 0 ? laneOverride : laneBox.getSelectedId(); }
+    juce::String laneName() const;
+    int stackedLaneId (const StackedLane& lane) const;
+    int stackedLaneAt (juce::Point<int> p) const;  // -1: none
+    int laneBoundaryAt (juce::Point<int> p) const; // k: the line under lane k (k + 1 below it); -1: none
+    void enterLane (int index);                     // the override for stacked lane `index` (-1: none)
+    void addStackedLane();
+    void removeStackedLane (int index);
+    void saveStackedLanes();
+    void loadStackedLanes();
+    void rebuildStackedBoxes();
     class ScaleBox final : public IconComboBox
     {
     public:
@@ -500,12 +575,39 @@ private:
         std::function<void()> onPopup;
         void showPopup() override
         {
-            if (onPopup)
-                onPopup();
-            else
+            if (! onPopup)
+            {
                 IconComboBox::showPopup();
+                return;
+            }
+            onPopup();
+            // issue #242 (round 190od): juce::ComboBox marks its popup active before showPopup() and clears the mark only
+            // in its own menu's callback, so a box whose click opens another menu stayed "active" after that menu
+            // closed and never opened again. The menu onPopup() showed is the modal component now: its end clears it.
+            if (auto* menu = juce::Component::getCurrentlyModalComponent())
+                juce::ModalComponentManager::getInstance()->attachCallback (
+                    menu, juce::ModalCallbackFunction::create ([box = juce::Component::SafePointer<ScaleBox> (this)] (int) {
+                        if (box != nullptr)
+                            box->popupClosed();
+                    }));
+            else
+                popupClosed();
+        }
+        void popupClosed()
+        {
+            if (isPopupActive())
+                hidePopup();
         }
     };
+    // chord created on each click (like FL's "stamp"); round 190nu: a click opens the Stamp menu (FL's stamp button opens
+    // its menu), with the Scale degree chord and its options on top
+    ScaleBox chordBox { Icon::chord };
+    IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
+    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
+    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
+    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
+    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
+    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
     ScaleBox scaleBox { Icon::keyboard };
     juce::ComboBox scaleRootBox, scaleNameBox; // (issue #203: docked in the Clip-launch / Simple layouts)
     int splitRoot = 0;                         // the root box's choice while no scale is chosen
@@ -533,6 +635,51 @@ private:
     void showKeyMenu (int key); // right-click on the keyboard: key labels of the channel
     std::vector<int> chordIntervals() const;
     bool chordTopDown = false; // the chord stamp puts the clicked key on top (FL 2026's top-down mode)
+    // --- round 190nu (discussion #105; core/KeyRegions.h): key regions and the Scale degree chord ----------------------
+    static constexpr int degreeStampId = 1000; // the chord box's "Scale degree chord" item
+public:
+    bool isDegreeStamp() const { return chordBox.getSelectedId() == degreeStampId; }
+    void setDegreeStamp (bool on) { chordBox.setSelectedId (on ? degreeStampId : 1, juce::sendNotificationSync); }
+    // its options (saved with the UI options): the chord's size, the inversion, and "Hear the chord before clicking"
+    static inline keyregions::DegreeSize degreeSize = keyregions::DegreeSize::triad;
+    static inline int degreeInversion = 0;
+    static inline bool degreeHear = true;
+    // the scale in force at `tick`: its key region's (a key marker), else this editor's own (the scale box / Automatic)
+    keyregions::Degrees scaleDegreesAt (std::int64_t tick) const;
+    // the keys a click on `key` at `tick` writes with the chosen stamp (the first leads the drag): the chord shape on the
+    // scale-snapped key, or the Scale degree chord in the region's key; one key without a stamp (or without a key)
+    std::vector<int> stampKeys (int key, std::int64_t tick) const;
+    // key markers (FL's Time markers › Add key marker; LYNX: a key region over the time selection)
+    void addKeyMarker (std::int64_t tick, const keyregions::State& state);
+    void addKeyRegion (std::int64_t from, std::int64_t to, const keyregions::State& state);
+    juce::PopupMenu getMarkersMenuForSnapshot() { return markersMenu(); }
+    juce::PopupMenu getPatternMarkerMenuForSnapshot (int index) { return patternMarkerMenu (index); }
+    // the ghost of the chord a click would write (the Scale degree chord), at the mouse; its keys and label
+    void hoverDegreeForSnapshot (juce::Point<int> at) { updateDegreeGhost (at); }
+    std::vector<int> degreeGhostKeys() const { return degreeGhost.keys; }
+    juce::String degreeGhostLabel() const { return degreeGhost.label; }
+    bool degreeHearRunning() const { return degreeHearTimer.isTimerRunning(); }
+    juce::Point<int> pointForSnapshot (int key, std::int64_t tick) const { return { (int) tickToX ((double) tick) + 4, keyToY (key) + rowHeight / 2 }; }
+private:
+    struct DegreeGhost
+    {
+        std::int64_t tick = -1, length = 0;
+        std::vector<int> keys;
+        juce::String label;
+    } degreeGhost;
+    void updateDegreeGhost (juce::Point<int> at);
+    void clearDegreeGhost();
+    juce::Rectangle<int> degreeGhostArea() const;
+    juce::PopupMenu keyChoiceMenu (const keyregions::State& current, std::function<void (keyregions::State)> pick);
+    juce::PopupMenu degreeOptionsMenu();
+    juce::PopupMenu patternMarkerMenu (int index);
+    // "Hear the chord before clicking": after a short rest of the mouse, the ghost chord sounds (no timer otherwise)
+    juce::TimedCallback degreeHearTimer { [this] { degreeHearStep(); } };
+    void degreeHearStep();
+    void stopDegreeHear();
+    int degreeHearStage = 0;
+    std::vector<int> degreeSounding;
+    int degreeSoundingChannel = -1;
     bool inScale (int key) const;
     int scaleRoot() const;  // 0..11
     int scaleIndex() const; // index into notetools::scales(), 0 = none (also Automatic)
@@ -708,6 +855,13 @@ private:
     int previewKey = -1;
     int lastScaleDragKeys = 0; // (a snap-to-scale drag: the scale steps last applied)
     NoteMask litKeys {}; // keys sounding on the channel(s) shown: lit on the keyboard (issue #14, FL)
+    // round 190pf (research190oe P13): the Chord lane's chord at the song position, while "Highlight the Chord lane's
+    // chord" is on (the timer compares it; the grid repaints only when it changes)
+    chordlane::Highlight shownChord {};
+public:
+    chordlane::Highlight chordHighlightForShot() const noexcept { return shownChord; }
+    void setChordHighlightForShot (chordlane::Highlight h) { shownChord = h; repaint(); }
+private:
     NoteMask soundingNow() const;
     bool isLit (int key) const noexcept { return key >= 0 && key < 128 && ((litKeys[(std::size_t) (key >> 6)] >> (key & 63)) & 1u) != 0; }
     double playheadTick = -1.0;
@@ -797,6 +951,10 @@ private:
     void addPatternSignatureByKey();
     int markerAtX (int x) const;          // the pattern marker drawn under x on the ruler, or -1
     void showPatternMarkerMenu (int index);
+
+    // issue #250 (round 190oq): deleted notes fade out as FL's do (ui/DeleteFade.h); `fadeOut` before they go
+    ui::DeleteFade deleteFade { *this, ui::DeleteFade::pianoRollMs };
+    void fadeOut (const std::vector<int>& notes);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PianoRollComponent)
     std::unique_ptr<ui::TimerWhileShowing> showingTimer; // the polling timer, only while on screen (round 174f)

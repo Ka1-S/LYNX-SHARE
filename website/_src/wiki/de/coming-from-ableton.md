@@ -1,9 +1,24 @@
 ---
-source: d5cc625221
+source: 37920663db
 ---
 ![Das Clip-Start-Layout: ein Clip-Raster mit Szenen neben der Playlist](/assets/img/cliplaunch.webp)
 
 LYNX SHARE startet im Pattern-Arbeitsablauf: ein Channel Rack, Patterns und eine Playlist. Der Clip-Start-Arbeitsablauf ist optional und fügt neben der Playlist ein Clip-Raster mit Szenen hinzu. LYNX SHARE liest und schreibt `.als`-Sets. Es hat keine Verbindung zu Ableton.
+
+Diese Seite ist auch für Nutzer von Bitwig Studio: Das Clip-Raster funktioniert genauso, und die DAWproject-Dateien (`.dawproject`) von Bitwig öffnen sich mit `Datei › Öffnen...` und werden von `Datei › Exportieren › DAWproject (.dawproject)...` geschrieben.
+
+## Deine ersten Schritte
+
+1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst. Klicke auf `Ableton Live oder Bitwig`: Das Clip-Start-Layout öffnet sich. Später wechselt `Ansicht › Layout-Stil › Clip-Start-Arbeitsablauf` jederzeit dorthin.
+2. **Fülle einen Slot.** Ziehe ein Sample oder ein Pattern aus dem Browser in einen Slot, oder klicke mit rechts auf einen leeren Slot und wähle `Pattern hier einfügen`.
+3. **Starte.** Klicke auf das Dreieck links von einem Clip, oder auf das Dreieck einer Szene in der Spalte `Szenen`, um die ganze Zeile zu starten. Oder öffne eines deiner `.als`-Sets (unten).
+
+Was anders ist als in Live:
+
+- Die Playlist ist das Arrangement, und ihre Spuren sind die Spalten des Rasters. Eine Spur, die einen Clip gestartet hat, bleibt im Raster, bis du `Zurück zur Playlist` drückst.
+- Außerhalb des Rasters gelten die Tasten von FL Studio. `Ctrl+Z` macht einen Schritt rückgängig, und noch einmal gedrückt wiederholt es ihn.
+- Nur einige der eigenen Geräte von Live werden umgewandelt (siehe Gut zu wissen). Plugins von Drittanbietern kommen mit ihrem Zustand mit.
+- Das Pattern-Layout, die Arbeitsweise von FL Studio mit Channel Rack und Patterns, arbeitet am selben Projekt.
 
 ## Ein Live-Set öffnen
 
@@ -59,7 +74,7 @@ Follow Actions laufen nach einer Anzahl von Takten oder Durchgängen des Clips. 
 
 | Geschrieben | Nicht geschrieben |
 |---|---|
-| Eine MIDI-Spur pro Kanal, mit den Noten als MIDI-Clips | Die eigenen Instrumente und Effekte von LYNX SHARE. Ihre Spuren und Noten bleiben erhalten |
+| Eine MIDI-Spur pro Kanal, mit den Noten als MIDI-Clips | Die eigenen Instrumente und Effekte von LYNX SHARE, außer Helix, das zu Wavetable wird. Ihre Spuren und Noten bleiben erhalten |
 | Audiospuren mit Stretch, Transponierung, Gain, Fades und Warp-Modus | Automation von Effektparametern |
 | Gruppen, Returns und Sends | Routen von Insert zu Insert |
 | VST2- und VST3-Plugins mit ihrem Zustand | |
@@ -70,9 +85,11 @@ Ein Bericht nach dem Export listet auf, was ausgelassen wurde.
 
 ## Gut zu wissen
 
-- Viele der eigenen Devices von Live kommen als die von LYNX SHARE herein, mit ihren Einstellungen und ihrer Automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift und Operator (ohne FM). Die übrigen entfallen und stehen im Importbericht.
-- Instrument- und Audio-Effect-Racks kommen mit ihren Ketten, Zonen und Makros, und ein Drum Rack wird zum Drum Rack von LYNX SHARE. Die MIDI-Effect-Racks von Live werden noch nicht umgewandelt und stehen im Importbericht.
+- Viele der eigenen Devices von Live kommen als die von LYNX SHARE herein, mit ihren Einstellungen und ihrer Automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Hybrid Reverb, Delay, Echo, Grain Delay, Auto Filter, Saturator, Overdrive, Roar, Erosion, Vinyl Distortion, Corpus, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Spectral Time, Spectral Resonator, Looper, Simpler, Sampler, Drift, Operator, Wavetable und Meld. Die übrigen entfallen und stehen im Importbericht.
+- Instrument- und Audio-Effect-Racks kommen mit ihren Ketten, Zonen und Makros, und ein Drum Rack wird zum Drum Rack von LYNX SHARE. Der Arpeggiator von Live wird zum Arpeggiator des Kanals. Pitch, Velocity, Chord, Note Length und MIDI-Effect-Racks werden in die Noten geschrieben.
 - Der Importbericht listet auf, was ausgelassen wurde.
+- In der Device-Ansicht zeigt ein Rack die Devices seiner Ketten direkt an, und der Macro-Map-Modus (die `Map`-Buttons des Racks) gibt einen Device-Parameter an ein Makro, wie in Live.
+- Der Session-Mixer hat den Solo-/Cue-Schalter von Live, mit einem `Cue Out` für deine Kopfhörer und einer `Cue-Lautstärke`.
 - Live kürzt Audioclips, die sich in einem exportierten Set überlappen.
 - Warp-Marker aus einem Live-Set bleiben beim Import erhalten und werden beim Export zurückgeschrieben.
 
@@ -83,3 +100,4 @@ Ein Bericht nach dem Export listet auf, was ausgelassen wurde.
 - [Projekte importieren](/wiki/importing-projects/)
 - [Dateiformate](/wiki/file-formats/)
 - [Zwei Arbeitsabläufe in einem Programm](/why/#workflows)
+- [Lernen: Anleitungen](/learn/)
