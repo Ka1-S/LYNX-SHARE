@@ -5458,7 +5458,9 @@ std::unique_ptr<Effect> makeEffectOfSlot (const EffectSlot& slot)
     if (slot.kind == EffectKind::atrium) // round 190nr: the dense late tank only where it runs
         return verbs::makeAtrium (verbs::atriumDense (slot.params));
     if (slot.kind == EffectKind::vocodex)
-        return vocodex::make (slot.state);
+        return vocodex::make (slot.state, slot.params); // (round 190pt: liveControls)
+    if (slot.kind == EffectKind::xyzController && slot.params[(std::size_t) xy::flInputCurves] >= 0.5f)
+        return xy::makeEffectWithCurves (slot); // (round 190pt: FL's input curves from the state)
     if (slot.kind == EffectKind::maximus)
         return maximusfx::make (slot.state, slot.engineRev);
     if (slot.kind == EffectKind::multibandDelay)

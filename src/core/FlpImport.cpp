@@ -16,6 +16,8 @@
 #include "core/TransporterFl.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
+#include "core/StateParams.h"
+#include "core/Vocodex.h"
 #include "core/XyController.h"
 #include "core/Vfx.h"
 #include "core/VideoPlayer.h"
@@ -347,6 +349,11 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
         return std::pair { transmitter::controlRange (k).lo, transmitter::controlRange (k).hi };
     if (plugin == "LuxeVerb" && k < luxeVerbControlCount)
         return std::pair { luxeverb::ranges[(std::size_t) k].lo, luxeverb::ranges[(std::size_t) k].hi };
+    if (plugin == "Vocodex" && id.isMixer() && k < vocodex::paramCount) // (round 190pt: the DLL's own ranges)
+    {
+        const auto r = vocodex::controlRange (k);
+        return std::pair { r.first, r.second };
+    }
     if (plugin == "Harmor" && id.isChannel() && k < harmor::flParamCount) // (round 190pr: the DLL's own ranges)
         return harmor::flParamRange (k);
     // Round 190pr: the raw ranges of FL's own effects that the demos' song-start values (0xD8) and pattern events use most
@@ -4591,6 +4598,20 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     for (auto it = drumKits.rbegin(); it != drumKits.rend(); ++it)
         splitDrumChannel (song, it->first, it->second);
 
+    // round 190pt: a Vocodex whose controls are live parameters takes their song-start values (0xD8, written into the
+    // parameters above) into its state too, so the effect starts from them (it follows a parameter when it moves away
+    // from the value it was built with)
+    if (const auto* table = stateparams::tableFor (EffectKind::vocodex))
+        for (auto& track : song.mixer)
+            for (auto& fx : track.effects)
+                if (fx.kind == EffectKind::vocodex && fx.params[(std::size_t) vocodex::liveControls] >= 0.5f)
+                    for (int k = 0; k < vocodex::paramCount; ++k)
+                    {
+                        const auto [lo, hi] = vocodex::controlRange (k);
+                        const auto raw = lo + (int) std::nearbyint ((double) std::clamp (fx.params[(std::size_t) k], 0.0f, 1.0f) * (double) (hi - lo));
+                        if (table->get (fx.state, k) != std::optional<int> (raw))
+                            fx.state = table->with (fx.state, k, raw);
+                    }
     numberChorusInstances (song); // the random LFO phases FL gives each Hyper Chorus instance (REA_rodada59 §2.6)
     flpexport::stampOrigins (song); // what the import made of each FL plugin (Export to FL Studio, round 171e)
     clipops::updateCrossfades (song); // the project's "Automatic crossfades" on its overlapping audio clips (round 167a)

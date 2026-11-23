@@ -561,8 +561,8 @@ Table lovePhilterTable()
 }
 
 // --- Vocodex (core/Vocodex.h): FL's 20 controls, the options block and the eight switches, in place in the state -----
-// Ranges from FL's form (REA_rodada20 §4.2.2); those of attack / release curve, mod band width, unison pitch and
-// unison pan are not confirmed (chosen around the installation presets' values).
+// Ranges from FL's form (REA_rodada20 §4.2.2); round 190pt checked the 20 controls against the DLL's ProcessParam
+// (core/Vocodex.h controlRange): all agree but unison pan, −256…256 (it read 0…256 before).
 struct VcxField
 {
     const char* name;
@@ -578,7 +578,7 @@ const std::vector<VcxField>& vcxFields()
         { "Hold", 0, 10000, 1666, 32 }, { "Attack", 0, 10000, 1115, 36 }, { "Attack curve", 0, 2000, 0, 40 }, { "Release", 0, 10000, 3500, 44 },
         { "Release curve", 0, 2000, 0, 48 }, { "Freeze", 0, 1, 0, 52 }, { "Band width", 5, 1000, 349, 56 }, { "Flatness", 0, 100, 100, 60 },
         { "Mod band width", 0, 4000, 2000, 64 }, { "Mod pitch", -1200, 1200, 0, 68 }, { "Unison pitch", 0, 1000, 250, 72 },
-        { "Unison pan", 0, 256, 128, 76 },
+        { "Unison pan", -256, 256, 128, 76 }, // (round 190pt: the DLL's own range, ProcessParam REC_FromMIDI)
         { "Hold mode", 0, 1, 0, 80 }, { "Order", 1, 4, 2, 84 }, { "Unison", 0, 4, 0, 88 }, { "Bands", 5, 100, 47, 92 },
         { "Draft", 0, 1, 1, 96, false, true }, { "Mod input", 0, 8, 1, 100 }, { "Car input", -1, 8, 0, 104 },
         { "L-R encoding", 0, 1, 0, 108, true }, { "Min times", 0, 1, 1, 109, true }, { "To mod", 0, 1, 1, 110, true },

@@ -38,6 +38,29 @@ constexpr int curveMode (int axis) noexcept { return 14 + axis; }
 constexpr float curveModeValue (int mode) noexcept { return (float) mode / 12.0f; }
 int curveModeOf (float value) noexcept;
 int paramCount (EffectKind kind) noexcept;
+// X-Y-Z only (round 190pt): a hidden parameter after the named ones (not saved while 0). 1 = the slot's FL state holds
+// the axes' INPUT curves and the level of each axis goes through its input curve before the smoother, as FL's
+// [DECOMP Fruity X-Y-Z Controller_x64.dll 0x83C0A0: ProcessParam 0…2 stores inCurve (level) as the target; 0x83CBF0:
+// output = outCurve (smoothed target)]. 0 (projects saved before, new slots): the level is the target, as before.
+constexpr int flInputCurves = 17;
+// One point of an FL curve (the X-Y-Z's input / output curves): the segment that ends at it has its mode and tension.
+struct CurvePoint
+{
+    double x = 0.0, y = 0.0;
+    float tension = 0.0f;
+    int mode = 0;
+};
+// FL's X-Y-Z curves from its state (version 3), read in order: 11 × i32, flags, combo, then per axis 8 bytes and two
+// curves (input, output), each i32 3, i32 3, i32 points, 24 bytes per point (f64 x, f64 y, f32 tension, u8 mode, 2 bytes,
+// i8 sign) and a 20-byte tail [DATA: every X-Y-Z state of FL's demos ends exactly there; 3-point curves in Stroll Up].
+// [axis][0 input, 1 output]; empty when the state does not parse.
+std::vector<std::array<std::vector<CurvePoint>, 2>> flCurves (const std::vector<std::uint8_t>& state);
+// An FL curve's value at x (the shared envelope evaluator's walk [DECOMP 0x7858B0]: before the first point its value,
+// segment by segment with its end point's mode / tension, a segment of no length is passed at once, after the last
+// point its value). Empty: x.
+double evaluate (const std::vector<CurvePoint>& curve, double x) noexcept;
+// Whether a curve is FL's straight (0, 0) → (1, 1).
+bool isIdentity (const std::vector<CurvePoint>& curve) noexcept;
 
 // The default parameters (goal centred, full range, straight, FL's default speed / acceleration).
 EffectParams defaults (EffectKind kind) noexcept;
@@ -62,10 +85,13 @@ struct Mover
 };
 
 std::unique_ptr<Effect> makeEffect (EffectKind kind);
+// round 190pt: an X-Y-Z slot with flInputCurves set takes its input curves from the slot's FL state
+std::unique_ptr<Effect> makeEffectWithCurves (const EffectSlot& slot);
 
 // FL's saved state (0xD5) → LYNX's slot (nullopt when it doesn't parse). X-Y: i32 version + 10 × i32 parameters
 // (levels / min / max 0…65536, tension −128…128, speed, acceleration); X-Y-Z: version 3 (levels, speed, acceleration,
-// each axis' output curve: its ends as Min / Max, its point's mode and tension (round 165)).
+// each axis' output curve: its ends as Min / Max, its point's mode and tension (round 165); round 190pt: the curves read
+// in order (a 3-point curve moves the ones after it), flInputCurves set when an input curve is not straight).
 std::optional<EffectSlot> fromFl (const std::string& pluginName, const std::vector<std::uint8_t>& state);
 
 // The text a parameter shows ("X level 50%", "Tension +32").

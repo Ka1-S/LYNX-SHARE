@@ -1491,11 +1491,13 @@ struct Engine::Impl
     std::array<MapReader, 13> maps;
     double map (int m, double x) const noexcept { return maps[(std::size_t) m].at (x); }
 
+    bool reuseBands = false; // (round 190pt: set by reconfigure only)
     void setupBands();
     void setupPassFilters();
     void setupSaturation();
     void clear() noexcept;
     bool takeOver (const Impl& o) noexcept;
+    bool keepAllFilters = false; // (round 190pt: takeOver for reconfigure — FL's set-up keeps every filter's state)
     void filterVoices (Band& B, int fat, int lvl, int n) noexcept;
     double* voiceBuf (int slot) noexcept { return voiceOut.data() + (std::size_t) slot * (voiceOut.size() / maxVoices); }
     void accumulate (int lv, const double* a, const double* b, double scale, int n2) noexcept;
@@ -1509,7 +1511,22 @@ void Engine::Impl::setupBands()
     const auto& scale = freqScale();
     const int N = s.bands, fat = s.unison;
     bandCount = N, unison = fat, order = s.order;
-    bands.assign ((std::size_t) N, Band {});
+    if (reuseBands && bands.size() == (std::size_t) N) // (round 190pt, reconfigure: the voices keep their buffers' capacity)
+        for (auto& B : bands)
+        {
+            auto voices = std::move (B.voices);
+            B = Band {};
+            for (std::size_t v = 0; v < voices.size(); ++v)
+            {
+                auto peak = std::move (voices[v].peak);
+                auto rms = std::move (voices[v].rms);
+                B.voices[v] = Voice {};
+                B.voices[v].peak = std::move (peak);
+                B.voices[v].rms = std::move (rms);
+            }
+        }
+    else
+        bands.assign ((std::size_t) N, Band {});
     widthFactor = (float) (std::exp ((double) ((float) s.params[bandWidth] * 0.00100000005f) * std::log (5.0)) - 1.0) * 0.5f;
     flat = (double) ((float) s.params[flatness] * 0.00999999978f);
     attOrder = (double) powFloat (2.0f, (float) s.params[attackCurve] * 0.00100000005f);
@@ -1874,13 +1891,13 @@ bool Engine::Impl::takeOver (const Impl& o) noexcept
     {
         auto& B = bands[b];
         const auto& OB = o.bands[b];
-        if (B.level != OB.level)
-            continue; // (filtered at another octave level: that band starts afresh)
+        if (B.level != OB.level && ! keepAllFilters)
+            continue; // (filtered at another octave level: that band starts afresh; FL's set-up in place keeps it all)
         for (int v = -unison; v < 2; ++v)
         {
             auto& u = B.voices[(std::size_t) (v + 4)];
             const auto& ou = OB.voices[(std::size_t) (v + 4)];
-            if (u.oversample == ou.oversample)
+            if (u.oversample == ou.oversample || keepAllFilters)
                 for (int i = 0; i < order; ++i)
                     u.filters[(std::size_t) i].s = ou.filters[(std::size_t) i].s;
             u.peak.takeOver (ou.peak);
@@ -2420,9 +2437,48 @@ bool Engine::takeOver (const Engine& old) noexcept
     return impl->takeOver (*old.impl);
 }
 
+bool Engine::takeOverInPlace (const Engine& old) noexcept
+{
+    impl->keepAllFilters = true;
+    const auto ok = impl->takeOver (*old.impl);
+    impl->keepAllFilters = false;
+    return ok;
+}
+
 void Engine::process (const float* own, const float* mod, const float* car, float* out, int n) noexcept
 {
     impl->process (own, mod, car, out, n);
+}
+
+void Engine::reconfigure (const State& state) noexcept
+{
+    // what prepare computes from the controls, on the buffers prepare sized (the layout is the same: maps, options,
+    // band count, order, unison, Draft)
+    auto& p = *impl;
+    p.st.params = state.params;
+    const auto& s = p.st;
+    p.wet = curve7 ((float) s.params[Param::wet] * 0.00100000005f);
+    p.carPass = (float) curve11 (s.params[carVol], 7.81249983e-05f);
+    p.modPass = (float) curve11 (s.params[modVol], 7.81249983e-05f);
+    if (s.toMod && s.fromCar)
+        p.modPass = s.params[Param::freeze] == 1 ? 0.0f : p.modPass * 4.0f;
+    p.noiseAmp = curve7 ((float) s.params[carNoise] * 7.81249983e-05f) * 0.5f;
+    if (s.toNoise && s.fromCar)
+        p.noiseAmp *= 4.0f;
+    p.reuseBands = true; // (same band count: the voices keep their buffers' capacity)
+    try
+    {
+        p.setupBands();
+    }
+    catch (...) // (a hold window that grew could not be allocated)
+    {
+    }
+    p.reuseBands = false;
+    p.setupPassFilters();
+    p.tail = s.params[carNoise] == 0 && ! s.internalCarrier() ? (int) std::nearbyint (p.fs * 0.5 + (double) p.tailMax + 16.0) : noTail;
+    p.clear();
+    p.snap = false;
+    p.wetNow = p.carPassNow = p.modPassNow = 0.0f;
 }
 
 int Engine::latencySamples() const noexcept { return impl->draft ? fifoFrames : 0; }
@@ -2581,7 +2637,7 @@ class VocodexEffect final : public Effect
 public:
     static constexpr int chunk = 2048;
 
-    explicit VocodexEffect (const std::vector<std::uint8_t>& slotState)
+    explicit VocodexEffect (const std::vector<std::uint8_t>& slotState, const EffectParams* liveParams = nullptr)
     {
         auto [raw, data] = splitInstallData (slotState);
         if (auto parsed = parseState (raw))
@@ -2590,6 +2646,14 @@ public:
             cur->st = *parsed;
             accepted = *parsed;
             trailer.assign (slotState.begin() + (std::ptrdiff_t) raw.size(), slotState.end());
+            // (round 190pt) the parameters' controls as they are now are where the effect starts from: the state is
+            // the truth until a parameter moves (an edit of the state in the editor or a fresh effect after one is not
+            // undone by parameters that did not move; the import keeps both the same)
+            live = liveParams != nullptr;
+            lastRaw = parsed->params;
+            if (live)
+                for (int k = 0; k < paramCount; ++k)
+                    lastRaw[(std::size_t) k] = rawOf (k, (*liveParams)[(std::size_t) k]);
         }
         const State* state = cur != nullptr ? &cur->st : nullptr;
         if (state && state->internalCarrier())
@@ -2623,6 +2687,11 @@ public:
         rate = sr;
         if (runsEngine())
             cur->engine.prepare (cur->st, sr, chunk, cur->st.draft());
+        if (runsEngine() && live) // (round 190pt: the engine a control change is set up in)
+        {
+            cur->spare = std::make_unique<Engine>();
+            cur->spare->prepare (cur->st, sr, chunk, cur->st.draft());
+        }
         if (carrier != nullptr)
             carrier->prepare (sr);
         if (sgPreset != nullptr)
@@ -2661,7 +2730,7 @@ public:
         useSide[1] = true;
     }
 
-    void process (float* l, float* r, int n, const EffectParams&, double bpm) noexcept override
+    void process (float* l, float* r, int n, const EffectParams& params, double bpm) noexcept override
     {
         const auto sides = side;
         const auto used = useSide;
@@ -2676,6 +2745,29 @@ public:
                 retired.store (cur.release(), std::memory_order_release);
                 cur.reset (next);
             }
+        // round 190pt: FL's automation of the controls (liveControls): a control whose parameter moved is FL's
+        // ProcessParam (raw = min + round (v · range)), then FL's band set-up on the running signal
+        if (live && runsEngine() && cur->spare != nullptr)
+        {
+            bool changed = false;
+            for (int k = 0; k < paramCount; ++k)
+            {
+                if (k == sg) // (the SG stage is built with the effect: not followed)
+                    continue;
+                const auto raw = rawOf (k, params[(std::size_t) k]);
+                if (raw == lastRaw[(std::size_t) k])
+                    continue;
+                lastRaw[(std::size_t) k] = raw;
+                if (cur->st.params[(std::size_t) k] != raw)
+                    cur->st.params[(std::size_t) k] = raw, changed = true;
+            }
+            if (changed)
+            {
+                cur->spare->reconfigure (cur->st);
+                cur->spare->takeOverInPlace (cur->engine);
+                cur->engine.swap (*cur->spare);
+            }
+        }
         const State* state = &cur->st;
         if (auto* s = dynamic_cast<SytrusCarrier*> (carrier.get()))
             s->setTempo (bpm);
@@ -2765,6 +2857,11 @@ public:
             auto next = std::make_unique<Running>();
             next->st = *s;
             next->engine.prepare (next->st, rate, chunk, next->st.draft());
+            if (live)
+            {
+                next->spare = std::make_unique<Engine>();
+                next->spare->prepare (next->st, rate, chunk, next->st.draft());
+            }
             pending.store (next.release(), std::memory_order_release);
             accepted = *s;
             return true;
@@ -2777,11 +2874,17 @@ public:
 
 private:
     bool runsEngine() const noexcept { return cur != nullptr && (! cur->st.internalCarrier() || carrier != nullptr); }
+    static int rawOf (int k, float v) noexcept
+    {
+        const auto [lo, hi] = controlRange (k);
+        return lo + (int) std::nearbyint ((double) std::clamp (v, 0.0f, 1.0f) * (double) (hi - lo));
+    }
 
     struct Running
     {
         State st;
         Engine engine;
+        std::unique_ptr<Engine> spare; // (round 190pt: liveControls only)
     };
     std::unique_ptr<Running> cur;                 // the audio thread's
     std::atomic<Running*> pending { nullptr };    // set up by acceptState, taken by process
@@ -2797,11 +2900,38 @@ private:
     std::vector<float> ownBuf, modBuf, carBuf, outBuf, zeros;
     std::array<std::array<const float*, 2>, 2> side {};
     std::array<bool, 2> useSide { false, false };
+    bool live = false;                            // (round 190pt) the slot's parameters drive the controls
+    std::array<int, paramCount> lastRaw {};       // the controls the parameters last asked for
 };
 } // namespace
 
 std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& state)
 {
     return std::make_unique<VocodexEffect> (state);
+}
+
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& state, const EffectParams& params)
+{
+    return std::make_unique<VocodexEffect> (state, params[(std::size_t) liveControls] >= 0.5f ? &params : nullptr);
+}
+
+std::pair<int, int> controlRange (int k) noexcept
+{
+    // [EXEC] Vocodex_x64.dll's ProcessParam (REC_FromMIDI 0 / 2^30, read back with REC_GetValue), round 190pt
+    static constexpr std::pair<int, int> ranges[paramCount] { { 0, 2000 },  { 0, 1000 },  { 0, 16000 },  { 0, 65536 }, { 0, 16000 },
+                                                              { 0, 65536 }, { 0, 12800 }, { 0, 65536 },  { 0, 10000 }, { 0, 10000 },
+                                                              { 0, 2000 },  { 0, 10000 }, { 0, 2000 },   { 0, 1 },     { 5, 1000 },
+                                                              { 0, 100 },   { 0, 4000 },  { -1200, 1200 }, { 0, 1000 }, { -256, 256 } };
+    return k >= 0 && k < paramCount ? ranges[k] : std::pair<int, int> { 0, 1 };
+}
+
+void controlsToParams (const State& state, EffectParams& params) noexcept
+{
+    for (int k = 0; k < paramCount; ++k)
+    {
+        const auto [lo, hi] = controlRange (k);
+        params[(std::size_t) k] = std::clamp ((float) ((double) (state.params[(std::size_t) k] - lo) / (double) (hi - lo)), 0.0f, 1.0f);
+    }
+    params[(std::size_t) liveControls] = 1.0f;
 }
 } // namespace lynx::vocodex

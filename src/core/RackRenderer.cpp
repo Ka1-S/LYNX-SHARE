@@ -1,5 +1,6 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/Vocodex.h"
 #include "core/SytrusEngine.h"
 #include "core/Harmor.h"
 #include "core/TrackStates.h"
@@ -4633,6 +4634,9 @@ RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std:
     // (round 190jg: a hosted plugin too, when it declares its tail — CLAP's clap.tail, PluginEffect::tailSamples)
     p.tailHold = (! p.longHold || p.isPlugin) && slot.sidechain < 0 && slot.sidechain2 < 0;
     p.used = (int) std::min (slot.params.size(), effectInfo (slot.kind).params.size());
+    // round 190pt: a Vocodex with liveControls has FL's 20 controls as hidden parameters that automation moves
+    if (slot.kind == EffectKind::vocodex && slot.params[(std::size_t) vocodex::liveControls] >= 0.5f)
+        p.used = vocodex::paramCount;
     p.firstAutomated = p.used;
     if ((std::size_t) track < state.effectParamAuto.size() && i < state.effectParamAuto[(std::size_t) track].size())
     {
