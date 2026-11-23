@@ -47,7 +47,7 @@ TEST (parity190nhkhs_law_codes_keep_round_190nb_values_and_map_the_new_snapins)
         { "kHs Distortion", "\"dc_filter\": \"true\", \"dynamics\": \"0.5\", \"drive\": \"2\", \"bias\": \"0\", \"spread\": \"0\", \"type\": \"hardclip\", \"mix\": \"1\", \"$type\": \"distortion\"", k::Law::distortion },
         { "kHs Bitcrush", "\"dither_amount\": \"0\", \"bit_depth\": \"8\", \"sample_rate\": \"6000\", \"adc_quality\": \"1\", \"mix2\": \"1\", \"dac_quality\": \"0\", \"quantize\": \"1\", \"$type\": \"bitcrush\"", k::Law::bitcrush },
         { "kHs Frequency Shifter", "\"shift\": \"-250\", \"$type\": \"frequency_shifter\"", k::Law::freqShift },
-        { "kHs Ensemble", "\"spread\": \"0.5\", \"voices\": \"6\", \"motion\": \"symmetric\", \"detune\": \"0.25\", \"mix\": \"1\", \"$type\": \"unison\"", k::Law::ensemble },
+        { "kHs Ensemble", "\"spread\": \"0.5\", \"voices\": \"6\", \"motion\": \"symmetric\", \"detune\": \"0.25\", \"mix\": \"1\", \"$type\": \"unison\"", k::Law::ensemble2 }, // (round 190py: law 52)
     };
     for (const auto& c : cases)
     {

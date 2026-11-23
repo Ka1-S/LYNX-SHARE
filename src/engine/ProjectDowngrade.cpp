@@ -1550,11 +1550,12 @@ void toRelease0130 (juce::var& root, Losses& lost)
     }
 
     // round 190nh: the Kilohearts part-2 laws on Effector (hidden [12] codes 41 … 48; round 190oc: 49, the Nonlinear
-    // Filter; set only by the Kilohearts translator). 0.1.30 reads [12] in eighths (round 190nb's five laws, codes 8 … 40,
-    // which stay), so codes 41 … 43 would play its Shaper law on these values: [12 …] are cut and Effector plays the
-    // algorithm its visible Type names (the Nonlinear Filter: Filter)
+    // Filter; round 190py: 50 Flanger, 51 Dual Delay, 52 Ensemble; set only by the Kilohearts translator). 0.1.30 reads
+    // [12] in eighths (round 190nb's five laws, codes 8 … 40, which stay), so codes 41 … 43 would play its Shaper law on
+    // these values: [12 …] are cut and Effector plays the algorithm its visible Type names (the Nonlinear Filter: Filter;
+    // the Flanger: Flanger; the Dual Delay: Delay)
     {
-        juce::StringArray laws, nonlinear;
+        juce::StringArray laws, nonlinear, flangerDelay;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
@@ -1562,7 +1563,8 @@ void toRelease0130 (juce::var& root, Losses& lost)
             const auto law = khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]);
             if (khsdsp::lawCode (law) < 41)
                 return;
-            addOnce (law == khsdsp::Law::nonlinearFilter ? nonlinear : laws, where);
+            addOnce (law == khsdsp::Law::nonlinearFilter ? nonlinear
+                     : law == khsdsp::Law::flanger || law == khsdsp::Law::dualDelay ? flangerDelay : laws, where);
             params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
         });
         if (! laws.isEmpty())
@@ -1571,6 +1573,9 @@ void toRelease0130 (juce::var& root, Losses& lost)
         if (! nonlinear.isEmpty())
             lost.push_back ({ TR_NOOP ("Effector's Kilohearts Nonlinear Filter law (the kHs Nonlinear Filter stand-in) plays Effector's own Filter: {0}"),
                               listOf (nonlinear), true });
+        if (! flangerDelay.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}"),
+                              listOf (flangerDelay), true });
     }
 
     // round 190oc: Helix round 4 (a fourth state block after 0.1.30's, revision 4): unison on the granular and spectral

@@ -12649,3 +12649,4 @@ countries: cn sg
 "Automation of a channel's Pitch knob does nothing in this release: {0}" = "在此版本中，通道 Pitch 旋钮的自动化不起作用：{0}"
 "Automation of 3x Osc's parameters does nothing in this release: {0}" = "在此版本中，3x Osc 参数的自动化不起作用：{0}"
 "The export plays the song straight through in this release (from bar 1, past the skip markers)" = "在此版本中，导出会从头到尾播放歌曲（从第 1 小节开始，忽略跳过标记）"
+"Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}" = "Effector 的 Kilohearts Flanger 与 Dual Delay 规律（kHs Flanger 与 kHs Dual Delay 的替代）改为播放 Effector 自身的 Flanger 与 Delay：{0}"

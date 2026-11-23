@@ -23,5 +23,6 @@ std::string formatParam (int param, float value, double bpm);
 // kiloheartsLaw (round 190nb): the slot holds a Kilohearts snapin law (core/KiloheartsDsp.h, hidden [12]): its buffers
 // are allocated at prepare()
 // kiloheartsLatency (round 190nh): the law's reported latency (khsdsp::lawLatency)
-std::unique_ptr<Effect> make (bool kiloheartsLaw = false, int kiloheartsLatency = 0);
+// kiloheartsLawCode (round 190py): the law's code at creation (khsdsp::lawCode; buffers only that law needs)
+std::unique_ptr<Effect> make (bool kiloheartsLaw = false, int kiloheartsLatency = 0, int kiloheartsLawCode = 0);
 } // namespace lynx::effector

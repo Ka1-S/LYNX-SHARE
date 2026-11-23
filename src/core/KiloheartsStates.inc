@@ -845,7 +845,7 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
     if (kind == EffectKind::effector
         && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"
             || type == "comb_filter" || type == "chorus" || type == "trance_gate" || type == "phaser" || type == "distortion" || type == "bitcrush" || type == "frequency_shifter" || type == "unison"
-            || type == "dirty_filter"))
+            || type == "dirty_filter" || type == "flanger" || type == "dualdelay"))
     {
         namespace k = khsdsp;
         auto hidden = [&] (int index, double v) { slot.params[(std::size_t) index] = (float) std::clamp (v, 0.0, 1.0); ++n; };
@@ -920,7 +920,9 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         else if (type == "unison")
         {
             typeIs (2); // Flanger (the nearest modulated delay)
-            hidden (k::lawParam, k::lawValue (k::Law::ensemble));
+            // round 190py: law 52, the plug-in's own voice motions and 2× line (law 48, round 190nh's, stays for slots
+            // saved with it)
+            hidden (k::lawParam, k::lawValue (k::Law::ensemble2));
             hidden (k::valueParam, std::clamp (m.num ("voices", 6.0), 2.0, 16.0) / 16.0);
             hidden (k::valueParam + 1, m.num ("detune", 0.25));
             hidden (k::valueParam + 2, m.num ("spread", 0.5));
@@ -981,6 +983,43 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
             hidden (k::valueParam + 2, k::enc::logValue (m.num ("cutoff", 440.0), k::enc::nlfCutLo, k::enc::nlfCutHi));
             hidden (k::valueParam + 3, k::enc::logValue (m.num ("q", 0.707), k::enc::nlfQLo, k::enc::nlfQHi));
             hidden (k::valueParam + 4, m.num ("drive", 0.25));
+        }
+        else if (type == "flanger")
+        {
+            // round 190py: FlangerDsp read in HeartCore (REA_rodada190py-khs); times × 64 and the rate / 32: powers of two,
+            // so the snapin's floats come back exactly
+            typeIs (2); // Flanger
+            hidden (k::lawParam, k::lawValue (k::Law::flanger));
+            hidden (k::valueParam, std::clamp (m.num ("delay", 0.001), 0.0, 0.015) * k::enc::flSeconds);
+            hidden (k::valueParam + 1, std::clamp (m.num ("mod_depth", 0.001), 0.0, 0.015) * k::enc::flSeconds);
+            hidden (k::valueParam + 2, std::clamp (m.num ("mod_rate", 0.3), 0.0, 32.0) / k::enc::flRateHz);
+            hidden (k::valueParam + 3, 0.5 * (std::clamp (m.num ("phase", 0.0), -1.0, 1.0) + 1.0));
+            hidden (k::valueParam + 4, (std::clamp (m.num ("scroll", 0.5), -10.0, 10.0) + 10.0) / 20.0);
+            hidden (k::valueParam + 5, 0.5 * (std::clamp (m.num ("feedback", 0.0), -1.0, 1.0) + 1.0));
+            hidden (k::valueParam + 6, m.num ("spread", 0.25));
+            hidden (k::valueParam + 7, m.flag ("barberpole", false) ? 1.0 : 0.0);
+        }
+        else if (type == "dualdelay")
+        {
+            // round 190py: DualdelayDsp read in HeartCore (REA_rodada190py-khs); the time / 16 and the ratio / 4 exactly
+            typeIs (5); // Delay
+            hidden (k::lawParam, k::lawValue (k::Law::dualDelay));
+            hidden (k::valueParam, std::clamp (m.num ("delay_time", 0.2), 0.0, 16.0) / k::enc::ddSeconds);
+            hidden (k::valueParam + 1, std::clamp (m.num ("ratio", 1.618034), 0.0, 4.0) / k::enc::ddRatio);
+            hidden (k::valueParam + 2, std::clamp (m.num ("delay_numerator", 3.0), 1.0, 64.0) / 64.0);
+            static constexpr const char* dens[7] { "denominator_4", "denominator_4t", "denominator_8", "denominator_8t",
+                                                    "denominator_16", "denominator_16t", "denominator_32" };
+            int d = 4;
+            for (int i = 0; i < 7; ++i)
+                if (m.str ("delay_denominator") == dens[i])
+                    d = i;
+            hidden (k::valueParam + 3, d / 6.0);
+            hidden (k::valueParam + 4, m.str ("sync_mode") == "sync" ? 1.0 : 0.0);
+            hidden (k::valueParam + 5, m.num ("feedback", 0.5));
+            hidden (k::valueParam + 6, m.num ("crosstalk", 0.5));
+            hidden (k::valueParam + 7, m.num ("spread", 0.5));
+            hidden (k::valueParam + 8, 0.5 * (std::clamp (m.num ("tone", 0.0), -1.0, 1.0) + 1.0));
+            hidden (k::valueParam + 9, m.num ("duck", 0.0));
         }
         else if (type == "phaser")
         {
