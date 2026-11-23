@@ -12652,3 +12652,11 @@ countries: cn sg
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "导出文件的名称。导出时会填入 $project、$date 或 $bpm 等通配符。/ 会把文件放进导出文件夹内同名的文件夹（需要时自动创建）"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空插槽：单击添加效果器，双击或中键单击可搜索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "音轨效果：[LMB] 为其混音器轨道添加效果  [MMB] 或双击：搜索效果（也可从浏览器拖放到这里）"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改进。只改变外观的默认打开；会改变按键、单击或拖动作用的默认关闭，因此在你打开其中一项之前，LYNX SHARE 的操作与 FL Studio 相同。每个开关与其所在行指明位置的设置是同一个设置。"
+"FL-exact (turn all LYNX extras off)" = "与 FL 相同（关闭所有 LYNX 附加功能）"
+"Recommended" = "推荐"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "关闭所有 LYNX 附加功能：LYNX SHARE 与 FL Studio 相同（Esc 关闭获得焦点的窗口和起始页保留，与 FL Studio 一样）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "每个 LYNX 附加功能恢复默认：只改变外观的打开，其余关闭"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "比其样式更长的样式片段会重复播放样式直到片段结束；FL Studio 只播放一次，之后无声。默认打开。“常规”页面中也有。"

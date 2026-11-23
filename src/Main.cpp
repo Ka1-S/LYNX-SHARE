@@ -175,6 +175,7 @@
 #include "ui/LiveRemoteUi.h"
 #include "ui/GamepadInput.h"
 #include "ui/SettingsPages.h"
+#include "core/ExtrasDefaults.h" // round 190qk (--selftest extras190qk)
 #include "ui/ExtendedHintPanel.h"
 #include "core/FlSettings.h"
 #include "ui/OtherAppsExport.h"
@@ -3530,6 +3531,14 @@ public:
             return;
         }
 
+        // --extras190qkshot <prefix> (round 190qk: the LYNX extras on by default, FL-exact / Recommended): src/Extras190qkShot.inc
+        if (args.contains ("--extras190qkshot"))
+        {
+            setApplicationReturnValue (runExtras190qkShot (args[args.indexOf ("--extras190qkshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --design190ooshot <prefix> [project] (round 190oo, design review 2): src/Design190ooShot.inc
         if (args.contains ("--design190ooshot"))
         {
@@ -5462,6 +5471,38 @@ private:
         lynx::AudioEngine offline (false);
         const auto peak = offline.renderOffline (2.0, 48000.0);
         const auto audioOk = peak > 0.01f && peak < 10.0f;
+
+        // round 190qk (core/ExtrasDefaults.h, the owner's policy 11-23): first, before any item switches an option — every
+        // LYNX extra starts at the default the list names (the visual four on, FL's own two on, the rest off); a 0.1.31
+        // ui-options.txt keeps what the user changed and takes the new defaults for the rest; a file with the user-set
+        // list keeps a choice that differs from the default; the page's two buttons' values
+        juce::String extras190qkResult = "OK";
+        {
+            lynx::SettingsHooks hooks;
+            hooks.getGeneral = [] { return lynx::GeneralOptions {}; };
+            for (const auto& item : lynx::extras::items)
+            {
+                const auto now = item.id == "general.stretchedClipsLoop" ? lynx::stretchedClipsLoop()
+                                                                        : lynx::lynxExtraOn (offline, hooks, item.id);
+                if (now != lynx::extras::defaultOn (item.id))
+                    extras190qkResult = "ERROR default of " + juce::String (std::string (item.id));
+            }
+            const auto kept = lynx::extras::userSet();
+            std::vector<std::string> old { "wheelZones=1", "shadeFadedAudio=0", "hoverValues=0", "escClosesWindows=0", "liveScaleControl=1" };
+            lynx::extras::followDefaults (old);
+            const std::vector<std::string> expected { "wheelZones=1", "shadeFadedAudio=0", "hoverValues=0", "escClosesWindows=0", "liveScaleControl=1" };
+            if (old != expected || lynx::extras::userSet() != std::set<std::string> { "controlBar.liveScale", "general.escCloses", "playlist.wheelZones" })
+                extras190qkResult = "ERROR 0.1.31 file";
+            std::vector<std::string> mine { "trackInserts=0", "prChordHighlight=0", "extrasUserSet=playlist.trackInserts" };
+            lynx::extras::followDefaults (mine);
+            if (mine[0] != "trackInserts=0" || mine[1] != "prChordHighlight=1")
+                extras190qkResult = "ERROR user-set list";
+            if (lynx::extras::noteUserChoices ("\nshadeFadedAudio=0\ntrackInserts=0\nwheelZones=1") != "\nextrasUserSet=playlist.trackInserts,playlist.wheelZones")
+                extras190qkResult = "ERROR noting the choices";
+            if (! lynx::extras::flExactOn ("general.escCloses") || lynx::extras::flExactOn ("playlist.shadeFadedAudio") || lynx::extras::flExactOn ("general.stretchedClipsLoop"))
+                extras190qkResult = "ERROR FL-exact values";
+            lynx::extras::userSet() = kept;
+        }
 
         // project format round trip, with accents in the name
         auto original = lynx::Song::makeDefault();
@@ -10657,7 +10698,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && extras190qkResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -10771,6 +10812,7 @@ private:
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
+               << "extras190qk=" << extras190qkResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -20465,6 +20507,8 @@ private:
         // (rollup 0.1.30: since round 190ib, switching the link on asks first when it moves inserts or routes channels;
         // this run accepts, as the user clicking "Link")
         PlaylistComponent::answerLinkConfirmation = [] (const autolink::Report&) { return true; };
+        // (round 190qk: the inserts column is on by default now; this route starts with it off, as before, and puts it back)
+        const auto insertsWere = std::exchange (PlaylistComponent::showTrackInserts, false);
         pl.runAction ("playlist.linkTracks");
         PlaylistComponent::answerLinkConfirmation = nullptr;
         engine.dispatchPendingMessages();
@@ -20474,7 +20518,7 @@ private:
         const auto kick = song().playlistTracks.size() > 0 ? song().playlistTracks[0].mixerTrack : -1;
         check ("linked", song().linkTracksToMixer && vox > 0 && song().mixer[(std::size_t) vox].name == "Vox chain" && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth,
                juce::String (pl.headerWidthForSnapshot()));
-        check ("inserts_off_by_default", ! PlaylistComponent::showTrackInserts && pl.insertsListForSnapshot (1).isEmpty());
+        check ("inserts_off", ! PlaylistComponent::showTrackInserts && pl.insertsListForSnapshot (1).isEmpty());
         const auto shotRows = [&] (const juce::String& name, int rows) {
             engine.dispatchPendingMessages();
             const auto bottom = pl.trackRowForSnapshot (rows).getY();
@@ -20566,6 +20610,7 @@ private:
         pl.runAction ("playlist.trackInserts");
         engine.dispatchPendingMessages();
         check ("inserts_off_again", ! PlaylistComponent::showTrackInserts && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth);
+        PlaylistComponent::showTrackInserts = insertsWere;
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
@@ -20594,6 +20639,7 @@ private:
 #include "IssuesShot190od.inc" // round 190od (issues #236-#242)
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
+#include "Extras190qkShot.inc" // round 190qk (the LYNX extras on by default)
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
 #include "RackAuto190owShot.inc" // round 190ow (PAT-7 rest, DE-123: the automation clip rows at work)
@@ -31714,6 +31760,8 @@ private:
             // 1280 px, then off again
             {
                 const auto topBar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 80)); };
+                const auto nameWas = std::exchange (lynx::ui::simplelook::projectNameShown(), false); // (round 190qk: on by default)
+                ui.resized();
                 ui.transportForSnapshot (true, false);
                 writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-playing");
                 ui.transportForSnapshot (false, false);
@@ -31726,7 +31774,7 @@ private:
                 offline.dispatchPendingMessages();
                 writeImage (lynx::shot::snapshot (ui, topBar()), "topbar-project-name-1280");
                 ui.setSize (wide, tall);
-                lynx::ui::simplelook::projectNameShown() = false;
+                lynx::ui::simplelook::projectNameShown() = nameWas;
                 ui.resized();
                 offline.dispatchPendingMessages();
             }

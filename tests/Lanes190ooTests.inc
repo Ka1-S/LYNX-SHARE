@@ -68,7 +68,7 @@ TEST (lanes190oo_lanes_folded_when_a_project_opens)
 TEST (lanes190oo_live_scale_control_parts)
 {
     using namespace lynx;
-    CHECK (! livescale::shown); // a LYNX extra: off by default (the one key box stays)
+    CHECK (livescale::shown); // a LYNX extra: on by default since round 190qk (Live's three controls in the Clip-launch layout)
     // the key box's 145 px: the 18 px switch, then root and mode as Live's 44 : 66, 2 px apart
     const auto p = livescale::split (145);
     CHECK (p.toggleX == 0 && p.toggleW == 18);

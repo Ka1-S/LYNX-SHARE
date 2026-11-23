@@ -9,6 +9,7 @@
 #include <atomic>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -651,7 +652,7 @@ public:
 private:
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
-    bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
+    bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse (round 190qk: stays off, idle CPU)
     // round 190lr (DL-49): Live's Tap box in the Clip-launch layout taps the tempo itself (FL's tapper window stays in its
     // right-click menu); "Start Playback with Tap Tempo" (a UI setting, Live's preference: off) starts the song on the 4th tap
     controls::TapTempo liveTaps;
@@ -1048,7 +1049,7 @@ private:
     ui::HintBar hintBar;
     ui::TweakReadout tweakReadout; // FL's Tools › Last tweaked, at the hint bar's right end (round 162d)
     void refreshTweakReadout();
-    void updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live);
+    void updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live, std::optional<juce::Point<float>> mouseAt);
     int tweakTicks = 0;
     void placeHintBar (juce::Rectangle<int> row); // the hint bar and, at its right end, the last-tweaked read-out
     bool hintsFrozen = false; // --snapshot: keep the hint that was set

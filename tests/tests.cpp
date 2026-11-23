@@ -17804,6 +17804,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Loudness190amTests.inc"
 #include "UsedOnly190amTests.inc"
 #include "Extras190amTests.inc"
+#include "Extras190qkTests.inc" // round 190qk: the extras on by default, the user-set list
 #include "Workflow190iuTests.inc" // round 190iu: issues #186 and #191
 #include "Reload190aoTests.inc"
 #include "Pin190aoTests.inc"

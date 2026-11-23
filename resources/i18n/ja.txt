@@ -12652,3 +12652,11 @@ countries: jp
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "書き出すファイルの名前です。$project、$date、$bpm などのワイルドカードは書き出し時に置き換えられます。/ を入れると、書き出し先フォルダー内のその名前のフォルダーにファイルを置きます (必要なら作成)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空きスロット: クリックでエフェクトを追加、ダブルクリックまたは中クリックで検索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "トラックのエフェクト: [LMB] ミキサートラックにエフェクトを追加  [MMB] またはダブルクリック: 検索  (ブラウザーからここへドロップも可)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 独自の改良です。見た目だけを変えるものは初期設定でオン、キー・クリック・ドラッグの動作を変えるものはオフなので、どれかをオンにするまで LYNX SHARE は FL Studio と同じように動作します。各スイッチは、その行に書かれた場所にある設定と同じものです。"
+"FL-exact (turn all LYNX extras off)" = "FL と同じ（LYNX の追加機能をすべてオフ）"
+"Recommended" = "おすすめ"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "LYNX の追加機能をすべてオフ: LYNX SHARE を FL Studio と同じに（Esc でフォーカス中のウィンドウを閉じる機能とスタートページは、FL Studio と同じく残ります）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "LYNX の追加機能をすべて初期設定に: 見た目だけを変えるものはオン、それ以外はオフ"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "パターンより長くしたパターンクリップは、クリップの終わりまでパターンを繰り返し再生します。FL Studio は一度だけ再生し、その後は無音です。初期設定でオン。「全般」ページにもあります。"

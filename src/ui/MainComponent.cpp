@@ -144,6 +144,7 @@
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
+#include "core/ExtrasDefaults.h" // round 190qk: which extras are on by default, the user-set list
 #include "core/LynxExtras.h" // round 190on (P2: the command palette lists the extras)
 #include "ui/SettingsPages.h"
 #include "ui/DawProjectExport.h" // round 190jf (B22)
@@ -3492,6 +3493,17 @@ void MainComponent::loadUiSettings()
 {
     juce::StringArray lines;
     lines.addLines (uiSettingsFile().loadFileAsString());
+    {
+        // round 190qk (core/ExtrasDefaults.h): each LYNX extra the user never set takes the default of this version
+        std::vector<std::string> raw;
+        raw.reserve ((std::size_t) lines.size());
+        for (const auto& l : lines)
+            raw.push_back (l.toStdString());
+        extras::followDefaults (raw);
+        for (int i = 0; i < lines.size(); ++i)
+            if (raw[(std::size_t) i] != lines[i].toStdString())
+                lines.set (i, juce::String::fromUTF8 (raw[(std::size_t) i].c_str()));
+    }
     // the sound in FL's order (0.1.20) wins over the old key, wherever each line is
     const auto flMetronomeSound = std::any_of (lines.begin(), lines.end(), [] (const juce::String& l) { return l.trim().startsWith ("metronomeSoundFl"); });
 
@@ -3976,7 +3988,7 @@ void MainComponent::saveUiSettings()
     if (! persistent)
         return;
 
-    uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
+    const auto text = juce::String ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
                                       + "\ntypingRoot=" + juce::String (typingRoot)
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
@@ -4169,6 +4181,8 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
+    // round 190qk (core/ExtrasDefaults.h): the LYNX extras the user set, so the others follow a new default
+    uiSettingsFile().replaceWithText (text + juce::String (extras::noteUserChoices (text.toStdString())));
 }
 
 // --- transport -----------------------------------------------------------------------------------
@@ -8329,6 +8343,7 @@ void MainComponent::timerCallback()
         ui::Hint hint;
         bool live = false;
         juce::Component* hovered = nullptr;
+        std::optional<juce::Point<float>> mouseAt; // (round 190qk: read once a tick, the hover value pill reuses it)
 
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
@@ -8347,12 +8362,13 @@ void MainComponent::timerCallback()
         {
             const auto source = juce::Desktop::getInstance().getMainMouseSource();
 
+            mouseAt = source.getScreenPosition();
             if (auto* under = source.getComponentUnderMouse(); under == &hintBar)
                 hint = hintBar.getHint(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu)
             else if (under != nullptr)
             {
                 live = source.isDragging();
-                const auto at = live ? source.getLastMouseDownPosition() : source.getScreenPosition();
+                const auto at = live ? source.getLastMouseDownPosition() : *mouseAt;
                 hint = ui::hintFor (under, under->getLocalPoint (nullptr, at).roundToInt());
                 hovered = under;
             }
@@ -8370,7 +8386,7 @@ void MainComponent::timerCallback()
         if (detailView != nullptr && detailView->isShowing()) // (round 190jn: Live's Info View; repaints only on a change)
             detailView->setInfoHint (hint);
         if (hoverValues)
-            updateHoverValue (hovered, hint, live);
+            updateHoverValue (hovered, hint, live, mouseAt);
         if (++tweakTicks >= 3) // 10 times a second
         {
             tweakTicks = 0;
@@ -10771,14 +10787,23 @@ void MainComponent::placeHintBar (juce::Rectangle<int> row)
 // Settings › General › "Show a control's value next to the mouse..." (round 177d, pain point 10; off by default = FL,
 // whose value shows in the hint bar only): the value the hint bar shows for the control under the mouse, in the
 // drag read-out's pill just above the cursor. A drag shows its own read-out, so nothing here while one runs.
-void MainComponent::updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live)
+void MainComponent::updateHoverValue (juce::Component* hovered, const ui::Hint& hint, bool live, std::optional<juce::Point<float>> mouseAt)
 {
     if (live)
     {
         hoverTipShown = false; // (the drag's read-out owns the pill now)
         return;
     }
-    const auto at = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+    // (round 190qk, on by default now: the pointer as the hint read it this tick — no second query of the pointer, which is
+    // a round trip to the X server on Linux; nothing hovered: nothing to read)
+    if (hovered == nullptr || ! mouseAt)
+    {
+        if (hoverTipShown)
+            ui::hideValueTip();
+        hoverTipShown = false;
+        return;
+    }
+    const auto at = mouseAt->roundToInt();
     const auto show = hovered != nullptr && hint.value.isNotEmpty() && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown()
                       && (hovered->getTopLevelComponent() == getTopLevelComponent()
                           || (bool) hovered->getTopLevelComponent()->getProperties().getWithDefault ("lynxNativeChild", false));
