@@ -249,16 +249,136 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
     return plan;
 }
 
+int switchFadeSamples (double sampleRate) noexcept
+{
+    // (see Pdc.h: the crossfade's added step stays under a full-scale 100 Hz sine's steepest step)
+    constexpr double pi = 3.14159265358979323846;
+    return sampleRate > 0.0 ? std::max (1, (int) std::ceil (sampleRate / (100.0 * pi))) : 141;
+}
+
 DelayLine::DelayLine (int delaySamples)
     : delay (std::max (1, delaySamples)),
+      capacity (delay),
       left ((std::size_t) delay, 0.0f),
       right ((std::size_t) delay, 0.0f),
       quiet (delay)
 {
 }
 
+DelayLine::DelayLine (int delaySamples, std::shared_ptr<DelayLine> before, int previousDelay, int fadeSamples)
+    : delay (std::max (0, delaySamples)),
+      capacity (std::max ({ 1, delay, previousDelay })),
+      left ((std::size_t) capacity, 0.0f),
+      right ((std::size_t) capacity, 0.0f),
+      quiet (capacity),
+      previous (std::move (before)),
+      from (std::max (0, previousDelay))
+{
+    // a longer delay waits until the ring holds that far back: the line before gave `from` samples of history
+    wait = std::max (0, delay - from);
+    fadeLength = fadeLeft = std::max (1, fadeSamples);
+    moving = delay != from;
+    settledFlag.store (! moving, std::memory_order_relaxed);
+    adopted.store (previous == nullptr || from == 0, std::memory_order_relaxed);
+    if (adopted.load (std::memory_order_relaxed))
+        previous = nullptr;
+}
+
+void DelayLine::dropPrevious() noexcept
+{
+    // (the audio reads `previous` only until it sets `adopted`)
+    if (previous != nullptr && adopted.load (std::memory_order_acquire))
+        previous = nullptr;
+}
+
+float DelayLine::historyAt (int age, int side) const noexcept
+{
+    if (! adopted.load (std::memory_order_relaxed)) // never ran: it holds what the line before it held
+        return previous != nullptr && age <= from ? previous->historyAt (age, side) : 0.0f;
+    if (age < 1 || age > capacity || (delay == 0 && ! moving)) // (a line that lets the audio through keeps nothing)
+        return 0.0f;
+    return (side == 0 ? left : right)[(std::size_t) ((position - age + capacity) % capacity)];
+}
+
+void DelayLine::adopt() noexcept
+{
+    // (audio thread, the line's first block) the audio the line before still held, as if it had gone through this one
+    if (previous != nullptr)
+    {
+        auto any = false;
+        for (int age = 1; age <= std::min (from, capacity); ++age)
+        {
+            const auto at = (std::size_t) ((position - age + capacity) % capacity);
+            left[at] = previous->historyAt (age, 0);
+            right[at] = previous->historyAt (age, 1);
+            any = any || left[at] != 0.0f || right[at] != 0.0f;
+        }
+        quiet = any ? 0 : capacity;
+    }
+    adopted.store (true, std::memory_order_release);
+}
+
+// A line on the move (or one whose ring is longer than its delay, after a move to a shorter one): sample by sample,
+// the old delay's tap until the new one holds audio, then the crossfade to the new tap. A delay of 0 taps the input.
+void DelayLine::runMove (const float* sl, const float* sr, float level, float* dl, float* dr, bool add, int n) noexcept
+{
+    const auto tap = [this] (const std::vector<float>& ring, int d, float in) {
+        return d == 0 ? in : ring[(std::size_t) ((position - d + capacity) % capacity)];
+    };
+    for (int i = 0; i < n; ++i)
+    {
+        const auto inL = sl != nullptr ? sl[i] * level : 0.0f;
+        const auto inR = sr != nullptr ? sr[i] * level : 0.0f;
+        auto outL = tap (left, delay, inL), outR = tap (right, delay, inR);
+        if (moving)
+        {
+            const auto oldL = tap (left, from, inL), oldR = tap (right, from, inR);
+            if (wait > 0)
+            {
+                --wait;
+                outL = oldL;
+                outR = oldR;
+            }
+            else
+            {
+                const auto g = (float) (fadeLength - fadeLeft + 1) / (float) fadeLength; // (1 at the last sample)
+                outL = oldL + (outL - oldL) * g;
+                outR = oldR + (outR - oldR) * g;
+                if (--fadeLeft <= 0)
+                    moving = false;
+            }
+        }
+        left[(std::size_t) position] = inL; // (after the taps: a tap of `capacity` reads the oldest sample)
+        right[(std::size_t) position] = inR;
+        position = (position + 1) % capacity;
+        if (add)
+        {
+            dl[i] += outL;
+            dr[i] += outR;
+        }
+        else
+        {
+            dl[i] = outL;
+            dr[i] = outR;
+        }
+    }
+    if (! moving)
+        settledFlag.store (true, std::memory_order_release);
+}
+
 void DelayLine::process (float* l, float* r, int n) noexcept
 {
+    if (! adopted.load (std::memory_order_relaxed))
+        adopt();
+    if (delay == 0 && ! moving) // (a move to no delay is over: the audio passes untouched)
+        return;
+    if (moving || capacity != delay)
+    {
+        runMove (l, r, 1.0f, l, r, false, n);
+        quiet = 0;
+        return;
+    }
+
     // in contiguous ring segments: swap what comes in for what goes out
     for (int done = 0; done < n;)
     {
@@ -281,25 +401,60 @@ void DelayLine::process (float* l, float* r, int n) noexcept
 
 void DelayLine::clear() noexcept
 {
-    if (quiet >= delay)
+    if (! adopted.load (std::memory_order_relaxed))
+        adopted.store (true, std::memory_order_release); // (nothing of the line before is wanted any more)
+    if (moving)
+    {
+        moving = false;
+        wait = fadeLeft = 0;
+        settledFlag.store (true, std::memory_order_release);
+    }
+    if (quiet >= capacity)
         return;
-    std::memset (left.data(), 0, sizeof (float) * (std::size_t) delay);
-    std::memset (right.data(), 0, sizeof (float) * (std::size_t) delay);
-    quiet = delay;
+    std::memset (left.data(), 0, sizeof (float) * (std::size_t) capacity);
+    std::memset (right.data(), 0, sizeof (float) * (std::size_t) capacity);
+    quiet = capacity;
 }
 
 void DelayLine::mixInto (const float* sl, const float* sr, float level, float* dl, float* dr, int n) noexcept
 {
+    if (! adopted.load (std::memory_order_relaxed))
+        adopt();
+    if (delay == 0 && ! moving) // (a move to no delay is over: the source as it is)
+    {
+        if (sl != nullptr)
+            for (int i = 0; i < n; ++i)
+            {
+                dl[i] += sl[i] * level;
+                dr[i] += sr[i] * level;
+            }
+        return;
+    }
+
     if (sl == nullptr)
     {
-        if (quiet >= delay)
+        if (quiet >= capacity)
+        {
+            if (moving) // (silence on both taps: the move is over)
+            {
+                moving = false;
+                wait = fadeLeft = 0;
+                settledFlag.store (true, std::memory_order_release);
+            }
             return; // all zeros inside: the output would be silence and the position doesn't matter
+        }
 
-        quiet += n;
+        quiet = std::min (capacity, quiet + n);
     }
     else
     {
         quiet = 0;
+    }
+
+    if (moving || capacity != delay)
+    {
+        runMove (sl, sr, level, dl, dr, true, n);
+        return;
     }
 
     for (int done = 0; done < n;)

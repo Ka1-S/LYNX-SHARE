@@ -3493,6 +3493,15 @@ public:
             quit();
             return;
         }
+        // --mixerqolshot190qh <prefix> [project.flp] (round 190qh, research190qa R5 Mixer QoL): src/MixerQolShot190qh.inc
+        if (args.contains ("--mixerqolshot190qh"))
+        {
+            const auto i = args.indexOf ("--mixerqolshot190qh");
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runMixerQolShot190qh (args[i + 1].unquoted(), project) ? 0 : 1);
+            quit();
+            return;
+        }
         // --mixer221shot190ng <prefix> (round 190ng, issue #221): src/Mixer221Shot190ng.inc
         if (args.contains ("--mixer221shot190ng"))
         {
@@ -9441,6 +9450,69 @@ private:
         juce::String issue258Log;
         const auto issue258Result = issue258Check (issue258Log);
 
+        // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
+        // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
+        // thresholds in a .lynxtheme (D2-MX7; none written for the default look), the three unbound actions (D2-MX1, MX8)
+        // and the strips' extras (D2-VF5, MX3: off by default, under the read-out when on, the meters shorter by them)
+        juce::String mixerqol190qhResult = "OK";
+        {
+            lynx::AudioEngine e (false);
+            const auto before = e.getLatencySamples(); // (the default song's own: its Master limiter)
+            e.editSong ([] (lynx::Song& s) {
+                auto limiter = lynx::makeEffectSlot (lynx::EffectKind::fruityLimiter);
+                limiter.params[3] = 0.401f; // (FL's look-ahead, about 11 ms: round 188e)
+                s.mixer[1].effects.push_back (limiter);
+            });
+            const auto on = e.getLatencySamples();
+            e.editSong ([] (lynx::Song& s) { s.mixer[1].effects[0].enabled = false; });
+            const auto off = e.getLatencySamples();
+            e.editSong ([] (lynx::Song& s) {
+                s.mixer[1].effects[0].enabled = true;
+                s.mixer[1].muted = true;
+            });
+            const auto muted = e.getLatencySamples();
+            if (on <= before || off != before || muted != on)
+                mixerqol190qhResult = "ERROR PDC before / on / off / muted " + juce::String (before) + " / " + juce::String (on) + " / " + juce::String (off) + " / "
+                                      + juce::String (muted);
+
+            lynx::themes::Spec spec;
+            const auto plain = lynx::themeui::toJson (spec);
+            spec.meterZones = true;
+            spec.meterYellowDb = -12.0f;
+            spec.meterRedDb = -3.0f;
+            const auto back = lynx::themeui::fromJson (lynx::themeui::toJson (spec));
+            if (plain.contains ("meterYellowDb") || ! back || ! back->meterZones || back->meterYellowDb != -12.0f || back->meterRedDb != -3.0f
+                || lynx::themeui::fromJson (plain)->meterZones)
+                mixerqol190qhResult = "ERROR theme meter thresholds";
+
+            for (const auto* id : { "mixer.unsoloAll", "mixer.unmuteAll", "mixer.inputMonitoring" })
+                if (const auto* a = lynx::keys::findAction (id); a == nullptr || ! lynx::keys::KeyMap().chordsFor (id).empty())
+                    mixerqol190qhResult = "ERROR action " + juce::String (id);
+
+            const auto keptPeaks = lynx::MixerStrips::showPeakValues, keptCorrelation = lynx::MixerStrips::showCorrelation;
+            {
+                lynx::MixerComponent mixer (e);
+                mixer.setSize (1400, 800);
+                auto& strips = mixer.getStripsForSnapshot();
+                strips.setShowPeakValues (false);
+                strips.setShowCorrelation (false);
+                const auto fader = strips.faderAreaForSnapshot (1);
+                const auto none = strips.peakValueAreaForSnapshot (1).isEmpty() && strips.correlationAreaForSnapshot (1).isEmpty();
+                strips.setShowPeakValues (true);
+                strips.setShowCorrelation (true);
+                const auto peak = strips.peakValueAreaForSnapshot (1), corr = strips.correlationAreaForSnapshot (1);
+                const auto shorter = strips.faderAreaForSnapshot (1);
+                if (! none || peak.isEmpty() || corr.isEmpty() || corr.getY() <= shorter.getBottom() || peak.getY() < corr.getBottom()
+                    || fader.getHeight() - shorter.getHeight() != lynx::MixerStrips::correlationRowHeight + lynx::MixerStrips::peakRowHeight
+                    || ! e.getMeters().correlationWanted.load())
+                    mixerqol190qhResult = "ERROR strip extras " + peak.toString() + " / " + corr.toString() + " / " + fader.toString() + " / " + shorter.toString();
+                strips.setShowPeakValues (false);
+                strips.setShowCorrelation (false);
+            }
+            lynx::MixerStrips::showPeakValues = keptPeaks;
+            lynx::MixerStrips::showCorrelation = keptCorrelation;
+        }
+
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
@@ -10717,7 +10789,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -10832,6 +10904,7 @@ private:
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
+               << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -20641,6 +20714,7 @@ private:
 #include "IssuesShot190mq.inc" // round 190mq
 #include "Focus218Shot190ng.inc" // round 190ng (issue #218)
 #include "Mixer221Shot190ng.inc" // round 190ng (issue #221)
+#include "MixerQolShot190qh.inc" // round 190qh (research190qa R5, Mixer QoL)
 #include "IssuesShot190ng.inc" // round 190ng (issues #215, #217, #219, #220, #222)
 #include "TrackClipsShot190ne.inc" // round 190ne
 #include "TrackStatesShot190op.inc" // round 190op

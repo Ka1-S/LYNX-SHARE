@@ -574,6 +574,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
     outputSlot.fill (-1);
     // VFX Script (round 165d): the audio thread waits a bounded time for the Python thread (exports wait for it)
     vfx::script::setRealtime (openAudioDevice);
+    liveDevice = openAudioDevice; // (round 190qh)
     const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
     mark ("  engine: workers + default song");
     if (juce::JUCEApplicationBase::getInstance() != nullptr) // issue #36: retired racks are freed from their own message
@@ -5624,6 +5625,7 @@ void AudioEngine::publishSong()
         factories.araInstrument = [this] (const ChannelDef& c, double rate) { return araHost->instrumentFor (c, rate); };
     }
     factories.currentSource = currentSource; // (round 190my: FL's Current track's latency in the PDC plan)
+    factories.movePdcLines = liveDevice; // (round 190qh: a live edit moves the PDC lines without a cut; never in a render)
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -5648,6 +5650,7 @@ void AudioEngine::publishSong()
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;
     lastPublishedShape.sideLines = state->sideLines; // (round 190hq: the side inputs' lines carry over as the sends' do)
+    lastPublishedShape.hwRoutes = state->hwRoutes; // (round 190qh: the hardware outputs' lines too; each edit restarted them from silence)
     // round 190hq (B13): what the Master hears is this much later than what the rack renders (the clocks LYNX sends and
     // follows, Link and played notes count it, as they count the output buffer)
     masterPdcSamples.store (state->pdc.total, std::memory_order_relaxed);

@@ -262,6 +262,7 @@ struct RackState
     // count as 0 in the plan. The song itself is not changed.
     std::vector<char> lowLatencyTracks;                 // [track]
     int pdcCurrentSource = -1;                          // (round 190my: Factories::currentSource, for buildPdc)
+    bool movePdcLines = false;                          // (round 190qh: Factories::movePdcLines, for buildPdc)
     std::vector<lowlatency::SlotMask> lowLatencySlots;  // [track] bit s = slot s is bypassed
     // The latency of each bypassed slot when the plan was made ([track][slot], 0 elsewhere), for the UI.
     std::vector<std::vector<int>> lowLatencySaved;
@@ -438,6 +439,9 @@ struct RackState
         // Round 190my (DF-82): the mixer track FL's Current track runs on (the renderer's setCurrentSource), for the PDC
         // plan: its latency is added to that track's (−1 = none)
         int currentSource = -1;
+        // round 190qh (D2-MX9): a live engine's rebuild moves a changed PDC line to its new delay with a crossfade (an
+        // engine without an audio device — an export, a bounce — keeps making new lines: its renders stay bit for bit)
+        bool movePdcLines = false;
         // Round 190jb (FL renders with the instances that play): an export's hosted plugin channels / slots and its
         // Patchers that host plugins take the unit these return (the live engine's running one); nullptr or unset: built
         // new as usual
@@ -1380,6 +1384,19 @@ private:
         int silentSamples = 0;
     };
     std::vector<SmartDisableState> smartDisable; // [track * maxEffectSlots + slot]
+    // Round 190qh (D2-MX9): an effect slot switched off or on while the audio runs crossfades between its input and its
+    // output over switchFade samples (Pdc.h switchFadeSamples: no click) instead of stepping. `gain` is where the slot is
+    // (1 = on); a slot first seen here (a new renderer, an export, another effect in the slot) starts where it is.
+    // A slot switched on waits first for its effect's latency (`hold`): until then the effect's output is what it held
+    // from before (or nothing), and the delay compensation of the other paths waits the same time (DelayLine's move).
+    struct SlotFade
+    {
+        const Effect* effect = nullptr;
+        float gain = 1.0f, target = 1.0f;
+        int hold = 0;
+    };
+    std::vector<SlotFade> slotFades; // [track * maxEffectSlots + slot]
+    int switchFade = 141;
 
     struct TrackEqState
     {

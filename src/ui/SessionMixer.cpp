@@ -1243,9 +1243,10 @@ void SessionMixerComponent::paintMeter (juce::Graphics& g, int insert, juce::Rec
             const auto top = juce::roundToInt (yOf (juce::Decibels::gainToDecibels (level.level, -100.0f)));
             const auto lit = bar.withTop (juce::jlimit (bar.getY(), bar.getBottom(), top));
             juce::ColourGradient gradient (c::meterClip, 0.0f, (float) bar.getY(), c::meterLow, 0.0f, (float) bar.getBottom(), false);
-            gradient.addColour (1.0 - meters::scalePosition (0.0f), c::meterClip);
-            gradient.addColour (1.0 - meters::scalePosition (-6.0f), c::meterMid);
-            gradient.addColour (1.0 - meters::scalePosition (-18.0f), c::meterLow);
+            // (round 190qh: Options › Theme's own meter thresholds when set)
+            gradient.addColour (1.0 - meters::scalePosition (c::meterRedAt (0.0f)), c::meterClip);
+            gradient.addColour (1.0 - meters::scalePosition (c::meterYellowAt (-6.0f)), c::meterMid);
+            gradient.addColour (1.0 - meters::scalePosition (c::meterYellowAt (-6.0f) - 12.0f), c::meterLow);
             g.setGradientFill (gradient);
             g.fillRect (lit);
         }

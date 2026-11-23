@@ -1947,6 +1947,7 @@ private:
     void failRemoteHistory (bool uncertain);
     static juce::String remoteDeviceStateHashOf (const Song&);
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
+    bool liveDevice = false; // (round 190qh) an engine made to play on an audio device (the app's); exports have none
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
     std::vector<int> frozenMissing;                    // (frozenAudioMissing)
     struct FreezeCheck

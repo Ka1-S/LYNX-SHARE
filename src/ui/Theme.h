@@ -60,6 +60,12 @@ inline juce::Colour warning { 0xfff5b942 };                      // markers, mis
 inline juce::Colour meterLow { 0xff3ddc84 };
 inline juce::Colour meterMid { 0xfff5c542 };
 inline juce::Colour meterClip { 0xffff3b3f };
+// Round 190qh (D2-MX7, Options › Theme › "Own meter thresholds", a LYNX extra): where the track meters turn yellow and red
+// (dBFS). Off = each meter keeps its own (the Mixer's FL gradient: green to -18, yellow at -6, red from 0).
+inline bool meterZonesOwn = false;
+inline float meterYellowDb = -6.0f, meterRedDb = 0.0f;
+inline float meterYellowAt (float ownDb) noexcept { return meterZonesOwn ? meterYellowDb : ownDb; }
+inline float meterRedAt (float ownDb) noexcept { return meterZonesOwn ? meterRedDb : ownDb; }
 
 // step sequencer / editors
 inline juce::Colour knobArc { 0xffc5c9d1 };     // rotary value arcs at rest (accent while touched)

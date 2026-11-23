@@ -1289,6 +1289,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         const loadtrace::Scope timing ("pdc");
         state->lowLatencyTracks = factories.lowLatencyTracks; // (round 190aq; empty in exports)
         state->pdcCurrentSource = factories.currentSource; // (round 190my)
+        state->movePdcLines = factories.movePdcLines; // (round 190qh)
         state->buildPdc (previous);
     }
     state->buildMixerGraph();
@@ -1723,12 +1724,45 @@ void RackState::buildPdc (const RackState* previous)
     pdc = computePdc (song, channelLatency, slotLatency, sampleRate, pdcCurrentSource);
 
     // reuses lines of the same length: editing the song must not click the audio
-    auto line = [] (int length, const std::shared_ptr<DelayLine>* old) -> std::shared_ptr<DelayLine> {
-        if (length <= 0)
-            return nullptr;
-        if (old != nullptr && *old != nullptr && (*old)->length() == length)
+    // Round 190qh (D2-MX9, FL: a switched-off slot's latency leaves the PDC at once): a live edit that changes an edge's
+    // delay (a slot switched off or on, a plugin's new latency) moves the edge's line to the new delay with a short
+    // crossfade (DelayLine's second constructor, switchFadeSamples) instead of starting a new one from silence, which
+    // cut the audio for the new delay's length. Only for the same edge (`same`) and in the live engine (movePdcLines): a
+    // first build and every build of an export or a render make their lines as before.
+    const auto fade = switchFadeSamples (sampleRate);
+    const auto live = previous != nullptr && movePdcLines;
+    auto line = [live, fade] (int length, const std::shared_ptr<DelayLine>* old, bool same = true) -> std::shared_ptr<DelayLine> {
+        const auto* before = old != nullptr ? old->get() : nullptr;
+        if (before != nullptr && length > 0 && before->length() == length)
+        {
+            (*old)->dropPrevious(); // (a move it made is long over: the line before it can go)
             return *old;
-        return std::make_shared<DelayLine> (length);
+        }
+        if (! live || ! same)
+            return length > 0 ? std::make_shared<DelayLine> (length) : nullptr;
+        if (length <= 0) // no delay any more: the old one fades out (nothing to do once a line already passes the audio)
+            return before == nullptr || (before->length() == 0 && before->settled()) ? nullptr
+                                                                                      : std::make_shared<DelayLine> (0, *old, before->length(), fade);
+        return std::make_shared<DelayLine> (length, before != nullptr ? *old : nullptr, before != nullptr ? before->length() : 0, fade);
+    };
+    // (round 190qh) the edges of the snapshot before are the same edges here: the same channel, the same insert with the
+    // same routes (an insert deleted or moved gives other edges at these indices)
+    const auto* was = previous != nullptr ? &previous->song : nullptr;
+    auto sameChannel = [&] (std::size_t c) {
+        return was != nullptr && was->channels.size() == song.channels.size() && c < song.channels.size()
+               && was->channels[c].uid == song.channels[c].uid && was->channels[c].mixerTrack == song.channels[c].mixerTrack;
+    };
+    auto sameTrack = [&] (std::size_t t) {
+        if (was == nullptr || was->mixer.size() != song.mixer.size() || t >= song.mixer.size())
+            return false;
+        const auto& a = was->mixer[t];
+        const auto& b = song.mixer[t];
+        if (a.name != b.name || a.toMaster != b.toMaster || a.sends.size() != b.sends.size())
+            return false;
+        for (std::size_t i = 0; i < a.sends.size(); ++i)
+            if (a.sends[i].target != b.sends[i].target)
+                return false;
+        return true;
     };
 
     // round 190bu: the inserts with a chain Blend under 100 % get their dry path, as late as their active slots make
@@ -1771,7 +1805,7 @@ void RackState::buildPdc (const RackState* previous)
 
     for (std::size_t c = 0; c < pdc.channelDelay.size(); ++c)
         channelDelays[c] = line (pdc.channelDelay[c],
-                                 previous != nullptr && c < previous->channelDelays.size() ? &previous->channelDelays[c] : nullptr);
+                                 previous != nullptr && c < previous->channelDelays.size() ? &previous->channelDelays[c] : nullptr, sameChannel (c));
 
     sendDelays.resize (pdc.sendDelay.size());
 
@@ -1786,7 +1820,8 @@ void RackState::buildPdc (const RackState* previous)
             if (previous != nullptr && t < previous->sendDelays.size() && k < previous->sendDelays[t].size())
                 old = &previous->sendDelays[t][k];
 
-            sendDelays[t][k] = line (pdc.sendDelay[t][k], old);
+            sendDelays[t][k] = line (pdc.sendDelay[t][k], old,
+                                     old != nullptr && sameTrack (t) && previous->sendDelays[t].size() == pdc.sendDelay[t].size());
         }
     }
 
@@ -1828,9 +1863,9 @@ void RackState::buildPdc (const RackState* previous)
         const std::shared_ptr<DelayLine>* old = nullptr;
         if (previous != nullptr)
             for (const auto& r : previous->hwRoutes)
-                if (r.track == (int) t)
+                if (r.track == (int) t && ! r.cue) // (round 190qh: not the same track's Cue route, whose line is its own)
                     old = &r.delay;
-        hwRoutes.push_back ({ (int) t, track.outputChannel, track.outputMode, line (length, old) });
+        hwRoutes.push_back ({ (int) t, track.outputChannel, track.outputMode, line (length, old, sameTrack (t)) });
     }
     // round 190nc (DL-110, Live's Cue mode): each cued track's output also to the Cue Out, lined up with Main (the routes
     // exist only while the Cue Out is separate from the Main Out; channels the device lacks are dropped by the callback)
@@ -1847,7 +1882,7 @@ void RackState::buildPdc (const RackState* previous)
                 for (const auto& r : previous->hwRoutes)
                     if (r.track == (int) t && r.cue)
                         old = &r.delay;
-            hwRoutes.push_back ({ (int) t, cue.out, cue.outMode, line (length, old), true });
+            hwRoutes.push_back ({ (int) t, cue.out, cue.outMode, line (length, old, sameTrack (t)), true });
         }
     }
 
@@ -2833,10 +2868,30 @@ float squaresOf (const float* data, int n) noexcept
     return std::isfinite (sum) ? sum : 0.0f;
 }
 
+// Round 190qh (D2-MX3): the block's sum of L·R, for the Mixer's correlation bars (only while they show)
+float productsOf (const float* l, const float* r, int n) noexcept
+{
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    int i = 0;
+    for (; i + 4 <= n; i += 4)
+    {
+        s0 += l[i] * r[i];
+        s1 += l[i + 1] * r[i + 1];
+        s2 += l[i + 2] * r[i + 2];
+        s3 += l[i + 3] * r[i + 3];
+    }
+    for (; i < n; ++i)
+        s0 += l[i] * r[i];
+    const auto sum = (s0 + s1) + (s2 + s3);
+    return std::isfinite (sum) ? sum : 0.0f;
+}
+
 void meterPower (MeterBank* meters, int track, const float* l, const float* r, int n) noexcept
 {
     if (meters != nullptr && meters->powerWanted.load (std::memory_order_relaxed))
         meters->accumulatePower (track, squaresOf (l, n), squaresOf (r, n), n);
+    if (meters != nullptr && meters->correlationWanted.load (std::memory_order_relaxed))
+        meters->accumulateCorrelation (track, productsOf (l, r, n), squaresOf (l, n), squaresOf (r, n));
 }
 
 // No NaN / inf in the block? Round 190ge: by the exponent bits (all ones only for an inf or a NaN), four lanes at a
@@ -3029,6 +3084,8 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
+    slotFades.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {}); // (round 190qh)
+    switchFade = switchFadeSamples (sr);
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
     tapBuffers.assign ((std::size_t) RackState::maxSendTaps * 2 * chunkCapacity, 0.0f);
     sampleRate = sr;
@@ -4187,7 +4244,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         instrument.setHardwareIo (liveInput, hwOut != nullptr && hwOut->active.load (std::memory_order_relaxed) ? hwOut : nullptr, liveInputOffset);
 
     // idle channel, no notes in this chunk and no PDC: nothing to do (neither clear nor sum into the mixer)
-    const auto hasDelay = (std::size_t) i < state.channelDelays.size() && state.channelDelays[(std::size_t) i] != nullptr;
+    const auto hasDelay = (std::size_t) i < state.channelDelays.size() && state.channelDelays[(std::size_t) i] != nullptr
+                          && ! state.channelDelays[(std::size_t) i]->passesThrough(); // (round 190qh: a line moved to no delay)
     const auto hasArp = ((std::size_t) i < state.arpeggiators.size() && state.arpeggiators[(std::size_t) i] != nullptr)
                         || ((std::size_t) i < state.echoes.size() && state.echoes[(std::size_t) i] != nullptr);
     const auto* sources = state.hasMidiRoutes && (std::size_t) i < state.midiSources.size() && ! state.midiSources[(std::size_t) i].empty()
@@ -4841,7 +4899,30 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                     times->effectMeters[at + (std::size_t) o].store (0.0f, std::memory_order_relaxed);
         };
 
-        if (! plan.active || wet <= 0.0f)
+        // round 190qh (D2-MX9): a slot switched on or off while playing crossfades instead of stepping (SlotFade)
+        auto* fade = (std::size_t) track * maxEffectSlots + i < slotFades.size() ? &slotFades[(std::size_t) track * maxEffectSlots + i] : nullptr;
+        auto fading = false;
+        if (fade != nullptr)
+        {
+            const auto target = plan.active ? 1.0f : 0.0f;
+            if (fade->effect != effects[i].get())
+                *fade = { effects[i].get(), target, target, 0 };
+            if (fade->target != target)
+            {
+                fade->target = target;
+                // (switched on from off: its first `latency` samples are not its input's yet)
+                fade->hold = target > 0.0f && fade->gain <= 0.0f ? std::max (0, effects[i]->latencySamples()) : 0;
+            }
+            // (not the hardware insert: its dry path is inside it, see `partial`; nor a slot the Mix knob keeps silent)
+            fading = (fade->gain != target || fade->hold > 0) && wet > 0.0f && slots[i].kind != EffectKind::hardwareInsert;
+            if (! fading)
+            {
+                fade->gain = target;
+                fade->hold = 0;
+            }
+        }
+
+        if ((! plan.active && ! fading) || wet <= 0.0f)
         {
             if (plan.liveMeters)
                 clearMeters();
@@ -4930,7 +5011,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // dry/wet: keep the dry signal to mix later
         // (not the hardware insert: its dry path is delayed by its round trip inside it, so the slot's mix scales its own
         // dry/wet instead — round 164d)
-        const auto partial = wet < 0.999f && slots[i].kind != EffectKind::hardwareInsert;
+        const auto partial = (wet < 0.999f || fading) && slots[i].kind != EffectKind::hardwareInsert;
 
         if (partial)
         {
@@ -5047,7 +5128,28 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             nonFiniteBlocks.fetch_add (1, std::memory_order_relaxed);
         }
 
-        if (partial)
+        if (partial && fading) // round 190qh: the switch's crossfade, a step of 1 / switchFade per sample
+        {
+            const auto* dl = trackScratch (track, 0);
+            const auto* dr = trackScratch (track, 1);
+            const auto target = plan.active ? 1.0f : 0.0f;
+            const auto step = 1.0f / (float) std::max (1, switchFade);
+            auto g = fade->gain;
+            auto hold = fade->hold;
+            for (int k = 0; k < n; ++k)
+            {
+                if (hold > 0)
+                    --hold;
+                else
+                    g = target > g ? std::min (target, g + step) : std::max (target, g - step);
+                const auto w = wet * g;
+                l[k] = dl[k] + (l[k] - dl[k]) * w;
+                r[k] = dr[k] + (r[k] - dr[k]) * w;
+            }
+            fade->gain = g;
+            fade->hold = hold;
+        }
+        else if (partial)
         {
             const auto* dl = trackScratch (track, 0);
             const auto* dr = trackScratch (track, 1);
@@ -8423,6 +8525,8 @@ void RackRenderer::adoptUnits (const RackRenderer& from, const char* channels, c
                 const auto key = t * maxEffectSlots + s;
                 if (key < smartDisable.size() && key < from.smartDisable.size())
                     smartDisable[key] = from.smartDisable[key];
+                if (key < slotFades.size() && key < from.slotFades.size())
+                    slotFades[key] = from.slotFades[key];
                 if (key < goalGlideAmount.size() && key < from.goalGlideAmount.size())
                     goalGlideAmount[key] = from.goalGlideAmount[key];
                 if (key < goalGlideEffect.size() && key < from.goalGlideEffect.size())

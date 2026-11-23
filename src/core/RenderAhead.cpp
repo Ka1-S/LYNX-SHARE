@@ -133,6 +133,8 @@ struct RenderAhead::Entry
     // round 190lr (DL-108): the blocks' sums of squares and their frames, kept only while the Session mixer's RMS bars show
     std::array<float, 2 * maxMixerTracks> power {};
     std::array<int, maxMixerTracks> powerFrames {};
+    // round 190qh (D2-MX3): the blocks' L·R, L², R² sums, kept only while the Mixer's correlation bars show
+    std::array<float, 3 * maxMixerTracks> correlation {};
 };
 
 struct RenderAhead::Partition
@@ -888,6 +890,8 @@ void RenderAhead::harvestMeters (Entry& entry) noexcept
         entry.power[(std::size_t) (i * 2)] = pl;
         entry.power[(std::size_t) (i * 2 + 1)] = pr;
         entry.powerFrames[(std::size_t) i] = frames;
+        m.takeCorrelationSums (t, entry.correlation[(std::size_t) (i * 3)], entry.correlation[(std::size_t) (i * 3 + 1)],
+                               entry.correlation[(std::size_t) (i * 3 + 2)]); // (zeros while nobody wants them)
     }
 }
 
@@ -897,6 +901,8 @@ void RenderAhead::replayMeters (const Entry& entry, MeterBank* meters) noexcept
         return;
     const auto power = meters->powerWanted.load (std::memory_order_relaxed);
     aheadMeters->powerWanted.store (power, std::memory_order_relaxed); // (round 190lr: the part rendered ahead sums them too)
+    const auto correlation = meters->correlationWanted.load (std::memory_order_relaxed);
+    aheadMeters->correlationWanted.store (correlation, std::memory_order_relaxed); // (round 190qh: and these)
     for (int i = 0; i < current->aheadTrackCount; ++i)
     {
         const auto l = entry.peaks[(std::size_t) (i * 2)], r = entry.peaks[(std::size_t) (i * 2 + 1)];
@@ -905,6 +911,9 @@ void RenderAhead::replayMeters (const Entry& entry, MeterBank* meters) noexcept
         if (power && entry.powerFrames[(std::size_t) i] > 0)
             meters->accumulatePower (current->aheadTrackList[(std::size_t) i], entry.power[(std::size_t) (i * 2)], entry.power[(std::size_t) (i * 2 + 1)],
                                      entry.powerFrames[(std::size_t) i]);
+        if (correlation)
+            meters->accumulateCorrelation (current->aheadTrackList[(std::size_t) i], entry.correlation[(std::size_t) (i * 3)],
+                                           entry.correlation[(std::size_t) (i * 3 + 1)], entry.correlation[(std::size_t) (i * 3 + 2)]);
     }
 }
 

@@ -155,6 +155,9 @@ constexpr int dotCount = 9;
 const char* dotId (Dot dot); // "selection", "highlight", ... (the .lynxtheme keys)
 
 // A theme: what a .lynxtheme file holds and what Options › Theme edits.
+// (round 190qh) the meter thresholds' ranges (dBFS): yellow −40 … −1, red −20 … +6, red at least 1 dB over yellow
+constexpr float meterYellowMin = -40.0f, meterYellowMax = -1.0f, meterRedMin = -20.0f, meterRedMax = 6.0f;
+
 struct Spec
 {
     std::string name = "LYNX";
@@ -177,13 +180,17 @@ struct Spec
     // .flstheme OverrideClips, hint "Use the note color list to find random colors for new clips"): a new audio clip
     // channel or automation clip takes a random colour of the 16 note colours instead of the default grey
     bool clipsUseNoteColours = false;
+    // Round 190qh (D2-MX7, a LYNX extra beside the Meters dot): the track meters' own thresholds (dBFS) where they turn
+    // yellow and red; off = each meter keeps its own (the Mixer's: yellow at -6, red from 0)
+    bool meterZones = false;
+    float meterYellowDb = -6.0f, meterRedDb = 0.0f;
 
     bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
     bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
     bool isDefaultLook() const noexcept
     {
         return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots()
-               && ! clipsUseNoteColours;
+               && ! clipsUseNoteColours && ! meterZones;
     }
     bool operator== (const Spec&) const = default;
 };

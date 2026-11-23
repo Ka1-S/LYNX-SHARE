@@ -121,6 +121,10 @@ void applyDrawingDots (const themes::Spec& spec)
     colour::stepOn = theme::stepOn = dot (themes::Dot::steps, colour::accent);
     colour::selection = dot (themes::Dot::selection, colour::accent);
     colour::defaultTrack = dot (themes::Dot::tracks, juce::Colour (0xff485156)); // (issue #238: FL's grey unless set)
+    // round 190qh (D2-MX7): the track meters' own thresholds, when set
+    colour::meterZonesOwn = spec.meterZones;
+    colour::meterYellowDb = spec.meterYellowDb;
+    colour::meterRedDb = std::max (spec.meterRedDb, spec.meterYellowDb + 1.0f);
     // FL's "Audio and automation clips use note colors" (round 190od): the engine's new clips pick from the note colours
     std::array<std::uint32_t, newclipcolours::count> notes {};
     for (int i = 0; i < newclipcolours::count; ++i)
@@ -194,6 +198,11 @@ juce::String toJson (const themes::Spec& spec)
         o->setProperty ("menuStyle", juce::String (themes::menuStyleId (spec.menuStyle)));
     if (spec.clipsUseNoteColours) // (round 190od: FL's OverrideClips)
         o->setProperty ("clipsUseNoteColors", true);
+    if (spec.meterZones) // (round 190qh: the meters' own thresholds; files without them keep each meter's own)
+    {
+        o->setProperty ("meterYellowDb", spec.meterYellowDb);
+        o->setProperty ("meterRedDb", spec.meterRedDb);
+    }
     return juce::JSON::toString (juce::var (o));
 }
 
@@ -233,6 +242,12 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
         spec.gridIntensity = (float) juce::jlimit (themes::gridIntensityMin, themes::gridIntensityMax, (double) v["gridIntensity"]);
     spec.menuStyle = themes::menuStyleFromId (v["menuStyle"].toString().toStdString());
     spec.clipsUseNoteColours = (bool) v.getProperty ("clipsUseNoteColors", false);
+    if (! v["meterYellowDb"].isVoid() && ! v["meterRedDb"].isVoid())
+    {
+        spec.meterZones = true;
+        spec.meterYellowDb = juce::jlimit (themes::meterYellowMin, themes::meterYellowMax, (float) (double) v["meterYellowDb"]);
+        spec.meterRedDb = juce::jlimit (std::max (themes::meterRedMin, spec.meterYellowDb + 1.0f), themes::meterRedMax, (float) (double) v["meterRedDb"]);
+    }
     return spec;
 }
 
@@ -626,8 +641,41 @@ public:
                                                                  &dimSlider, &imageListLabel, &imageList, &openBackgrounds, &imageNote, &soundTitle,
                                                                  &soundName, &soundButton, &soundPlay, &soundDefault, &soundNote, &slotA, &slotB, &abNote, &lookTitle,
                                                                  &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
-                                                                 &optionsTitle, &clipsNoteColours })
+                                                                 &optionsTitle, &clipsNoteColours, &meterZones, &meterYellowLabel, &meterYellow,
+                                                                 &meterRedLabel, &meterRed })
             add (*c);
+        // round 190qh (D2-MX7, a LYNX extra next to the Meters dot): where the track meters turn yellow and red
+        meterZones.setButtonText (tr ("Own meter thresholds"));
+        meterZones.setTooltip (tr ("Off: each meter keeps its own colors (the Mixer: yellow from -6 dB, red from 0 dB)"));
+        meterZones.setComponentID ("theme.meterZones");
+        meterZones.onClick = [this] { edit ([on = meterZones.getToggleState()] (themes::Spec& s) { s.meterZones = on; }); };
+        styleLabel (meterYellowLabel, tr ("Yellow from"));
+        styleLabel (meterRedLabel, tr ("Red from"));
+        for (auto* box : { &meterYellow, &meterRed })
+        {
+            box->setSliderStyle (juce::Slider::IncDecButtons);
+            box->setTextBoxStyle (juce::Slider::TextBoxLeft, false, 52, 20);
+            box->setIncDecButtonsMode (juce::Slider::incDecButtonsDraggable_Vertical);
+            box->setTextValueSuffix (" dB");
+        }
+        meterYellow.setRange (themes::meterYellowMin, themes::meterYellowMax, 0.5);
+        meterRed.setRange (themes::meterRedMin, themes::meterRedMax, 0.5);
+        meterYellow.setComponentID ("theme.meterYellow");
+        meterRed.setComponentID ("theme.meterRed");
+        meterYellow.onValueChange = [this] {
+            editSoon ([v = (float) meterYellow.getValue()] (themes::Spec& s) {
+                s.meterZones = true;
+                s.meterYellowDb = v;
+                s.meterRedDb = std::max (s.meterRedDb, v + 1.0f);
+            });
+        };
+        meterRed.onValueChange = [this] {
+            editSoon ([v = (float) meterRed.getValue()] (themes::Spec& s) {
+                s.meterZones = true;
+                s.meterRedDb = v;
+                s.meterYellowDb = std::min (s.meterYellowDb, v - 1.0f);
+            });
+        };
         // FL's Theme › Options (round 190od): "Audio and automation clips use note colors"
         clipsNoteColours.setButtonText (tr ("Audio and automation clips use note colors"));
         clipsNoteColours.setTooltip (tr ("Use the note color list to find random colors for new clips"));
@@ -865,6 +913,17 @@ private:
             for (auto& d : dots)
                 d.setBounds (r.removeFromLeft (pitch));
         }
+        {
+            // round 190qh: the meters' own thresholds, under the dots (the Meters dot sets their green)
+            auto r = row (24);
+            meterZones.setBounds (r.removeFromLeft (juce::jmin (220, r.getWidth() / 3)));
+            const auto label = juce::jmin (90, r.getWidth() / 6);
+            meterYellowLabel.setBounds (r.removeFromLeft (label));
+            meterYellow.setBounds (r.removeFromLeft (juce::jmin (110, r.getWidth() / 2)));
+            r.removeFromLeft (8);
+            meterRedLabel.setBounds (r.removeFromLeft (label));
+            meterRed.setBounds (r.removeFromLeft (juce::jmin (110, r.getWidth())));
+        }
         adjustNote.setBounds (row (18));
         optionsTitle.setBounds (row (24)); // (FL's Options, round 190od)
         clipsNoteColours.setBounds (row (24));
@@ -1028,6 +1087,11 @@ private:
         workspaceWell.note = spec.workspace == 0 ? tr ("Automatic") : juce::String();
         autoWorkspace.setToggleState (spec.workspace == 0, juce::dontSendNotification);
         clipsNoteColours.setToggleState (spec.clipsUseNoteColours, juce::dontSendNotification);
+        meterZones.setToggleState (spec.meterZones, juce::dontSendNotification);
+        meterYellow.setValue (spec.meterYellowDb, juce::dontSendNotification);
+        meterRed.setValue (spec.meterRedDb, juce::dontSendNotification);
+        for (auto* c : std::initializer_list<juce::Component*> { &meterYellow, &meterRed, &meterYellowLabel, &meterRedLabel })
+            c->setAlpha (spec.meterZones ? 1.0f : 0.55f);
         const auto palette = themes::adjustedPalette (spec);
         for (int i = 0; i < themes::dotCount; ++i)
         {
@@ -1281,6 +1345,9 @@ private:
         soundDefault { tr ("Default") };
     SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") }, optionsTitle { tr ("Options") };
     juce::ToggleButton clipsNoteColours;
+    juce::ToggleButton meterZones; // (round 190qh)
+    juce::Label meterYellowLabel, meterRedLabel;
+    juce::Slider meterYellow, meterRed;
     juce::Label menuStyleLabel, gridLabel, lookNote;
     juce::ComboBox menuStyleBox;
     juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

@@ -18113,3 +18113,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
 #include "Repeats190pmTests.inc" // round 190pm (0.1.32): Note Repeats and Conditions (research190oe P19)
+#include "MixerQol190qhTests.inc" // round 190qh (0.1.32 R5): Mixer QoL, FL's PDC rule for a switched-off slot (D2-MX9)

@@ -66,6 +66,111 @@ void unmuteAll (Song& song)
         song.mixer[0].muted = false;
 }
 
+bool anySolo (const Song& song) noexcept
+{
+    for (std::size_t i = 1; i < song.mixer.size(); ++i)
+        if (song.mixer[i].solo)
+            return true;
+    return false;
+}
+
+bool anyMute (const Song& song) noexcept
+{
+    for (const auto& m : song.mixer)
+        if (m.muted && ! m.lockState)
+            return true;
+    return false;
+}
+
+namespace
+{
+bool stillThere (const Song& song, const SwitchMemory::Entry& e) noexcept
+{
+    return e.track >= 0 && e.track < (int) song.mixer.size() && song.mixer[(std::size_t) e.track].name == e.name;
+}
+} // namespace
+
+bool canRestore (const Song& song, const SwitchMemory& memory) noexcept
+{
+    return std::any_of (memory.entries.begin(), memory.entries.end(), [&song] (const SwitchMemory::Entry& e) { return stillThere (song, e); });
+}
+
+SwitchRestore unsoloAllOrRestore (Song& song, SwitchMemory& memory)
+{
+    if (anySolo (song))
+    {
+        memory.entries.clear();
+        for (std::size_t i = 1; i < song.mixer.size(); ++i)
+            if (auto& m = song.mixer[i]; m.solo)
+            {
+                memory.entries.push_back ({ (int) i, m.name, m.soloSources });
+                m.solo = false;
+            }
+        return SwitchRestore::cleared;
+    }
+    auto any = false;
+    for (const auto& e : memory.entries)
+        if (e.track > 0 && stillThere (song, e))
+        {
+            auto& m = song.mixer[(std::size_t) e.track];
+            m.solo = true;
+            m.soloSources = e.soloSources;
+            any = true;
+        }
+    memory.entries.clear();
+    return any ? SwitchRestore::restored : SwitchRestore::nothing;
+}
+
+SwitchRestore unmuteAllOrRestore (Song& song, SwitchMemory& memory)
+{
+    if (anyMute (song))
+    {
+        memory.entries.clear();
+        for (std::size_t i = 0; i < song.mixer.size(); ++i)
+            if (auto& m = song.mixer[i]; m.muted && ! m.lockState)
+            {
+                memory.entries.push_back ({ (int) i, m.name, true });
+                m.muted = false;
+            }
+        return SwitchRestore::cleared;
+    }
+    auto any = false;
+    for (const auto& e : memory.entries)
+        if (stillThere (song, e) && ! song.mixer[(std::size_t) e.track].lockState)
+        {
+            song.mixer[(std::size_t) e.track].muted = true;
+            any = true;
+        }
+    memory.entries.clear();
+    return any ? SwitchRestore::restored : SwitchRestore::nothing;
+}
+
+InputMonitor toggledMonitor (const Song& song, int track, InputMonitor before) noexcept
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return InputMonitor::off;
+    const auto now = song.mixer[(std::size_t) track].monitor;
+    if (track == 0) // the Master has no arm: its input plays unless monitoring is off
+        return now == InputMonitor::off ? InputMonitor::on : InputMonitor::off;
+    if (now != InputMonitor::on)
+        return InputMonitor::on;
+    return before == InputMonitor::on ? InputMonitor::whenArmed : before;
+}
+
+void setSlotEnabledOn (Song& song, const std::vector<int>& tracks, int row, bool on)
+{
+    for (const auto t : tracks)
+    {
+        if (t < 0 || t >= (int) song.mixer.size())
+            continue;
+        auto& effects = song.mixer[(std::size_t) t].effects;
+        const auto rows = effectRows (effects);
+        for (std::size_t i = 0; i < effects.size() && i < rows.size(); ++i)
+            if (rows[i] == row && ! effects[i].lockState)
+                effects[i].enabled = on;
+    }
+}
+
 void toggleLockState (Song& song, int track)
 {
     if (track >= 0 && track < (int) song.mixer.size())
