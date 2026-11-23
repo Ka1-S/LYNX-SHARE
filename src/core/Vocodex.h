@@ -121,6 +121,15 @@ public:
     // nothing taken) when the layouts differ.
     bool takeOver (const Engine& old) noexcept;
     void process (const float* own, const float* mod, const float* car, float* out, int n) noexcept;
+    // Round 190pt: FL's band set-up again for new controls (`state` differs from the prepared one in `params` only), as
+    // FL's ProcessParam runs it for every control but a few [DECOMP Vocodex_x64.dll FUN_00853e80 → FUN_00851dd0]: every
+    // signal state starts cleared, so take the running one over (takeOver) right after. Allocates nothing unless a hold
+    // window grows past the largest this engine had.
+    void reconfigure (const State& state) noexcept;
+    // takeOver as FL's set-up in place: every band filter keeps its state, also where its oversampling changed
+    // [DECOMP FUN_00626690 / FUN_006260c0: the design writes the coefficients only]
+    bool takeOverInPlace (const Engine& old) noexcept;
+    void swap (Engine& other) noexcept { impl.swap (other.impl); }
 
     int latencySamples() const noexcept;
     int maxBlock() const noexcept;
@@ -157,6 +166,19 @@ std::vector<std::uint8_t> appendInstallData (std::vector<std::uint8_t> flState, 
 std::pair<std::vector<std::uint8_t>, InstallData> splitInstallData (const std::vector<std::uint8_t>& slotState);
 
 std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& state);
+
+// Round 190pt: FL's 20 controls as the slot's parameters, for FL's automation of them (pattern events, song-start values,
+// automation clips): parameter k (k < paramCount, hidden: Vocodex has no named parameters) = (raw − min) / (max − min)
+// over the DLL's own range [EXEC: ProcessParam with REC_FromMIDI 0 / 2^30, read back], and parameter liveControls = 1
+// switches them on (FL imports, which keep the state's controls equal to the parameters, song-start values included).
+// The effect starts from its state and takes a control whenever its parameter moves away from the value it was built
+// with, raw = min + round (v (max − min)), with FL's band set-up (Engine::reconfigure); an edit of the state (the
+// editor) is not undone by parameters that did not move. 0 (projects saved before, new slots): the state alone, as
+// before.
+constexpr int liveControls = paramCount;
+std::pair<int, int> controlRange (int control) noexcept;
+void controlsToParams (const State& state, EffectParams& params) noexcept;
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& state, const EffectParams& params);
 
 // test hook (round beatfl190kr): the band followers' sliding maximum (window W: the current input and the W − 1 before
 // it) run over the input in blocks of the given length, from a cleared state
