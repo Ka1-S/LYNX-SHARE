@@ -27,6 +27,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_
     set_source_files_properties(src/core/Slayer.cpp PROPERTIES COMPILE_OPTIONS "-fno-inline")
 endif()
 
+# Round 190pz: the FL engines whose files say `#pragma GCC optimize ("fp-contract=off", "rounding-math")` give their own
+# functions other optimisation settings than the header templates they call (std::min / std::max / std::clamp ...), and
+# GCC does not inline across that: Kepler called std::min / std::max out of line for ~9 % of its time. The whole file
+# with -frounding-math has one setting, so they inline again (the arithmetic is the same: bit-identical renders).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(src/core/Kepler.cpp src/core/ChorusFx.cpp src/core/MultibandDelayFx.cpp src/core/LovePhilter.cpp
+                                src/core/FlangusFastDist.cpp PROPERTIES COMPILE_OPTIONS "-frounding-math")
+endif()
+
 # The plugins are shared libraries: everything they link must be position independent (the option is declared below)
 if(LYNX_BUILD_PLUGINS)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)

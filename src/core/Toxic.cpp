@@ -28,10 +28,27 @@
 #pragma GCC optimize ("fp-contract=off")
 #endif
 
+// round 190pz: the oscillator lanes four at a time on x86 (bit-identical; Osc::renderSse). LYNX_TOXIC_SSE=0 in the
+// environment runs the scalar loop (A/B and the tests' null check)
+#if (defined(__x86_64__) || defined(_M_X64)) && (defined(__SSE2__) || defined(_M_X64))
+ #define LYNX_TOXIC_SSE 1
+ #include <emmintrin.h>
+ #include <cstdlib>
+#else
+ #define LYNX_TOXIC_SSE 0
+#endif
+
 namespace lynx
 {
 namespace
 {
+#if LYNX_TOXIC_SSE
+bool sseLanes() noexcept
+{
+    static const bool on = [] { const char* v = std::getenv ("LYNX_TOXIC_SSE"); return v == nullptr || std::atoi (v) != 0; }();
+    return on;
+}
+#endif
 constexpr int paramCount = 340;
 constexpr int chunk = 64;      // engine chunk: buffer size − 4 (REA_rodada45 §1.1, EXEC)
 constexpr int voiceCount = 32; // the wrapper's max polyphony (§1.3)
@@ -380,6 +397,13 @@ struct Osc // FUN_180029da0 / FUN_180029ec0 / FUN_180029cc0 / FUN_180029fa0 (§3
     {
         const auto g = (lanes + 3) / 4 * 4;
         const auto kk = k * 0.001f;
+       #if LYNX_TOXIC_SSE
+        if (sseLanes())
+        {
+            renderSse (n, g, kk, outL, outR);
+            return;
+        }
+       #endif
         float y[maxLanes] {}, gl[maxLanes] {}, gr[maxLanes] {};
         for (int s = 0; s < n; ++s)
         {
@@ -428,6 +452,72 @@ struct Osc // FUN_180029da0 / FUN_180029ec0 / FUN_180029cc0 / FUN_180029fa0 (§3
                 M[(std::size_t) r.dst] = out[(std::size_t) r.src] * r.amount + M[(std::size_t) r.dst];
         }
     }
+
+   #if LYNX_TOXIC_SSE
+    // Round 190pz: the lane loop above, four lanes at a time as the DLL's own SSE code runs it — the same operations in the
+    // same order on every lane (no FMA: fp-contract is off in this file), so the output is bit-identical. Truncation
+    // (i32) is cvttps2dq: the float product is exact as a double, and out of range / NaN give INT_MIN both ways. The
+    // envelope's clamp (en > 1 → 1, NaN kept) is minps (1, en). The pan sums keep their scalar order.
+    void renderSse (int n, int g, float kk, float* outL, float* outR) noexcept
+    {
+        static constexpr float zeros[4 * 256] {};
+        const auto scaleM = _mm_set1_ps (16777215.0f), toFrac = _mm_set1_ps (5.96046448e-08f), one = _mm_set1_ps (1.0f),
+                   kkv = _mm_set1_ps (kk);
+        const auto low24 = _mm_set1_epi32 (0xffffff);
+        alignas (16) float pl[4], pr[4];
+        alignas (16) std::int32_t seg[4];
+        for (int s = 0; s < n; ++s)
+        {
+            const auto tt = t;
+            const auto ttv = _mm_set1_ps (tt);
+            float accL = 0.0f, accR = 0.0f;
+            for (int q = 0; q < g; q += 4)
+            {
+                const auto Q = (std::size_t) q;
+                const auto iv = _mm_cvttps_epi32 (_mm_mul_ps (scaleM, _mm_loadu_ps (&M[Q])));
+                const auto phv = _mm_loadu_si128 ((const __m128i*) &ph[Q]);
+                const auto incv = _mm_loadu_si128 ((const __m128i*) &inc[Q]);
+                const auto rd = _mm_add_epi32 (_mm_slli_epi32 (iv, 8), phv);
+                _mm_storeu_si128 ((__m128i*) &ph[Q], _mm_add_epi32 (phv, incv));
+                _mm_storeu_si128 ((__m128i*) &inc[Q], _mm_add_epi32 (incv, _mm_loadu_si128 ((const __m128i*) &dinc[Q])));
+                _mm_store_si128 ((__m128i*) seg, _mm_srli_epi32 (rd, 24));
+                const auto fr = _mm_mul_ps (_mm_cvtepi32_ps (_mm_and_si128 (rd, low24)), toFrac);
+                const auto eo = _mm_loadu_ps (&e[Q]);
+                const auto en = _mm_add_ps (_mm_mul_ps (_mm_sub_ps (_mm_loadu_ps (&etgt[Q]), eo), _mm_loadu_ps (&ecoef[Q])), eo);
+                _mm_storeu_ps (&e[Q], _mm_min_ps (one, en));
+                const float* c[4];
+                for (int j = 0; j < 4; ++j)
+                    c[j] = (tab[Q + (std::size_t) j] != nullptr ? tab[Q + (std::size_t) j] : zeros) + 4 * seg[j];
+                auto c0 = _mm_loadu_ps (c[0]), c1 = _mm_loadu_ps (c[1]), c2 = _mm_loadu_ps (c[2]), c3 = _mm_loadu_ps (c[3]);
+                _MM_TRANSPOSE4_PS (c0, c1, c2, c3); // c0 = the lanes' c[0], ... c3 = their c[3]
+                const auto w = _mm_add_ps (_mm_mul_ps (_mm_add_ps (_mm_mul_ps (_mm_add_ps (_mm_mul_ps (c3, fr), c2), fr), c1), fr), c0);
+                const auto lev = _mm_add_ps (_mm_mul_ps (_mm_add_ps (_mm_mul_ps (_mm_add_ps (_mm_mul_ps (ttv, _mm_loadu_ps (&L3[Q])),
+                                                                                                  _mm_loadu_ps (&L2[Q])), ttv),
+                                                                    _mm_loadu_ps (&L1[Q])), ttv),
+                                             _mm_loadu_ps (&L0[Q]));
+                const auto y = _mm_mul_ps (_mm_mul_ps (w, eo), lev);
+                _mm_storeu_ps (&out[Q], y);
+                const auto gl = _mm_loadu_ps (&gL[Q]), gr = _mm_loadu_ps (&gR[Q]);
+                _mm_storeu_ps (&gL[Q], _mm_add_ps (_mm_mul_ps (_mm_sub_ps (_mm_loadu_ps (&gLt[Q]), gl), kkv), gl));
+                _mm_storeu_ps (&gR[Q], _mm_add_ps (_mm_mul_ps (_mm_sub_ps (_mm_loadu_ps (&gRt[Q]), gr), kkv), gr));
+                _mm_store_ps (pl, _mm_mul_ps (gl, y));
+                _mm_store_ps (pr, _mm_mul_ps (y, gr));
+                const auto sl = ((pl[1] + pl[0]) + pl[2]) + pl[3];
+                const auto sr = ((pr[1] + pr[0]) + pr[2]) + pr[3];
+                if (q == 0)
+                    accL = sl, accR = sr;
+                else
+                    accL = sl + accL, accR = sr + accR;
+            }
+            outL[s] = accL, outR[s] = accR;
+            for (int i = 0; i < g; ++i)
+                M[(std::size_t) i] = 20.0f;
+            t = tt + dt;
+            for (const auto& r : routes)
+                M[(std::size_t) r.dst] = out[(std::size_t) r.src] * r.amount + M[(std::size_t) r.dst];
+        }
+    }
+   #endif
 };
 
 class Engine;

@@ -107,6 +107,8 @@ struct Detector
         slowA = expF (-125.663704f / fs);
         laGlide.setup (fs, 10.0f); holdGlide.setup (fs, 10.0f); relGlide.setup (fs, 10.0f);
         modeNow = -1;
+        attackAtOne = expF (-(cOne / std::max (tiny, baseTime / (1.0f * 1.0f)))); // (round 190pz: cOne changed)
+        lastT = lastRel = lastLa = -1;
     }
     void setMode (int mode)
     {
@@ -118,6 +120,17 @@ struct Detector
         const float t2 = baseTime + baseTime;
         for (int b = 0; b < 8; ++b)
             release[b] = expF (-(cOne / std::max (tiny, t2 - 0.01f * (float) b)));
+        attackAtOne = expF (-(cOne / std::max (tiny, baseTime / (1.0f * 1.0f))));
+    }
+    // round 190pz: the same values, worked out once instead of per band and sample (bit-identical): the attack while
+    // a band's ratio stays at its floor of 1 (most of the time), and the last coefficient of each time that glides
+    float attackAtOne = 0;
+    float lastT = -1, lastA = 0, lastRel = -1, lastAR = 0, lastLa = -1, lastAA = 0;
+    float coefOf (float time, float& last, float& value) noexcept
+    {
+        if (time != last)
+            last = time, value = expF (-(cOne / time));
+        return value;
     }
     // sens 0…1, la / hold / rel in s
     float run (float x, float sensFactor, float la, float hold, float rel)
@@ -137,8 +150,9 @@ struct Detector
         {
             const float p = bands[b] * bands[b];
             float r = p / std::max (tiny, stage[b][3]);
-            r = std::max (1.0f, logF (std::max (tiny, r)));
-            const float attack = expF (-(cOne / std::max (tiny, baseTime / (r * r))));
+            // (round 190pz: below 2.7 the logarithm is under 1, so r is 1 and the attack is attackAtOne)
+            r = r < 2.7f ? 1.0f : std::max (1.0f, logF (std::max (tiny, r)));
+            const float attack = r == 1.0f ? attackAtOne : expF (-(cOne / std::max (tiny, baseTime / (r * r))));
             float in = p;
             for (int k = 0; k < 4; ++k)
             {
@@ -155,7 +169,7 @@ struct Detector
         const float live = 1.0f - (slow < 1e-6f ? 1.0f : 0.0f);
         const float t = std::max (tiny, gateTime / std::max (tiny, live));
         gateTime = 3.0f;
-        const float a = expF (-(cOne / t));
+        const float a = coefOf (t, lastT, lastA);
         float in = flux;
         for (int k = 0; k < 4; ++k)
             in = avg[k] = a * avg[k] + (1.0f - a) * in;
@@ -179,8 +193,8 @@ struct Detector
         }
         // attack over the lookahead, release over the release time
         const float relNow = std::max (tiny, relGlide.next (rel));
-        const float aR = expF (-(cOne / relNow));
-        const float aA = expF (-(cOne / std::max (tiny, laNow)));
+        const float aR = coefOf (relNow, lastRel, lastAR);
+        const float aA = coefOf (std::max (tiny, laNow), lastLa, lastAA);
         float e = (float) v;
         for (int k = 0; k < 4; ++k)
         {
