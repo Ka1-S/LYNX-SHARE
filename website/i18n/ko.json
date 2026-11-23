@@ -602,7 +602,7 @@
 "try.rnd": "랜덤화",
 "try.clr": "지우기",
 "fe.engT": "성능",
-"fe.engP": "오디오 엔진은 채널과 믹서 트랙을 CPU 코어에 분산하고, 소리가 없는 채널은 건너뛰며, 지금 재생하지 않는 프로젝트 부분을 조금 앞서 렌더링하고, 긴 오디오 파일은 디스크에서 스트리밍합니다. PC 한 대(개발자의 Windows 11, Ryzen 5 3600)에서 FL Studio 2026의 데모 곡 <i>Thief</i>를 재생하며 측정했을 때, LYNX SHARE 0.1.30은 CPU 코어 하나의 27.5 %와 프라이빗 메모리 540 MB를 썼고 FL Studio는 59.5 %와 898 MB를 썼습니다. 곡을 여는 데는 4.4초가 걸렸습니다(FL Studio: 8.1초). 방법과 수치는 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha\">0.1.30 릴리스 노트</a>에 있으며, 결과는 환경마다 다릅니다.",
+"fe.engP": "오디오 엔진은 채널과 믹서 트랙을 CPU 코어에 분산하고, 소리가 없는 채널은 건너뛰며, 지금 재생하지 않는 프로젝트 부분을 조금 앞서 렌더링하고, 긴 오디오 파일은 디스크에서 스트리밍합니다. PC 한 대(개발자의 Windows 11, Ryzen 5 3600)에서 FL Studio 2026의 데모 곡 <i>Thief</i>를 재생하며 측정했을 때, LYNX SHARE 0.1.31은 CPU 코어 하나의 34.4 %와 프라이빗 메모리 564 MB를 썼고 FL Studio는 93.9 %와 905 MB를 썼습니다. 곡을 여는 데는 4.3초가 걸렸습니다(FL Studio: 7.1초). 방법과 수치는 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31-alpha\">0.1.31 릴리스 노트</a>에 있으며, 결과는 환경마다 다릅니다.",
 "fe.engP2": "FL Studio처럼 기본으로 켜져 있는 안전한 과부하는 CPU가 부족할 때도 창이 계속 반응하게 하고, 비활성화한 트랙이나 채널은 다시 켤 때까지 비용이 들지 않습니다. Linux arm64 빌드는 Raspberry Pi 4나 5에서 실행됩니다.",
 "fe.offT": "오프라인과 개인정보 보호",
 "fe.offP": "LYNX SHARE는 인터넷 연결 없이 작동하며, 업데이트를 확인할지 묻는 첫 시작 창에 답하기 전에는 어디에도 연결하지 않습니다. 계정도 텔레메트리도 없고, 크래시 보고서는 동의한 경우에만 전송됩니다. 샌드박스와 패키저를 위해 LYNX_OFFLINE=1 또는 --offline을 쓰면 LYNX SHARE 자체의 모든 연결이 꺼집니다. <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md\">개인정보 처리방침</a>에 연결할 수 있는 모든 주소가 나열되어 있습니다.",

@@ -10,7 +10,7 @@
 "u.0.1.31.n6": "<strong>오토메이션과 모듈레이션</strong>: Touch, Latch, Write 쓰기 모드, 오토메이션 캡처, 그리고 모든 노브용 모듈레이터(LFO, 엔벨로프 팔로워, ADSR, 스텝, 랜덤, 매크로, 키트랙, 벨로시티)이며 서드파티 플러그인에서도 쓸 수 있습니다.",
 "u.0.1.31.n7": "<strong>클립 실행 레이아웃</strong>: Live의 랙 디바이스를 Device View에 인라인으로 표시하고 Macro Map 모드와 Live의 Solo / Cue를 제공합니다. <strong>간단한 레이아웃</strong>: 덕킹 기준, 리버브와 에코 센드, 섹션과 박자 변경.",
 "u.0.1.31.n8": "<strong>형식과 플러그인</strong>: FL Studio Mobile .flm 내보내기, 압축 루프 패키지, 모두 모으고 저장, 다른 프로젝트에서 가져온 트랙, 믹서 인서트의 ARA, 플러그인 39개가 든 플러그인 팩(Linux에서는 LV2도, Windows에서는 20 MB .7z도).",
-"u.0.1.31.b0": "<strong>성능</strong>을 Windows PC 한 대에서 FL Studio 2026과 다시 비교했습니다. Thief는 코어 하나의 {{PERF_THIEF_CPU}} %로 재생되고(FL Studio: {{PERF_THIEF_CPU_FL}} %), Exoplanet은 {{PERF_EXO_CPU}} %입니다(FL Studio: {{PERF_EXO_CPU_FL}} %). 안전한 과부하는 곡이 멈추면 바로 풀립니다.",
+"u.0.1.31.b0": "<strong>성능</strong>을 Windows PC 한 대에서 FL Studio 2026과 다시 비교했습니다. Thief는 코어 하나의 34.4 %로 재생되고(FL Studio: 93.9 %), Exoplanet은 44.2 %입니다(FL Studio: 125.7 %). 안전한 과부하는 곡이 멈추면 바로 풀립니다.",
 "u.0.1.31.b1": "<strong>FL 일치도</strong>: Kilohearts 법칙 8개와 Nonlinear Filter 추가(Kilohearts Essentials 5.88 → 6.85, Nonlinear Filter 4.62 → 9.43), FL의 슬라이드 법칙, Sytrus, Ogun, SimSynth 벨로시티, Harmor 오토메이션과 다중 타깃 오토메이션 클립, 채널 랙의 FL 오토메이션 클립 행.",
 "u.0.1.31.b2": "<strong>기여자 제공</strong>: 도킹된 창의 헤더를 숨기는 톱니바퀴(PR #248, #256)와 보여 주는 탭의 크기를 따르는 창(PR #259)은 FKHR26, Formula Controller로 가는 Patcher 케이블(PR #257)은 codewithamoako가 만들었습니다.",
 "u.0.1.31.f0": "약 30개 GitHub 이슈: #193, #206, #215, #218, #222, #225–#244, #246, #247, #249–#254, 그중 #233(오프라인으로 시작), #243(믹서 인서트의 ARA), #251(모든 미디어와 함께 저장), #253(FL의 센드 오토메이션), #254(가로 마우스 휠).",

@@ -7,8 +7,8 @@ The short version of each release. The full notes, with measurements, known issu
 
 **Performance**
 - Measured again against FL Studio 2026 on one Windows PC in a quiet-machine run: while FL's *Thief* demo plays, LYNX
-  SHARE uses {{PERF_THIEF_CPU}} % of one CPU core (FL Studio: {{PERF_THIEF_CPU_FL}} %) and *Exoplanet* {{PERF_EXO_CPU}} % (FL Studio:
-  {{PERF_EXO_CPU_FL}} %); *Thief* takes {{PERF_THIEF_RAM}} MB of memory (FL Studio: {{PERF_THIEF_RAM_FL}} MB).
+  SHARE uses 34.4 % of one CPU core (FL Studio: 93.9 %) and *Exoplanet* 44.2 % (FL Studio:
+  125.7 %); *Thief* takes 564 MB of memory (FL Studio: 905 MB).
 - *Safe overloads* lets go as soon as the transport stops, the CPU meter shows the live part and the part rendered ahead,
   the plugin performance monitor lists each plugin's longest block and spikes, Windows PCs with four logical CPUs or fewer
   no longer start graphics-driver threads for drawing, Atrium's dense tank only takes memory where it runs (Live's

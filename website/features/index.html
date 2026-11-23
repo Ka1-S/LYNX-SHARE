@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="7d44d675";
+window.LYNX_LANG=lang;window.LYNX_V="d90fb3e6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=7d44d675">
+<link rel="stylesheet" href="/assets/site.css?v=d90fb3e6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -324,7 +324,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="engine">
   <div class="wrap prose" style="max-width:820px">
     <h2 data-i18n="fe.engT">Performance</h2>
-    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent, renders the part of a project you are not playing live a little ahead, and streams long audio files from disk. Measured on one PC (the developer's, Windows 11, Ryzen 5 3600) while FL Studio 2026's own demo song <i>Thief</i> plays, LYNX SHARE 0.1.30 used 27.5 % of one CPU core and 540 MB of private memory, where FL Studio used 59.5 % and 898 MB, and it opened the song in 4.4 s (FL Studio: 8.1 s). The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha">0.1.30 release notes</a>; your results will differ.</p>
+    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent, renders the part of a project you are not playing live a little ahead, and streams long audio files from disk. Measured on one PC (the developer's, Windows 11, Ryzen 5 3600) while FL Studio 2026's own demo song <i>Thief</i> plays, LYNX SHARE 0.1.31 used 34.4 % of one CPU core and 564 MB of private memory, where FL Studio used 93.9 % and 905 MB, and it opened the song in 4.3 s (FL Studio: 7.1 s). The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31-alpha">0.1.31 release notes</a>; your results will differ.</p>
     <p data-i18n="fe.engP2">Safe overloads, on by default as in FL Studio, keeps the window responsive when the CPU runs out, and a deactivated track or channel costs nothing until you switch it back on. The Linux arm64 build runs on a Raspberry Pi 4 or 5.</p>
   </div>
 </section>
@@ -345,8 +345,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=7d44d675" defer></script>
-<script src="/assets/features.js?v=7d44d675" defer></script>
-<script src="/assets/motion.js?v=7d44d675" defer></script>
+<script src="/assets/site.js?v=d90fb3e6" defer></script>
+<script src="/assets/features.js?v=d90fb3e6" defer></script>
+<script src="/assets/motion.js?v=d90fb3e6" defer></script>
 </body>
 </html>

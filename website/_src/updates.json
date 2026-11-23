@@ -18,7 +18,7 @@
       "**Formats and plugins**: FL Studio Mobile .flm export, Zipped loop package and Collect all and save, tracks imported from another project, ARA on a mixer insert, and a plugin pack of 39 plugins, also as LV2 on Linux and as a 20 MB .7z on Windows."
     ],
     "better": [
-      "**Performance**, measured again against FL Studio 2026 on one Windows PC: Thief plays with {{PERF_THIEF_CPU}} % of one core (FL Studio: {{PERF_THIEF_CPU_FL}} %) and Exoplanet with {{PERF_EXO_CPU}} % (FL Studio: {{PERF_EXO_CPU_FL}} %). Safe overloads lets go as soon as the song stops.",
+      "**Performance**, measured again against FL Studio 2026 on one Windows PC: Thief plays with 34.4 % of one core (FL Studio: 93.9 %) and Exoplanet with 44.2 % (FL Studio: 125.7 %). Safe overloads lets go as soon as the song stops.",
       "**FL parity**: eight more Kilohearts laws and the Nonlinear Filter (Kilohearts Essentials 5.88 → 6.85, Nonlinear Filter 4.62 → 9.43); FL's slide law, Sytrus, Ogun and SimSynth velocity, Harmor automation and multi-target automation clips; FL's automation clip rows in the Channel rack.",
       "**From contributors**: a gear that hides the header of docked windows (PRs #248 and #256) and windows that take the size of the tab they show (PR #259) by FKHR26; Patcher cables into a Formula Controller (PR #257) by codewithamoako."
     ],

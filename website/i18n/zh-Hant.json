@@ -602,7 +602,7 @@
 "try.rnd": "隨機化",
 "try.clr": "清除",
 "fe.engT": "效能",
-"fe.engP": "音訊引擎會把通道和混音器軌道分配到各個 CPU 核心上，跳過靜音的通道，提前一點算繪你沒有即時播放的那部分專案，並從磁碟串流讀取較長的音訊檔案。在一台電腦上（開發者的電腦，Windows 11，Ryzen 5 3600）測量，FL Studio 2026 自帶的示範歌曲 <i>Thief</i> 播放時，LYNX SHARE 0.1.30 使用了單一 CPU 核心的 27.5 % 和 540 MB 私有記憶體，而 FL Studio 使用了 59.5 % 和 898 MB，而且它開啟這首歌用了 4.4 秒（FL Studio：8.1 秒）。方法和數字見 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.30-alpha\">0.1.30 發行說明</a>；你的結果會有所不同。",
+"fe.engP": "音訊引擎會把通道和混音器軌道分配到各個 CPU 核心上，跳過靜音的通道，提前一點算繪你沒有即時播放的那部分專案，並從磁碟串流讀取較長的音訊檔案。在一台電腦上（開發者的電腦，Windows 11，Ryzen 5 3600）測量，FL Studio 2026 自帶的示範歌曲 <i>Thief</i> 播放時，LYNX SHARE 0.1.31 使用了單一 CPU 核心的 34.4 % 和 564 MB 私有記憶體，而 FL Studio 使用了 93.9 % 和 905 MB，而且它開啟這首歌用了 4.3 秒（FL Studio：7.1 秒）。方法和數字見 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31-alpha\">0.1.31 發行說明</a>；你的結果會有所不同。",
 "fe.engP2": "安全過載預設開啟，與 FL Studio 一樣，會在 CPU 不夠用時讓視窗保持回應，而停用的軌道或通道在你重新開啟之前不佔任何資源。Linux arm64 版本可在 Raspberry Pi 4 或 5 上執行。",
 "fe.offT": "離線且私密",
 "fe.offP": "LYNX SHARE 不需要網際網路連線就能運作，在你回答第一次啟動視窗（它會詢問是否檢查更新）之前，它不會連到任何地方。沒有帳號，沒有遙測，只有在你同意時才會傳送當機報告。對於沙箱和封裝者，LYNX_OFFLINE=1 或 --offline 會關閉 LYNX SHARE 自己的所有連線。<a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md\">隱私權政策</a>列出了它可能連絡的每個位址。",
