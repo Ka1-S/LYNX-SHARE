@@ -23,7 +23,7 @@
       "**From contributors**: a gear that hides the header of docked windows (PRs #248 and #256) and windows that take the size of the tab they show (PR #259) by FKHR26; Patcher cables into a Formula Controller (PR #257) by codewithamoako."
     ],
     "fixed": [
-      "Around 30 GitHub issues: #193, #218, #222, #225–#244, #246, #247 and #249–#254, among them #233 (start offline), #243 (ARA on a mixer insert), #251 (save with all media), #253 (FL's send automation) and #254 (horizontal mouse wheel)."
+      "Around 30 GitHub issues: #193, #206, #215, #218, #222, #225–#244, #246, #247 and #249–#254, among them #233 (start offline), #243 (ARA on a mixer insert), #251 (save with all media), #253 (FL's send automation) and #254 (horizontal mouse wheel)."
     ],
     "known": [
       "JSFX scripts with their own @gfx display show LYNX SHARE's slider panel instead. Linux arm64 has no plugin pack yet. #199, #255 and #258 were not reproduced; 0.1.31 adds checks for them."
