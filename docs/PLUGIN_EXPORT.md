@@ -75,8 +75,9 @@ in `~/.lv2`, `/usr/lib/lv2` or `/usr/local/lib/lv2` (CI installs `lv2-dev`; ever
 `lv2lint` (built from its author's repository at a fixed commit in CI) runs with `-Mpack` and two of its checks skipped,
 both about JUCE's wrapper rather than LYNX: "Plugin Run" fails a `run()` that takes any mutex, and JUCE's takes the
 processor's callback lock (uncontended unless the host is loading a state; JUCE's VST3 wrapper does the same), and "UI
-Resize Interface" fails the `ui:resize` extension data JUCE's editor offers. Its warnings left: no `doap:license`, the
-editor uses instance-access, the editor lives in the plugin's binary.
+Resize Interface" fails the `ui:resize` extension data JUCE's editor offers. Its warnings left: the editor uses
+instance-access, the editor lives in the plugin's binary. (Since 0.1.31 each plugin's `.ttl` names its licence,
+`doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>`, JUCE fix 51; JUCE wrote none.)
 
 The last column of the table says what is built: `0` nothing, `1` in the CLAP, `2` in the CLAP and as a VST3 of its own.
 The VST3 short list is the user's call: each VST3 carries the whole runtime (see "Sizes"), the CLAP holds them all at

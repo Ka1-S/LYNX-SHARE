@@ -359,6 +359,10 @@
 #     integer, which lv2lint failed on every parameter), and an effect its LV2 class when the build defines
 #     JucePlugin_LV2Class (cmake/LynxPlugins.cmake, from the VST3 category; else lv2:Plugin, as before).
 #
+# 51. Every platform (compiled only for LV2; round 190qd, the 0.1.31 release, owner OK 11-23),
+#    juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: the plugin's .ttl that JUCE's LV2 manifest helper writes
+#    names its licence, `doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>` (LYNX's plugins are AGPL-3.0-or-later,
+#    LICENSE). JUCE wrote none, and lv2lint warned on every LV2 plugin of the pack ("no license specified").#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -563,6 +567,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("LV2: the effect's plugin class (fix 50)" "LYNX patch (fix 50): the effect's class"
             "             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|"
             "             #elif defined (JucePlugin_LV2Class) // LYNX patch (fix 50): the effect's class (lv2:EQPlugin, ...)|NL|              JucePlugin_LV2Class|NL|             #else|NL|              \"lv2:Plugin\"|NL|             #endif|NL|")
+        lynx_juce_fix("LV2: the plugin's licence in its .ttl (fix 51)" "LYNX patch (fix 51): the licence"
+            "              \"\\\\tlv2:minorVersion \" << minorVersion << \" ;\\\\n\"|NL|"
+            "              \"\\\\tdoap:license <http://spdx.org/licenses/AGPL-3.0-or-later> ;\\\\n\" // LYNX patch (fix 51): the licence (LYNX's plugins are AGPL-3.0-or-later)|NL|              \"\\\\tlv2:minorVersion \" << minorVersion << \" ;\\\\n\"|NL|")
         lynx_juce_fix("LV2: unconnected outputs while suspended (fix 50)" "LYNX patch (fix 50): an output port"
             "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL|                    std::fill (ptr, ptr + numSteps, 0.0f);|NL|"
             "                    const auto ptr = ports.getBufferForAudioOutput (i);|NL||NL|                    if (ptr != nullptr) // LYNX patch (fix 50): an output port the host left unconnected|NL|                        std::fill (ptr, ptr + numSteps, 0.0f);|NL|")
