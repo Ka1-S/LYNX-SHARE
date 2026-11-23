@@ -1,5 +1,6 @@
 #include "core/EchoSuite.h"
 #include "core/FastMath.h"
+#include "core/LazyFloats.h"
 
 #include <atomic>
 #include <algorithm>
@@ -37,47 +38,139 @@ bool on (float v) noexcept { return v >= 0.5f; }
 
 // Circular delay line (power-of-two size). at (d) is x[n − d] for the sample about to be written (d ≥ 2), read with
 // 4-point cubic (Catmull-Rom / Hermite) interpolation.
-struct Line
+//
+// Round 190px (perf 7, RAM of Live sets): a long line (Echoform's 20.6 s, the tape / hybrid / spiral lines) keeps
+// its full size as its LOGICAL size (maxDelay(), the clamps and every decision made from them are unchanged), but its
+// ring runs over a power-of-two CAPACITY that starts at `lazyStart` samples (about 3 s at 44.1 kHz) and doubles, in
+// place, the first time a read reaches past it (LazyFloats: the pages past the capacity are reserved, never touched).
+// Bit-identical to the full ring whenever no sample a read needs was overwritten before the line grew: always with a
+// delay that stays put (a project's settings), that changes no faster than the audio runs (a turned or automated time
+// knob gliding, tempo changes), and in every line's first `capacity` samples (the start of a song). Only a jump of the
+// delay to more than the capacity, after the ring has wrapped, reads silence there where the full ring still held
+// audio from before the jump (as a line that was just made). Short lines (Line: diffusion, shifters) are a plain vector
+// with no check at all, as before; the long ones are LongLine.
+template <bool Grows>
+struct DelayLine
 {
-    std::vector<float> buf;
-    int mask = 0;
-    int w = 0;
+    static constexpr int lazyStart = 1 << 17;
 
     void allocate (double samples)
     {
         int size = 16;
         while ((double) size < samples + 8.0)
             size <<= 1;
-        buf.assign ((std::size_t) size, 0.0f);
-        mask = size - 1;
+        logicalMask = size - 1;
         w = 0;
+        // (LYNX_LONGLINES_FULL=1: every line its whole ring, as before round 190px — the null test of the gate)
+        static const bool full = std::getenv ("LYNX_LONGLINES_FULL") != nullptr;
+        if (Grows && ! full && size > lazyStart && lazy.reserve ((std::size_t) size) && lazy.commit ((std::size_t) lazyStart))
+        {
+            plain.clear();
+            plain.shrink_to_fit();
+            buf = lazy.data();
+            mask = lazyStart - 1;
+            growAt = (unsigned) (lazyStart - growMargin);
+            readHi = (double) (lazyStart - growMargin - 2);
+            std::fill (buf, buf + lazyStart, 0.0f); // (touched here, off the audio thread: no page faults while it plays)
+            return;
+        }
+        lazy = {};
+        plain.assign ((std::size_t) size, 0.0f);
+        buf = plain.data();
+        mask = size - 1;
+        growAt = ~0u;
+        readHi = maxDelay();
     }
+    bool empty() const noexcept { return buf == nullptr; }
     void clear() noexcept
     {
-        std::fill (buf.begin(), buf.end(), 0.0f);
+        if (buf != nullptr)
+            std::fill (buf, buf + mask + 1, 0.0f);
         w = 0;
     }
-    double maxDelay() const noexcept { return (double) mask - 4.0; }
+    double maxDelay() const noexcept { return (double) logicalMask - 4.0; }
     void push (float x) noexcept
     {
         buf[(std::size_t) w] = x;
         w = (w + 1) & mask;
     }
-    float tap (int d) const noexcept { return buf[(std::size_t) ((w - d) & mask)]; } // x[n − d], d ≥ 1
+    // x[n − d], d ≥ 1 (d ≤ 0 or past the logical size: as the full ring, which wraps)
+    float tap (int d) const noexcept
+    {
+        if constexpr (Grows)
+            if ((unsigned) (d - 1) >= growAt) [[unlikely]]
+                grow (d);
+        return buf[(std::size_t) ((w - d) & mask)];
+    }
     float at (double d) const noexcept
     {
-        if (buf.empty())
+        if (buf == nullptr)
             return 0.0f;
-        d = std::clamp (d, 2.0, maxDelay());
+        if constexpr (Grows)
+        {
+            // (the clamp's upper compare doubles as the check: `readHi` is maxDelay() once the ring is whole, else
+            // what the capacity can read now; std::clamp's arithmetic otherwise, NaN included)
+            d = std::max (d, 2.0);
+            if (d > readHi) [[unlikely]]
+            {
+                d = std::min (d, maxDelay());
+                grow ((int) d + 2);
+            }
+        }
+        else
+            d = std::clamp (d, 2.0, maxDelay());
         const auto i = (int) d;
         const auto t = (float) (d - (double) i);
-        const auto xm1 = tap (i - 1), x0 = tap (i), x1 = tap (i + 1), x2 = tap (i + 2);
+        const auto xm1 = raw (i - 1), x0 = raw (i), x1 = raw (i + 1), x2 = raw (i + 2);
         const auto c1 = 0.5f * (x1 - xm1);
         const auto c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
         const auto c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
         return ((c3 * t + c2) * t + c1) * t + x0;
     }
+    // the samples the ring holds in RAM now (tests, the memory figures)
+    std::size_t capacity() const noexcept { return buf == nullptr ? 0 : (std::size_t) mask + 1; }
+
+private:
+    static constexpr int growMargin = 8; // (grows a little before a read reaches the ring's oldest sample)
+    float raw (int d) const noexcept { return buf[(std::size_t) ((w - d) & mask)]; }
+    // The ring's capacity made the next power of two that holds `d` back (d ≤ 0: the whole logical size), in place: the
+    // older part of the ring, [w, capacity), moves to the end of the new one, so every delay up to the old capacity
+    // reads what it read before; the part in between was never touched (zeros). Audio thread (no allocation).
+    void grow (int d) const noexcept
+    {
+        const auto oldCap = mask + 1, full = logicalMask + 1;
+        auto cap = oldCap;
+        if (d <= 0 || d >= full - growMargin)
+            cap = full;
+        else
+            while (cap < full && cap - growMargin <= d)
+                cap <<= 1;
+        if (cap <= oldCap || ! lazy.commit ((std::size_t) cap))
+        {
+            growAt = ~0u; // (already whole, or the system refused the memory: the ring stays as it is)
+            readHi = maxDelay();
+            return;
+        }
+        const auto tail = oldCap - w;
+        std::memmove (buf + w + (cap - oldCap), buf + w, (std::size_t) tail * sizeof (float));
+        std::fill (buf + w, buf + oldCap, 0.0f);
+        mask = cap - 1;
+        growAt = cap >= full ? ~0u : (unsigned) (cap - growMargin);
+        readHi = cap >= full ? maxDelay() : (double) (cap - growMargin - 2);
+    }
+
+    // (mutable: a read may grow the ring; one instance is only ever used by one thread)
+    mutable float* buf = nullptr;
+    mutable int mask = 0;
+    mutable unsigned growAt = ~0u; // a read of d with d − 1 ≥ this grows the ring first
+    mutable double readHi = 0.0;   // at (d) with d above this grows the ring first (or clamps at maxDelay())
+    int logicalMask = 0;
+    int w = 0;
+    mutable LazyFloats lazy;
+    std::vector<float> plain; // (short lines, or when the system refuses the reservation)
 };
+using Line = DelayLine<false>;
+using LongLine = DelayLine<true>;
 
 // one-pole low-pass (impulse invariant); hp() = input − low-pass
 struct OnePole
@@ -1225,7 +1318,7 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
-        if (ch[0].line.buf.empty())
+        if (ch[0].line.empty())
             prepare (sr);
         float inPeak = 0.0f;
         for (int i = 0; i < n; ++i)
@@ -1827,7 +1920,7 @@ private:
 
     struct Channel
     {
-        Line line;
+        LongLine line;
         PitchShifter pitch;
         Shifter shifter;
         std::array<Allpass, 4> diff;
@@ -2087,7 +2180,7 @@ private:
     static constexpr int hybridFirMax = 96; // round 190lf: LoFi's FIR, up to 192 kHz
     struct HybridState
     {
-        Line a, b;
+        LongLine a, b;
         double ga = 1.0, gb = 1.0, aPrev = 0.0, bPrev = 0.0;
         Biquad tilt;
         bool dirty = true;
@@ -2159,9 +2252,9 @@ private:
             hybridLaw1 (l, r, n, p, bpm);
             return;
         }
-        if (hyb.a.buf.empty() || hyb.dirty)
+        if (hyb.a.empty() || hyb.dirty)
         {
-            if (hyb.a.buf.empty())
+            if (hyb.a.empty())
             {
                 hyb.a.allocate (sr * 3.6 + 8.0);
                 hyb.b.allocate (sr * 3.6 + 8.0);
@@ -2230,9 +2323,9 @@ private:
     void hybridLaw1 (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
     {
         const auto need = sr * 3.6 * 1.6 + 8.0; // the longest time and its swing
-        if (hyb.a.buf.empty() || hyb.dirty || hyb.a.maxDelay() < need - 16.0)
+        if (hyb.a.empty() || hyb.dirty || hyb.a.maxDelay() < need - 16.0)
         {
-            if (hyb.a.buf.empty() || hyb.a.maxDelay() < need - 16.0)
+            if (hyb.a.empty() || hyb.a.maxDelay() < need - 16.0)
             {
                 hyb.a.allocate (need);
                 hyb.b.allocate (need);
@@ -2384,12 +2477,12 @@ private:
     }
     struct TapeState
     {
-        Line in[2], z[2];
+        LongLine in[2], z[2];
         double passX[2][2][3] {}, passY[2][2][3] {}, loopX[2][3] {}, loopY[2][3] {};
         bool dirty = true;
         // round 148: the ping-pong's measured kernels (first pass and loop per side) and the lines their output is read from
         BlockConvolver first[2], loop[2];
-        Line firstOut[2], loopOut[2];
+        LongLine firstOut[2], loopOut[2];
         double kernelRate = 0.0;
     } tape;
 
@@ -2451,11 +2544,11 @@ private:
     void tapeProcess (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
     {
         const auto& v = tapeData (tapeVoicingOf (p[tapeVoicing]));
-        if (tape.in[0].buf.empty() || tape.dirty)
+        if (tape.in[0].empty() || tape.dirty)
         {
             for (int c = 0; c < 2; ++c)
             {
-                if (tape.in[c].buf.empty())
+                if (tape.in[c].empty())
                 {
                     tape.in[c].allocate (sr * 4.6 + 1300.0);
                     tape.z[c].allocate (sr * 4.6 + 1300.0);
@@ -2634,7 +2727,7 @@ private:
     // pair tone
     struct SecondLoop
     {
-        Line line;
+        LongLine line;
         std::array<Allpass, 4> diff;
         OnePole lowCut, highCut;
     };
@@ -2802,7 +2895,7 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
-        if (ch[0].line.buf.empty())
+        if (ch[0].line.empty())
             prepare (sr);
         const auto wet = clamp01 (p[mix]), dry = 1.0f - wet; // linear crossfade (REA_rodada101 §4)
         const auto beats = syncBeats (syncIndex (p[sync]));
@@ -2917,7 +3010,7 @@ private:
 
     struct Channel
     {
-        Line line;
+        LongLine line;
         Shifter shifter;
         OnePole lo, hi;
         Biquad band, ap; // round 190do: the measured loop's filters
@@ -3040,7 +3133,7 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
-        if (ch[0].line.buf.empty())
+        if (ch[0].line.empty())
             prepare (sr);
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
@@ -3597,7 +3690,7 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
-        if (ch[0].line.buf.empty())
+        if (ch[0].line.empty())
             prepare (sr);
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
@@ -3749,7 +3842,7 @@ public:
 private:
     struct Channel
     {
-        Line line;
+        LongLine line;
         std::array<Allpass, 4> diff;
         std::array<RandomLfo, 16> detune;
         RandomLfo diffLfo;
