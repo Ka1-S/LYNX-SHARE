@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Avant de commencer
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Cliquez sur `Voix / audio`. Une piste Voice apparaît sous les autres, armée pour enregistrer depuis la première entrée de votre périphérique audio.
 3. Le dock sous la timeline montre la piste, avec son indicateur `Niveau d'entrée` à droite. Chantez une note et regardez-le bouger.
 
-Le bouton `+ Piste de voix` de la carte `Ensuite : 3 choses à essayer` fait la même chose (0.1.31).
+Le bouton `+ Piste de voix` de la carte `Ensuite : 3 choses à essayer` fait la même chose.
 
 ## Enregistrer une prise
 

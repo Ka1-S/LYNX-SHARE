@@ -1,5 +1,5 @@
 ---
-source: 34014064c8
+source: 933ca35b0b
 ---
 ![Нижняя часть Менеджера плагинов с пометкой о том, что каждый файл плагина проверяется в отдельном процессе](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -111,6 +111,7 @@ VST2 в macOS не поддерживается. В Linux плагины для 
 
 - Все плагины лежат в одном файле CLAP, `LYNX Plugins.clap`. Короткий список есть также в VST3, а в Linux — в LV2.
 - Инструменты в пакете: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil и LYNX Duoloom.
+- В Windows берите `LYNX-Plugins-<version>-win-x64.7z` (около 20 МБ). `.zip` (около 195 МБ) содержит те же файлы.
 - Запустите скрипт установки из архива (`install.cmd` в Windows, `install.sh` в macOS и Linux), затем заново просканируйте плагины в своей DAW.
 - Плагин открывает тот же редактор, что и внутри LYNX SHARE, а его состояние открывается в LYNX SHARE как проект.
 

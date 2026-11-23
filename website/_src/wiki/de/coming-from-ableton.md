@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![Das Clip-Start-Layout: ein Clip-Raster mit Szenen neben der Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Diese Seite ist auch für Nutzer von Bitwig Studio: Das Clip-Raster funktioniert
 
 ## Deine ersten Schritte
 
-1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst (0.1.31). Klicke auf `Ableton Live oder Bitwig`: Das Clip-Start-Layout öffnet sich. In 0.1.30 wähle `Ansicht › Layout-Stil › Clip-Start-Arbeitsablauf`.
+1. **Wähle das Layout.** Beim ersten Start von LYNX SHARE fragt eine Willkommenskarte, woher du kommst. Klicke auf `Ableton Live oder Bitwig`: Das Clip-Start-Layout öffnet sich. Später wechselt `Ansicht › Layout-Stil › Clip-Start-Arbeitsablauf` jederzeit dorthin.
 2. **Fülle einen Slot.** Ziehe ein Sample oder ein Pattern aus dem Browser in einen Slot, oder klicke mit rechts auf einen leeren Slot und wähle `Pattern hier einfügen`.
 3. **Starte.** Klicke auf das Dreieck links von einem Clip, oder auf das Dreieck einer Szene in der Spalte `Szenen`, um die ganze Zeile zu starten. Oder öffne eines deiner `.als`-Sets (unten).
 

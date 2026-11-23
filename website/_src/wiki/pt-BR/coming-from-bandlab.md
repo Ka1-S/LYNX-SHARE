@@ -1,5 +1,5 @@
 ---
-source: 736421c170
+source: 5e5d2e8e05
 ---
 ![O Layout Simple: faixas numa linha do tempo, uma batida inicial e a Drum Machine](/assets/img/learn/simple-beat-2.webp)
 
@@ -7,7 +7,7 @@ Escolha o **Layout Simple**. É uma janela só, com as suas faixas numa linha do
 
 ## Suas três primeiras coisas
 
-1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem (0.1.31). Clique em `BandLab, FL Studio Mobile ou GarageBand`: a janela muda para o Layout Simple, com uma batida inicial numa faixa de bateria. Na 0.1.30, escolha `Exibir › Estilo de layout › Layout Simple`.
+1. **Escolha o layout.** Na primeira vez que o LYNX SHARE abre, um cartão de boas-vindas pergunta de onde você vem. Clique em `BandLab, FL Studio Mobile ou GarageBand`: a janela muda para o Layout Simple, com uma batida inicial numa faixa de bateria. Depois, `Exibir › Estilo de layout › Layout Simple` troca para ele a qualquer momento.
 2. **Faça uma batida.** Clique nos quadrados da Drum Machine sob a linha do tempo. Veja [Faça uma batida no Layout Simple](/learn/simple-beat/).
 3. **Adicione um loop e a sua voz.** `Loops` abre o painel de loops: arraste um loop para a linha do tempo. Depois [grave a sua voz](/learn/record-voice/) numa faixa de voz.
 

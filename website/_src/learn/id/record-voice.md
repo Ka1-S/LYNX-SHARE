@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Sebelum mulai
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Klik `Vokal / audio`. Track Voice muncul di bawah yang lain, siap merekam dari input pertama perangkat audiomu.
 3. Dock di bawah linimasa menampilkan track itu, dengan meter `Level input` di kanan. Nyanyikan satu nada dan lihat meter bergerak.
 
-Tombol `+ Trek voice` di kartu `Berikutnya: 3 hal untuk dicoba` melakukan hal yang sama (0.1.31).
+Tombol `+ Trek voice` di kartu `Berikutnya: 3 hal untuk dicoba` melakukan hal yang sama.
 
 ## Rekam satu take
 

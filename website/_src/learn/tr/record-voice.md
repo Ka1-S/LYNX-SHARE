@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Başlamadan önce
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. `Ses / audio` düğmesine tıklayın. Diğerlerinin altında, ses aygıtınızın ilk girişinden kayda hazır bir Voice izi görünür.
 3. Zaman çizelgesinin altındaki panel izi gösterir; sağında `Giriş seviyesi` göstergesi vardır. Bir nota söyleyin ve hareketini izleyin.
 
-`Sıradaki: denemeniz gereken 3 şey` kartındaki `+ Ses parçası` düğmesi aynı işi yapar (0.1.31).
+`Sıradaki: denemeniz gereken 3 şey` kartındaki `+ Ses parçası` düğmesi aynı işi yapar.
 
 ## Bir take kaydedin
 

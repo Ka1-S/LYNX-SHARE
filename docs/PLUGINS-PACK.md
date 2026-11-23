@@ -49,7 +49,7 @@ New in 0.1.31 (round 190ov): Strike Shaper, Anvil Bus, Corrode, Soundboard, Plat
 LYNX Model as CLAP and VST3. The Harmonia engine exports as LYNX Chimefield (Cherry Audio sells a Harmonia synth); inside
 LYNX it keeps its name. New in 0.1.31: the VST3 list also as LV2 on Linux.
 
-New in 0.1.32 (round 190pq): LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom, LYNX's synths Tetra, Helix and Braid, as
+New in 0.1.31 (round 190pq, rollup step 8): LYNX Fourfold, LYNX Wavecoil and LYNX Duoloom, LYNX's synths Tetra, Helix and Braid, as
 CLAP, VST3 and LV2 (Linux). Their engine names are other makers' products, so they export under these names; inside LYNX
 the engines keep their names. Fourfold and Duoloom start from the engine's defaults (they have no preset bank), Wavecoil
 from its first preset.

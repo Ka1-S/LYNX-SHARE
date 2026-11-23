@@ -720,7 +720,7 @@ def render_learn(data, pages):
     return ('<div class="phead"><div class="wrap"><h1 data-i18n="lr.h1">Learn LYNX SHARE</h1><p data-i18n="lr.sub">Short videos with the same steps written out, and a page for each program you may be coming from.</p></div></div>'
             '<div class="wrap learnhub">'
             '<ol class="start3"><li><b data-i18n="lr.s1">Download</b><span data-i18n="lr.s1d">Free for Windows, macOS and Linux. <a href="/download/">Download page</a></span></li>'
-            '<li><b data-i18n="lr.s2">Pick how you like to work</b><span data-i18n="lr.s2d">From 0.1.31 the first start asks where you are coming from and opens the layout that fits. In 0.1.30: View › Layout style.</span></li>'
+            '<li><b data-i18n="lr.s2">Pick how you like to work</b><span data-i18n="lr.s2d">The first start asks where you are coming from and opens the layout that fits. Later: View › Layout style.</span></li>'
             '<li><b data-i18n="lr.s3">Watch a first video</b><span data-i18n="lr.s3d">One minute: <a href="/learn/simple-beat/">make a beat in the Simple layout</a>.</span></li></ol>'
             '<h2 data-i18n="lr.tutT">Tutorials</h2><div class="tcards">%s</div>'
             '<h2 id="coming-from" data-i18n="lr.fromT">Coming from another program?</h2><p class="lead" data-i18n="lr.fromL">What is the same, what is different, which layout to pick and where things are.</p><div class="fcards">%s</div>'

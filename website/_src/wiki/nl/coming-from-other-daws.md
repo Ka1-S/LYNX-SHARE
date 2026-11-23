@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE heeft drie lay-outs. Kom je van Logic, Cubase, Reaper, Pro Tools of Studio One, begin dan met de **Eenvoudige lay-out met de Mixer bij de hand**: één track per instrument of stem op een tijdlijn, zoals je het kent. De Patroonlay-out, de werkwijze van FL Studio, is er voor wanneer je patterns wilt.
 
 ## Je eerste stappen
 
-1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt (0.1.31). Klik op `Logic, Cubase, Reaper, Pro Tools of Studio One`: de Eenvoudige lay-out opent op de kaart New track en de Mixer verschijnt met je eerste track. In 0.1.30 kies je `Beeld › Lay-outstijl › Eenvoudige lay-out` en open je de Mixer met `F9`.
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt. Klik op `Logic, Cubase, Reaper, Pro Tools of Studio One`: de Eenvoudige lay-out opent op de kaart New track en de Mixer verschijnt met je eerste track. Later schakel je op elk moment over met `Beeld › Lay-outstijl › Eenvoudige lay-out`, en `F9` opent de Mixer.
 2. **Voeg een track toe.** `+ Spoor toevoegen` biedt `Stem / audio`, `Instrument`, `Drums`, `Sampler`, `Gitaar / bas`, `Importeren` en `Loops`. Speel een instrumenttrack met de computertoetsen, het toetsenbord op het scherm of een MIDI-keyboard.
 3. **Neem op.** Kies je audioapparaat in `Opties › Audio-instellingen...` en zie dan [Neem je stem op](/learn/record-voice/).
 

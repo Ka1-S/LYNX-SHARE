@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Ta strona jest też dla użytkowników Bitwig Studio: siatka klipów działa tak
 
 ## Pierwsze kroki
 
-1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz (0.1.31). Kliknij `Ableton Live lub Bitwig`: otwiera się układ Clip-launch. W 0.1.30 wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`.
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz. Kliknij `Ableton Live lub Bitwig`: otwiera się układ Clip-launch. Później przełączysz się na ten układ w każdej chwili przez `Widok › Styl układu › Układ z uruchamianiem klipów`.
 2. **Wypełnij slot.** Przeciągnij sample lub pattern z Browsera do slotu albo kliknij pusty slot prawym przyciskiem i wybierz `Umieść tu wzorzec`.
 3. **Uruchom.** Kliknij trójkąt po lewej stronie klipu albo trójkąt sceny w kolumnie `Sceny`, żeby uruchomić cały wiersz. Możesz też otworzyć jeden ze swoich setów `.als` (niżej).
 

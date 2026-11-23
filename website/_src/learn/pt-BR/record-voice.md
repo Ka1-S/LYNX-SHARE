@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Antes de começar
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Clique em `Voz / áudio`. Uma faixa de voz aparece sob as outras, armada para gravar da primeira entrada do seu dispositivo de áudio.
 3. O dock sob a linha do tempo mostra a faixa, com o medidor `Nível de entrada` à direita. Cante uma nota e veja o medidor se mexer.
 
-O botão `+ Faixa de voz` do cartão `Próximo: 3 coisas para testar` faz o mesmo (0.1.31).
+O botão `+ Faixa de voz` do cartão `Próximo: 3 coisas para testar` faz o mesmo.
 
 ## Grave uma take
 

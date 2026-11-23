@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Choisir la disposition simple
 
 ![La carte de bienvenue demande d'où vous venez](/assets/img/learn/simple-beat-1.webp)
 
-1. Lancez LYNX SHARE. La première fois, une carte de bienvenue demande d'où vous venez (0.1.31).
+1. Lancez LYNX SHARE. La première fois, une carte de bienvenue demande d'où vous venez.
 2. Cliquez sur `BandLab, FL Studio Mobile ou GarageBand`. La fenêtre passe à la disposition simple, et un beat de départ est placé sur une piste Drums.
 
-En 0.1.30, choisissez `Vue › Style de disposition › Disposition simple`, cliquez sur `+ Ajouter une piste`, puis sur `Batterie`, et choisissez l'un des beats de départ. Le même menu change de disposition à tout moment. Le projet reste tel quel.
+Sans la carte, choisissez `Vue › Style de disposition › Disposition simple`, cliquez sur `+ Ajouter une piste`, puis sur `Batterie`, et choisissez l'un des beats de départ. Le même menu change de disposition à tout moment. Le projet reste tel quel.
 
 ## Jouer le beat
 
@@ -40,7 +40,7 @@ La lettre à côté de chaque ligne est sa touche sur le clavier de l'ordinateur
 
 ![Le panneau Loops à côté de la timeline](/assets/img/learn/simple-beat-5.webp)
 
-- La carte `Ensuite : 3 choses à essayer` (0.1.31) coche chaque étape toute seule. `Ouvrir les boucles` ouvre le panneau Loops : glissez une boucle sur la timeline. Une boucle suit le tempo et la tonalité du projet.
+- La carte `Ensuite : 3 choses à essayer` coche chaque étape toute seule. `Ouvrir les boucles` ouvre le panneau Loops : glissez une boucle sur la timeline. Une boucle suit le tempo et la tonalité du projet.
 - [Enregistrez votre voix](/learn/record-voice/) sur une piste Voice.
 - `Terminer` enregistre le morceau en WAV ou MP3.
 

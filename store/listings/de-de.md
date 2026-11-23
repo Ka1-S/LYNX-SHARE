@@ -49,7 +49,15 @@ LYNX SHARE befindet sich im Alpha-Stadium: Rechne mit Ecken und Kanten und melde
 
 ## What's new
 
-LYNX SHARE 0.1.30: leichter denn je, mit etwa der halben CPU-Last von FL Studio 2026, während auf unserem Test-PC die Thief-Demo von FL läuft; ARA-2-Hosting, sodass Melodyne und andere ARA-Plugins Audio-Clips direkt bearbeiten; ein polyphoner Noteneditor und polyphones Audio-zu-MIDI; ein natürlicheres Newtone; Helix, ein neuer Wavetable-Synthesizer, und Tetra, ein FM-Synthesizer mit 4 Operatoren; ein Akkord-Helfer; eine Drum Machine im Stil von BandLab, ein Stimmgerät und ein Loop-Browser im Einfachen Arbeitsablauf; Return-Spuren, Sends und ein Crossfader im Clip-Start-Arbeitsablauf; MPE und Hardware-MIDI-Out; ein DirectWave-Editor; DAWproject-, GarageBand- und BandLab-Projekte, .gig-, .dwp- und .ncw-Instrumente und -Samples sowie AIFF- und M4A-Export; mehr als 40 überarbeitete Plugin-Platzhalter; und Korrekturen für rund 40 gemeldete Probleme.
+LYNX SHARE 0.1.31: ein eingebauter Tracker, der auch Tracker-Module (.mod, .xm, .s3m, .it) öffnet; LYNX Model,
+physikalische Modelle von Marimba, Vibraphon, Xylophon, Glockenspiel, Röhrenglocken und Kalimba; JSFX-Effekt- und
+Instrumenten-Skripte; eine Willkommenskarte, die das richtige Layout einrichtet, und eine Startseite mit deinen
+letzten Projekten; eine Suche, die jeden Befehl findet; zwei Projekte nebeneinander mit Kopieren und Einfügen
+dazwischen; eine Abschnittsspur, eine Akkordspur mit Smart Tempo und Spurversionen; Automations-Schreibmodi, Capture
+automation und Modulatoren für jeden Regler; FL-Studio-Mobile-Export als .flm; die Rack-Devices von Live direkt in der
+Ansicht mit einer Macro Map und Solo / Cue im Clip-Start-Arbeitsablauf; Ducken unter und Echo-Sends im Einfachen
+Arbeitsablauf; ARA-Plugins auf einem Mixer-Insert; FL-Studio-Projekte, die näher an FL spielen; und Korrekturen für
+rund 30 gemeldete Probleme.
 
 ## Features
 

@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Escolha o Layout Simple
 
 ![O cartão de boas-vindas pergunta de onde você vem](/assets/img/learn/simple-beat-1.webp)
 
-1. Abra o LYNX SHARE. Na primeira vez, um cartão de boas-vindas pergunta de onde você vem (0.1.31).
+1. Abra o LYNX SHARE. Na primeira vez, um cartão de boas-vindas pergunta de onde você vem.
 2. Clique em `BandLab, FL Studio Mobile ou GarageBand`. A janela muda para o Layout Simple, e uma batida inicial é colocada numa faixa de bateria.
 
-Na 0.1.30, escolha `Exibir › Estilo de layout › Layout Simple`, clique em `+ Adicionar faixa`, depois em `Bateria` e escolha uma das batidas iniciais. O mesmo menu troca de layout a qualquer momento. O projeto continua como está.
+Sem o cartão, escolha `Exibir › Estilo de layout › Layout Simple`, clique em `+ Adicionar faixa`, depois em `Bateria` e escolha uma das batidas iniciais. O mesmo menu troca de layout a qualquer momento. O projeto continua como está.
 
 ## Toque a batida
 
@@ -40,7 +40,7 @@ A letra ao lado de cada linha é a tecla dela no teclado do computador: aperte-a
 
 ![O painel Loops ao lado da linha do tempo](/assets/img/learn/simple-beat-5.webp)
 
-- O cartão `Próximo: 3 coisas para testar` (0.1.31) marca cada passo sozinho. `Abrir Loops` abre o painel Loops: arraste um loop para a linha do tempo. Um loop segue o andamento e a tonalidade do projeto.
+- O cartão `Próximo: 3 coisas para testar` marca cada passo sozinho. `Abrir Loops` abre o painel Loops: arraste um loop para a linha do tempo. Um loop segue o andamento e a tonalidade do projeto.
 - [Grave a sua voz](/learn/record-voice/) numa faixa de voz.
 - `Concluir` salva a música como WAV ou MP3.
 

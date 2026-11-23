@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Fichier › Ouvrir...` (`Ctrl+O`) ouvre les projets `.lynx` propres à LYNX SHARE, ainsi que les fichiers `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` et `.mid`. Un projet venu d'un autre programme est un import : il devient un nouveau projet LYNX SHARE non enregistré, et le fichier d'origine n'est jamais modifié.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand pour iOS) | Pistes, régions MIDI et audio, tempo, signature, tonalité, sections en marqueurs, niveau, pan et muet, comme pistes de la disposition simple. Instruments Sampler créés dans GarageBand pour iOS | Les pistes d'instrument jouent le synthé et la batterie intégrés. Les régions Drummer, les dossiers de prises et les changements de tempo sont listés. Les projets de GarageBand 11 et antérieurs ne sont pas lisibles |
 | `.blx` (BandLab) | Pistes, régions MIDI et audio avec leurs boucles, tempo, signature, tonalité, volume, pan et muet, automation du volume et du pan, et les effets courants, comme pistes de la disposition simple | Les pistes d'instrument jouent le synthé et la batterie intégrés. Les autres effets et le preset Mastering sont laissés de côté et listés. Testé uniquement sur des projets inventés |
 | `.mid` | Notes, signatures et tous les changements de tempo | Un fichier MIDI ne contient aucun son : les canaux reçoivent le synthé LYNX SHARE ou un canal MIDI Out |
-| `.mod`, `.xm`, `.s3m`, `.it` (modules tracker) | Les instruments en canaux Sampler avec leurs samples, les patterns, la liste d'ordre en Playlist, la vitesse et le tempo, le volume des notes, le panoramique, le retard et la coupure ; les changements de volume et de panoramique comme événements du canal (MOD et XM), et les slides, le vibrato, les arpèges et les enveloppes de hauteur comme courbes de hauteur des notes | Les autres effets et les enveloppes d'instrument sont comptés dans le rapport d'import. `Vue › Fenêtres et outils › Tracker` édite les notes à la façon d'un tracker |
+| `.mod`, `.xm`, `.s3m`, `.it` (modules tracker) | Les instruments en canaux Sampler avec leurs samples, les patterns, la liste d'ordre en Playlist, la vitesse et le tempo, le volume des notes, le panoramique, le retard et la coupure ; les changements de volume et de panoramique comme événements du canal (MOD et XM), et les slides, le vibrato, les arpèges et les enveloppes de hauteur comme courbes de hauteur des notes | Les autres effets et les enveloppes d'instrument sont comptés dans le rapport d'import. `Vue › Tracker` édite les notes à la façon d'un tracker |
 | `.zip` | Le paquet de boucles zippé de FL Studio, ou un projet exporté avec ses samples : décompressé dans un dossier à part, puis le projet qu'il contient s'ouvre avec ses samples | |
 
 Les plugins tiers VST2, VST3 et CLAP d'un `.flp` ou d'un `.dawproject`, et les plugins VST2 et VST3 d'un `.als`, se chargent avec leur état enregistré si le même plugin est installé sur votre ordinateur.

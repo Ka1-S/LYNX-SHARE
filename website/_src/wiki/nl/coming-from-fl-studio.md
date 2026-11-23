@@ -1,5 +1,5 @@
 ---
-source: 7342d4fb1f
+source: f6f0977999
 ---
 LYNX SHARE behoudt de workflow die je kent: een Channel Rack, patterns, een Playlist en een Mixer, op dezelfde toetsen. Het opent `.flp`-projecten rechtstreeks en kan er ook een terugschrijven.
 
@@ -7,7 +7,7 @@ LYNX SHARE is een onafhankelijk programma. Het is niet verbonden aan Image-Line,
 
 ## Je eerste stappen
 
-1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt (0.1.31). Klik op `FL Studio`: je krijgt de Patroonlay-out, de standaard, met het Channel Rack, de Piano Roll, de Playlist en de Mixer. Skip op de kaart doet hetzelfde.
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt. Klik op `FL Studio`: je krijgt de Patroonlay-out, de standaard, met het Channel Rack, de Piano Roll, de Playlist en de Mixer. Skip op de kaart doet hetzelfde.
 2. **Open een project.** Open een van je `.flp`-projecten (hieronder), of klik op stappen in het Channel Rack om een beat te maken.
 3. **Vind je plugins.** LYNX SHARE scant de gebruikelijke pluginmappen op de achtergrond. Voor een eigen map open je `Opties › Pluginbeheer...`, klik je op `Pluginmappen...`, voeg je de map toe en klik je op `Nieuwe plugins zoeken`.
 

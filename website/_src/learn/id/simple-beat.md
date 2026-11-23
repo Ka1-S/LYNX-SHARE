@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Pilih tata letak sederhana
 
 ![Kartu sambutan menanyakan dari mana kamu datang](/assets/img/learn/simple-beat-1.webp)
 
-1. Jalankan LYNX SHARE. Saat pertama kali, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31).
+1. Jalankan LYNX SHARE. Saat pertama kali, sebuah kartu sambutan menanyakan dari mana kamu datang.
 2. Klik `BandLab, FL Studio Mobile, atau GarageBand`. Jendela beralih ke tata letak sederhana, dan beat awal ditaruh di track Drums.
 
-Di 0.1.30, pilih `Tampilan › Gaya tata letak › Alur kerja sederhana`, klik `+ Tambah trek`, lalu `Drum`, dan pilih salah satu beat awal. Menu yang sama beralih tata letak kapan saja. Proyeknya tetap seperti semula.
+Tanpa kartu, pilih `Tampilan › Gaya tata letak › Alur kerja sederhana`, klik `+ Tambah trek`, lalu `Drum`, dan pilih salah satu beat awal. Menu yang sama beralih tata letak kapan saja. Proyeknya tetap seperti semula.
 
 ## Putar beat
 
@@ -40,7 +40,7 @@ Huruf di samping setiap baris adalah tombolnya di keyboard komputer: tekan untuk
 
 ![Panel Loops di samping linimasa](/assets/img/learn/simple-beat-5.webp)
 
-- Kartu `Berikutnya: 3 hal untuk dicoba` (0.1.31) mencentang setiap langkah dengan sendirinya. `Buka Loop` membuka panel Loops: seret sebuah loop ke linimasa. Loop mengikuti tempo dan kunci nada proyek.
+- Kartu `Berikutnya: 3 hal untuk dicoba` mencentang setiap langkah dengan sendirinya. `Buka Loop` membuka panel Loops: seret sebuah loop ke linimasa. Loop mengikuti tempo dan kunci nada proyek.
 - [Rekam suaramu](/learn/record-voice/) di track Voice.
 - `Selesai` menyimpan lagu sebagai WAV atau MP3.
 

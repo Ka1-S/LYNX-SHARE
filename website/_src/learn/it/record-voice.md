@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Prima di iniziare
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Clicca `Voce / audio`. Una traccia Voce compare sotto le altre, armata per registrare dal primo ingresso del tuo dispositivo audio.
 3. Il dock sotto la timeline mostra la traccia, con il meter `Livello di ingresso` a destra. Canta una nota e guardalo muoversi.
 
-Il pulsante `+ Traccia voce` della scheda `Prossimo: 3 cose da provare` fa lo stesso (0.1.31).
+Il pulsante `+ Traccia voce` della scheda `Prossimo: 3 cose da provare` fa lo stesso.
 
 ## Registra una take
 

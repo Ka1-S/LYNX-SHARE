@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Deze pagina is ook voor Bitwig Studio-gebruikers: het clipraster werkt op dezelf
 
 ## Je eerste stappen
 
-1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt (0.1.31). Klik op `Ableton Live of Bitwig`: de Clipstart-lay-out opent. In 0.1.30 kies je `Beeld › Lay-outstijl › Clipstart-lay-out`.
+1. **Kies de lay-out.** De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt. Klik op `Ableton Live of Bitwig`: de Clipstart-lay-out opent. Later schakel je op elk moment over met `Beeld › Lay-outstijl › Clipstart-lay-out`.
 2. **Vul een slot.** Sleep een sample of een pattern uit de Browser naar een slot, of klik met rechts op een leeg slot en kies `Patroon hier plaatsen`.
 3. **Start.** Klik op de driehoek links van een clip, of op de driehoek van een scène in de kolom `Scènes` om de hele rij te starten. Of open een van je `.als`-sets (hieronder).
 

@@ -127,7 +127,7 @@ insert to any hardware output.
 </tr>
 </table>
 
-- **Tracker:** *View › Windows and tools › Tracker* (Shift+F7), or *Edit in tracker* in a channel's menu, shows a pattern's notes as rows
+- **Tracker:** *View › Tracker* (Shift+F7), or *Edit in tracker* in a channel's menu, shows a pattern's notes as rows
   and channels, the tracker way; it edits the same notes as the Piano Roll.
 - **Audio clips:** warp markers and Auto-warp, fades, take lanes and comping, and FL Studio's audio clip menu.
 - **Track versions** (a LYNX extra): named alternate versions of a track's clips, automation lanes and insert effects,
@@ -313,7 +313,8 @@ for guests who don't have the host's plugins. The host can let a guest only list
   one that crashes goes silent instead of taking your project down. A performance monitor shows what each plugin costs.
 - **The plugin pack:** 39 of LYNX SHARE's own effects and instruments, from Facet EQ to LYNX Model, also work in other
   DAWs: every one in a single CLAP, a short list also as VST3 and, on Linux, LV2. It is an optional `LYNX-Plugins` download for Windows,
-  macOS and Linux; see [`docs/PLUGINS-PACK.md`](docs/PLUGINS-PACK.md).
+  macOS and Linux (on Windows take the `.7z`, about 20 MB; the `.zip` has the same files); see
+  [`docs/PLUGINS-PACK.md`](docs/PLUGINS-PACK.md).
 
 ### Performance
 
@@ -359,7 +360,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **FL Studio Mobile** `.flm` | ✅ partial | ✅ a copy, with losses listed | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. Export is *File › Save a copy as FL Studio Mobile project (.flm)...*; see below. |
 | **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-layout tracks. |
 | **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-layout tracks. |
-| **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Volume and pan changes become the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes become the notes' pitch curves; what is left out is counted in the report. The built-in Tracker (*View › Windows and tools › Tracker*) edits the notes the tracker way. |
+| **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Volume and pan changes become the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes become the notes' pitch curves; what is left out is counted in the report. The built-in Tracker (*View › Tracker*) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.30, 0.1.28 or 0.1.27 can open, and lists what that release loses. |
 

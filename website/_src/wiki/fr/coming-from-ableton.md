@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![La disposition Clip-launch : une grille de clips avec des scènes à côté de la Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Cette page convient aussi aux utilisateurs de Bitwig Studio : la grille de clips
 
 ## Vos premiers pas
 
-1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez (0.1.31). Cliquez sur `Ableton Live ou Bitwig` : la disposition par lancement de clips s'ouvre. En 0.1.30, choisissez `Vue › Style de disposition › Disposition par lancement de clips`.
+1. **Choisissez la disposition.** Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez. Cliquez sur `Ableton Live ou Bitwig` : la disposition par lancement de clips s'ouvre. Plus tard, `Vue › Style de disposition › Disposition par lancement de clips` y bascule à tout moment.
 2. **Remplissez un slot.** Glissez un sample ou un pattern du Browser dans un slot, ou faites un clic droit sur un slot vide et choisissez `Placer un pattern ici`.
 3. **Lancez.** Cliquez sur le triangle à gauche d'un clip, ou sur le triangle d'une scène dans la colonne `Scènes` pour lancer toute la ligne. Ou ouvrez l'un de vos sets `.als` (ci-dessous).
 

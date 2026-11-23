@@ -1,9 +1,9 @@
 ---
-source: 9974ffb64e
+source: 54ebedc064
 ---
 ![De Clipstart-lay-out: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
 
-`Beeld › Lay-outstijl` heeft drie items: `Pattern-lay-out (standaard)`, `Clipstart-lay-out` en `Eenvoudige lay-out`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Lay-out. De keuze blijft bewaard als je het programma sluit.
+`Beeld › Lay-outstijl` heeft drie items: `Pattern-lay-out (standaard)`, `Clipstart-lay-out` en `Eenvoudige lay-out`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Lay-out. De keuze blijft bewaard als je het programma sluit. De eerste keer dat LYNX SHARE start, vraagt een welkomstkaart waar je van komt en kiest de lay-out die past.
 
 De Pattern-lay-out, de standaard, werkt zoals FL Studio: het Channel Rack, patterns, de Piano Roll, de Playlist en de Mixer. De Clipstart-lay-out, in de stijl van Ableton Live, voegt naast de Playlist een clipraster met scènes toe, een sessiemixer en de clip- en apparaatweergave; patterns en het Channel Rack blijven beschikbaar. De Eenvoudige lay-out brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile: tracks en een tijdlijn, loops, pads en snel opnemen. Wisselen verplaatst alleen de vensters: het project blijft hetzelfde.
 

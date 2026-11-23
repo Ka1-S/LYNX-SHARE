@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## 選擇你從哪裡轉過來
 
 ![歡迎卡片會問你從哪裡轉過來](/assets/img/learn/switch-layouts-1.webp)
 
-1. 啟動 LYNX SHARE。第一次啟動時，歡迎卡片會問你從哪裡轉過來（0.1.31）。
+1. 啟動 LYNX SHARE。第一次啟動時，歡迎卡片會問你從哪裡轉過來。
 2. 每個回答對應一種版面：
    - `BandLab、FL Studio Mobile 或 GarageBand`：簡易版面，一個視窗裡有音軌、循環素材和快速錄音。
    - `FL Studio`：模式版面，包含 Channel rack、Piano roll、播放清單和混音器。

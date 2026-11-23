@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d77a6b65";
+window.LYNX_LANG=lang;window.LYNX_V="664d66dd";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d77a6b65">
+<link rel="stylesheet" href="/assets/site.css?v=664d66dd">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -93,7 +93,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>LYNX SHARE starts in the Pattern layout: a Channel rack, patterns and a Playlist. The Clip-launch layout is optional and adds a clip grid with scenes beside the Playlist. LYNX SHARE reads and writes <code>.als</code> sets. It is not affiliated with Ableton.</p>
 <p>This page is for Bitwig Studio users too: the clip grid works the same way, and Bitwig's DAWproject files (<code>.dawproject</code>) open with <code>File › Open...</code> and are written by <code>File › Export › DAWproject (.dawproject)...</code>.</p>
 <h2 id="your-first-steps">Your first steps</h2>
-<ol><li><strong>Pick the layout.</strong> The first time LYNX SHARE starts, a welcome card asks where you are coming from (0.1.31). Click <code>Ableton Live or Bitwig</code>: the Clip-launch layout opens. In 0.1.30, choose <code>View › Layout style › Clip-launch layout</code>.</li><li><strong>Fill a slot.</strong> Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose <code>Put a pattern here</code>.</li><li><strong>Launch.</strong> Click the triangle at the left of a clip, or the triangle of a scene in the <code>Scenes</code> column to launch the whole row. Or open one of your <code>.als</code> sets (below).</li></ol>
+<ol><li><strong>Pick the layout.</strong> The first time LYNX SHARE starts, a welcome card asks where you are coming from. Click <code>Ableton Live or Bitwig</code>: the Clip-launch layout opens. Later, <code>View › Layout style › Clip-launch layout</code> switches to it at any time.</li><li><strong>Fill a slot.</strong> Drag a sample or a pattern from the Browser into a slot, or right-click an empty slot and choose <code>Put a pattern here</code>.</li><li><strong>Launch.</strong> Click the triangle at the left of a clip, or the triangle of a scene in the <code>Scenes</code> column to launch the whole row. Or open one of your <code>.als</code> sets (below).</li></ol>
 <p>What is different from Live:</p>
 <ul><li>The Playlist is the arrangement, and its tracks are the columns of the grid. A track that launched a clip stays on the grid until you press <code>Back to Playlist</code>.</li><li>The keys follow FL Studio outside the grid. <code>Ctrl+Z</code> undoes one step, and pressed again redoes it.</li><li>Only some of Live's own devices are converted (see Good to know). Third-party plugins come over with their state.</li><li>The Pattern layout, FL Studio's way of working with a Channel rack and patterns, works on the same project.</li></ul>
 <h2 id="open-a-live-set">Open a Live set</h2>
@@ -124,8 +124,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d77a6b65" defer></script>
-<script src="/assets/wiki.js?v=d77a6b65" defer></script>
-<script src="/assets/motion.js?v=d77a6b65" defer></script>
+<script src="/assets/site.js?v=664d66dd" defer></script>
+<script src="/assets/wiki.js?v=664d66dd" defer></script>
+<script src="/assets/motion.js?v=664d66dd" defer></script>
 </body>
 </html>

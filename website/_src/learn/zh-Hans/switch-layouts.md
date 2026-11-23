@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## 选择你从哪里转过来
 
 ![欢迎卡片会问你从哪里转过来](/assets/img/learn/switch-layouts-1.webp)
 
-1. 启动 LYNX SHARE。第一次启动时，欢迎卡片会问你从哪里转过来（0.1.31）。
+1. 启动 LYNX SHARE。第一次启动时，欢迎卡片会问你从哪里转过来。
 2. 每个回答对应一种布局：
    - `BandLab、FL Studio Mobile 或 GarageBand`：简易布局，一个窗口里有音轨、循环素材和快速录音。
    - `FL Studio`：模式布局，包含 Channel rack、Piano roll、播放列表和混音器。

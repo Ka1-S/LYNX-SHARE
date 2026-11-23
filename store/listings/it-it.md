@@ -50,7 +50,14 @@ LYNX SHARE è in fase alpha: aspettati qualche imperfezione e segnala eventuali 
 
 ## What's new
 
-LYNX SHARE 0.1.30: più leggero che mai, con circa la metà della CPU di FL Studio 2026 mentre la demo Thief di FL suona sul nostro PC di prova; hosting ARA 2, così Melodyne e altri plugin ARA modificano le clip audio direttamente; un editor di note polifonico e l'audio in MIDI polifonico; un Newtone più naturale; Helix, un nuovo sintetizzatore wavetable, e Tetra, un sintetizzatore FM a 4 operatori; un assistente per gli accordi; una drum machine in stile BandLab, un accordatore e un Loop Browser nel Flusso semplice; tracce di ritorno, send e un crossfader nel Flusso a lancio di clip; MPE e MIDI Out hardware; un editor DirectWave; progetti DAWproject, GarageBand e BandLab, strumenti e sample .gig, .dwp e .ncw, ed esportazione AIFF e M4A; più di 40 sostituti di plugin rifatti; e correzioni per circa 40 problemi segnalati.
+LYNX SHARE 0.1.31: un Tracker integrato che apre anche i moduli tracker (.mod, .xm, .s3m, .it); LYNX Model, modelli
+fisici di marimba, vibrafono, xilofono, glockenspiel, campane tubolari e kalimba; script JSFX di effetti e strumenti;
+una scheda di benvenuto che imposta il layout giusto e una pagina iniziale con i tuoi progetti recenti; una ricerca
+che trova ogni comando; due progetti affiancati con copia e incolla tra loro; una corsia delle sezioni, una traccia
+accordi con Smart Tempo e versioni della traccia; modalità di scrittura dell'automazione, Capture automation e
+modulatori per qualsiasi manopola; esportazione .flm per FL Studio Mobile; i dispositivi rack di Live in linea con una
+Macro Map e Solo / Cue nel Flusso a lancio di clip; Abbassa sotto e mandate di Eco nel Flusso semplice; plugin ARA su
+un insert del mixer; progetti FL Studio che suonano più vicini a FL; e correzioni per circa 30 problemi segnalati.
 
 ## Features
 

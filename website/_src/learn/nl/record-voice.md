@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Voordat je begint
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Klik op `Stem / audio`. Er verschijnt een Voice-track onder de andere, klaar om op te nemen van de eerste ingang van je audioapparaat.
 3. De dock onder de tijdlijn toont de track, met rechts de meter `Ingangsniveau`. Zing een noot en zie hem bewegen.
 
-De knop `+ Voice-spoor` van de kaart `Hierna: 3 dingen om te proberen` doet hetzelfde (0.1.31).
+De knop `+ Voice-spoor` van de kaart `Hierna: 3 dingen om te proberen` doet hetzelfde.
 
 ## Neem een take op
 

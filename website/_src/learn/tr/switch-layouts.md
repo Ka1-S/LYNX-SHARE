@@ -1,11 +1,11 @@
 ---
-source: fffb2dce40
+source: ebe3befa50
 ---
 ## Nereden geldiğinizi seçin
 
 ![Karşılama kartı nereden geldiğinizi sorar](/assets/img/learn/switch-layouts-1.webp)
 
-1. LYNX SHARE'i başlatın. İlk açılışta bir karşılama kartı nereden geldiğinizi sorar (0.1.31).
+1. LYNX SHARE'i başlatın. İlk açılışta bir karşılama kartı nereden geldiğinizi sorar.
 2. Her cevap bir yerleşim seçer:
    - `BandLab, FL Studio Mobile veya GarageBand`: Basit yerleşim; izlerin, loop'ların ve hızlı kaydın olduğu tek bir pencere.
    - `FL Studio`: Channel Rack, Piano Roll, Playlist ve Mixer'ın olduğu Pattern yerleşimi.

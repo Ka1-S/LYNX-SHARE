@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `File › Buka...` (`Ctrl+O`) membuka proyek `.lynx` milik LYNX SHARE sendiri dan juga file `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, dan `.mid`. Proyek dari program lain adalah impor: ia menjadi proyek LYNX SHARE baru yang belum disimpan, dan file aslinya tidak pernah ditulisi.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand untuk iOS) | Track, region MIDI dan audio, tempo, birama, nada dasar, section sebagai marker, level, pan, dan mute, sebagai track Alur kerja sederhana. Instrumen Sampler yang dibuat di GarageBand untuk iOS | Track instrumen memainkan synth dan drum bawaan. Region Drummer, folder take, dan perubahan tempo dicantumkan. Proyek dari GarageBand 11 dan yang lebih lama tidak bisa dibaca |
 | `.blx` (BandLab) | Track, region MIDI dan audio beserta loop-nya, tempo, birama, nada dasar, volume, pan, dan mute, otomasi volume dan pan, dan efek umum, sebagai track Alur kerja sederhana | Track instrumen memainkan synth dan drum bawaan. Efek lain dan preset Mastering dilewati dan dicantumkan. Hanya diuji pada proyek rekaan |
 | `.mid` | Not, birama, dan setiap perubahan tempo | File MIDI tidak membawa suara: channel mendapat synth LYNX SHARE atau channel MIDI Out |
-| `.mod`, `.xm`, `.s3m`, `.it` (modul tracker) | Instrumen sebagai channel Sampler beserta sample-nya, pattern, daftar urutan sebagai Playlist, kecepatan dan tempo, volume not, pan, delay, dan cut; perubahan volume dan pan sebagai event channel (MOD dan XM), serta slide, vibrato, arpeggio, dan envelope pitch sebagai kurva pitch not | Efek lain dan envelope instrumen dihitung di laporan impor. `Tampilan › Jendela dan alat › Tracker` mengedit not dengan cara tracker |
+| `.mod`, `.xm`, `.s3m`, `.it` (modul tracker) | Instrumen sebagai channel Sampler beserta sample-nya, pattern, daftar urutan sebagai Playlist, kecepatan dan tempo, volume not, pan, delay, dan cut; perubahan volume dan pan sebagai event channel (MOD dan XM), serta slide, vibrato, arpeggio, dan envelope pitch sebagai kurva pitch not | Efek lain dan envelope instrumen dihitung di laporan impor. `Tampilan › Tracker` mengedit not dengan cara tracker |
 | `.zip` | Paket loop zip FL Studio, atau proyek yang diekspor beserta sample-nya: diekstrak ke folder tersendiri, lalu proyek di dalamnya dibuka beserta sample-nya | |
 
 Plugin pihak ketiga VST2, VST3, dan CLAP di file `.flp` atau `.dawproject`, serta plugin VST2 dan VST3 di file `.als`, dimuat dengan state yang tersimpan jika plugin yang sama terinstal di komputermu.

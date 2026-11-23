@@ -1,5 +1,5 @@
 ---
-source: 4ca4775a35
+source: 37920663db
 ---
 ![Il layout a lancio di clip: una griglia di clip con le scene accanto alla Playlist](/assets/img/cliplaunch.webp)
 
@@ -9,7 +9,7 @@ Questa pagina è anche per chi usa Bitwig Studio: la griglia di clip funziona al
 
 ## I tuoi primi passi
 
-1. **Scegli il layout.** La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni (0.1.31). Clicca `Ableton Live o Bitwig`: si apre il layout a lancio di clip. Nella 0.1.30, scegli `Vista › Stile del layout › Flusso a lancio di clip`.
+1. **Scegli il layout.** La prima volta che LYNX SHARE si avvia, una scheda di benvenuto chiede da dove vieni. Clicca `Ableton Live o Bitwig`: si apre il layout a lancio di clip. Più tardi, `Vista › Stile del layout › Flusso a lancio di clip` passa ad esso in qualsiasi momento.
 2. **Riempi uno slot.** Trascina un sample o un pattern dal Browser in uno slot, oppure clicca con il tasto destro su uno slot vuoto e scegli `Metti un pattern qui`.
 3. **Lancia.** Clicca il triangolo a sinistra di una clip, oppure il triangolo di una scena nella colonna `Scene` per lanciare l'intera riga. Oppure apri uno dei tuoi set `.als` (sotto).
 

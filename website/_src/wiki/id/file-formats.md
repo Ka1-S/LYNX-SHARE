@@ -1,7 +1,7 @@
 ---
-source: 54585dcc5a
+source: e1ff018baf
 ---
-LYNX SHARE menyimpan proyek sebagai file `.lynx`. Program ini juga membuka proyek dari program lain, memuat file audio yang umum, dan mengekspor audio, MIDI, dan proyek untuk program lain. Tabel mencantumkan setiap format di 0.1.30 alpha.
+LYNX SHARE menyimpan proyek sebagai file `.lynx`. Program ini juga membuka proyek dari program lain, memuat file audio yang umum, dan mengekspor audio, MIDI, dan proyek untuk program lain. Tabel mencantumkan setiap format di 0.1.31 alpha.
 
 Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu menanyakan tempat menulis file `.lynx`, dan file aslinya tidak pernah diubah.
 
@@ -26,7 +26,7 @@ Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu
 | `.band` | `File › Buka...` (paketnya, file `projectData`-nya, atau zip-nya) | Tidak | Proyek GarageBand 10 atau GarageBand untuk iOS, sebagai track Alur kerja sederhana. Parsial: track instrumen memainkan synth dan drum bawaan, kecuali instrumen Sampler yang dibuat di GarageBand untuk iOS. Proyek dari GarageBand 11 dan yang lebih lama tidak bisa dibaca |
 | `.blx` | `File › Buka...`, atau foldernya dengan impor `Folder...` Alur kerja sederhana | Tidak | Proyek BandLab yang diunduh oleh Cakewalk atau Sonar, sebagai track Alur kerja sederhana dengan region, tempo, nada dasar, mix, otomasi volume dan pan, dan efek umum. Parsial: suara instrumen BandLab dan pedal lainnya dicantumkan di laporan impor |
 | `.mid`, `.midi` | `File › Buka...` membuat proyek baru. `File › Impor › File MIDI...` dan Piano Roll mengimpor ke proyek yang sedang terbuka | `File › Ekspor › File MIDI...` (`Ctrl+Shift+M`) | |
-| `.mod`, `.xm`, `.s3m`, `.it` | `File › Buka...` | Tidak | Modul tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Instrumennya menjadi channel Sampler dengan sample-nya, lagunya menjadi klip pattern dengan perubahan temponya, dan `Tampilan › Jendela dan alat › Tracker` mengedit not-notnya. Sebagian: efek seperti slide, vibrato dan arpeggio, envelope, serta perubahan volume pada not yang sedang berbunyi dicantumkan di laporan impor |
+| `.mod`, `.xm`, `.s3m`, `.it` | `File › Buka...` | Tidak | Modul tracker (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Instrumennya menjadi channel Sampler dengan sample-nya, lagunya menjadi klip pattern dengan perubahan temponya, dan `Tampilan › Tracker` mengedit not-notnya. Sebagian: efek seperti slide, vibrato dan arpeggio, envelope, serta perubahan volume pada not yang sedang berbunyi dicantumkan di laporan impor |
 | `.wav` | Sebagai sample atau clip audio | `File › Ekspor › File Wave...`, 16 bit, 24 bit, atau 32 bit float | Dither, informasi tempo, marker loop, dan marker Playlist bersifat opsional |
 | `.mp3` | Sebagai sample atau clip audio | `File › Ekspor › File MP3...` | Bitrate konstan |
 | `.ogg` | Sebagai sample atau clip audio | `File › Ekspor › File OGG...` | |

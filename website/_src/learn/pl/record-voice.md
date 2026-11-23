@@ -1,5 +1,5 @@
 ---
-source: c22e3487eb
+source: 6cdabe8ca5
 ---
 ## Zanim zaczniesz
 
@@ -14,7 +14,7 @@ source: c22e3487eb
 2. Kliknij `Wokal / audio`. Pod pozostałymi pojawia się ścieżka Voice, gotowa do nagrywania z pierwszego wejścia twojego urządzenia audio.
 3. Dok pod osią czasu pokazuje ścieżkę, a po prawej wskaźnik `Poziom wejścia`. Zaśpiewaj dźwięk i patrz, jak się rusza.
 
-Przycisk `+ Ścieżka głosu` na karcie `Dalej: 3 rzeczy do wypróbowania` robi to samo (0.1.31).
+Przycisk `+ Ścieżka głosu` na karcie `Dalej: 3 rzeczy do wypróbowania` robi to samo.
 
 ## Nagraj podejście
 

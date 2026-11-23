@@ -1,5 +1,5 @@
 ---
-source: 7342d4fb1f
+source: f6f0977999
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
@@ -7,7 +7,7 @@ LYNX SHARE adalah program independen. Program ini tidak berafiliasi dengan, didu
 
 ## Langkah pertamamu
 
-1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang (0.1.31). Klik `FL Studio`: kamu mendapat tata letak Pattern, yang bawaan, dengan Channel Rack, Piano roll, Playlist, dan Mixer. Tombol Lewati di kartu itu melakukan hal yang sama.
+1. **Pilih tata letak.** Saat LYNX SHARE pertama kali dijalankan, sebuah kartu sambutan menanyakan dari mana kamu datang. Klik `FL Studio`: kamu mendapat tata letak Pattern, yang bawaan, dengan Channel Rack, Piano roll, Playlist, dan Mixer. Tombol Lewati di kartu itu melakukan hal yang sama.
 2. **Buka proyek.** Buka salah satu proyek `.flp`-mu (di bawah), atau klik step di Channel Rack untuk membuat beat.
 3. **Temukan plugin-mu.** LYNX SHARE memindai folder plugin yang umum di latar belakang. Untuk folder milikmu sendiri, buka `Opsi › Pengelola plugin...`, klik `Folder plugin...`, tambahkan folder itu, lalu klik `Cari plugin baru`.
 

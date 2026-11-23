@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE ma trzy układy. Jeśli przechodzisz z Logic, Cubase, Reapera, Pro Tools lub Studio One, zacznij od **Prostego układu z Mixerem pod ręką**: jedna ścieżka na instrument lub głos na osi czasu, tak jak znasz. Układ Pattern, czyli praca jak w FL Studio, czeka, gdy zechcesz pracować na patternach.
 
 ## Twoje pierwsze kroki
 
-1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz (0.1.31). Kliknij `Logic, Cubase, Reaper, Pro Tools lub Studio One`: Prosty układ otwiera się na karcie New track, a Mixer pojawia się z pierwszą ścieżką. W 0.1.30 wybierz `Widok › Styl układu › Prosty układ` i otwórz Mixer klawiszem `F9`.
+1. **Wybierz układ.** Przy pierwszym uruchomieniu LYNX SHARE karta powitalna pyta, skąd przychodzisz. Kliknij `Logic, Cubase, Reaper, Pro Tools lub Studio One`: Prosty układ otwiera się na karcie New track, a Mixer pojawia się z pierwszą ścieżką. Później przełączysz się na ten układ w każdej chwili przez `Widok › Styl układu › Prosty układ`, a `F9` otwiera Mixer.
 2. **Dodaj ścieżkę.** `+ Dodaj ścieżkę` oferuje `Wokal / audio`, `Instrument`, `Perkusja`, `Sampler`, `Gitara / bas`, `Importuj` i `Pętle`. Na ścieżce instrumentu zagrasz klawiszami komputera, klawiaturą ekranową lub klawiaturą MIDI.
 3. **Nagrywaj.** Wybierz urządzenie audio w `Opcje › Ustawienia audio...`, potem zobacz [Nagraj swój głos](/learn/record-voice/).
 

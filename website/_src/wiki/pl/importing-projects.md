@@ -1,5 +1,5 @@
 ---
-source: a29416cb8c
+source: 532b2eee04
 ---
 `Plik › Otwórz...` (`Ctrl+O`) otwiera własne projekty `.lynx` LYNX SHARE, a także pliki `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx` i `.mid`. Projekt z innego programu jest importem: staje się nowym, niezapisanym projektem LYNX SHARE, a oryginalny plik nigdy nie jest zapisywany.
 
@@ -22,7 +22,7 @@ source: a29416cb8c
 | `.band` (GarageBand 10, GarageBand na iOS) | Ścieżki, regiony MIDI i audio, tempo, metrum, tonacja, sekcje jako znaczniki, poziom, panorama i wyciszenie, jako ścieżki Prostego układu. Instrumenty Sampler z GarageBand na iOS | Ścieżki instrumentów grają wbudowanym syntezatorem i perkusją. Regiony Drummer, foldery z podejściami i zmiany tempa są wymienione. Projekty z GarageBand 11 i starszych nie są czytelne |
 | `.blx` (BandLab) | Ścieżki, regiony MIDI i audio z ich pętlami, tempo, metrum, tonacja, głośność, panorama i wyciszenie, automatyka głośności i panoramy oraz typowe efekty, jako ścieżki Prostego układu | Ścieżki instrumentów grają wbudowanym syntezatorem i perkusją. Inne efekty i preset Mastering są pomijane i wymienione. Testowane tylko na zmyślonych projektach |
 | `.mid` | Nuty, metrum i każda zmiana tempa | Plik MIDI nie niesie dźwięków: kanały dostają syntezator LYNX SHARE albo kanał MIDI Out |
-| `.mod`, `.xm`, `.s3m`, `.it` (moduły trackerowe) | Instrumenty jako kanały Samplera z ich samplami, patterny, lista kolejności jako Playlist, szybkość i tempo, głośność nut, panorama, opóźnienie i cięcie; zmiany głośności i panoramy jako zdarzenia kanału (MOD i XM) oraz slajdy, vibrato, arpeggia i obwiednie wysokości jako krzywe wysokości nut | Inne efekty i obwiednie instrumentów są liczone w raporcie importu. `Widok › Okna i narzędzia › Tracker` edytuje nuty na sposób trackera |
+| `.mod`, `.xm`, `.s3m`, `.it` (moduły trackerowe) | Instrumenty jako kanały Samplera z ich samplami, patterny, lista kolejności jako Playlist, szybkość i tempo, głośność nut, panorama, opóźnienie i cięcie; zmiany głośności i panoramy jako zdarzenia kanału (MOD i XM) oraz slajdy, vibrato, arpeggia i obwiednie wysokości jako krzywe wysokości nut | Inne efekty i obwiednie instrumentów są liczone w raporcie importu. `Widok › Tracker` edytuje nuty na sposób trackera |
 | `.zip` | Spakowany pakiet loopów FL Studio albo projekt wyeksportowany z samplami: rozpakowany do własnego folderu, po czym otwiera się projekt w środku wraz z samplami | |
 
 Pluginy innych firm VST2, VST3 i CLAP w pliku `.flp` lub `.dawproject` oraz VST2 i VST3 w pliku `.als` wczytują się z zapisanym stanem, jeśli ten sam plugin jest zainstalowany na Twoim komputerze.

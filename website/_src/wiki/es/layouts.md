@@ -1,9 +1,9 @@
 ---
-source: 9974ffb64e
+source: 54ebedc064
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 
-`Ver › Estilo de diseño` tiene tres entradas: `Diseño Patrón (predeterminado)`, `Diseño de lanzamiento de clips` y `Diseño simple`. La misma opción está en `Opciones › Configuración general`, bajo Diseño. La elección se conserva al cerrar el programa.
+`Ver › Estilo de diseño` tiene tres entradas: `Diseño Patrón (predeterminado)`, `Diseño de lanzamiento de clips` y `Diseño simple`. La misma opción está en `Opciones › Configuración general`, bajo Diseño. La elección se conserva al cerrar el programa. La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes y elige el diseño que encaja.
 
 El diseño Patrón, el predeterminado, funciona como FL Studio: el Channel Rack, los patrones, el Piano Roll, la Playlist y el Mixer. El diseño de lanzamiento de clips, al estilo de Ableton Live, añade una cuadrícula de clips con escenas junto a la Playlist, un mezclador de sesión y las vistas de clip y de dispositivo; los patrones y el Channel Rack siguen disponibles. El diseño simple mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile: pistas y línea de tiempo, loops, pads y grabación rápida. Al cambiar solo se mueven las ventanas: el proyecto sigue siendo el mismo.
 

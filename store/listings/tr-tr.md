@@ -49,7 +49,14 @@ LYNX SHARE alfa aşamasındadır: bazı pürüzler olabilir, lütfen sorunları 
 
 ## What's new
 
-LYNX SHARE 0.1.30: hiç olmadığı kadar hafif; test PC'mizde FL'nin Thief demosu çalarken FL Studio 2026'nın yaklaşık yarısı kadar CPU kullanıyor; ARA 2 desteği sayesinde Melodyne ve diğer ARA plugin'leri ses kliplerini yerinde düzenliyor; polifonik bir nota editörü ve polifonik sesten MIDI'ye dönüştürme; daha doğal bir Newtone; yeni bir wavetable synth olan Helix ve 4 operatörlü bir FM synth olan Tetra; bir Akor yardımcısı; Basit iş akışında BandLab tarzı bir Drum Machine, bir akort aleti ve bir Loop Browser; Klip başlatma iş akışında dönüş izleri, send'ler ve bir crossfader; MPE ve donanım MIDI Out; bir DirectWave editörü; DAWproject, GarageBand ve BandLab projeleri, .gig, .dwp ve .ncw enstrümanları ve sample'ları, AIFF ve M4A dışa aktarma; yenilenmiş 40'tan fazla plugin yedeği; ve bildirilen yaklaşık 40 sorun için düzeltmeler.
+LYNX SHARE 0.1.31: tracker modüllerini (.mod, .xm, .s3m, .it) de açan yerleşik bir Tracker; marimba, vibrafon,
+ksilofon, glockenspiel, tüp çanlar ve kalimbanın fiziksel modelleri olan LYNX Model; JSFX efekt ve enstrüman
+script'leri; doğru yerleşimi kuran bir karşılama kartı ve son projelerinizin olduğu bir başlangıç sayfası; her komutu
+bulan bir arama; aralarında kopyala yapıştır olan yan yana iki proje; bir Bölümler şeridi, Smart Tempo'lu bir Akor
+şeridi ve Parça sürümleri; otomasyon yazma modları, Otomasyon yakala ve her düğme için modülatörler; FL Studio Mobile
+.flm dışa aktarma; Klip başlatma iş akışında Macro Map ve Solo / Cue ile satır içi Live rack cihazları; Basit iş
+akışında Altında kıs ve Eko send'leri; bir mixer insert'inde ARA plugin'leri; FL'ye daha yakın çalan FL Studio
+projeleri; ve bildirilen yaklaşık 30 sorun için düzeltmeler.
 
 ## Features
 

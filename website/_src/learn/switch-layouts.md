@@ -6,7 +6,7 @@ summary: Pick a layout on the welcome card, then switch between Simple, Pattern 
 
 ![The welcome card asks where you are coming from](/assets/img/learn/switch-layouts-1.webp)
 
-1. Start LYNX SHARE. The first time, a welcome card asks where you are coming from (0.1.31).
+1. Start LYNX SHARE. The first time, a welcome card asks where you are coming from.
 2. Each answer picks a layout:
    - `BandLab, FL Studio Mobile or GarageBand`: the Simple layout, one window with tracks, loops and quick recording.
    - `FL Studio`: the Pattern layout, with the Channel rack, Piano roll, Playlist and Mixer.

@@ -1,7 +1,7 @@
 ---
-source: 54585dcc5a
+source: e1ff018baf
 ---
-LYNX SHARE speichert Projekte als `.lynx`-Dateien. Es öffnet auch Projekte anderer Programme, lädt die gängigen Audiodateien und exportiert Audio, MIDI und Projekte für andere Programme. Die Tabelle listet jedes Format von 0.1.30 alpha.
+LYNX SHARE speichert Projekte als `.lynx`-Dateien. Es öffnet auch Projekte anderer Programme, lädt die gängigen Audiodateien und exportiert Audio, MIDI und Projekte für andere Programme. Die Tabelle listet jedes Format von 0.1.31 alpha.
 
 Ein Projekt, das aus dem Format eines anderen Programms geöffnet wurde, ist ein Import. `Datei › Speichern` fragt dann, wohin die `.lynx`-Datei geschrieben werden soll, und die Originaldatei wird nie verändert.
 
@@ -26,7 +26,7 @@ Ein Projekt, das aus dem Format eines anderen Programms geöffnet wurde, ist ein
 | `.band` | `Datei › Öffnen...` (das Paket, seine `projectData`-Datei oder ein Zip davon) | Nein | GarageBand-10- oder GarageBand-für-iOS-Projekt, als Spuren im Einfachen Arbeitsablauf. Unvollständig: Instrumentenspuren spielen den eingebauten Synth und die Drums, außer Sampler-Instrumenten, die in GarageBand für iOS gemacht wurden. Projekte aus GarageBand 11 und älter sind nicht lesbar |
 | `.blx` | `Datei › Öffnen...`, oder sein Ordner mit dem Import `Ordner...` des Einfachen Arbeitsablaufs | Nein | BandLab-Projekt, das von Cakewalk oder Sonar heruntergeladen wurde, als Spuren im Einfachen Arbeitsablauf mit Regionen, Tempo, Tonart, dem Mix, Lautstärke- und Pan-Automation und den gängigen Effekten. Unvollständig: Die Instrumentenklänge und andere Pedale von BandLab stehen im Importbericht |
 | `.mid`, `.midi` | `Datei › Öffnen...` erzeugt ein neues Projekt. `Datei › Importieren › MIDI-Datei...` und das Piano Roll importieren ins aktuelle | `Datei › Exportieren › MIDI-Datei...` (`Ctrl+Shift+M`) | |
-| `.mod`, `.xm`, `.s3m`, `.it` | `Datei › Öffnen...` | Nein | Tracker-Module (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Die Instrumente werden zu Sampler-Kanälen mit ihren Samples, der Song wird zu Pattern-Clips mit seinen Tempowechseln, und `Ansicht › Fenster und Werkzeuge › Tracker` bearbeitet die Noten. Teilweise: Effekte wie Slides, Vibrato und Arpeggios, Hüllkurven und Lautstärkeänderungen auf einer klingenden Note stehen im Importbericht |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Datei › Öffnen...` | Nein | Tracker-Module (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). Die Instrumente werden zu Sampler-Kanälen mit ihren Samples, der Song wird zu Pattern-Clips mit seinen Tempowechseln, und `Ansicht › Tracker` bearbeitet die Noten. Teilweise: Effekte wie Slides, Vibrato und Arpeggios, Hüllkurven und Lautstärkeänderungen auf einer klingenden Note stehen im Importbericht |
 | `.wav` | Als Sample oder Audioclip | `Datei › Exportieren › Wave-Datei...`, 16-Bit, 24-Bit oder 32-Bit Float | Optional Dither, Tempoinformation, Loop-Marker und Playlist-Marker |
 | `.mp3` | Als Sample oder Audioclip | `Datei › Exportieren › MP3-Datei...` | Konstante Bitrate |
 | `.ogg` | Als Sample oder Audioclip | `Datei › Exportieren › OGG-Datei...` | |

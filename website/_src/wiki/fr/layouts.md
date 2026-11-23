@@ -1,9 +1,9 @@
 ---
-source: 9974ffb64e
+source: 54ebedc064
 ---
 ![La disposition par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 
-`Vue › Style de disposition` propose trois entrées : `Disposition Pattern (par défaut)`, `Disposition par lancement de clips` et `Disposition simple`. Le même choix existe dans `Options › Réglages généraux`, sous Disposition. Le choix est conservé quand vous fermez le programme.
+`Vue › Style de disposition` propose trois entrées : `Disposition Pattern (par défaut)`, `Disposition par lancement de clips` et `Disposition simple`. Le même choix existe dans `Options › Réglages généraux`, sous Disposition. Le choix est conservé quand vous fermez le programme. Au premier démarrage de LYNX SHARE, une carte de bienvenue demande d'où vous venez et choisit la disposition qui convient.
 
 La disposition Pattern, celle par défaut, fonctionne comme FL Studio : le Channel Rack, les patterns, le Piano Roll, la Playlist et le Mixer. La disposition par lancement de clips, dans le style d'Ableton Live, ajoute une grille de clips avec des scènes à côté de la Playlist, une table de mixage de session et les vues clip et appareil ; les patterns et le Channel Rack restent disponibles. La disposition simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile : des pistes et une timeline, des boucles, des pads et l'enregistrement rapide. Changer de disposition ne déplace que les fenêtres : le projet reste le même.
 

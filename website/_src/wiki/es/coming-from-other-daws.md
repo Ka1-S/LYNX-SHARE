@@ -1,11 +1,11 @@
 ---
-source: 20cf7fed48
+source: c82c79e958
 ---
 LYNX SHARE tiene tres diseños. Si vienes de Logic, Cubase, Reaper, Pro Tools o Studio One, empieza por el **Diseño simple con el Mixer a mano**: una pista por instrumento o voz en una línea de tiempo, como ya conoces. El Diseño Patrón, la forma de trabajar de FL Studio, está ahí para cuando quieras patrones.
 
 ## Tus primeros pasos
 
-1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes (0.1.31). Haz clic en `Logic, Cubase, Reaper, Pro Tools o Studio One`: el Diseño simple se abre en su tarjeta de nueva pista, y el Mixer aparece con tu primera pista. En la 0.1.30, elige `Ver › Estilo de diseño › Diseño simple` y abre el Mixer con `F9`.
+1. **Elige el diseño.** La primera vez que arranca LYNX SHARE, una tarjeta de bienvenida pregunta de dónde vienes. Haz clic en `Logic, Cubase, Reaper, Pro Tools o Studio One`: el Diseño simple se abre en su tarjeta de nueva pista, y el Mixer aparece con tu primera pista. Más tarde, `Ver › Estilo de diseño › Diseño simple` cambia a él en cualquier momento, y `F9` abre el Mixer.
 2. **Añade una pista.** `+ Añadir pista` ofrece `Voz / audio`, `Instrumento`, `Batería`, `Sampler`, `Guitarra / bajo`, `Importar` y `Loops`. Toca una pista de instrumento con las teclas del ordenador, el teclado en pantalla o un teclado MIDI.
 3. **Graba.** Elige tu dispositivo de audio en `Opciones › Configuración de audio...` y consulta [Graba tu voz](/learn/record-voice/).
 

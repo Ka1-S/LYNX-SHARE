@@ -1,14 +1,14 @@
 ---
-source: 4ebe52e456
+source: 2116c7d24c
 ---
 ## Wähle das Einfache Layout
 
 ![Die Willkommenskarte fragt, woher du kommst](/assets/img/learn/simple-beat-1.webp)
 
-1. Starte LYNX SHARE. Beim ersten Mal fragt eine Willkommenskarte, woher du kommst (0.1.31).
+1. Starte LYNX SHARE. Beim ersten Mal fragt eine Willkommenskarte, woher du kommst.
 2. Klicke auf `BandLab, FL Studio Mobile oder GarageBand`. Das Fenster wechselt zum Einfachen Layout, und ein Starter-Beat liegt auf einer Drums-Spur.
 
-In 0.1.30 wähle `Ansicht › Layout-Stil › Einfacher Arbeitsablauf`, klicke auf `+ Spur hinzufügen`, dann auf `Drums`, und such einen der Starter-Beats aus. Dasselbe Menü wechselt jederzeit das Layout. Das Projekt bleibt, wie es ist.
+Ohne die Karte wähle `Ansicht › Layout-Stil › Einfacher Arbeitsablauf`, klicke auf `+ Spur hinzufügen`, dann auf `Drums`, und such einen der Starter-Beats aus. Dasselbe Menü wechselt jederzeit das Layout. Das Projekt bleibt, wie es ist.
 
 ## Spiele den Beat ab
 
@@ -40,7 +40,7 @@ Der Buchstabe neben jeder Zeile ist ihre Taste auf der Computertastatur: Drücke
 
 ![Das Loops-Panel neben der Zeitleiste](/assets/img/learn/simple-beat-5.webp)
 
-- Die Karte `Als Nächstes: 3 Dinge zum Ausprobieren` (0.1.31) hakt jeden Schritt von selbst ab. `Loops öffnen` öffnet das Loops-Panel: Ziehe einen Loop auf die Zeitleiste. Ein Loop folgt Tempo und Tonart des Projekts.
+- Die Karte `Als Nächstes: 3 Dinge zum Ausprobieren` hakt jeden Schritt von selbst ab. `Loops öffnen` öffnet das Loops-Panel: Ziehe einen Loop auf die Zeitleiste. Ein Loop folgt Tempo und Tonart des Projekts.
 - [Nimm deine Stimme auf](/learn/record-voice/), auf einer Stimmenspur.
 - `Fertigstellen` speichert den Song als WAV oder MP3.
 

@@ -1,7 +1,7 @@
 ---
-source: 54585dcc5a
+source: e1ff018baf
 ---
-LYNX SHARE slaat projecten op als `.lynx`-bestanden. Het opent ook projecten van andere programma's, laadt de gangbare audiobestanden en exporteert audio, MIDI en projecten voor andere programma's. De tabel toont elk formaat van 0.1.30 alpha.
+LYNX SHARE slaat projecten op als `.lynx`-bestanden. Het opent ook projecten van andere programma's, laadt de gangbare audiobestanden en exporteert audio, MIDI en projecten voor andere programma's. De tabel toont elk formaat van 0.1.31 alpha.
 
 Een project dat uit het formaat van een ander programma is geopend, is een import. `Bestand › Opslaan` vraagt dan waar een `.lynx`-bestand moet komen, en het originele bestand wordt nooit gewijzigd.
 
@@ -26,7 +26,7 @@ Een project dat uit het formaat van een ander programma is geopend, is een impor
 | `.band` | `Bestand › Openen...` (het pakket, zijn `projectData`-bestand of een zip ervan) | Nee | GarageBand 10- of GarageBand voor iOS-project, als tracks van de Eenvoudige lay-out. Gedeeltelijk: instrumenttracks spelen de ingebouwde synth en drums, behalve Sampler-instrumenten die in GarageBand voor iOS zijn gemaakt. Projecten van GarageBand 11 en ouder zijn niet leesbaar |
 | `.blx` | `Bestand › Openen...`, of zijn map met de import `Map...` van de Eenvoudige lay-out | Nee | BandLab-project dat door Cakewalk of Sonar is gedownload, als tracks van de Eenvoudige lay-out met regio's, tempo, toonsoort, de mix, volume- en panautomatisering en de gebruikelijke effecten. Gedeeltelijk: de instrumentgeluiden en andere pedalen van BandLab staan in het importrapport |
 | `.mid`, `.midi` | `Bestand › Openen...` maakt een nieuw project. `Bestand › Importeren › MIDI-bestand...` en de Piano Roll importeren in het huidige | `Bestand › Exporteren › MIDI-bestand...` (`Ctrl+Shift+M`) | |
-| `.mod`, `.xm`, `.s3m`, `.it` | `Bestand › Openen...` | Nee | Trackermodules (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). De instrumenten worden Sampler-kanalen met hun samples, het nummer wordt patternclips met zijn tempowisselingen, en `Beeld › Vensters en hulpmiddelen › Tracker` bewerkt de noten. Gedeeltelijk: effecten zoals slides, vibrato en arpeggio's, envelopes en volumewijzigingen op een klinkende noot staan in het importrapport |
+| `.mod`, `.xm`, `.s3m`, `.it` | `Bestand › Openen...` | Nee | Trackermodules (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker). De instrumenten worden Sampler-kanalen met hun samples, het nummer wordt patternclips met zijn tempowisselingen, en `Beeld › Tracker` bewerkt de noten. Gedeeltelijk: effecten zoals slides, vibrato en arpeggio's, envelopes en volumewijzigingen op een klinkende noot staan in het importrapport |
 | `.wav` | Als sample of audioclip | `Bestand › Exporteren › Wave-bestand...`, 16-bit, 24-bit of 32-bit float | Optioneel dither, tempo-informatie, loopmarkeringen en Playlistmarkeringen |
 | `.mp3` | Als sample of audioclip | `Bestand › Exporteren › MP3-bestand...` | Constante bitrate |
 | `.ogg` | Als sample of audioclip | `Bestand › Exporteren › OGG-bestand...` | |
