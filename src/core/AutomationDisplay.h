@@ -9,6 +9,7 @@
 // Cost: the tables are rebuilt only when the Song changes (`songStamp`); an update evaluates each automated target once
 // (a few binary-search-free clip walks), and controls look their target up in a small sorted vector.
 
+#include "core/LinkFormula.h"    // round 190qp: target links
 #include "core/RackAutomation.h" // round 190ow (DE-123)
 #include "core/Song.h"
 
@@ -27,7 +28,10 @@ public:
     // UI thread, from a timer. `tick` = the transport position; `playing` = the transport runs. While stopped no
     // automated value is shown (the controls show the Song's value, which a hand move edits, as in FL). Returns true
     // when a shown value changed (the editors then repaint their automated controls).
-    bool update (const Song& song, std::uint64_t songStamp, double tick, bool playing)
+    // Round 190qp: `released` = the controls moved by hand that leave their automation for now (AudioEngine's released
+    // targets: FL until the next Play, Live's override until Re-Enable Automation); they show their own value, as the
+    // renderer plays it (before, the control was drawn on its automation while the sound held the hand-set value).
+    bool update (const Song& song, std::uint64_t songStamp, double tick, bool playing, const std::vector<AutomationTarget>* released = nullptr)
     {
         if (songStamp != builtStamp || ! built)
         {
@@ -52,6 +56,10 @@ public:
                 else
                     it->value = v;
             }
+            if (released != nullptr && ! released->empty())
+                next.erase (std::remove_if (next.begin(), next.end(),
+                                            [released] (const Entry& e) { return std::find (released->begin(), released->end(), e.target) != released->end(); }),
+                            next.end());
             std::sort (next.begin(), next.end(), [] (const Entry& a, const Entry& b) { return less (a.target, b.target); });
         }
 
@@ -96,12 +104,20 @@ private:
         AutomationTarget target;
         float value = 0.0f;
     };
+    // round 190qp: an automation clip linked to several controls (FL's target links, Automation::links, round 190ov) shows
+    // on each of them, its value through that link's formula and scale, as the renderer plays it (linkGroupValueAt)
+    struct Through
+    {
+        int automation = -1, link = -1;
+        linkformula::Formula formula;
+    };
     struct Source
     {
         AutomationTarget target;
         int automation = -1;       // song.automations index, or -1 for a pattern event lane
         std::vector<int> clips;    // automation: its clips, sorted by start
         int pattern = -1, lane = -1;
+        std::vector<Through> links; // (round 190qp) the linked automations among `clips`' and their link on `target`
     };
 
     static bool less (const AutomationTarget& a, const AutomationTarget& b) noexcept
@@ -143,18 +159,30 @@ private:
                 continue;
             if (triggered)
                 anyTriggered = true;
-            // one source per target: its clips play as one (issue #97, the renderer's rule)
-            const auto same = std::find_if (sources.begin(), sources.end(), [&] (const Source& s) { return s.target == automation.target; });
-            if (same != sources.end())
-            {
+            // one source per target: its clips play as one (issue #97, the renderer's rule); round 190qp: a clip linked to
+            // several controls (FL's target links) is a clip of each of them, through its link
+            const auto add = [&] (const AutomationTarget& target, int link) {
+                if (target.kind == AutomationTargetKind::none || target.kind == AutomationTargetKind::tempo)
+                    return;
+                auto same = std::find_if (sources.begin(), sources.end(), [&] (const Source& s) { return s.target == target; });
+                if (same == sources.end())
+                {
+                    Source s;
+                    s.target = target;
+                    s.automation = a;
+                    same = sources.insert (sources.end(), std::move (s));
+                }
                 same->clips.insert (same->clips.end(), list.begin(), list.end());
-                continue;
-            }
-            Source s;
-            s.target = automation.target;
-            s.automation = a;
-            s.clips = std::move (list);
-            sources.push_back (std::move (s));
+                if (link >= 0)
+                    same->links.push_back ({ a, link, linkformula::Formula::compile (automation.links[(std::size_t) link].formula) });
+            };
+            if (automation.links.empty())
+                add (automation.target, -1);
+            else
+                for (int l = 0; l < (int) automation.links.size(); ++l)
+                    if (std::none_of (automation.links.begin(), automation.links.begin() + l,
+                                      [&] (const Automation::Link& x) { return x.target == automation.links[(std::size_t) l].target; }))
+                        add (automation.links[(std::size_t) l].target, l);
         }
         for (auto& list : patternClips)
             std::sort (list.begin(), list.end(), byStart);
@@ -213,10 +241,19 @@ private:
             if (trigger.second >= 0.0 && (playing == nullptr || trigger.second > (double) playing->start)
                 && (playing != nullptr || ended == nullptr || trigger.second > (double) ended->start))
                 return trigger.first;
+            // (round 190qp: a linked clip's value through its link to this target)
+            const auto through = [&s, &song] (int automation, float v) {
+                for (const auto& l : s.links)
+                    if (l.automation == automation)
+                        return song.automations[(std::size_t) automation].links[(std::size_t) l.link].scaled (l.formula.map (v));
+                return v;
+            };
             if (playing != nullptr)
-                return song.automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick);
+                return through (playing->automation,
+                                song.automations[(std::size_t) playing->automation].playAt (tick - (double) playing->start + (double) playing->offset, tick));
             if (ended != nullptr)
-                return song.automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end());
+                return through (ended->automation,
+                                song.automations[(std::size_t) ended->automation].playAt ((double) (ended->length + ended->offset), (double) ended->end()));
             return none; // before the first clip: the control's own value
         }
 

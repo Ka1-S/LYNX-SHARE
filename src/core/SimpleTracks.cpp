@@ -874,6 +874,18 @@ int patternOf (const Song& song, int track)
     return first != nullptr ? first->pattern : -1;
 }
 
+int editorPattern (const Song& song, int track)
+{
+    const auto first = patternOf (song, track);
+    if (first < 0)
+        return -1;
+    const auto current = song.currentPattern;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.track == track && c.pattern == current)
+            return current;
+    return first;
+}
+
 int ensurePattern (Song& song, int track, int bars, bool* made)
 {
     if (made != nullptr)

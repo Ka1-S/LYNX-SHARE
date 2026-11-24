@@ -12730,3 +12730,9 @@ countries: cn sg
 "Number of effect slots on new mixer tracks" = "新混音器轨道的效果槽位数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每个插入通道有 10 个效果槽位：第 10 个之后槽位中的效果将被省略：{0}"
 "This insert has no free slot ({0} effects)" = "此插入通道没有空槽（{0} 个效果）"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "导出所去的文件夹：{0}。文件名中含有文件夹（/）时，“导出...”会直接写到那里，不再询问文件"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI 片段：[LMB] 单击或拖动在此轨道上绘制一个  [2xLMB] 在片段上：在下方编辑其音符"
+"Move this rule up (the first matching rule wins)" = "上移此规则（第一个匹配的规则生效）"
+"Move this rule down" = "下移此规则"

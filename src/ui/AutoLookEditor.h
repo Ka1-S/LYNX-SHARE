@@ -10,7 +10,7 @@
 
 // Issue #239 (round 190od, LYNX extra): Settings › LYNX extras › "Automatic colors and icons": the user's rules
 // (core/AutoLook.h) — the switch, one row per rule (how the name is compared, the text, the colour, the icon, what it
-// colours), Add rule and Apply to this project. Every change is saved at once (autolookui::save).
+// colours, move up / down, remove), Add rule and Apply to this project. Every change is saved at once (autolookui::save).
 namespace lynx
 {
 class AudioEngine;
@@ -42,6 +42,8 @@ private:
     struct Row;
     void changed (bool relayout = false);
     void addRow (int index);
+    void moveRule (int index, int by); // round 190qo: up (−1) / down (+1) the list
+    int noteHeight (int width) const;
 
     AudioEngine& engine;
     bool persistent;
@@ -49,6 +51,6 @@ private:
     juce::Label note, status;
     juce::TextButton addButton, applyButton;
     std::vector<std::unique_ptr<Row>> rows;
-    static constexpr int rowHeight = 30, gap = 6;
+    static constexpr int rowHeight = 30, gap = 6, noteIndent = 27;
 };
 } // namespace lynx

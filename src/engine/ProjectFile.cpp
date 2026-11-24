@@ -530,6 +530,8 @@ juce::var flOriginToVar (const FlOrigin& origin)
     if (! origin.state.empty())
         o->setProperty ("state", juce::Base64::toBase64 (origin.state.data(), origin.state.size()));
     o->setProperty ("print", juce::String::toHexString ((juce::int64) origin.fingerprint));
+    if (origin.trialSaved) // (issue #282: FL's trial mark of the plugin)
+        o->setProperty ("trial", true);
     return juce::var (o.release());
 }
 
@@ -546,6 +548,7 @@ FlOrigin flOriginFromVar (const juce::var& v)
             origin.state.assign ((const std::uint8_t*) raw.getData(), (const std::uint8_t*) raw.getData() + raw.getDataSize());
     }
     origin.fingerprint = (std::uint64_t) v["print"].toString().getHexValue64();
+    origin.trialSaved = (bool) v.getProperty ("trial", false);
     return origin;
 }
 

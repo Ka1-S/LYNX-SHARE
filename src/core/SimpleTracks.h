@@ -122,6 +122,9 @@ Result addTrack (Song& song, const Request& request);
 int ensurePattern (Song& song, int track, int bars = 4, bool* made = nullptr);
 // The pattern ensurePattern would give without making one (-1: none yet)
 int patternOf (const Song& song, int track);
+// Round 190qp: the pattern the dock's Editor tab shows: the current pattern while a pattern clip on the track plays it
+// (a double-clicked clip, a clip drawn there), else patternOf. -1 as patternOf.
+int editorPattern (const Song& song, int track);
 
 // Renames a Simple track everywhere: the Playlist track, its insert and its channel (Drums: its group and its pattern
 // when they carry the old name). An empty name is ignored. Returns the name given (made unique among the tracks).

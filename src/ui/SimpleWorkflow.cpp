@@ -1008,6 +1008,27 @@ void SimpleWorkflow::showEffectsOfInsert (int insert)
         dock->setTab (SimpleDock::Tab::effects);
 }
 
+bool SimpleWorkflow::openNotesOf (int track)
+{
+    if (! active)
+        return false;
+    const auto kind = simpletracks::kindOf (engine.getSong(), track);
+    if (kind != simpletracks::Kind::instrument && kind != simpletracks::Kind::sampler)
+        return false;
+    dockTrack = track;
+    if (! SimpleDock::shownSetting)
+    {
+        SimpleDock::shownSetting = true;
+        if (host.settingsChanged)
+            host.settingsChanged();
+    }
+    updateDock();
+    if (dock == nullptr)
+        return false;
+    dock->setTab (SimpleDock::Tab::editor);
+    return true;
+}
+
 void SimpleWorkflow::toggleDock()
 {
     SimpleDock::shownSetting = ! SimpleDock::shownSetting;

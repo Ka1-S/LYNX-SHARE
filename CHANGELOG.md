@@ -10,6 +10,35 @@ The short version of each release. The full notes, with measurements, known issu
   "+" tab under it adds a slot, and Options › General settings sets how many slots new mixer tracks get. PR #260 by
   @codewithamoako.
 
+## 0.1.31.1 alpha — fixes
+
+A hotfix for 0.1.31.
+
+- Fixed: automation of FL Studio projects on the controls. An FL automation clip linked to several controls, or to one
+  through a mapping formula (imported this way since 0.1.31), now moves every control it drives, by its formula, in the
+  Mixer (faders, send knobs), the plugin windows and the Device view; before, only the first control showed it, and
+  with the clip's raw value (#253, Discord).
+- Fixed: a control you move by hand while the song plays shows the value you gave it for as long as it stays off its
+  automation (until the next Play in the Pattern layout, until *Re-Enable Automation* in the Clip-launch layout), as you
+  hear it; before, it was drawn back on its automation while the sound kept your value.
+- Fixed: Device view cards follow automation while the song plays, as the plugin's own window and the Mixer do (Discord).
+- Fixed: in the Clip-launch layout, choosing a track in the Arrangement (its header, a clip or a spot of its lane)
+  shows that track's devices in the Device view, as in Live (Discord).
+- Fixed: docked plugin and channel windows opened a little further away each time, until after a few clicks they opened
+  outside the main window and seemed not to open at all (Discord).
+- Fixed: Export audio with a folder in the file name (`/BOUNCE/$project...`) writes there without asking for the file
+  again; a new *Folder...* button picks the export folder, and a second export no longer goes into `BOUNCE/BOUNCE` (#215).
+- Fixed: in Track-only mode and in the Simple layout, a double-click on a clip of an instrument track opens that
+  instrument's notes even when the clip is empty (it opened the Channel rack); the Simple layout's editor follows the
+  clip you open, and a hint on an empty instrument track says how to draw a MIDI clip (Discord).
+- Fixed: Automatic colors and icons let you add only one rule (#239).
+- Fixed: right-clicking the hint bar crashed LYNX (#269).
+- Fixed: markers couldn't be deleted (#281).
+- Fixed: two LYNX entries in the Linux app menu (#278).
+- Fixed: a Patcher used as an instrument came back in FL as an empty synth.
+- Changed: plugins FL saved as a trial keep FL's trial mark on export (#282).
+- Fixed: 0.1.31 used ~7 MB more memory and more CPU right after start-up.
+
 ## 0.1.31 alpha
 
 **Performance**

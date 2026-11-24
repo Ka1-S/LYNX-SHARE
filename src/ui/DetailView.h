@@ -141,6 +141,7 @@ public:
     juce::Rectangle<int> windowButtonForCheck (int card) const; // (issue #191: in this component's coordinates)
     bool pressWindowButtonForCheck (int card); // (--zorder191test: the button's action when an editor covers it on screen)
     int chainInsertForCheck() const;
+    double knobValueForCheck (int card, int knob) const; // (hotfix 0.1.31.1: the value a card's knob shows; -100: none)
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;
     void toggleFoldForCheck (int card);

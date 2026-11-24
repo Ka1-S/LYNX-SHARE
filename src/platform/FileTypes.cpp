@@ -1,4 +1,5 @@
 #include "platform/FileTypes.h"
+#include "core/DesktopEntries.h"
 #include "platform/Package.h"
 #include "platform/Paths.h"
 
@@ -65,6 +66,25 @@ void refreshDesktopDatabases()
     runQuietly ({ "update-desktop-database", dataHome().getChildFile ("applications").getFullPathName() });
 }
 
+// Issue #278 (round 190qr): an entry another program made for this AppImage (Gear Lever, AppImageLauncher, appimaged:
+// their own .desktop file in the user's applications folder, pointing at the AppImage they keep), else none
+juce::File managerEntry (const juce::File& appImage)
+{
+    if (appImage == juce::File())
+        return {};
+    const auto path = appImage.getFullPathName().toStdString();
+    const auto folder = dataHome().getChildFile ("applications");
+    for (const auto& entry : juce::RangedDirectoryIterator (folder, false, "*.desktop", juce::File::findFiles))
+    {
+        const auto file = entry.getFile();
+        if (file == entryFile() || file.getSize() > 64 * 1024)
+            continue;
+        if (desktopentries::startsAppImage (file.loadFileAsString().toStdString(), path))
+            return file;
+    }
+    return {};
+}
+
 bool writeEntry (const juce::File& appImage)
 {
     auto text = appDir().getChildFile (entryName).loadFileAsString();
@@ -101,6 +121,15 @@ bool runningAsAppImage()
    #endif
 }
 
+bool appImageInMenuByManager()
+{
+   #if JUCE_LINUX || JUCE_BSD
+    return managerEntry (appImageFile()) != juce::File();
+   #else
+    return false;
+   #endif
+}
+
 bool appImageMenuEntryInstalled()
 {
    #if JUCE_LINUX || JUCE_BSD
@@ -113,8 +142,8 @@ bool appImageMenuEntryInstalled()
 bool setAppImageMenuEntry (bool on)
 {
    #if JUCE_LINUX || JUCE_BSD
-    if (on)
-        return runningAsAppImage() && writeEntry (appImageFile());
+    if (on) // (issue #278: an AppImage manager's entry already puts this AppImage in the menu: no second one)
+        return runningAsAppImage() && (appImageInMenuByManager() || writeEntry (appImageFile()));
     if (! appImageMenuEntryInstalled())
         return true;
     entryFile().deleteFile();
@@ -133,10 +162,20 @@ bool setAppImageMenuEntry (bool on)
 void registerFileTypes()
 {
    #if JUCE_LINUX || JUCE_BSD
-    // the AppImage moved or was replaced (AppImageUpdate keeps the old file name only with -O): follow it
-    if (const auto appImage = appImageFile(); appImage != juce::File() && appImageMenuEntryInstalled()
-        && ! entryFile().loadFileAsString().contains ("TryExec=" + appImage.getFullPathName() + "\n"))
-        writeEntry (appImage);
+    // issue #278 (round 190qr): an AppImage manager (Gear Lever, AppImageLauncher...) put this AppImage in the menu with
+    // an entry of its own: LYNX's entry goes, or the menu lists LYNX SHARE twice (the type file and the icon stay: the
+    // manager's entry is a copy of LYNX's own, MimeType included). Else, the AppImage moved or was replaced
+    // (AppImageUpdate keeps the old file name only with -O): follow it.
+    if (const auto appImage = appImageFile(); appImage != juce::File() && appImageMenuEntryInstalled())
+    {
+        if (managerEntry (appImage) != juce::File())
+        {
+            entryFile().deleteFile();
+            refreshDesktopDatabases();
+        }
+        else if (! entryFile().loadFileAsString().contains ("TryExec=" + appImage.getFullPathName() + "\n"))
+            writeEntry (appImage);
+    }
    #endif
 
    #if JUCE_WINDOWS

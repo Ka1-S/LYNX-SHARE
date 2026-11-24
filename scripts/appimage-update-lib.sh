@@ -23,6 +23,13 @@ update_target()
     esac
 }
 
+# Round 190qp: where the arm64 address points now (update_target's rules for UPDATE_ADDRESS_AARCH64). deploy-site.sh rewrote
+# update/.htaccess with the x86_64 redirect only, so every site deploy after 0.1.31 left the arm64 address at 404.
+update_target_aarch64()
+{
+    UPDATE_ADDRESS="$UPDATE_ADDRESS_AARCH64" update_target
+}
+
 # The tag in a target URL.
 update_target_tag() { sed -n 's#.*/releases/download/\([^/]*\)/.*#\1#p' <<<"$1"; }
 

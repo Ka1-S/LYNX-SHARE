@@ -374,16 +374,25 @@ juce::PopupMenu HintBar::copyMenu() const
     return menu;
 }
 
+juce::PopupMenu HintBar::rightClickMenu() const
+{
+    auto menu = onMenu != nullptr ? onMenu() : juce::PopupMenu();
+    if (menu.getNumItems() > 0)
+        menu.addSeparator();
+    // issue #269 (0.1.30 crashed on every right-click of the bar): the copy items are walked from a named menu. JUCE's
+    // iterator keeps a pointer to the menu it walks; 0.1.30 gave it copyMenu's temporary result, destroyed at the end of
+    // the declaration, so each Item copy read freed memory (a segfault in String's copy)
+    const auto copy = copyMenu();
+    for (juce::PopupMenu::MenuItemIterator it (copy); it.next();)
+        menu.addItem (it.getItem());
+    return menu;
+}
+
 void HintBar::mouseDown (const juce::MouseEvent& e)
 {
     if (! e.mods.isPopupMenu())
         return;
-    auto menu = onMenu != nullptr ? onMenu() : juce::PopupMenu();
-    if (menu.getNumItems() > 0)
-        menu.addSeparator();
-    for (juce::PopupMenu::MenuItemIterator it (copyMenu()); it.next();)
-        menu.addItem (it.getItem());
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    rightClickMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 // rollup 0.1.30 step 13 (CI paint gate, stream playlist +5 %): the laid-out text kept between paints

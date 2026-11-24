@@ -267,6 +267,20 @@ void addJumpToNextBar (Song& song, std::int64_t tick)
     }
 }
 
+int deleteInSelection (Song& song)
+{
+    auto& list = song.markers();
+    const auto before = list.size();
+    if (song.hasLoop())
+    {
+        const auto from = song.loopStart, to = song.loopEnd;
+        std::erase_if (list, [from, to] (const Marker& m) { return m.tick >= from && m.tick < to; });
+    }
+    else
+        list.clear();
+    return (int) (before - list.size());
+}
+
 void changeToMarkerLoop (Song& song)
 {
     if (! song.hasLoop())

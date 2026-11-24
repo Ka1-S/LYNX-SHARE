@@ -62,7 +62,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p' CMakeLists.txt)"
           [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             tag="${GITHUB_REF_NAME#v}"
@@ -262,7 +262,8 @@ jobs:
           $nsis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
           if (-not $nsis) { $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe" }
           if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress; $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe" }
-          & $nsis -V2 -INPUTCHARSET UTF8 "-DVERSION=$env:VERSION" "-DSTAGE=$PWD\pkg\$name" "-DOUTFILE=$PWD\dist\LYNX-$env:LABEL-setup-x64.exe" `
+          $vi = if (($env:VERSION -split '\.').Count -ge 4) { $env:VERSION } else { "$env:VERSION.0" }  # (a hotfix: 0.1.31.1)
+          & $nsis -V2 -INPUTCHARSET UTF8 "-DVERSION=$env:VERSION" "-DVIVERSION=$vi" "-DSTAGE=$PWD\pkg\$name" "-DOUTFILE=$PWD\dist\LYNX-$env:LABEL-setup-x64.exe" `
             "-DICON=$PWD\resources\LYNX.ico" resources\installer\LYNX.nsi
           if ($LASTEXITCODE -ne 0) { throw "makensis failed ($LASTEXITCODE)" }
           # the installer installs and uninstalls cleanly (per user, into a scratch folder)

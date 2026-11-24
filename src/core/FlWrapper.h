@@ -70,6 +70,12 @@ constexpr int withFlDetached (int recordFlags, bool detached) noexcept
 {
     return detached ? recordFlags | flDetachedFlag : recordFlags & ~flDetachedFlag;
 }
+// 0x80 = the plugin was a trial when FL saved it (its FPF_DemoVersion info flag; FL writes the bit on plugin records
+// only). An FL in which that plugin is still a trial does not load its settings: it locks the plugin ("The plugin is a
+// limited trial version and will not load these settings until you buy it"); an FL that owns it loads them. Issue #282,
+// round 190qs [STATIC FLEngine 2026: docs/analise/REA_rodada190qs.md].
+constexpr int flTrialSavedFlag = 0x80;
+constexpr bool flTrialSaved (int recordFlags) noexcept { return recordFlags >= 0 && (recordFlags & flTrialSavedFlag) != 0; }
 
 // FL's plugin wrapper settings page (the wrapper's gear tab; REA round 146a: option names and hints from FLEngine's
 // string pool, e.g. "Use fixed size buffers", "|Allow plugin to be multi-threaded by FL Studio",

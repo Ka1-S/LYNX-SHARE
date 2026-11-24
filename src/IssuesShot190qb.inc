@@ -161,7 +161,8 @@
                                                   preview, resolved);
             report.add ("preview: " + preview);
             check ("215_folder_in_the_name", resolved.startsWith ("BOUNCE/LYNX SHARE_D20-M11-Y2026_130-BPM_") && resolved.endsWith ("Hz-24bit"), resolved);
-            check ("215_preview_shows_the_folder", preview.contains ("BOUNCE/LYNX SHARE_D20-M11-Y2026_130-BPM_"), preview);
+            // (round 190qp: the line shows the whole path now, with the system's separator)
+            check ("215_preview_shows_the_folder", preview.replaceCharacter ('\\', '/').contains ("BOUNCE/LYNX SHARE_D20-M11-Y2026_130-BPM_"), preview);
             savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.0f), prefix + "-215-folder-name.png");
             savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.5f), prefix + "-215-folder-name@150.png");
             auto nested = makeExportPanelWithName (engine, "AC/DC", "Bounces/$year/$project", when, preview, resolved);

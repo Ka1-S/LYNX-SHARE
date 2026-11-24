@@ -1,4 +1,13 @@
 {
+"u.0.1.31.1.t": "Korrekturen für 0.1.31",
+"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 behebt, was ihr zu 0.1.31 gemeldet habt: Automation von FL-Projekten auf den Reglern, Plugin-Fenster, die sich nicht mehr öffneten, die Device-Ansicht, Export mit einem Ordner im Dateinamen, Clips auf Instrumentenspuren, einen Absturz in der Hinweisleiste und den Speicher beim Start.",
+"u.0.1.31.1.f0": "FL-Automationsclips, die mehrere Regler steuern oder einen über eine Formel, bewegen jeden gesteuerten Regler im Mixer, in den Plugin-Fenstern und in der Device-Ansicht; ein von Hand bewegter Regler zeigt den Wert, den du hörst (#253).",
+"u.0.1.31.1.f1": "Angedockte Plugin- und Kanalfenster öffnen sich wieder dort, wo sie waren, statt nach ein paar Klicks aus dem Hauptfenster zu wandern.",
+"u.0.1.31.1.f2": "Clip-Launch-Layout: Eine im Arrangement gewählte Spur zeigt ihre Geräte, und die Regler der Device-Ansicht folgen der Automation.",
+"u.0.1.31.1.f3": "Audio-Export mit einem Ordner im Dateinamen schreibt dorthin, ohne erneut zu fragen (#215); Automatische Farben und Icons nehmen mehr als eine Regel an (#239); ein Rechtsklick auf die Hinweisleiste lässt LYNX nicht mehr abstürzen (#269).",
+"u.0.1.31.1.f4": "Nur-Spuren-Modus und Simple-Layout: Ein Doppelklick auf einen leeren Clip einer Instrumentenspur öffnet seine Noten.",
+"u.0.1.31.1.f5": "0.1.31 brauchte direkt nach dem Start ~7 MB mehr Speicher und mehr CPU.",
+"u.0.1.31.1.k0": "Mit 0.1.31 gemeldete LYNX-ASIO-Probleme ließen sich noch nicht nachstellen; Details helfen (Hilfe › Problem melden...).",
 "u.0.1.31.t": "Ein eingebauter Tracker, LYNX Model, JSFX, Linux arm64, zwei Projekte nebeneinander und vieles mehr",
 "u.0.1.31.s": "LYNX SHARE 0.1.31 bringt einen eingebauten Tracker mit Import von Tracker-Modulen, LYNX Model (physikalische Modelle von Schlagstabinstrumenten), JSFX-Skripte, Linux-arm64-Builds, eine Willkommenskarte und eine Startseite, Search actions für jeden Befehl, zwei Projekte nebeneinander mit Kopieren und Einfügen dazwischen, eine Abschnittsspur, eine Akkordspur mit Smart Tempo, Spurversionen, Automations-Schreibmodi, Capture automation und Modulatoren für jeden Regler, FL-Studio-Mobile-Export als .flm, die Rack-Devices von Live direkt in der Ansicht mit einer Macro Map und Solo / Cue, ARA auf einem Mixer-Insert, ein Plugin-Paket mit 39 Plugins (auch als LV2 unter Linux und als 20-MB-.7z unter Windows) und Korrekturen für rund 30 GitHub-Issues.",
 "u.0.1.31.n0": "<strong>Tracker</strong>: Ansicht › Tracker (Shift+F7) zeigt die Noten eines Patterns als Zeilen und Kanäle und bearbeitet sie auf Tracker-Art, und Tracker-Module (.mod, .xm, .s3m, .it) öffnen sich mit ihren Samples, Patterns und ihrem Tempo.",

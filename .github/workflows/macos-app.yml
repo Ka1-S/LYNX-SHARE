@@ -53,7 +53,7 @@ jobs:
           INPUT_LABEL: ${{ inputs.label }}
           INPUT_REF: ${{ inputs.ref }}
         run: |
-          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p' CMakeLists.txt)"
           [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
           sha="$(git rev-parse HEAD)"
           if [[ -n "$INPUT_LABEL" ]]; then label="$INPUT_LABEL"

@@ -1,4 +1,13 @@
 {
+"u.0.1.31.1.t": "Perbaikan untuk 0.1.31",
+"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 memperbaiki yang kamu laporkan di 0.1.31: automasi proyek FL pada kontrol, jendela plugin yang berhenti terbuka, tampilan Device, ekspor dengan folder di nama file, klip di track instrumen, crash di bilah petunjuk, dan memori saat mulai.",
+"u.0.1.31.1.f0": "Klip automasi FL yang menggerakkan beberapa kontrol, atau satu kontrol lewat formula, kini menggerakkan setiap kontrolnya di mixer, jendela plugin, dan tampilan Device; kontrol yang digeser dengan tangan menampilkan nilai yang terdengar (#253).",
+"u.0.1.31.1.f1": "Jendela plugin dan channel yang di-dock terbuka lagi di tempatnya, tidak bergeser keluar dari jendela utama setelah beberapa klik.",
+"u.0.1.31.1.f2": "Tata letak Clip-launch: memilih track di Arrangement menampilkan device-nya, dan kenop tampilan Device mengikuti automasi.",
+"u.0.1.31.1.f3": "Ekspor audio dengan folder di nama file langsung menulis ke sana (#215); Warna dan ikon otomatis menerima lebih dari satu aturan (#239); klik kanan pada bilah petunjuk tidak lagi membuat LYNX crash (#269).",
+"u.0.1.31.1.f4": "Mode hanya track dan tata letak Simple: klik ganda pada klip kosong di track instrumen membuka not-notnya.",
+"u.0.1.31.1.f5": "0.1.31 memakai ~7 MB memori dan CPU lebih banyak tepat setelah mulai.",
+"u.0.1.31.1.k0": "Masalah LYNX ASIO yang dilaporkan di 0.1.31 belum bisa direproduksi; detail akan membantu (Bantuan › Laporkan masalah...).",
 "u.0.1.31.t": "Tracker bawaan, LYNX Model, JSFX, Linux arm64, dua proyek berdampingan, dan banyak lagi",
 "u.0.1.31.s": "LYNX SHARE 0.1.31 menambahkan Tracker bawaan dengan impor modul tracker, LYNX Model (model fisik instrumen mallet), skrip JSFX, build Linux arm64, kartu sambutan dan halaman awal, Search actions untuk setiap perintah, dua proyek berdampingan dengan salin dan tempel di antaranya, lajur bagian, lajur akor dengan Smart Tempo, versi trek, mode tulis otomasi, Capture automation dan modulator untuk knob apa pun, ekspor .flm untuk FL Studio Mobile, perangkat rack Live secara inline dengan Macro Map dan Solo / Cue, ARA pada insert mixer, paket plugin berisi 39 plugin (juga LV2 di Linux, dan .7z 20 MB di Windows), serta perbaikan untuk sekitar 30 isu GitHub.",
 "u.0.1.31.n0": "<strong>Tracker</strong>: Tampilan › Tracker (Shift+F7) menampilkan not sebuah pattern sebagai baris dan channel dan menyuntingnya dengan cara tracker, dan modul tracker (.mod, .xm, .s3m, .it) terbuka lengkap dengan sample, pattern, dan tempo-nya.",

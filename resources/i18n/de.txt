@@ -12730,3 +12730,9 @@ countries: de at ch li lu
 "Number of effect slots on new mixer tracks" = "Anzahl der Effekt-Slots neuer Mixer-Spuren"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Diese Version hat 10 Effekt-Slots pro Insert: Die Effekte in den Slots nach Slot 10 fallen weg: {0}"
 "This insert has no free slot ({0} effects)" = "Dieser Insert hat keinen freien Slot ({0} Effekte)"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "Der Ordner, in den exportiert wird: {0}. Mit einem Ordner im Dateinamen (ein /) schreibt Exportieren... dorthin, ohne nach der Datei zu fragen"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI-Clip: [LMB] klicken oder ziehen zeichnet einen auf dieser Spur  [2xLMB] auf einem Clip: seine Noten unten bearbeiten"
+"Move this rule up (the first matching rule wins)" = "Diese Regel nach oben verschieben (die erste passende Regel gilt)"
+"Move this rule down" = "Diese Regel nach unten verschieben"

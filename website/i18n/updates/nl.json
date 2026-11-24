@@ -1,4 +1,13 @@
 {
+"u.0.1.31.1.t": "Oplossingen voor 0.1.31",
+"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 lost op wat jullie over 0.1.31 meldden: automatisering van FL-projecten op de regelaars, pluginvensters die niet meer opengingen, de Device-weergave, exporteren met een map in de bestandsnaam, clips op instrumentsporen, een crash in de hintbalk en het geheugen bij het opstarten.",
+"u.0.1.31.1.f0": "FL-automatiseringsclips die meerdere regelaars sturen, of één via een formule, bewegen elke regelaar in de mixer, de pluginvensters en de Device-weergave; een met de hand bewogen regelaar toont de waarde die je hoort (#253).",
+"u.0.1.31.1.f1": "Gedockte plugin- en kanaalvensters openen weer waar ze waren, in plaats van na een paar klikken uit het hoofdvenster te schuiven.",
+"u.0.1.31.1.f2": "Clip-launch-indeling: een spoor kiezen in het Arrangement toont zijn devices, en de knoppen van de Device-weergave volgen de automatisering.",
+"u.0.1.31.1.f3": "Audio exporteren met een map in de bestandsnaam schrijft daarheen zonder opnieuw te vragen (#215); Automatische kleuren en pictogrammen nemen meer dan één regel aan (#239); rechtsklikken op de hintbalk laat LYNX niet meer crashen (#269).",
+"u.0.1.31.1.f4": "Alleen-sporen-modus en Simple-indeling: dubbelklikken op een lege clip van een instrumentspoor opent de noten.",
+"u.0.1.31.1.f5": "0.1.31 gebruikte vlak na het opstarten ~7 MB meer geheugen en meer CPU.",
+"u.0.1.31.1.k0": "LYNX ASIO-problemen die bij 0.1.31 zijn gemeld, konden nog niet worden nagebootst; details helpen (Help › Een probleem melden...).",
 "u.0.1.31.t": "Een ingebouwde Tracker, LYNX Model, JSFX, Linux arm64, twee projecten naast elkaar en nog veel meer",
 "u.0.1.31.s": "LYNX SHARE 0.1.31 voegt een ingebouwde Tracker toe met import van trackermodules, LYNX Model (fysieke modellen van mallet-instrumenten), JSFX-scripts, Linux arm64-builds, een welkomstkaart en een startpagina, Acties zoeken voor elk commando, twee projecten naast elkaar met kopiëren en plakken ertussen, een Sectiebaan, een Akkoordspoor met Smart Tempo, Trackversies, schrijfmodi voor automatisering, Automatisering vastleggen en modulators voor elke knop, FL Studio Mobile .flm-export, de rackdevices van Live inline met een Macro Map en Solo / Cue, ARA op een mixer-insert, een pluginpakket van 39 plugins (op Linux ook als LV2, en op Windows als .7z van 20 MB) en oplossingen voor ongeveer 30 GitHub-issues.",
 "u.0.1.31.n0": "<strong>Tracker</strong>: Beeld › Tracker (Shift+F7) toont de noten van een pattern als rijen en kanalen en bewerkt ze op de trackermanier, en trackermodules (.mod, .xm, .s3m, .it) openen met hun samples, patterns en tempo.",

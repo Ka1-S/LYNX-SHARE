@@ -5336,7 +5336,7 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
     {
         automationDisplayAtMs = now;
         const auto playing = transport.playing.load (std::memory_order_relaxed);
-        automationDisplay.update (song, songStamp, estimatedPositionNow(), playing);
+        automationDisplay.update (song, songStamp, estimatedPositionNow(), playing, &releasedTargets); // (round 190qp: moved by hand)
         automationDisplayCostMs = juce::Time::getMillisecondCounterHiRes() - now;
     }
     return automationDisplay;

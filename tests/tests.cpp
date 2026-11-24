@@ -17751,6 +17751,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LayoutStyle184aTests.inc"
 #include "Rack116Tests.inc"
 #include "Issue116DetachedTests.inc"
+#include "Issue282TrialMarkTests.inc" // round 190qs: issue #282, FL's trial mark and the FL generators' round trip
 #include "Trial187bTests.inc"
 #include "ProjectKey184aTests.inc"
 #include "KeyGuess184aTests.inc"
@@ -18114,3 +18115,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
 #include "Repeats190pmTests.inc" // round 190pm (0.1.32): Note Repeats and Conditions (research190oe P19)
 #include "MixerQol190qhTests.inc" // round 190qh (0.1.32 R5): Mixer QoL, FL's PDC rule for a switched-off slot (D2-MX9)
+#include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
+#include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
+#include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
+#include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)

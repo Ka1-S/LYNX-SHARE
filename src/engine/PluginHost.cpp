@@ -2933,7 +2933,7 @@ int PluginHost::scanJsfx()
                     known.removeType (d);
                     removed = true;
                 }
-            const auto found = scanFiles (files, {});
+            const auto found = scanFiles (files, {}, false); // (round 190ql: nothing new: plugins.xml stays as it is)
             if (removed && found == 0)
                 save();
             return found;
@@ -2941,7 +2941,7 @@ int PluginHost::scanJsfx()
     return 0;
 }
 
-int PluginHost::scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress)
+int PluginHost::scanFiles (const juce::StringArray& files, const std::function<bool (float, const juce::String&)>& progress, bool saveUnchanged)
 {
     const std::scoped_lock lock (scanLock);
     stopScan = false;
@@ -2986,7 +2986,8 @@ int PluginHost::scanFiles (const juce::StringArray& files, const std::function<b
             unsaved = false;
         }
     }
-    save();
+    if (unsaved || saveUnchanged)
+        save();
     return known.getNumTypes() - before;
 }
 

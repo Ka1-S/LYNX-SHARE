@@ -73,6 +73,7 @@
 #include "ui/WindowClipboard.h"
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
+#include "core/TrackOnly.h"
 #include "core/RegionLoop.h"
 #include "core/QuickRender.h"
 #include "core/TempoDetect.h"
@@ -6535,7 +6536,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         switch (ruler::press (press))
         {
             case ruler::Action::markerMenu:
-                showRulerMenu (e.x);
+                showRulerMenu (e.x, e.y);
                 return;
 
             case ruler::Action::zoomRange:
@@ -6614,6 +6615,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     bool rightEdge = false, leftEdge = false;
     const auto hit = clipAt (e.x, e.y, rightEdge, leftEdge);
     const auto tool = tools.getTool();
+    // hotfix 0.1.31.1: the Clip-launch Arrangement (Live) — a click on a clip or on a lane selects that track (the Device
+    // View follows; the hook is the main window's, which acts only while a Device View exists)
+    if (onArrangementTrackChosen && ! flmods::ctrl (e.mods))
+        chooseArrangementTrack (hit >= 0 ? engine.getSong().playlist[(std::size_t) hit].track : yToTrack (e.y));
 
     // Performance mode (round 165m): while the song plays, a click on a clip of the performance zone launches it (the
     // button's release is the release of the Hold modes) and a right-click stops its track; Ctrl / Alt edit as usual
@@ -8302,7 +8307,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     else if (drag == Drag::loop && rulerMenuOnClick && ruler::isClick (e.getDistanceFromDragStartX(), e.getDistanceFromDragStartY()))
     {
         rulerMenuOnClick = false;
-        showRulerMenu (e.getMouseDownX());
+        showRulerMenu (e.getMouseDownX(), e.getMouseDownY());
     }
     else if (drag == Drag::loop && rulerDoubleDrag && engine.getSong().hasLoop())
     {
@@ -10120,6 +10125,17 @@ void PlaylistComponent::followLinkedTrack (int track)
         insert = t.mixerTrack;
     if (insert > 0 && insert < (int) engine.getSong().mixer.size() && onLinkedMixerTrack)
         onLinkedMixerTrack (insert);
+    chooseArrangementTrack (track);
+}
+
+void PlaylistComponent::chooseArrangementTrack (int track)
+{
+    if (! onArrangementTrackChosen || track < 0 || track >= numTracks())
+        return;
+    if (projection.isChild (track)) // (an automation lane: its owner track)
+        track = projection.ownerOf (track);
+    if (track >= 0)
+        onArrangementTrackChosen (track);
 }
 
 std::vector<int> PlaylistComponent::bandTargets (int track) const
@@ -11024,14 +11040,15 @@ void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
                              true);
 }
 
-juce::PopupMenu PlaylistComponent::rulerMenu (int x)
+juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
 {
     const auto& song = engine.getSong();
     const auto tick = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
 
-    // marker near the click (up to 6 px)
-    int near = -1;
-    for (int i = 0; i < (int) song.markers().size(); ++i)
+    // the marker whose tag was pressed (issue #281, round 190qr: the whole tag, as FL; it was only 6 px around the
+    // marker's line, so a right-click on its name gave the menu without "Delete"), else one near the click (up to 6 px)
+    int near = y >= 0 ? markerTagAt (x, y) : -1;
+    for (int i = 0; near < 0 && i < (int) song.markers().size(); ++i)
         if (std::abs (tickToX ((double) song.markers()[(std::size_t) i].tick) - x) <= 6.0)
             near = i;
 
@@ -11178,6 +11195,11 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
             editTempoMarker (sg.hasLoop() ? sg.loopStart : snap ((double) songPositionTick(), true), -1);
         });
         timeMarkers.addItem (tr ("Place loop") + "\tShift+T", [this] { runAction ("playlist.markerLoop"); });
+        // issue #281 (round 190qr): FL's Time markers › Delete, between Place loop and Change to marker loop
+        timeMarkers.addItem (tr ("Delete"), ! song.markers().empty(), false, [this] {
+            engine.editSong ([] (Song& s) { markers::deleteInSelection (s); });
+            repaint();
+        });
         timeMarkers.addItem (tr ("Change to marker loop"), song.hasLoop(), false, [this] {
             engine.editSong ([] (Song& s) { markers::changeToMarkerLoop (s); });
         });
@@ -11195,6 +11217,14 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
     {
         menu.addSeparator();
         menu.addSectionHeader (markerLabel (song.markers()[(std::size_t) near]));
+        // FL's marker menu (FL 2026, round 190qr shot 281-fl-marker-menu.png): the header, Delete, Rename..., ...
+        menu.addItem (tr ("Delete"), [this, near] {
+            engine.editSong ([near] (Song& s) {
+                if (near < (int) s.markers().size())
+                    s.markers().erase (s.markers().begin() + near);
+            });
+            repaint();
+        });
         menu.addItem (tr ("Rename marker..."), [this, near] { editMarkerName (0, near); });
         menu.addItem (tr ("Place loop (from this marker to the next)"), [this, near] {
             engine.editSong ([near] (Song& s) {
@@ -11234,12 +11264,6 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
                 });
             menu.addSubMenu (tr ("Marker action"), action);
         }
-        menu.addItem (tr ("Remove marker"), [this, near] {
-            engine.editSong ([near] (Song& s) {
-                if (near < (int) s.markers().size())
-                    s.markers().erase (s.markers().begin() + near);
-            });
-        });
     }
 
     if (song.hasLoop())
@@ -11288,9 +11312,9 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
     return menu;
 }
 
-void PlaylistComponent::showRulerMenu (int x)
+void PlaylistComponent::showRulerMenu (int x, int y)
 {
-    rulerMenu (x).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 // Round 190ol (P6): the Simple layout's "Change time signature here...": numerator 1-16, denominator 2 / 4 / 8 / 16, the
@@ -14689,6 +14713,10 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         if (projection.isChild (h.track))
             hint.text = tr ("Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)");
+        // round 190qp (Discord, 0.1.31: "not sure how to make a MIDI clip"): the Simple layout's instrument tracks say how
+        else if (simpleHeaders && brush.kind == ClipKind::pattern && h.track >= 0 && h.track < (int) song.playlistTracks.size()
+                 && song.playlistTracks[(std::size_t) h.track].mode == PlaylistTrackMode::instrument)
+            hint.text = tr ("MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below");
         else if (trackclips::owns (song, h.track) && brush.kind == ClipKind::pattern) // round 190ne
             hint.text = tr ("Track clips: [LMB] draw a new empty clip  [Shift] drag a clip: a unique copy  [Shift+L] drag: a linked copy  [Ctrl+Alt+B] linked copies");
         else if (pointerclick::on)
@@ -14869,6 +14897,18 @@ void PlaylistComponent::openClipSource (int hit, bool other)
     }
     else if (clip.kind == ClipKind::pattern)
     {
+        // round 190qp (Discord, 0.1.31): in Track-only mode and the Simple layout a clip on an instrument track opens its
+        // instrument's notes, empty or not (Alt: the other editor, as below). The Pattern layout keeps FL's rule.
+        if (! other && (trackonly::active() || simpleHeaders))
+            if (const auto channel = trackonly::pianoRollChannelOf (engine.getSong(), hit); channel >= 0)
+            {
+                engine.setSelectedChannel (channel);
+                if (onOpenTrackClipNotes)
+                    onOpenTrackClipNotes (clip.track);
+                else if (onOpenPianoRoll)
+                    onOpenPianoRoll();
+                return;
+            }
         auto pianoRoll = editPatternsIn == 2
                          || (editPatternsIn == 0 && clip.pattern < (int) engine.getSong().patterns.size()
                              && hasPianoRollNotes (engine.getSong().patterns[(std::size_t) clip.pattern]));

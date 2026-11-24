@@ -100,6 +100,7 @@
 #include "core/WavetableSynth.h" // (round 190oc: the copy for 0.1.30 self-test)
 #include "core/AutoLook.h" // (rollup 0.1.31 step 4: the copy for 0.1.30 self-test)
 #include "flp/Flp.h"
+#include "flp/FlpWrite.h" // round 190qs (issue #282 self-test)
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
 #include "core/PerfProjects.h"
@@ -1849,6 +1850,20 @@ public:
             return;
         }
 
+        if (args.contains ("--hotfixui190qp"))
+        {
+            // LYNX --hotfixui190qp <prefix> [--plugin file]... (hotfix 0.1.31.1, round 190qp): the Clip-launch Arrangement's
+            // track selection reaching the Device View, and channel / plugin windows opened and closed again and again
+            // (src/HotfixUi190qp.inc); <prefix>-checks.txt, result=OK
+            const auto i = args.indexOf ("--hotfixui190qp");
+            juce::StringArray plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            runHotfixUi190qp (args[i + 1].unquoted(), plugins);
+            return;
+        }
+
         if (args.contains ("--pertabshot259"))
         {
             // LYNX --pertabshot259 <prefix> [--plugin file]... [--shot-scale 1.5 --shot-suffix @150] (round 190pw, PR #259:
@@ -1978,6 +1993,17 @@ public:
             // sound, through the app's engine with render-ahead off and on (src/Issue258Test.inc; Transistor Bass needs
             // FL Studio, LYNX_FL_INSTALL on Linux)
             runIssue258Test (args[args.indexOf ("--issue258test") + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--autolive190qp"))
+        {
+            // LYNX --autolive190qp <project.flp|.lynx> report.txt [--per-kind N] [--all-modes] (round 190qp, issue #253): the
+            // project's automated mixer volumes, send levels and effect parameters heard and shown through the app's engine
+            // (src/Hotfix190qpTest.inc)
+            const auto i = args.indexOf ("--autolive190qp");
+            const auto perKind = args.contains ("--per-kind") ? args[args.indexOf ("--per-kind") + 1].getIntValue() : 2;
+            runAutoLive190qpTest (args[i + 1].unquoted(), args[i + 2].unquoted(), perKind, args.contains ("--all-modes"));
             return;
         }
 
@@ -3579,6 +3605,17 @@ public:
         if (args.contains ("--headergearshot248"))
         {
             setApplicationReturnValue (runHeaderGearShot (args[args.indexOf ("--headergearshot248") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+        // --hotfix190qpwfshot <prefix> (round 190qp, 0.1.31.1 hotfix): src/Hotfix190qpWf.inc, its checks and pictures
+        if (args.contains ("--hotfix190qpwfshot"))
+        {
+            const auto prefix = args[args.indexOf ("--hotfix190qpwfshot") + 1].unquoted();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto r = hotfix190qpWfCheck (prefix);
+            juce::File (prefix + "-checks.txt").replaceWithText ("hotfix190qp_wf=" + r + "\n");
+            setApplicationReturnValue (r == "OK" ? 0 : 1);
             quit();
             return;
         }
@@ -9703,10 +9740,21 @@ private:
             lynx::windowplaces::fromVar ({});
         }
 
+        // hotfix 0.1.31.1 (round 190qp): a docked window's place in the dock's coordinates (src/HotfixUi190qp.inc)
+        const auto hotfixPlacesResult = hotfixPlaces190qpCheck();
+
         // round 190pv (issue #258): a cloned channel's own automation clip drives its sound (src/Issue258Test.inc: the app's
         // engine, render-ahead off and on; Transistor Bass when FL Studio is here, LYNX Synth always)
         juce::String issue258Log;
         const auto issue258Result = issue258Check (issue258Log);
+        // round 190qp (0.1.31.1, issue #253 / Discord): an imported FL project's mixer volume, send level and Fruity Filter
+        // cutoff automation heard and shown through the app's engine, as imported, with a flat lane added and with the
+        // clips moved into lanes, render-ahead off / on, Clip-launch's override (src/Hotfix190qpTest.inc)
+        juce::String autolive190qpLog;
+        const auto autolive190qpResult = autoLiveCheck (autoLiveFlSong(), autolive190qpLog, 2, true);
+        // round 190qs (issue #282): FL's trial mark travels with its plugin in Export to FL Studio (src/Issue282Check.inc)
+        juce::String issue282Log;
+        const auto issue282Result = issue282Check (issue282Log);
 
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
@@ -11037,6 +11085,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
+        const auto hotfix190qpWfResult = hotfix190qpWfCheck(); // round 190qp (0.1.31.1): track clips' notes, Export... with folders
         const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
         const auto determinismResult = lynx::determinism190po::check(); // round 190po: one render on any threads (Windows' x87)
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
@@ -11047,11 +11096,12 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
+                        && hotfix190qpWfResult == "OK" // (round 190qp)
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -11163,8 +11213,11 @@ private:
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
+               << "autolive190qp=" << autolive190qpResult << "\n"
+               << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
+               << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -11173,6 +11226,7 @@ private:
                << "chordlane190pf=" << chordlane190pfResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "determinism190po=" << determinismResult << "\n"
+               << "hotfix190qp_wf=" << hotfix190qpWfResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -20983,6 +21037,7 @@ private:
 #include "Tracks190peShot.inc" // round 190pe
 #include "HeaderGearShot248.inc" // rollup 0.1.31 step 7 (PRs #248 / #256)
 #include "PerTabShot259.inc" // round 190pw (PR #259)
+#include "HotfixUi190qp.inc" // hotfix 0.1.31.1 (round 190qp)
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)
@@ -21008,6 +21063,9 @@ private:
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
+#include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
+#include "Hotfix190qpWf.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes; Export... with folders in the name)
+#include "Issue282Check.inc" // round 190qs: issue #282, FL's trial mark and the Patcher generator in Export to FL Studio
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

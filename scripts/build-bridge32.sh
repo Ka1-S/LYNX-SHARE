@@ -18,7 +18,7 @@ B="$OUT/x86"
 mkdir -p "$B/juce" "$B/app" "$OUT/shim"
 echo '#include <dbghelp.h>' > "$OUT/shim/Dbghelp.h"
 
-VERSION="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+VERSION="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p' CMakeLists.txt)"
 MODULES=(juce_core juce_data_structures juce_events juce_graphics juce_gui_basics juce_gui_extra juce_audio_basics juce_audio_processors)
 {
     echo '#pragma once'
@@ -88,8 +88,8 @@ for src in "${SOURCES[@]}"; do OBJECTS+=("$B/app/$(echo "$src" | tr / _).o"); do
 echo "Bridge32: resources and link..."
 OUT_ABS="$(cd "$OUT" && pwd)"
 if [[ ! -f "$OUT/lynx_version.h" ]]; then
-    IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
-    printf '#pragma once\n#define LYNX_VERSION_MAJOR %s\n#define LYNX_VERSION_MINOR %s\n#define LYNX_VERSION_PATCH %s\n#define LYNX_VERSION_STR "%s"\n' "$VMAJ" "$VMIN" "$VPAT" "$VERSION" > "$OUT/lynx_version.h"
+    IFS=. read -r VMAJ VMIN VPAT VREV <<< "$VERSION"
+    printf '#pragma once\n#define LYNX_VERSION_MAJOR %s\n#define LYNX_VERSION_MINOR %s\n#define LYNX_VERSION_PATCH %s\n#define LYNX_VERSION_REVISION %s\n#define LYNX_VERSION_STR "%s"\n' "$VMAJ" "$VMIN" "$VPAT" "${VREV:-0}" "$VERSION" > "$OUT/lynx_version.h"
 fi
 ( cd resources && "$ZIG" rc /i "$OUT_ABS" /fo "$OUT_ABS/x86/LYNX-bridge32.res" LYNX-bridge32.rc )
 "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX-bridge32.exe" "$B"/juce/*.o "${OBJECTS[@]}" "$B/LYNX-bridge32.res" \

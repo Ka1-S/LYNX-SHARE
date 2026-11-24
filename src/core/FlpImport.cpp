@@ -2579,9 +2579,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         if (c.type == flp::ChannelType::instrument && ! c.pluginName.empty() && c.pluginName != "Fruity Wrapper" && c.pluginName != "FPC"
             && flmRackChildren.empty()) // (round 190jv: a FL Studio Mobile Rack that became a Layer and its instruments)
         {
-            def.flOrigin.plugin = c.pluginName;
-            if (def.pluginState != c.pluginState)
-                def.flOrigin.state = c.pluginState;
+            // (a Patcher played through its main generator, above: FL's Patcher goes back, its whole graph; round 190qs)
+            const auto& original = unpacked ? input.channels[(std::size_t) (&c - project.channels.data())] : c;
+            def.flOrigin.plugin = original.pluginName;
+            def.flOrigin.trialSaved = flTrialSaved (c.wrapperFlags); // (issue #282; the record's flags also stay in flWrapperFlags)
+            if (def.pluginState != original.pluginState)
+                def.flOrigin.state = original.pluginState;
         }
 
         song.channels.push_back (std::move (def));
@@ -3207,7 +3210,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (const auto source = sidechainSource (insert.index, patcherSidechain); source > 0 && source != insert.index)
                         slot.sidechain = source;
                     effectSlotMap.insert ({ { insert.index, original.index }, { (int) track.effects.size(), original.plugin } });
-                    slot.flOrigin = { original.plugin, original.state, 0 }; // (round 171e: Export to FL Studio)
+                    slot.flOrigin = { original.plugin, original.state, 0, flTrialSaved (original.wrapperFlags) }; // (round 171e: Export to FL Studio; #282)
                     track.effects.push_back (std::move (slot));
                     if (options.report != nullptr)
                         ++options.report->converted["Patcher (graph)"];
@@ -3541,7 +3544,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 // Export to FL Studio (round 171e): the FL effect itself, written back while LYNX leaves it as imported (one
                 // FL slot = one LYNX slot here; a hosted plugin travels as its plugin reference)
                 if (fx.kind != EffectKind::plugin && expanded.size() == 1)
-                    fx.flOrigin = { slot.plugin, slot.state, 0 };
+                    fx.flOrigin = { slot.plugin, slot.state, 0, flTrialSaved (slot.wrapperFlags) }; // (#282: FL's trial mark)
                 track.effects.push_back (fx);
             }
         }

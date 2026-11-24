@@ -103,6 +103,10 @@ public:
 
     std::function<void()> onOpenPattern;
     std::function<void()> onOpenPianoRoll;
+    // round 190qp: a pattern clip on an instrument track double-clicked in Track-only mode or the Simple layout opens its
+    // instrument's notes (core/TrackOnly.h pianoRollChannelOf): the Simple dock's Editor tab, else the Piano roll. The
+    // channel is selected and the clip's pattern made current before the call.
+    std::function<void (int track)> onOpenTrackClipNotes;
     std::function<void (int pattern)> onRenamePattern;  // clip menu: Rename and color (pattern clips)
     std::function<void (int channel)> onOpenInSampler;  // clip menu: the audio clip's file in a new Sampler channel
     // round 190dx: a new instrument track's channel was made (or its generator replaced): the main window opens it as the
@@ -464,6 +468,13 @@ public:
     // round 190ft (FL FUN_012e3aa0): a header click made an audio / instrument track the only selected one: its mixer
     // track (the main window makes it the mixer's current track when the mixer is showing)
     std::function<void (int insert)> onLinkedMixerTrack;
+    // Hotfix 0.1.31.1 (kainproctor, Discord): wherever a Device View shows (the Clip-launch layout, with Live's look or the
+    // classic one) a track chosen here — its
+    // header clicked alone, a clip or an empty spot of its lane clicked — is the selected track (Live 12 manual: the Device
+    // View shows the selected track's devices; one selection for Session and Arrangement). An automation lane chooses its
+    // owner track.
+    std::function<void (int track)> onArrangementTrackChosen;
+    void chooseArrangementTrack (int track); // (also the tests' way in)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
     // round 190jc (design190ia SG-2): the round "+" under the Simple tracks (the New-track chooser, as "+ Add track")
@@ -793,9 +804,11 @@ private:
     std::vector<int> sortClips (std::vector<int> placed = {}); // returns where the placed clips are now
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
-    void showRulerMenu (int x);                           // markers, time signature and loop
+    void showRulerMenu (int x, int y = -1);               // markers, time signature and loop
 public:
-    juce::PopupMenu rulerMenu (int x);                    // (round 190ol: the menu itself, also for the shots)
+    // (round 190ol: the menu itself, also for the shots). Issue #281 (round 190qr): `y` is the press; on a marker's tag
+    // (markerTagAt) the menu is that marker's, wherever on the tag, as FL's
+    juce::PopupMenu rulerMenu (int x, int y = -1);
 private:
     static juce::String markerLabel (const Marker& m);   // the text of a marker's tag on the ruler
     int markerTagAt (int x, int y) const;                 // the marker whose tag is under (x, y), or -1

@@ -1,4 +1,13 @@
 {
+"u.0.1.31.1.t": "Fixes for 0.1.31",
+"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 fixes what you reported on 0.1.31: automation of FL projects on the controls, plugin windows that stopped opening, the Device view, Export with a folder in the file name, clips on instrument tracks, a crash in the hint bar and start-up memory.",
+"u.0.1.31.1.f0": "FL automation clips that drive several controls, or one through a formula, move every control they drive in the Mixer, the plugin windows and the Device view; a control moved by hand shows the value you hear (#253).",
+"u.0.1.31.1.f1": "Docked plugin and channel windows open where they were again instead of drifting out of the main window after a few clicks.",
+"u.0.1.31.1.f2": "Clip-launch layout: choosing a track in the Arrangement shows its devices, and the Device view's knobs follow automation.",
+"u.0.1.31.1.f3": "Export audio with a folder in the file name writes there without asking again (#215); Automatic colors and icons take more than one rule (#239); right-clicking the hint bar no longer crashes LYNX (#269).",
+"u.0.1.31.1.f4": "Track-only mode and the Simple layout: a double-click on an empty clip of an instrument track opens its notes.",
+"u.0.1.31.1.f5": "0.1.31 used ~7 MB more memory and more CPU right after start-up.",
+"u.0.1.31.1.k0": "LYNX ASIO problems reported on 0.1.31 could not be reproduced yet; details help (Help › Report a problem...).",
 "u.0.1.31.t": "A built-in Tracker, LYNX Model, JSFX, Linux arm64, two projects side by side and much more",
 "u.0.1.31.s": "LYNX SHARE 0.1.31 adds a built-in Tracker with tracker module import, LYNX Model (physical models of mallet instruments), JSFX scripts, Linux arm64 builds, a welcome card and a start page, Search actions for every command, two projects side by side with copy and paste between them, a Sections lane, a Chord lane with Smart Tempo, Track versions, automation write modes, Capture automation and modulators for any knob, FL Studio Mobile .flm export, Live's rack devices inline with a Macro Map and Solo / Cue, ARA on a mixer insert, a plugin pack of 39 plugins (also LV2 on Linux, and a 20 MB .7z on Windows) and fixes for around 30 GitHub issues.",
 "u.0.1.31.n0": "<strong>Tracker</strong>: View › Tracker (Shift+F7) shows a pattern's notes as rows and channels and edits them the tracker way, and tracker modules (.mod, .xm, .s3m, .it) open with their samples, patterns and tempo.",
