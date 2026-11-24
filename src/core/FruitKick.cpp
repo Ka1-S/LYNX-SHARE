@@ -2,6 +2,7 @@
 // plugin's operation order; doubles where the plugin computes in double; long double for FL's x87 pan law.
 
 #include "core/FruitKick.h"
+#include "core/Vfx.h"
 #include "core/FlVoiceProcessor.h"
 #include "core/FlangusFastDist.h"
 #include "core/DrumParamRanges.h"
@@ -376,6 +377,7 @@ public:
         delete retired.exchange (nullptr);
         channelCents.store (channel.sampler.pitch * 100.0f);
         mono.store (channel.maxPolyphony == 1); // FL tells the generator its Max polyphony, never the Mono box (round 168l: 0xf6f240 → 0xfed7c0)
+        voiceProps.store (channel.engineRev >= 5);
         const auto b = bpm > 0.0 ? bpm : 120.0;
         if (channel.pluginState == state && b == tempo.load())
             return;
@@ -447,6 +449,29 @@ public:
                 if (! v.released)
                     engine->release (v);
     }
+
+    // Issue #271 (round 190qo): a slide note's velocity and pan move the sounding voices' Final.Vol / Final.Pan, as FL's
+    // host does for its Fruit Kick (FL 2026 /R renders, REA_rodada190qo). From engine revision 5 on.
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        take();
+        if (engine == nullptr || ! voiceProps.load (std::memory_order_relaxed) || ! std::isfinite (value))
+            return;
+        for (auto& v : engine->voices)
+        {
+            if (v.key != std::clamp (key, 0, 127) || v.released)
+                continue;
+            if (prop == (int) vfx::Prop::velocity)
+                v.initVol = (std::pow (11.0, 1.28 * std::clamp ((double) value, 0.0, 1.0)) - 1.0) / 10.0;
+            else if (prop == (int) vfx::Prop::pan)
+                v.notePan = std::clamp ((double) value, -1.0, 1.0);
+            else
+                continue;
+            v.fvol = (float) (v.initVol * channelVol);
+            v.fpan = (float) (v.notePan + channelPan);
+        }
+    }
+    std::atomic<bool> voiceProps { true }; // (ChannelDef::engineRev >= 5)
 
     bool idle() const noexcept override { return engine == nullptr || engine->quiet(); }
 

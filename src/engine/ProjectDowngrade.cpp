@@ -2452,6 +2452,44 @@ void toRelease0131 (juce::var& root, Losses& lost)
                               listOf (flangerDelay), true });
     }
 
+    // round 190qo (issue #271), ChannelDef::engineRev 5: (a) slide notes move the sounding notes' velocity and pan on the
+    // SoundFont, DX10, BeepMap, Granulizer, Fruit Kick, Wave Traveller, BooBass and Patcher channels (0.1.31: the pitch
+    // only); (b) the SoundFont plays FL's velocity curve (0.1.31: the SF2 curve, low velocities much quieter); (c) BooBass
+    // plays the note's velocity (0.1.31: every note at full level). One line each, naming the channels that have such notes
+    {
+        static const juce::StringArray sliding { "soundfont", "dx10", "beepmap", "granulizer", "fruitkick", "wavetraveller", "boobass", "patcher" };
+        std::map<int, std::pair<juce::String, juce::String>> rev5; // channel -> (kind, name)
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            const auto kind = c.getProperty ("instrument").toString();
+            if (sliding.contains (kind) && (int) c.getProperty ("engineRev") >= 5)
+                rev5[i] = { kind, c.getProperty ("name").toString() };
+        });
+        juce::StringArray slides, fonts, boobass;
+        if (! rev5.empty())
+            if (auto* patterns = arrayOf (root["patterns"]))
+                for (const auto& p : *patterns)
+                    if (auto* notes = arrayOf (p["notes"]))
+                        for (const auto& n : *notes)
+                            if (auto* f = arrayOf (n); f != nullptr && f->size() > 4)
+                                if (const auto it = rev5.find ((int) (*f)[2]); it != rev5.end())
+                                {
+                                    const auto velocity = (double) (*f)[4];
+                                    const auto otherVelocity = std::abs (velocity - 0.78125) > 0.001; // (FL's 100)
+                                    if (f->size() > 8 && (bool) (*f)[8])
+                                        addOnce (slides, it->second.second);
+                                    if (otherVelocity && it->second.first == "soundfont")
+                                        addOnce (fonts, it->second.second);
+                                    if (otherVelocity && it->second.first == "boobass")
+                                        addOnce (boobass, it->second.second);
+                                }
+        if (! slides.isEmpty())
+            lost.push_back ({ TR_NOOP ("Slide notes move only the pitch on these channels in this release, not the velocity and pan: {0}"), listOf (slides), true });
+        if (! fonts.isEmpty())
+            lost.push_back ({ TR_NOOP ("SoundFont channels play low velocities much quieter in this release (the older velocity curve): {0}"), listOf (fonts), true });
+        if (! boobass.isEmpty())
+            lost.push_back ({ TR_NOOP ("BooBass plays every note at full level in this release, whatever its velocity: {0}"), listOf (boobass), true });
+    }
+
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {
         if (c.hasProperty ("engineRev") && (int) c.getProperty ("engineRev") > 3)
             c.setProperty ("engineRev", 3);

@@ -1,6 +1,7 @@
 // FL Studio's BeepMap (REA_rodada65 §2). See BeepMap.h.
 
 #include "core/BeepMap.h"
+#include "core/Vfx.h"
 #include "core/HostSlide.h"
 #include "core/ModelParams.h"
 
@@ -563,6 +564,7 @@ public:
 
     void configure (const ChannelDef& channel, double bpm) noexcept override
     {
+        voiceProps.store (channel.engineRev >= 5); // (issue #271)
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
@@ -648,6 +650,32 @@ public:
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
+
+    // Issue #271 (round 190qo): a slide note's velocity and pan move the sounding voices' Final.Vol / Final.Pan, as FL's
+    // host does for its BeepMap (FL 2026 /R renders, REA_rodada190qo). From engine revision 5 on.
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! voiceProps.load (std::memory_order_relaxed) || ! std::isfinite (value))
+            return;
+        for (int i = 0; i < engine->count; ++i)
+        {
+            const auto slot = engine->order[(std::size_t) i];
+            auto& v = engine->voices[(std::size_t) slot];
+            if (v.key != std::clamp (key, 0, 127) || v.proc.released)
+                continue;
+            if (prop == (int) vfx::Prop::velocity)
+            {
+                volFactor[(std::size_t) slot] = (float) ((std::pow (11.0, 1.28 * std::clamp ((double) value, 0.0, 1.0)) - 1.0) / 10.0);
+                v.fvol = (float) (channelVol * (double) volFactor[(std::size_t) slot]);
+            }
+            else if (prop == (int) vfx::Prop::pan)
+            {
+                notePan[(std::size_t) slot] = std::clamp (value, -1.0f, 1.0f);
+                v.fpan = (float) std::clamp ((double) notePan[(std::size_t) slot] + channelPan, -1.0, 1.0);
+            }
+        }
+    }
+    std::atomic<bool> voiceProps { true }; // (ChannelDef::engineRev >= 5)
 
     void noteOff (int key) noexcept override
     {

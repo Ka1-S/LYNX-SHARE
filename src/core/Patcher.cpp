@@ -1131,6 +1131,33 @@ void Graph::controlChange (int cc, float value) noexcept
     forNoteTargets ([&] (Instrument& i) { i.controlChange (cc, value); });
 }
 
+// Issue #271 (round 190qo): a slide note's velocity / pan / Mod X / Y on the channel's own notes ("From LYNX SHARE" pin 0
+// Notes), passed to what those notes reach — FL's Patcher hands its notes' properties on (FL 2026 /R render of its Patcher
+// render test, a 3x Osc inside: the slide fades as 3x Osc's own channel does)
+void Graph::voiceProperty (int key, int prop, float value) noexcept
+{
+    if (! voiceProps.load (std::memory_order_relaxed) || pinTargets.empty())
+        return;
+    forLayeredTargets (pinTargets[0], 2, key, [&] (const MidiTarget& t, int k, float, float, float, bool) {
+        if (t.vfx)
+        {
+            if (auto& q = vfxQueues[(std::size_t) t.node])
+            {
+                vfx::Event e;
+                e.type = vfx::Event::Type::prop;
+                e.voice.key = k;
+                e.voice.colour = (t.midiChannel >= 0 ? t.midiChannel : 0) & 15;
+                e.id = vfx::inputId (k, e.voice.colour);
+                e.prop = (vfx::Prop) std::clamp (prop, 0, 4);
+                e.value = value;
+                q->in.add (e);
+            }
+        }
+        else if (auto& i = nodes[(std::size_t) t.node]->instrument)
+            i->voiceProperty (k, prop, value);
+    });
+}
+
 void Graph::voicePropertyPort (int port, int key, int prop, float value, int midiChannel) noexcept
 {
     if (port < 0 || port >= patchMidiPorts)
@@ -1804,6 +1831,7 @@ public:
     {
         graph.voicePropertyPort (port, key, prop, value, midiChannel);
     }
+    void voiceProperty (int key, int prop, float value) noexcept override { graph.voiceProperty (key, prop, value); } // (issue #271)
     int takePortEvents (PortEvent* out, int max) noexcept override { return graph.takeHostEvents (out, max); }
     bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override { graph.slideTo (key, cents, samples); }
@@ -1820,6 +1848,7 @@ public:
     void configure (const ChannelDef& channel, double bpm) noexcept override
     {
         tempo.store (bpm, std::memory_order_relaxed);
+        graph.voiceProps.store (channel.engineRev >= 5, std::memory_order_relaxed); // (issue #271)
         graph.takeValues (channel.patcher, bpm);
         if (tracks != nullptr)
             for (int k = 1; k <= graph.auxOutputs(); ++k)

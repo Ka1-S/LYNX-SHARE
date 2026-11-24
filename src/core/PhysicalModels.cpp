@@ -1,4 +1,5 @@
 #include "core/PhysicalModels.h"
+#include "core/Vfx.h"
 #include "core/DrumParamRanges.h"
 #include "core/HostSlide.h"
 #include "core/Sha256.h"
@@ -1953,6 +1954,7 @@ public:
             k[i] = channel.modelParams[i];
         knobs.write (k);
         pitchCents.store (channel.sampler.pitch * 100.0f);
+        velocityLevel.store (channel.engineRev >= 5); // (issue #271)
     }
 
     void setNextNoteExpression (float, float cents, bool) noexcept override { nextCents = cents; }
@@ -1973,11 +1975,15 @@ public:
             slide.start (100.0f * (float) (key - 60) + pitchCents.load() + cents - finalPitch, samples);
     }
 
-    void noteOn (int key, float) noexcept override
+    void noteOn (int key, float velocity) noexcept override
     {
         take();
         if (tables == nullptr)
             return;
+        // issue #271 (round 190qo): FL's host plays BooBass at Final.Vol = Init.Vol (11^(1.28 v) − 1) / 10 of the note's
+        // velocity, and a slide note moves it (FL 2026 /R renders: velocity 10 is 31.3 dB under velocity 100, and a slide
+        // to it ends there). From engine revision 5 on; before, every note played at full level (velocity 100's level).
+        hostVol = velocityLevel.load() ? initVolume (velocity) : 1.0f;
         // FL's final pitch = 100·(key − 60) cents (round 28 §4); p = trunc(pitch + 2400) cents above 16.35 Hz.
         // Keys below 36 (p < 0) read outside FL's table: LYNX clamps p at 0 (its own choice)
         currentKey = key;
@@ -2032,14 +2038,24 @@ public:
     void allNotesOff() noexcept override { active = false; }
     bool idle() const noexcept override { return ! active; }
 
+    // issue #271: a slide note's velocity moves the voice's Final.Vol (one voice: BooBass is monophonic)
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (velocityLevel.load() && prop == (int) vfx::Prop::velocity && active && stage < 3 && key == currentKey && std::isfinite (value))
+            hostVol = initVolume (value);
+    }
+    static float initVolume (float v) noexcept { return (float) ((std::pow (11.0, 1.28 * std::clamp ((double) v, 0.0, 1.0)) - 1.0) / 10.0); }
+    std::atomic<bool> velocityLevel { true }; // (ChannelDef::engineRev >= 5)
+    float hostVol = 1.0f;
+
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
         take();
         if (! active || tables == nullptr)
             return;
         // FL's per-voice level Vol·cos/sin((1 + pan)π/4) vs LYNX's √2·cos/sin channel gains (REA_rodada28 §4)
-        gl *= 0.70710678f;
-        gr *= 0.70710678f;
+        gl *= 0.70710678f * hostVol;
+        gr *= 0.70710678f * hostVol;
         for (int done = 0; done < n && active; done += 256)
         {
             const auto m = std::min (256, n - done);
