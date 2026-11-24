@@ -10,6 +10,17 @@ The short version of each release. The full notes, with measurements, known issu
   "+" tab under it adds a slot, and Options › General settings sets how many slots new mixer tracks get. PR #260 by
   @codewithamoako.
 
+**Added**
+- Easier options: every Settings page has **Reset this page** (with Undo); the **?** command palette finds every Settings
+  option and every window's own menu items, and opens Settings with the option outlined; every switch and box in Settings
+  says what it does when you point at it; *Settings › LYNX extras* is grouped by area, keeps **FL-exact** and
+  **Recommended** at the top and shows a small picture of what each visual extra adds.
+- **How to use this...** at the end of each window's menu (and *Help › How to use...*): a short guide with a link to its
+  Learn tutorial. A one-time tip the first time the Mixer, the Piano roll, the Tracker, the Device view or an automation
+  lane shows (*Settings › General › Show tips and hints* turns them off).
+- Notices: a plugin that can't open, a saved copy, a full insert or a failed backup now show a small card at the lower
+  right (with a button such as *Plugin manager...* or *Show in folder*) instead of a box to click away.
+
 **Changed**
 - LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
   linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout); extras you

@@ -28,7 +28,7 @@ struct GeneralOptions
     bool waveSpectral = false, waveStereo = false;
     int noteNames = 0;          // notenames::Style: English, Germanic, Solfège (round 165f)
     bool noteFlats = false;     // black notes as flats
-    bool noteNamesEveryKey = true; // the Piano roll names every key (LYNX, round 170a)
+    bool noteNamesEveryKey = false; // the Piano roll names every key (LYNX, round 170a; off as notenames::everyKey, round 190qx)
     bool rackPlayheadColumn = true; // the Channel Rack's playhead column + bar marks (LYNX, round 170a)
     bool rackStepsChannelColour = true; // lit Channel Rack steps in their channel's colour (LYNX, round 170a2)
     bool splash = true, startupSound = true, scanAtStart = true;
@@ -98,6 +98,9 @@ struct SettingsHooks
     // Settings › Link's "Show Link Toggle" (round 190gl): the main toolbar's Link toggle shown, and showing / hiding it
     std::function<bool()> linkToggleShown;
     std::function<void (bool)> showLinkToggle;
+    // round 190qx: Settings › General › Hints and warnings "Show tips" (the main window keeps it with its onboarding state)
+    std::function<bool()> tipsShown;
+    std::function<void (bool)> showTips;
 };
 
 // Settings pages (Settings window, ui/SettingsDialog.cpp)
@@ -182,11 +185,11 @@ public:
 
     void resized() override
     {
-        viewport.setBounds (getLocalBounds());
+        viewport.setBounds (getLocalBounds().withTrimmedTop (fixedTop));
         // round 190bj (QA: Settings › MIDI at ~390 px lost each input row's switch and device name): below the page's
         // narrowest width its rows keep that width and the page scrolls sideways instead of squeezing them
         const auto narrow = getWidth() - viewport.getScrollBarThickness() < minimumWidth();
-        const auto height = getHeight() - (narrow ? viewport.getScrollBarThickness() : 0);
+        const auto height = getHeight() - fixedTop - (narrow ? viewport.getScrollBarThickness() : 0);
         const auto width = juce::jmax (minimumWidth(), getWidth() - (needsScroll (height) ? viewport.getScrollBarThickness() : 0));
         content.setSize (width, juce::jmax (height, layout (width)));
     }
@@ -198,8 +201,15 @@ protected:
     juce::Component& page() noexcept { return content; }
 
     void add (juce::Component& c) { content.addAndMakeVisible (c); }
+    // round 190qx: a strip of this height along the page's top stays put while the rows scroll (the LYNX extras page's
+    // intro and its FL-exact / Recommended buttons); the page places what it adds there with addFixed()
+    void setFixedTop (int height) { fixedTop = juce::jmax (0, height); }
+    int getFixedTop() const noexcept { return fixedTop; }
+    void addFixed (juce::Component& c) { addAndMakeVisible (c); }
+    juce::Viewport& pageViewport() noexcept { return viewport; }
 
 private:
+    int fixedTop = 0;
     bool needsScroll (int height) { return layout (juce::jmax (minimumWidth(), getWidth())) > height; }
 
     juce::Viewport viewport;

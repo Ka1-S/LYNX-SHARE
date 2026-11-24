@@ -107,6 +107,7 @@ AutoLookEditor::AutoLookEditor (AudioEngine& e, bool keep) : engine (e), persist
     note.setText (tr ("When an item gets a name a rule matches (a rename, a new track or channel), it takes the rule's color and "
                       "icon. The first matching rule wins. The rules are yours: every project uses them."),
                   juce::dontSendNotification);
+    enable.setTooltip (note.getText()); // (round 190qx: the switch says it too)
     note.setFont (theme::font (theme::type::small));
     note.setColour (juce::Label::textColourId, theme::colour::textDisabled);
     note.setJustificationType (juce::Justification::topLeft);

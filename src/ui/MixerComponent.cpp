@@ -6,6 +6,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/Notices.h" // round 190qx
 #include "ui/AraMenu.h"
 #include "core/SelectionRename.h"
 #include "core/MixSnapshots.h"
@@ -8609,8 +8610,14 @@ void EffectsPanel::openPluginWindow (int slot)
         return;
     }
 
-    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
-                                            tr ("This plugin could not be loaded (it is not installed or has not been scanned)."));
+    // round 190qx: a notice, not a box to click away (the plugin's name in it)
+    {
+        const auto& song = engine.getSong();
+        juce::String name;
+        if (juce::isPositiveAndBelow (track, (int) song.mixer.size()) && juce::isPositiveAndBelow (slot, (int) song.mixer[(std::size_t) track].effects.size()))
+            name = quickpick::slotName (engine, song.mixer[(std::size_t) track].effects[(std::size_t) slot]);
+        ui::pluginNotLoaded (name);
+    }
 }
 
 void EffectsPanel::showAddMenu (int row)
