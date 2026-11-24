@@ -1565,15 +1565,57 @@ private:
     double knobValue (const Card& c, int knob) const
     {
         if (c.kind == Card::effect)
-            return slotActions.slotParamValue (c.knobs[(std::size_t) knob], c.index);
+            return shownValue (c, knob, slotActions.slotParamValue (c.knobs[(std::size_t) knob], c.index));
         if (c.knobs[(std::size_t) knob] >= engineKnobBase)
             return engineKnobValue (c, c.knobs[(std::size_t) knob] - engineKnobBase);
         const auto& song = engine.getSong();
         if (c.index < 0 || c.index >= (int) song.channels.size())
             return 0.0;
         const auto& ch = song.channels[(std::size_t) c.index];
-        return c.knobs[(std::size_t) knob] == 1 ? ch.pan : ch.volume;
+        return shownValue (c, knob, c.knobs[(std::size_t) knob] == 1 ? ch.pan : ch.volume);
     }
+    // Hotfix 0.1.31.1 (kainproctor, Discord: "tweaking any knob inside any plugin isn't reflected here"): while the song
+    // plays, a knob whose control automation drives shows the automation's value (core/AutomationDisplay), as the
+    // plugin's own window, the Mixer and FL do; while a mouse button is down the Song's value (the hand wins). `base`:
+    // the Song's value in the knob's own range.
+    double shownValue (const Card& c, int knob, double base) const
+    {
+        if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+            return base;
+        const auto& shown = engine.getAutomationDisplay();
+        if (! shown.any())
+            return base;
+        const auto k = c.knobs[(std::size_t) knob];
+        if (c.kind == Card::effect)
+        {
+            const auto t = k < 0 ? AutomationTarget { AutomationTargetKind::effectMix, insert, c.index, 0 }
+                                 : AutomationTarget { AutomationTargetKind::effectParam, insert, c.index, k };
+            return (double) shown.shown (t, (float) base);
+        }
+        if (k == 1) // (pan: the target's 0..1 is the knob's -1..1)
+            return (double) shown.shown ({ AutomationTargetKind::channelPan, c.index, 0, 0 }, (float) ((base + 1.0) * 0.5)) * 2.0 - 1.0;
+        return (double) shown.shown ({ AutomationTargetKind::channelVolume, c.index, 0, 0 }, (float) base);
+    }
+    // (the timer's test: a shown value of this chain changed since the last repaint)
+    bool automationMoved()
+    {
+        const auto& shown = engine.getAutomationDisplay();
+        if (shown.getGeneration() == shownGeneration)
+            return false;
+        shownGeneration = shown.getGeneration();
+        for (const auto& t : shown.automatedTargets())
+            if (((t.kind == AutomationTargetKind::effectParam || t.kind == AutomationTargetKind::effectMix) && t.index == insert && insert >= 0)
+                || ((t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan) && t.index == channel && channel >= 0))
+                return true;
+        return false;
+    }
+public:
+    double knobValueForCheck (int card, int knob) const
+    {
+        return card >= 0 && card < (int) cards.size() && knob >= 0 && knob < (int) cards[(std::size_t) card].knobs.size()
+                   ? knobValue (cards[(std::size_t) card], knob) : -100.0;
+    }
+private:
     void setKnob (const Card& c, int knob, double v)
     {
         if (c.kind == Card::effect)
@@ -2141,6 +2183,8 @@ private:
     void timerCallback() override
     {
         tickDeviceMeters(); // round 190lr (DL-87)
+        if (automationMoved()) // hotfix 0.1.31.1: the knobs follow their automation (only while the chain shows)
+            repaint();
         if (insert < 0 || hooks.levelOf == nullptr)
             return;
         bool moved = false;
@@ -2163,6 +2207,7 @@ private:
     std::map<std::uint64_t, CustomEntry> customs;
     juce::ScrollBar scrollBar { false };
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
+    std::uint32_t shownGeneration = 0; // (hotfix 0.1.31.1: the AutomationDisplay generation last drawn)
     std::array<meters::PeakHold, 2> levels {};
 
     int track = -1, insert = -1, channel = -1, chosenInsert = -1, actionsInsert = -1;
@@ -4321,6 +4366,7 @@ juce::Rectangle<int> DetailView::windowButtonForCheck (int card) const
 }
 bool DetailView::pressWindowButtonForCheck (int card) { return chain->pressWindowButtonForCheck (card); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
+double DetailView::knobValueForCheck (int card, int knob) const { return chain->knobValueForCheck (card, knob); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
 void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
