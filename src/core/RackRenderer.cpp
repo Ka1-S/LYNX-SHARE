@@ -1271,9 +1271,14 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     state->song = std::move (song);
     const auto tailStarted = std::chrono::steady_clock::now();
 
-    // scheduling: notes sorted by start (order among notes on the same tick is preserved)
+    // scheduling: notes sorted by start (order among notes on the same tick is preserved). Rollup 0.1.32 step 1: a pattern
+    // already in that order (the editors keep it: Pattern::sortNotes) is left as it is — the same order a stable sort gives,
+    // without moving every note; round 190pm's ratchet / Condition fields made a Note 104 bytes (88 before), and the moves
+    // cost Live's Patience +13 % instructions per edit snapshot
+    const auto byStart = [] (const Note& a, const Note& b) { return a.start < b.start; };
     for (auto& p : state->song.patterns)
-        std::stable_sort (p.notes.begin(), p.notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+        if (! std::is_sorted (p.notes.begin(), p.notes.end(), byStart))
+            std::stable_sort (p.notes.begin(), p.notes.end(), byStart);
     state->schedule = makeScheduleIndex (state->song);
     state->performanceZone = perf::zoneClips (state->song);
     if (factories.clipLauncher != nullptr && state->song.clipGrid)
