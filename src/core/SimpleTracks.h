@@ -49,6 +49,14 @@ int nextEmptyTrack (const Song& song);
 // The rows the Simple layout shows (round 190jc, design190ia SG-2): every track up to the last one the song uses (a clip
 // in the Playlist, a mode or a name), then the drop lane's row (nextEmptyTrack); at least 1, at most `rows`.
 int rowsShown (const Song& song, int rows);
+// Round 190qu (Discord 11-24, sidthenugget): the project has a track already (a clip in any clip list, a track mode or a
+// name). Then the Simple layout drops the "Drop a loop, audio or MIDI file here" strip with its "+" under the tracks
+// (unless dropStripAlways) and the New-track chooser its "Start from a demo song or a template..." / tour row: both are
+// for starting a song. Files can still be dropped under the tracks, and "+ Add track" stays in the title bar.
+bool anyTrack (const Song& song);
+// Playlist menu › "Drop strip under the tracks, always" in the Simple layout (ui-options.txt simpleDropStrip; off: the
+// strip shows only while the project is empty).
+inline bool dropStripAlways = false;
 
 struct Request
 {

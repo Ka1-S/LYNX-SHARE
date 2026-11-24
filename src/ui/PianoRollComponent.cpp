@@ -2413,11 +2413,15 @@ void PianoRollComponent::paint (juce::Graphics& g)
                         if (colour != keyBlack)
                             fillBlack (colour, { 0, y + inset, blackWidth, rowHeight - 2 * inset });
                         else
+                            // round 190qu (Discord 11-24, sidthenugget): each step runs to the key's tip, over the one
+                            // before it. Side by side, at a desktop scale of 125 % / 150 % a step's edge falls inside a
+                            // pixel that both rectangles only partly covered: the white key showed through as a light
+                            // line down every black key ("the black keys look broken")
                             for (int k = 0; k < shadeSteps; ++k)
                             {
-                                const auto x0 = blackWidth * k / shadeSteps, x1 = blackWidth * (k + 1) / shadeSteps;
+                                const auto x0 = blackWidth * k / shadeSteps;
                                 g.setColour (shade[k]);
-                                g.fillRect (x0, y + inset, x1 - x0, rowHeight - 2 * inset);
+                                g.fillRect (x0, y + inset, blackWidth - x0, rowHeight - 2 * inset);
                             }
                     }
                     else

@@ -394,6 +394,7 @@ public:
         auto c = ui::dialog::bodyOf (card()).reduced (20, 14);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (6);
+        if (startFrom.isVisible() || tourButton.isVisible()) // (round 190qu: not once the project has tracks)
         {
             // "Start from..." and the tour's button side by side
             auto row = c.removeFromBottom (28);
@@ -474,6 +475,13 @@ private:
             c->setVisible (! starterPage);
         tourButton.setButtonText (owner.tourCanContinue() ? tr ("Continue the tour") : tr ("First-song tour"));
         tourButton.setVisible (! starterPage && ! owner.tourRunning()); // (not while its card is up)
+        // round 190qu (Discord 11-24, sidthenugget): "Start from a demo song or a template..." and the tour start a song;
+        // once the project has a track the chooser only adds tracks (a running tour still shows its card)
+        if (simpletracks::anyTrack (owner.engine.getSong()) && ! owner.tourRunning() && ! owner.tourCanContinue())
+        {
+            startFrom.setVisible (false);
+            tourButton.setVisible (false);
+        }
         for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             c->setVisible (starterPage);
         for (auto& b : genreButtons)

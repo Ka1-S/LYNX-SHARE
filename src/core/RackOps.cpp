@@ -140,7 +140,7 @@ int insertPattern (Song& song, int index, const std::string& name)
     return index;
 }
 
-int splitPatternByChannel (Song& song, int index)
+int splitPatternByChannel (Song& song, int index, bool keepPatternName)
 {
     if (index < 0 || index >= (int) song.patterns.size())
         return 0;
@@ -153,31 +153,46 @@ int splitPatternByChannel (Song& song, int index)
             channels.push_back (n.channel);
 
     std::sort (channels.begin(), channels.end());
-    std::vector<Pattern> created;
+    if (channels.size() < 2) // (FL: nothing to split)
+        return 0;
 
-    for (auto channel : channels)
-    {
-        Pattern p;
-        const auto channelName = channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].name
-                                                                                         : "Channel " + std::to_string (channel + 1);
-        p.name = source.name + " - " + channelName;
-        p.lengthTicks = source.lengthTicks != 0 ? source.lengthTicks : source.effectiveLength (song.meter());
-        p.colour = channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].colour : source.colour;
-
+    const auto length = source.lengthTicks != 0 ? source.lengthTicks : source.effectiveLength (song.meter());
+    const auto channelName = [&song] (int channel) {
+        return channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].name : "Channel " + std::to_string (channel + 1);
+    };
+    const auto nameFor = [&] (int channel) { return keepPatternName ? source.name + " - " + channelName (channel) : channelName (channel); };
+    const auto only = [&source] (Pattern& p, int channel) {
+        p.notes.clear();
         for (const auto& n : source.notes)
             if (n.channel == channel)
                 p.notes.push_back (n);
-        p.loopOn = source.loopOn; // (the channel keeps its loop point)
-        p.loopMode = source.loopMode;
+        p.channelLoops.clear();
         for (const auto& l : source.channelLoops)
             if (l.channel == channel)
                 p.channelLoops.push_back (l);
+    };
 
-        created.push_back (std::move (p));
+    // the first channel stays in the pattern (its clips, events, markers and steps of automation clips with it), named
+    // after the channel; the pattern keeps its length so its clips loop as before
+    {
+        auto& first = song.patterns[(std::size_t) index];
+        only (first, channels.front());
+        first.name = nameFor (channels.front());
+        first.lengthTicks = length;
     }
 
-    if (created.empty())
-        return 0;
+    std::vector<Pattern> created;
+    for (std::size_t k = 1; k < channels.size(); ++k)
+    {
+        Pattern p;
+        p.name = nameFor (channels[k]);
+        p.lengthTicks = length;
+        p.colour = source.colour;
+        p.loopOn = source.loopOn; // (the channel keeps its loop point)
+        p.loopMode = source.loopMode;
+        only (p, channels[k]);
+        created.push_back (std::move (p));
+    }
 
     shiftPatternClips (song, index + 1, (int) created.size());
     song.patterns.insert (song.patterns.begin() + index + 1, created.begin(), created.end());

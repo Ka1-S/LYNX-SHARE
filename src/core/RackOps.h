@@ -98,10 +98,15 @@ int gotoFirstEmptyPattern (Song& song);
 // and selects it. Returns the new index.
 int insertPattern (Song& song, int index, const std::string& name);
 
-// Creates one pattern per channel that has notes in pattern `index`, named "<pattern> - <channel>"
-// and coloured after the channel, inserted right after it. The original pattern is unchanged.
-// Returns how many patterns were created.
-int splitPatternByChannel (Song& song, int index);
+// FL's Patterns › "Split by channel" (round 190qu, checked live in FL 2026 [EXEC]: a pattern with Kick and HiHat steps placed
+// twice in the Playlist became "808 Kick" — the same pattern, its clips unchanged, with the Kick's notes only — and a new
+// "808 HiHat" pattern right after it, placed nowhere; shots in /mnt/e/lynx-work/discord1124_190qu/shots/ref/fl-split-*):
+// the pattern keeps the notes of its first channel (the lowest index) and is named after it; every other channel that has
+// notes gets a new pattern, named after the channel, inserted right after it in channel order (the Playlist clips of
+// later patterns follow). Each part keeps the pattern's length and colour; the pattern's events, markers and automation
+// clip steps stay with the first. Nothing is placed. `keepPatternName`: the parts are called "<pattern> - <channel>"
+// instead (LYNX's "Convert project to Track-only"). Returns how many patterns were created (0: fewer than two channels).
+int splitPatternByChannel (Song& song, int index, bool keepPatternName = false);
 
 // Default name for a new pattern: "Pattern N" with the lowest N not in use.
 std::string newPatternName (const Song& song);

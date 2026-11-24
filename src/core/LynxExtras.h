@@ -113,6 +113,10 @@ inline constexpr Item items[] = {
       TR_NOOP ("In the Simple layout the project's name shows centred at the top of the window, over the transport, as BandLab shows it. Also in the View menu of the Simple layout."),
       "ui-options.txt:simpleProjectName" },
     // round 190pm (research190oe P23): a tablet or a touch screen (FL Studio Mobile and BandLab by finger, interpreted)
+    // round 190qu (Discord 11-24, sidthenugget): the drop strip is for an empty project; once there are tracks it goes
+    { "simple.dropStrip", TR_NOOP ("Simple workflow"), TR_NOOP ("Show the drop strip under the tracks when the project has tracks"),
+      TR_NOOP ("The Simple layout shows the \"Drop a loop, audio or MIDI file here\" strip with its + under the tracks only while the project is empty; on, it stays under the tracks. Files can be dropped under the tracks either way, and + Add track is in the title bar. Also in the Playlist menu of the Simple layout."),
+      "ui-options.txt:simpleDropStrip" },
     { "simple.touchMode", TR_NOOP ("Simple workflow"), TR_NOOP ("Touch mode"),
       TR_NOOP ("For a touch screen: in the Simple layout the controls are finger-sized, two fingers scroll the timeline and the editor and a pinch zooms them, and a long press on a knob opens a value pop-up with - and +. In every layout a long press opens the menu of what is under the finger. A mouse works as before. Suggested once when a finger is first used. Also in the View menu of the Simple layout."),
       "ui-options.txt:touchMode" },

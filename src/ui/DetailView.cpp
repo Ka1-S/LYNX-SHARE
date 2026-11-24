@@ -3597,6 +3597,8 @@ public:
                 takenBack = false;
                 update();
             }
+            else if (arrangement >= 0 && hooks.openArrangementClip != nullptr) // (round 190qu)
+                hooks.openArrangementClip (arrangement);
             else if (hooks.openClip != nullptr)
                 hooks.openClip (track, scene);
         };
@@ -3610,13 +3612,32 @@ public:
 
     void setSlot (int t, int s)
     {
-        if (t != track || s != scene)
+        if (t != track || s != scene || arrangement >= 0)
             takenBack = false; // (a new clip docks again)
         track = t;
         scene = s;
+        arrangement = -1;
         column.setSlot (t, s);
         update();
     }
+    // Round 190qu (Discord 11-24, kainproctor): an Arrangement clip selected in the Clip-launch layout shows here as in Live's
+    // Clip View — a pattern clip's notes (the docked Piano roll with Notes / Envelopes / MPE), an audio clip's name and its
+    // editor's button. −1: the clip grid's slot again. The Clip box column is the grid slot's (its launch settings), so an
+    // Arrangement clip shows the editor across the page.
+    void setArrangementClip (int index)
+    {
+        if (index == arrangement)
+            return;
+        takenBack = false;
+        arrangement = index;
+        const auto& song = engine.getSong();
+        if (index >= 0 && index < (int) song.playlist.size())
+            arrangementLike = song.playlist[(std::size_t) index];
+        column.setSlot (index >= 0 ? -1 : track, index >= 0 ? -1 : scene);
+        update();
+    }
+    int arrangementClip() const noexcept { return arrangement; }
+    bool editorDockedForCheck() const noexcept { return editor != nullptr && editor->getParentComponent() == this; }
     MidiToolsPanel& midiTools() noexcept { return column.midiTools(); }
     void sectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll)
     {
@@ -3802,8 +3823,34 @@ private:
     const Clip* clipShown() const
     {
         const auto& song = engine.getSong();
+        if (arrangement >= 0) // (round 190qu: an Arrangement clip, found again after an edit moved it in the list)
+        {
+            const auto& like = arrangementLike;
+            const auto sameSource = [&like] (const Clip& c) {
+                return c.gridSlot < 0 && c.kind == like.kind && c.pattern == like.pattern && c.channel == like.channel && c.automation == like.automation;
+            };
+            const auto& list = song.playlist;
+            if (arrangement < (int) list.size() && sameSource (list[(std::size_t) arrangement]) && list[(std::size_t) arrangement].track == like.track
+                && list[(std::size_t) arrangement].start == like.start)
+                return &list[(std::size_t) arrangement];
+            for (int i = 0; i < (int) list.size(); ++i)
+                if (sameSource (list[(std::size_t) i]) && list[(std::size_t) i].track == like.track && list[(std::size_t) i].start == like.start)
+                {
+                    arrangement = i;
+                    return &list[(std::size_t) i];
+                }
+            if (arrangement < (int) list.size() && sameSource (list[(std::size_t) arrangement])) // (moved or resized in place)
+            {
+                arrangementLike = list[(std::size_t) arrangement];
+                return &list[(std::size_t) arrangement];
+            }
+            return nullptr;
+        }
         return song.clipGrid && track >= 0 && scene >= 0 ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
     }
+    // what is docked: the grid slot, or (round 190qu) the Arrangement clip as track −2
+    int shownTrack() const noexcept { return arrangement >= 0 ? -2 : track; }
+    int shownScene() const noexcept { return arrangement >= 0 ? arrangement : scene; }
     bool dockable() const
     {
         const auto* clip = clipShown();
@@ -3814,7 +3861,7 @@ private:
     // the pattern's first event lane, else the volume of the track's channel (or of the pattern's first channel).
     void showEvents (const Clip& clip)
     {
-        if (events != nullptr && eventsTrack == track && eventsScene == scene)
+        if (events != nullptr && eventsTrack == shownTrack() && eventsScene == shownScene())
             return;
         dropEvents();
         const auto& song = engine.getSong();
@@ -3825,15 +3872,15 @@ private:
             target = song.patterns[(std::size_t) clip.pattern].events.front().target;
         else
         {
-            const auto chain = detailchain::forTrack (song, track);
+            const auto chain = detailchain::forTrack (song, arrangement >= 0 ? -1 : track);
             auto channel = chain.channel;
             if (channel < 0 && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size() && ! song.patterns[(std::size_t) clip.pattern].notes.empty())
                 channel = song.patterns[(std::size_t) clip.pattern].notes.front().channel;
             target = AutomationTarget { AutomationTargetKind::channelVolume, std::max (0, channel) };
         }
         events = makeEventEditor (engine, target);
-        eventsTrack = track;
-        eventsScene = scene;
+        eventsTrack = shownTrack();
+        eventsScene = shownScene();
         addAndMakeVisible (*events);
         resized();
     }
@@ -3854,9 +3901,9 @@ private:
         }
         const auto& song = engine.getSong();
         const auto* clip = clipShown();
-        if (column.isVisible() != (clip != nullptr))
+        if (column.isVisible() != (clip != nullptr && arrangement < 0)) // (round 190qu: the grid slot's column only)
         {
-            column.setVisible (clip != nullptr);
+            column.setVisible (clip != nullptr && arrangement < 0);
             resized();
         }
         // a pattern clip, on screen: the Piano roll docks here (unless its panel took it back since this clip was picked)
@@ -3890,13 +3937,13 @@ private:
         dropEvents();
         if (clip != nullptr && clip->kind == ClipKind::pattern && onScreen() && ! takenBack && hooks.dockPianoRoll != nullptr)
         {
-            if (editor != nullptr && dockedTrack == track && dockedScene == scene)
+            if (editor != nullptr && dockedTrack == shownTrack() && dockedScene == shownScene())
             {
                 applyMpeView();
                 return; // (already showing this clip: the user may have picked another pattern in it meanwhile)
             }
-            dockedTrack = track;
-            dockedScene = scene;
+            dockedTrack = shownTrack();
+            dockedScene = shownScene();
             auto* e = hooks.dockPianoRoll (clip->pattern);
             if (auto* roll = dynamic_cast<PianoRollComponent*> (e)) // (round 190im, R13: the launched clip's position)
                 roll->launchedPlayhead = [safe = juce::Component::SafePointer<ClipPage> (this), roll] {
@@ -3918,7 +3965,7 @@ private:
             release();
 
         // round 190cg: an audio clip shows its Audio panel and the audio editor (ui/ClipAudioPanel)
-        const auto audioKey = clip != nullptr && clip->kind == ClipKind::audio && onScreen() ? (track * 2000 + scene) * 4096 + (clip->channel & 4095) : -1;
+        const auto audioKey = clip != nullptr && clip->kind == ClipKind::audio && arrangement < 0 && onScreen() ? (track * 2000 + scene) * 4096 + (clip->channel & 4095) : -1;
         if (audioKey != audioPanelKey)
         {
             audioPanel.reset();
@@ -3939,7 +3986,7 @@ private:
 
         if (clip == nullptr)
         {
-            text = tr ("Select a clip in the clip grid to see it here");
+            text = tr ("Select a clip in the clip grid or the Arrangement to see it here"); // (round 190qu)
             open.setVisible (false);
         }
         else if (clip->kind == ClipKind::audio)
@@ -3947,6 +3994,13 @@ private:
             text = clip->channel >= 0 && clip->channel < (int) song.channels.size() ? utf8 (song.channels[(std::size_t) clip->channel].name) : tr ("Audio clip");
             open.setButtonText (tr ("Open in the audio editor"));
             open.setVisible (true);
+        }
+        else if (clip->kind == ClipKind::automation) // (round 190qu: an Arrangement automation clip, its points' editor)
+        {
+            text = clip->automation >= 0 && clip->automation < (int) song.automations.size() ? utf8 (song.automations[(std::size_t) clip->automation].name)
+                                                                                             : tr ("Automation clip");
+            open.setButtonText (tr ("Edit points..."));
+            open.setVisible (hooks.openArrangementClip != nullptr);
         }
         else
         {
@@ -3974,6 +4028,8 @@ private:
     int dockedTrack = -1, dockedScene = -1;
     bool takenBack = false;
     int track = -1, scene = -1;
+    mutable int arrangement = -1; // round 190qu: the Arrangement clip shown (an index into Song::playlist), −1: the grid slot
+    mutable Clip arrangementLike;  // (what it was, to find it again after an edit)
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -4014,6 +4070,19 @@ void DetailView::showSelection (int t, int s)
     scene = s;
     chain->setTrack (t);
     clipPage->setSlot (t, s);
+}
+
+bool DetailView::clipEditorDockedForCheck() const { return clipPage->editorDockedForCheck(); }
+int DetailView::arrangementClipForCheck() const { return clipPage->arrangementClip(); }
+
+void DetailView::showArrangementClip (int index)
+{
+    if (index < 0 && clipPage->arrangementClip() < 0)
+        return;
+    if (index < 0)
+        clipPage->setSlot (track, scene); // (the grid's selection again)
+    else
+        clipPage->setArrangementClip (index);
 }
 
 void DetailView::setPage (Page page)

@@ -347,6 +347,15 @@ int nextEmptyTrack (const Song& song)
     return -1;
 }
 
+bool anyTrack (const Song& song)
+{
+    bool any = false;
+    song.forEachClipList ([&any] (const std::vector<Clip>& clips) { any = any || ! clips.empty(); });
+    return any || std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [] (const PlaylistTrack& t) {
+               return t.mode != PlaylistTrackMode::unassigned || ! t.name.empty();
+           });
+}
+
 int rowsShown (const Song& song, int rows)
 {
     int last = -1;

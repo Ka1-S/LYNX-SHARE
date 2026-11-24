@@ -11,6 +11,7 @@
 #include "core/TrackVersions.h" // round 190pe (P20)
 
 #include "core/LaneView.h"
+#include "core/SimpleTracks.h"
 #include "core/LayoutStyle.h"
 #include "core/LiveScaleControl.h" // round 190oo (O-5)
 #include "core/MidiDrop.h"
@@ -79,6 +80,28 @@ void addLayoutItems (juce::PopupMenu& menu, bool patternLayout)
     menu.addSeparator();
     menu.addItem (tr ("Track-only mode (1 track = 1 instrument, the Channel rack hidden)"), patternLayout, trackonly::enabled(),
                   [] { setExtra ("layout.trackOnly", ! trackonly::enabled()); });
+    // round 190qu (Discord 11-24, sidthenugget): a pattern project into 1 track = 1 instrument, with FL's Split by channel
+    menu.addItem (tr ("Convert project to Track-only..."), patternLayout && boundEngine != nullptr, false, [] { runAction ("layout.convertTrackOnly"); });
+}
+
+// Round 190qu: "Convert project to Track-only" (trackonly::convertProject) after a confirmation; switches the mode on
+static void convertToTrackOnly()
+{
+    if (boundEngine == nullptr)
+        return;
+    juce::AlertWindow::showOkCancelBox (
+        juce::MessageBoxIconType::QuestionIcon, tr ("Convert project to Track-only"),
+        tr ("Every pattern clip of the arrangement is split by channel (Patterns › Split by channel) and each part goes onto its instrument's own track, at the same place. The song sounds the same; one step: Edit › Undo takes it back. Track-only mode is switched on."),
+        tr ("Convert"), tr ("Cancel"), nullptr, juce::ModalCallbackFunction::create ([] (int result) {
+            if (result != 1 || boundEngine == nullptr)
+                return;
+            trackonly::ConvertReport report;
+            boundEngine->editSong ([&report] (Song& s) { report = trackonly::convertProject (s); });
+            if (! trackonly::enabled())
+                setExtra ("layout.trackOnly", true);
+            ui::postHint ({ tr ("Track-only: {0} clips on their instruments' tracks, {1} patterns split, {2} tracks made",
+                                { juce::String (report.clipsMoved), juce::String (report.patternsSplit), juce::String (report.tracksMade) }), {} }, 5000);
+        }));
 }
 
 // --- settings ---------------------------------------------------------------------------------------------------------
@@ -132,6 +155,8 @@ bool readUiOption (const juce::String& key, bool on)
         startpage::setEnabled (on);
     else if (key == "rangeEdits") // round 190pa (P14, LYNX extra): Ctrl+Alt+drag ranges in the Pattern layout
         rangeedit::patternLayoutOn() = on;
+    else if (key == "simpleDropStrip") // round 190qu (Discord 11-24): the Simple drop strip under the tracks, always
+        simpletracks::dropStripAlways = on;
     else
         return false;
     return true;
@@ -167,7 +192,8 @@ juce::String uiOptionsText()
            + "\ntrackVersions=" + juce::String (trackversions::patternMenus() ? 1 : 0) // (round 190pe, P20)
            + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
            + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0) // (round 190oq, issue #252)
-           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
+           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0) // (round 190pa, P14)
+           + "\nsimpleDropStrip=" + juce::String (simpletracks::dropStripAlways ? 1 : 0); // (round 190qu)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -214,6 +240,8 @@ std::optional<bool> extraOn (std::string_view id)
         return startpage::enabled();
     if (id == "playlist.rangeEdits") // round 190pa (P14)
         return rangeedit::patternLayoutOn();
+    if (id == "simple.dropStrip") // round 190qu
+        return simpletracks::dropStripAlways;
     return std::nullopt;
 }
 
@@ -265,6 +293,8 @@ bool setExtra (std::string_view id, bool on)
         startpage::setEnabled (on);
     else if (id == "playlist.rangeEdits") // round 190pa (P14)
         rangeedit::patternLayoutOn() = on;
+    else if (id == "simple.dropStrip") // round 190qu
+        simpletracks::dropStripAlways = on;
     else
         return false;
     if (onChanged)
@@ -277,7 +307,8 @@ bool setExtra (std::string_view id, bool on)
 bool runAction (const std::string& id)
 {
     if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth"
-        || id == "playlist.clipLanesFolded" || id == "controlBar.liveScale") // (round 190oo: CS O-3, O-5)
+        || id == "playlist.clipLanesFolded" || id == "controlBar.liveScale" // (round 190oo: CS O-3, O-5)
+        || id == "simple.dropStrip") // (round 190qu)
         return setExtra (id, ! extraOn (id).value_or (true));
     // round 190jq: the pointer-click switch itself (toolbar button, menu, key); on also shows its button
     if (id == "playlist.pointerClick")
@@ -308,6 +339,23 @@ bool runAction (const std::string& id)
             onChanged();
         return true;
     }
+    if (id == "layout.convertTrackOnly") // round 190qu (Discord 11-24)
+    {
+        if (layoutstyle::current() == layoutstyle::Style::pattern)
+            convertToTrackOnly();
+        return true;
+    }
+    if (id == "playlist.lanesToClips") // round 190qu (Discord 11-24): the way back, every lane of the tracks a clip again
+    {
+        if (boundEngine == nullptr || laneview::laneCount (boundEngine->getSong()) == 0)
+            return true;
+        int made = 0;
+        boundEngine->editSong ([&made] (Song& s) { made = autolanes::lanesToClips (s); });
+        ui::postHint ({ tr ("{0} automation lanes turned back into clips (Edit › Undo takes it back)", { juce::String (made) }), {} }, 3000);
+        if (onChanged)
+            onChanged();
+        return true;
+    }
     return false;
 }
 
@@ -318,7 +366,13 @@ void addPlaylistMenuItems (const std::function<void (const char*, const juce::St
     {
         const auto movable = boundEngine != nullptr ? (int) laneview::movableClips (boundEngine->getSong()).size() : 0;
         add ("playlist.clipsToLanes", tr ("Move automation clips into their tracks' lanes ({0})", { juce::String (movable) }), movable > 0, false);
+        // round 190qu (Discord 11-24): and back
+        const auto lanes = boundEngine != nullptr ? laneview::laneCount (boundEngine->getSong()) : 0;
+        add ("playlist.lanesToClips", tr ("Turn automation lanes back into clips ({0})", { juce::String (lanes) }), lanes > 0, false);
     }
+    // round 190qu (Discord 11-24): the Simple layout's drop strip once the project has tracks
+    if (layoutstyle::current() == layoutstyle::Style::simple)
+        add ("simple.dropStrip", tr ("Show the drop strip under the tracks when the project has tracks"), true, simpletracks::dropStripAlways);
     // round 190jq (issues #191.3, #191, #164)
     {
         const auto style = layoutstyle::current();

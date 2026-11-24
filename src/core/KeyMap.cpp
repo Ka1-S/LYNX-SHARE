@@ -367,7 +367,12 @@ std::vector<Action> makeActions()
         { "playlist.headerWidth", TR_NOOP ("Drag the track header column's right edge to widen it on/off"), Context::playlist, {} },
         { "playlist.midiDrop", TR_NOOP ("MIDI files dropped on the Playlist become pattern clips on/off"), Context::playlist, {} },
         { "playlist.clipsToLanes", TR_NOOP ("Move automation clips into their tracks' lanes"), Context::playlist, {} },
+        // round 190qu (Discord 11-24): the way back, and Live / Bitwig's middle ground (no default keys: FL and Live have none)
+        { "playlist.lanesToClips", TR_NOOP ("Turn automation lanes back into clips"), Context::playlist, {} },
+        { "playlist.selectedClipsToLanes", TR_NOOP ("Move the selected automation clips into their tracks' lanes"), Context::playlist, {} },
+        { "playlist.laneRangeToClip", TR_NOOP ("Make an automation clip from the time selection of the selected track's lanes"), Context::playlist, {} },
         { "layout.trackOnly", TR_NOOP ("Track-only mode on/off"), Context::playlist, {} },
+        { "layout.convertTrackOnly", TR_NOOP ("Convert project to Track-only"), Context::playlist, {} }, // (round 190qu)
         // FL's Playlist menu › Picker panel › Enable (EEPatternsShowMenu; FL's shortcut page: Alt+P, issue #175)
         { "playlist.pickerPanel", TR_NOOP ("Picker panel on / off"), Context::playlist, { chord ('P', alt) } },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
