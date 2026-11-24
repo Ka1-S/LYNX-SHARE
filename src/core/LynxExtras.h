@@ -177,6 +177,14 @@ inline constexpr Item items[] = {
     { "playlist.rangeEdits", TR_NOOP ("Playlist"), TR_NOOP ("Range edits on chosen tracks (Ctrl+Alt+drag)"),
       TR_NOOP ("Ctrl+Alt+drag in the Playlist draws a time range over only the tracks (or the one automation lane) it crosses: Delete, Cut, Copy, Paste, Duplicate, Split and Render to audio then act on just that part, clips and automation lanes, and a drag inside it moves it. The other tracks stay as they are. Also always on in the Clip-launch layout's Arrangement."),
       "ui-options.txt:rangeEdits" },
+    // round 190qo (issue #251): Live's Collect All and Save on every save; FL and Live save the project where it is
+    { "file.alwaysCollect", TR_NOOP ("Files"), TR_NOOP ("Always collect and save"),
+      TR_NOOP ("Every save first copies the files the project uses from outside its folder into its Samples/Imported folder and makes the project use the copies (File › Collect all and save), so the project's folder always opens complete, here or on another computer. It takes more disk space. Also in the File menu, under Collect all and save."),
+      "ui-options.txt:alwaysCollect" },
+    // round 190qo (issue #215): FL asks where to save every export
+    { "export.noDialog", TR_NOOP ("Files"), TR_NOOP ("Export to the File name's folder without asking"),
+      TR_NOOP ("The Export window's Export... writes straight to the name its File name field gives, wildcards and folders included, inside the folder you last exported to (or the project's folder), without the file dialog. A file that exists already is still confirmed. The line under File name shows the whole path. Also in the Export window's Wildcards menu."),
+      "ui-options.txt:exportNoDialog" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

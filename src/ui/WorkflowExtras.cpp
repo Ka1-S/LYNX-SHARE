@@ -20,6 +20,7 @@
 #include "core/TakeCleanup.h"
 #include "core/TransportEdit.h"
 #include "core/MuteKeys.h"
+#include "core/SaveExtras.h" // round 190qo (#215, #251)
 #include "core/StartPage.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
@@ -132,6 +133,10 @@ bool readUiOption (const juce::String& key, bool on)
         startpage::setEnabled (on);
     else if (key == "rangeEdits") // round 190pa (P14, LYNX extra): Ctrl+Alt+drag ranges in the Pattern layout
         rangeedit::patternLayoutOn() = on;
+    else if (key == "alwaysCollect") // issue #251 (round 190qo, LYNX extra)
+        saveextras::setAlwaysCollect (on);
+    else if (key == "exportNoDialog") // issue #215 (round 190qo, LYNX extra)
+        saveextras::setExportNoDialog (on);
     else
         return false;
     return true;
@@ -167,7 +172,9 @@ juce::String uiOptionsText()
            + "\ntrackVersions=" + juce::String (trackversions::patternMenus() ? 1 : 0) // (round 190pe, P20)
            + "\nmuteKeyToggles=" + juce::String (mutekeys::toggles() ? 1 : 0) // (round 190oq, issue #249)
            + "\nstartPage=" + juce::String (startpage::enabled() ? 1 : 0) // (round 190oq, issue #252)
-           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0); // (round 190pa, P14)
+           + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0) // (round 190pa, P14)
+           + "\nalwaysCollect=" + juce::String (saveextras::alwaysCollect() ? 1 : 0) // (round 190qo, issue #251)
+           + "\nexportNoDialog=" + juce::String (saveextras::exportNoDialog() ? 1 : 0); // (round 190qo, issue #215)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -214,6 +221,10 @@ std::optional<bool> extraOn (std::string_view id)
         return startpage::enabled();
     if (id == "playlist.rangeEdits") // round 190pa (P14)
         return rangeedit::patternLayoutOn();
+    if (id == "file.alwaysCollect") // round 190qo (issue #251)
+        return saveextras::alwaysCollect();
+    if (id == "export.noDialog") // round 190qo (issue #215)
+        return saveextras::exportNoDialog();
     return std::nullopt;
 }
 
@@ -265,6 +276,10 @@ bool setExtra (std::string_view id, bool on)
         startpage::setEnabled (on);
     else if (id == "playlist.rangeEdits") // round 190pa (P14)
         rangeedit::patternLayoutOn() = on;
+    else if (id == "file.alwaysCollect") // round 190qo (issue #251)
+        saveextras::setAlwaysCollect (on);
+    else if (id == "export.noDialog") // round 190qo (issue #215)
+        saveextras::setExportNoDialog (on);
     else
         return false;
     if (onChanged)

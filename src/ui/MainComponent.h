@@ -742,6 +742,8 @@ private:
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
     void showTypingPianoMenu();
+    int reloadTypingLayouts (const std::string& keep); // issue #270: the user's .scr layouts read again
+    static juce::File typingLayoutsFolder();
     // the metronome volume knob in a callout under the metronome button
     void showMetronomeVolume();
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)

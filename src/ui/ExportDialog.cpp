@@ -22,6 +22,8 @@
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
+#include "ui/WorkflowExtras.h"
+#include "core/SaveExtras.h"
 #include "ui/WindowOwner.h"
 
 #include "engine/AacEncoder.h"
@@ -1195,6 +1197,8 @@ private:
             return;
         const auto ext = juce::String (exportopts::extension (options.format));
         auto text = tr ("File:") + " " + resolvedName() + ext;
+        if (saveextras::exportNoDialog()) // (round 190qo, issue #215: no file dialog will say where it goes)
+            text = tr ("File:") + " " + exportFolder().getChildFile (resolvedName() + ext).getFullPathName();
         if (options.stems != exportopts::Stems::none)
         {
             const auto base = resolvedName().toStdString();
@@ -1215,6 +1219,13 @@ private:
             const auto token = juce::String (std::string (w.token));
             menu.addItem (id++, token + "   " + tr (juce::String (std::string (w.meaning))));
         }
+        // issue #215 (round 190qo, LYNX extra): Export... without the file dialog
+        menu.addSeparator();
+        menu.addItem (tr ("Export to the File name's folder without asking"), true, saveextras::exportNoDialog(), [safe = juce::Component::SafePointer<ExportPanel> (this)] {
+            workflowextras::setExtra ("export.noDialog", ! saveextras::exportNoDialog());
+            if (safe != nullptr)
+                safe->refreshName();
+        });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wildcardButton), [safe = juce::Component::SafePointer<ExportPanel> (this)] (int chosen) {
             if (safe != nullptr && chosen > 0 && chosen <= (int) std::size (exportnaming::wildcards))
                 safe->insertWildcard (juce::String (std::string (exportnaming::wildcards[(std::size_t) chosen - 1].token)));
@@ -1507,10 +1518,33 @@ private:
         // issue #215 follow-up (round 190qb): a template with folders ("BOUNCE/$project") makes them inside the export
         // folder, so the file dialog opens there; folders made for a dialog that is cancelled are taken away again
         const auto target = folder.getChildFile (name + extension);
+        // issue #215 (round 190qo, LYNX extra): straight to that name, no file dialog (a file that exists is confirmed)
+        if (naming && saveextras::exportNoDialog() && folder.isDirectory())
+        {
+            const auto go = [safe = juce::Component::SafePointer<ExportPanel> (this), target, folder] {
+                if (safe == nullptr)
+                    return;
+                makeFoldersFor (target, folder);
+                safe->startExport (target, folder);
+            };
+            if (! target.existsAsFile())
+            {
+                go();
+                return;
+            }
+            juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Export audio"),
+                                                tr ("{0} already exists. Do you want to replace it?", { target.getFullPathName() }),
+                                                tr ("Replace"), tr ("Cancel"), nullptr,
+                                                juce::ModalCallbackFunction::create ([go] (int result) {
+                                                    if (result == 1)
+                                                        go();
+                                                }));
+            return;
+        }
         const auto made = makeFoldersFor (target, folder);
         chooser = lynx::ui::makeFileChooser (tr ("Export audio"), target, "*" + extension);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [this, extension, made] (const juce::FileChooser& fc) {
+                              [this, extension, made, folder, name] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
 
                                   if (file == juce::File())
@@ -1523,8 +1557,28 @@ private:
 
                                   if (! file.hasFileExtension (extension))
                                       file = file.withFileExtension (extension);
-                                  startExport (file);
+                                  // round 190qo (issue #215): the export folder stays the one the template's folders
+                                  // were made in ("BOUNCE/$project" saved in <folder>/BOUNCE: <folder>), so the next
+                                  // export doesn't nest them again (<folder>/BOUNCE/BOUNCE/...)
+                                  startExport (file, baseFolderOf (file, folder, name));
                               });
+    }
+
+    // the export folder a file stands for: `folder` when the file is where the template's folders put it in there, else
+    // the file's own folder (the user picked another one in the dialog)
+    static juce::File baseFolderOf (const juce::File& file, const juce::File& folder, const juce::String& name)
+    {
+        auto base = file.getParentDirectory();
+        const auto parts = juce::StringArray::fromTokens (name.replaceCharacter ('\\', '/'), "/", "");
+        for (int i = parts.size() - 2; i >= 0; --i) // (the folder parts, innermost first; the last part is the file's name)
+        {
+            if (parts[i].isEmpty() || parts[i] == ".")
+                continue;
+            if (! base.getFileName().equalsIgnoreCase (parts[i]))
+                return file.getParentDirectory();
+            base = base.getParentDirectory();
+        }
+        return base == folder ? folder : base;
     }
 
     // issue #215 follow-up (round 190qb): makes the folders between `base` and `file` that don't exist yet; the ones it
@@ -1543,14 +1597,14 @@ private:
     }
 
     // Renders to `file` with the window's choices (the file dialog's result, or "Same as last time"). Closes the window.
-    void startExport (juce::File file)
+    void startExport (juce::File file, juce::File exportFolderToKeep = {})
     {
         const auto o = options;
         auto& engineRef = engine;
         const auto tracks = onlyTracks;
         const auto after = afterRender;
         const auto inRealTime = realtime;
-        lastFolder = file.getParentDirectory();
+        lastFolder = exportFolderToKeep.isDirectory() ? exportFolderToKeep : file.getParentDirectory();
         // round 190ap: what "Same as last time" repeats (the plain Export window only)
         if (persistent && additions)
             exportLastFile().replaceWithText (juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));

@@ -67,6 +67,8 @@
 #include "engine/AudioLogger.h"
 #include "engine/JsfxFormat.h"
 #include "ui/PluginSkin.h"
+#include "core/SaveExtras.h"
+#include "engine/FlStudio.h"
 #include "platform/Paths.h"
 #include "ui/SetupWizard.h"
 #include "ui/DemoMode.h" // (round 190np)
@@ -3544,7 +3546,12 @@ void MainComponent::loadUiSettings()
         else if (key == "typingRoot")
             typingRoot = keys::typingpiano::clampRoot (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "typingLayout") // FL's layout name, so the list can grow
-            typingLayout = keys::typingpiano::layoutIndex (line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
+        {
+            const auto name = line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString();
+            typingLayout = keys::typingpiano::layoutIndex (name);
+            if (name != keys::typingpiano::layoutName (typingLayout)) // (one of the user's .scr files: read them now)
+                typingLayout = reloadTypingLayouts (name);
+        }
         else if (key == "keepEditorsOpen")
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
@@ -6553,11 +6560,44 @@ juce::PopupMenu MainComponent::makeMetronomeMenu()
     return menu;
 }
 
+// Issue #270 (round 190qo): the user's .scr layouts, as FL lists the files of its "Typing to piano" folder (sub folders
+// included): FL's own folder (an FL Studio found on this computer) and LYNX's (<settings>/Typing to piano). Returns the
+// index of the layout called `keep` after the reload (the Piano layout when it is gone).
+juce::File MainComponent::typingLayoutsFolder()
+{
+    return platform::settingsFolder().getChildFile ("Typing to piano");
+}
+
+int MainComponent::reloadTypingLayouts (const std::string& keep)
+{
+    std::vector<keys::typingpiano::UserLayout> files;
+    static const auto flFolder = findFlStudio().installDir.getChildFile ("System").getChildFile ("Config").getChildFile ("Typing to piano");
+    for (const auto& folder : { flFolder, typingLayoutsFolder() })
+    {
+        if (folder == juce::File() || ! folder.isDirectory())
+            continue;
+        auto found = folder.findChildFiles (juce::File::findFiles, true, "*.scr");
+        found.sort();
+        for (const auto& f : found)
+        {
+            if (f.getSize() > 64 * 1024) // (a layout is a few hundred bytes)
+                continue;
+            const auto sub = f.getParentDirectory() == folder ? juce::String() : f.getParentDirectory().getRelativePathFrom (folder).replaceCharacter ('\\', '/');
+            files.push_back ({ f.getFileNameWithoutExtension().toStdString(), sub.toStdString(), f.loadFileAsString().toStdString() });
+        }
+    }
+    keys::typingpiano::setUserLayouts (files);
+    return keys::typingpiano::layoutIndex (keep);
+}
+
 void MainComponent::showTypingPianoMenu()
 {
     // FL 2026's right-click on the typing keyboard button (KbToMIDIPopup, measured round 168t2): Root note C..B,
     // Octave 2..6 (where the Z row starts), Options › Reset, Layout (FL's .scr names and order, core/KeyMap.h).
     // FL's Reset (KbToMIDIResetClick 0x121ac70) releases the held notes and puts Root note C, Octave 4 and Layout Piano back.
+    // Round 190qo (issue #270): after FL's layouts, the .scr files of FL's folder and LYNX's (as FL lists its folder's files),
+    // then LYNX's chord layouts for FL's other seven-note scales, and a way to the folder for your own files.
+    typingLayout = reloadTypingLayouts (keys::typingpiano::layoutName (typingLayout));
     static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Root note"));
@@ -6575,14 +6615,42 @@ void MainComponent::showTypingPianoMenu()
         typingLayout = keys::typingpiano::pianoLayout();
         saveUiSettings();
     });
+    menu.addColumnBreak(); // (FL 2026: Root note / Octave / Options in one column, Layout in the next; shots/fl/270-*)
     menu.addSectionHeader (tr ("Layout"));
-    for (int l = 0; l < keys::typingpiano::layoutCount(); ++l) // (FL's file names, untranslated as in FL)
-        menu.addItem (keys::typingpiano::layoutName (l), true, typingLayout == l, [this, l] {
+    const auto item = [this] (int l) {
+        juce::PopupMenu::Item it (keys::typingpiano::layoutName (l)); // (FL's file names, untranslated as in FL)
+        it.setTicked (typingLayout == l);
+        it.setAction ([this, l] {
             heldKeys.releaseAll(); // a held key's notes belong to the old layout
             releaseTypingLaunches (true);
             typingLayout = l;
             saveUiSettings();
         });
+        return it;
+    };
+    using keys::typingpiano::Source;
+    juce::PopupMenu lynxLayouts;
+    std::map<juce::String, juce::PopupMenu> folders; // (a file in a sub folder: in a sub menu named after it)
+    for (int l = 0; l < keys::typingpiano::layoutCount(); ++l)
+    {
+        const auto source = keys::typingpiano::layoutSource (l);
+        if (source == Source::lynx)
+            lynxLayouts.addItem (item (l));
+        else if (const auto folder = juce::String (keys::typingpiano::layoutFolder (l)); source == Source::user && folder.isNotEmpty())
+            folders[folder].addItem (item (l));
+        else
+            menu.addItem (item (l));
+    }
+    for (auto& [folder, sub] : folders)
+        menu.addSubMenu (folder, sub, true, juce::Image(), false);
+    menu.addSeparator();
+    const auto lynxTicked = keys::typingpiano::layoutSource (typingLayout) == Source::lynx;
+    menu.addSubMenu (tr ("More scales with chords (LYNX)"), lynxLayouts, true, juce::Image(), lynxTicked);
+    menu.addItem (tr ("Open the folder for your own layouts..."), [] {
+        const auto folder = typingLayoutsFolder();
+        folder.createDirectory();
+        folder.startAsProcess();
+    });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
 }
 
@@ -10768,6 +10836,25 @@ void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
         keepOverwrittenCopy (file);   // the version this save replaces goes to the backup folder (like FL)
         engine.markCreatedNow();      // issue #231: every saved project carries Project info › Created (FL's "started on")
+        // issue #251 (round 190qo, LYNX extra "Always collect and save"): the files from outside the project's folder are
+        // copied into <folder>/Samples/Imported and the project uses them, before it is written
+        if (saveextras::alwaysCollect() && ! file.isAChildOf (autosaveFolder()))
+        {
+            std::map<std::string, std::string> relink;
+            ProjectPackage::Result collected;
+            juce::String collectError;
+            if (! ProjectPackage::collectIntoProject (engine.getSong(), file.getParentDirectory(), relink, collected, collectError))
+                ui::postHint ({ tr ("Could not copy"), collectError, false, false }, 5000);
+            else
+            {
+                if (! relink.empty())
+                    engine.editSong ([&relink] (Song& song) { applyRelocations (song, relink); });
+                if (collected.files > 0)
+                    ui::postHint ({ tr ("{0} files copied into {1}. The project now uses the copies and is saved.",
+                                        { juce::String (collected.files), file.getParentDirectory().getChildFile ("Samples").getChildFile ("Imported").getFullPathName() }),
+                                    {}, false, false }, 5000);
+            }
+        }
 
         if (ProjectFile::save (engine.getSong(), file, error, currentWindowLayout()))
         {
@@ -11333,6 +11420,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Save to new project folder..."), [this] { saveToNewProjectFolder(); });
         // issue #251 (round 190oq, LYNX extra): Live's Collect All and Save
         menu.addItem (tr ("Collect all and save"), [this] { collectAllAndSave(); });
+        // issue #251 (round 190qo, LYNX extra): the same on every save
+        menu.addItem (tr ("Always collect and save"), true, saveextras::alwaysCollect(), [] {
+            workflowextras::setExtra ("file.alwaysCollect", ! saveextras::alwaysCollect());
+        });
         menu.addItem (tr ("Save as template..."), [this] { saveAsTemplate(); });
         menu.addItem (tr ("Save a copy for an older LYNX..."), [this] { saveCopyForOlder(); }); // (round 190hq, LYNX extra)
         // round 190og (FLM coverage app-0003, LYNX extra: FL Studio writes no .flm): the song for FL Studio Mobile, with

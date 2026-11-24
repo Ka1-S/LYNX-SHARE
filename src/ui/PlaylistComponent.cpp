@@ -13189,6 +13189,31 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.mergeSimilarClips")) mergeSimilarClipsByKey();
     else if (is ("playlist.mergeAutomationClips")) mergeAutomationClipsByKey();
     else if (is ("playlist.cloneTracks")) cloneTracksWithDialog (! selectedTracks.empty() ? selectedTracks : std::vector<int> { juce::jmax (0, currentTrack) });
+    else if (is ("playlist.muteTracks")) // issue #249 (round 190qo): the selected tracks' LEDs, all muted -> all unmuted
+    {
+        const auto chosen = sortedTrackSelection();
+        const auto& song = engine.getSong();
+        const auto allMuted = ! chosen.empty() && std::all_of (chosen.begin(), chosen.end(), [&song] (int t) { return song.isTrackMuted (t); });
+        engine.editSong ([chosen, allMuted] (Song& s) {
+            for (const auto t : chosen)
+            {
+                if (t < 0)
+                    continue;
+                if ((int) s.playlistTracks.size() <= t)
+                    s.playlistTracks.resize ((std::size_t) t + 1);
+                s.playlistTracks[(std::size_t) t].muted = ! allMuted;
+            }
+        });
+        repaint();
+    }
+    else if (is ("playlist.soloTrack")) // issue #249 (round 190qo): FL's right-click / Ctrl+click on the track's LED
+    {
+        if (const auto track = currentTrack >= 0 ? currentTrack : (selectedTracks.empty() ? -1 : selectedTracks.front()); track >= 0)
+            engine.editSong ([track, count = numTracks()] (Song& s) {
+                noteedit::soloTrack (s, track, count, &flsettings::trackSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
+            });
+        repaint();
+    }
     else if (is ("playlist.makeUnique")) makeSelectionUnique();
     else if (is ("playlist.stretchMode")) setStretchOnResize (! EditorGlobals::get().stretchOnResize);
     else if (is ("playlist.createVariants"))
