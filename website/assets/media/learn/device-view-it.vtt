@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.800
+Nel layout a lancio di clip, la Vista dispositivi mostra i dispositivi di una traccia in fila.
+
+00:00:09.200 --> 00:00:14.600
+Clicca una traccia, qui Chords: prima il suo strumento, poi i suoi effetti.
+
+00:00:15.000 --> 00:00:20.400
+Trascina un effetto da Audio Effects del Browser sulla catena.
+
+00:00:20.800 --> 00:00:26.400
+Il segnale scorre da sinistra a destra. Ogni dispositivo mostra le sue manopole principali.
+
+00:00:26.800 --> 00:00:32.400
+Il suo pulsante finestra apre l'editor completo. Ctrl+C e Ctrl+V copiano un dispositivo.
+
+00:00:32.800 --> 00:00:38.200
+Premi Play: gli accordi ora passano per Echoform.
+
+00:00:38.600 --> 00:00:44.400
+Ctrl+Alt+4 mostra la Vista dispositivi; Shift+Tab passa alla clip.

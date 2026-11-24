@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Ogni traccia del Mixer va al Master. L'instradamento la manda anche altrove.
+
+00:00:09.000 --> 00:00:14.400
+Seleziona la traccia da inviare, qui Chords.
+
+00:00:14.800 --> 00:00:20.600
+Clicca la freccia sotto un'altra traccia: Chords ora va anche lì.
+
+00:00:21.000 --> 00:00:26.400
+La manopola sotto è il livello di mandata: quanto ci va.
+
+00:00:26.800 --> 00:00:32.200
+Metti un riverbero su quella traccia: un bus di riverbero che ogni traccia può condividere.
+
+00:00:32.600 --> 00:00:38.200
+Clic destro su una freccia per altro: Route to this track only, o Sidechain to this track.
+
+00:00:38.600 --> 00:00:45.000
+Riproduci: gli accordi prendono il loro spazio, e ogni traccia tiene il suo fader.

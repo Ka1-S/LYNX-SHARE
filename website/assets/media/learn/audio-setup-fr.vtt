@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Pas de son, ou des craquements ? Ouvrez Options, Audio settings.
+
+00:00:09.000 --> 00:00:14.400
+Le pilote : ASIO sous Windows, Core Audio sur Mac, PipeWire ou ALSA sous Linux.
+
+00:00:14.800 --> 00:00:20.200
+Le périphérique de sortie, c'est là que vous entendez LYNX. System default suit votre ordinateur.
+
+00:00:20.600 --> 00:00:26.200
+Buffer size : plus petit, il répond plus vite quand on joue ; plus grand, il laisse de la marge au processeur.
+
+00:00:26.600 --> 00:00:32.000
+Jouez un son de test pour vérifier que vous l'entendez.
+
+00:00:32.400 --> 00:00:37.800
+De n'importe où, Help, Test audio output fait la même chose.
+
+00:00:38.200 --> 00:00:44.200
+Des craquements ? Augmentez le tampon. Des notes en retard ? Diminuez-le.

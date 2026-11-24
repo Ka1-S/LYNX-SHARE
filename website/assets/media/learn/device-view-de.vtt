@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.800
+Im Clip-Start-Layout zeigt die Device view die Geräte einer Spur in einer Reihe.
+
+00:00:09.200 --> 00:00:14.600
+Klicke auf eine Spur, hier die Chords: erst ihr Instrument, dann ihre Effekte.
+
+00:00:15.000 --> 00:00:20.400
+Ziehe einen Effekt aus den Audio-Effekten des Browsers auf die Kette.
+
+00:00:20.800 --> 00:00:26.400
+Das Signal fließt von links nach rechts. Jedes Gerät zeigt seine wichtigsten Regler.
+
+00:00:26.800 --> 00:00:32.400
+Sein Fensterknopf öffnet den vollen Editor. Strg+C und Strg+V kopieren ein Gerät.
+
+00:00:32.800 --> 00:00:38.200
+Drücke Play: Die Akkorde laufen jetzt durch Echoform.
+
+00:00:38.600 --> 00:00:44.400
+Strg+Alt+4 zeigt die Device view; Umschalt+Tab wechselt zum Clip.

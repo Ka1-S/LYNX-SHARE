@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.800
+Dans la disposition par lancement de clips, la Vue des appareils montre les appareils d'une piste en rangée.
+
+00:00:09.200 --> 00:00:14.600
+Cliquez sur une piste, ici Chords : son instrument d'abord, puis ses effets.
+
+00:00:15.000 --> 00:00:20.400
+Glissez un effet d'Audio Effects du Browser sur la chaîne.
+
+00:00:20.800 --> 00:00:26.400
+Le signal circule de gauche à droite. Chaque appareil montre ses boutons principaux.
+
+00:00:26.800 --> 00:00:32.400
+Son bouton de fenêtre ouvre l'éditeur complet. Ctrl+C et Ctrl+V copient un appareil.
+
+00:00:32.800 --> 00:00:38.200
+Appuyez sur Play : les accords passent maintenant par Echoform.
+
+00:00:38.600 --> 00:00:44.400
+Ctrl+Alt+4 affiche la Vue des appareils ; Shift+Tab bascule vers le clip.

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="lt.track-only.t" data-desc="lt.track-only.s" data-wt="zh-Hans zh-Hant nl fr de id it ja ko pl pt-BR ru es tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work in tracks, without patterns · LYNX SHARE</title>
+<meta name="description" content="Track-only mode gives every instrument its own Playlist track: draw clips straight on the track, and keep the Channel rack out of the way until you need it.">
+<meta property="og:title" content="Work in tracks, without patterns · LYNX SHARE">
+<meta property="og:description" content="Track-only mode gives every instrument its own Playlist track: draw clips straight on the track, and keep the Channel rack out of the way until you need it.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.31">
+<meta property="og:url" content="https://lynx-share.com/learn/track-only/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/learn/track-only/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/learn/track-only/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/learn/track-only/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/learn/track-only/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/learn/track-only/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/learn/track-only/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/learn/track-only/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/learn/track-only/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/learn/track-only/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/learn/track-only/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/learn/track-only/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/learn/track-only/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/learn/track-only/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/learn/track-only/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/learn/track-only/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/learn/track-only/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/learn/track-only/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="34141f5b";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+else if(window.IntersectionObserver&&window.matchMedia&&!matchMedia("(prefers-reduced-motion: reduce)").matches)h.classList.add("mo");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v=0.1.26-logo2">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v=0.1.26-logo2">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v=0.1.26-logo2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=34141f5b">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/learn/" aria-current="page" data-i18n="nav.learn">Learn</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.track-only.t">Work in tracks, without patterns</h1><p data-i18n="lt.track-only.s">Track-only mode gives every instrument its own Playlist track: draw clips straight on the track, and keep the Channel rack out of the way until you need it.</p><p class="tmeta"><span data-i18n="lr.l.pattern">Pattern layout</span> · <span>0:56</span> · <span data-i18n="lr.lv.intermediate">Intermediate</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="track-only"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/track-only-en.webp"><source src="/assets/media/learn/track-only-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/track-only-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/track-only-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/track-only-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/track-only-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/track-only-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/track-only-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/track-only-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/track-only-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/track-only-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/track-only-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/track-only-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/track-only-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/track-only-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/track-only-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/track-only-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/track-only-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/track-only-en-720.mp4" download>720p, 2.1 MB</a> · <a href="/assets/media/learn/track-only-en-1080.mp4" download>1080p, 3.3 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.track-only.c0">Patterns or tracks</span></button></li><li><button type="button" data-seek="11.0"><b>0:11</b> <span data-i18n="lt.track-only.c1">Turn on Track-only mode</span></button></li><li><button type="button" data-seek="26.8"><b>0:27</b> <span data-i18n="lt.track-only.c2">Draw clips on tracks</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="patterns-or-tracks">Patterns or tracks</h2>
+<figure><a class="shot" href="/assets/img/learn/track-only-1.webp"><img src="/assets/img/learn/track-only-1.webp" alt="The Channel rack of a new project" loading="lazy" width="1280" height="720"></a></figure>
+<ol><li>In FL Studio, instruments sit in the Channel rack and play patterns that you place in the Playlist.</li><li>If you prefer tracks, as in most other programs, turn on Track-only mode.</li></ol>
+<h2 id="turn-on-track-only-mode">Turn on Track-only mode</h2>
+<figure><a class="shot" href="/assets/img/learn/track-only-2.webp"><img src="/assets/img/learn/track-only-2.webp" alt="Track-only mode in the LYNX extras" loading="lazy" width="690" height="685"></a></figure>
+<ol><li>Open <code>Options › LYNX extras...</code>, press <code>Ctrl+F</code> and type &quot;track-only&quot;, then click the switch. <code>View › Layout style</code> has it too.</li><li>LYNX offers each instrument a track of its own: click <code>Yes</code>. One undo step takes it back.</li></ol>
+<h2 id="draw-clips-on-tracks">Draw clips on tracks</h2>
+<figure><a class="shot" href="/assets/img/learn/track-only-3.webp"><img src="/assets/img/learn/track-only-3.webp" alt="Clips drawn on instrument tracks" loading="lazy" width="1280" height="720"></a></figure>
+<ol><li>Click on a track to draw a clip: it plays that track's instrument. Double-click a clip to write its notes.</li><li><code>F6</code> still opens the Channel rack, with the same instruments, each playing through its track's mixer track.</li></ol>
+<p>See also <a href="/wiki/playlist/">Playlist</a> and <a href="/wiki/layouts/">The three layouts</a>.</p></div><nav class="wpn"><a href="/learn/audio-setup/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.audio-setup.t">Set up your audio</b></a><a href="/learn/automation-lanes/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.automation-lanes.t">Automation lanes under your tracks</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=34141f5b" defer></script>
+<script src="/assets/learn.js?v=34141f5b" defer></script>
+<script src="/assets/motion.js?v=34141f5b" defer></script>
+</body>
+</html>

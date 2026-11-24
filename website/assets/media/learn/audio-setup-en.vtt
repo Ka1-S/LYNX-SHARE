@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+No sound, or crackles? Open Options, Audio settings.
+
+00:00:09.000 --> 00:00:14.400
+The driver: ASIO on Windows, Core Audio on a Mac, PipeWire or ALSA on Linux.
+
+00:00:14.800 --> 00:00:20.200
+The output device is where you hear LYNX. System default follows your computer.
+
+00:00:20.600 --> 00:00:26.200
+Buffer size: smaller answers faster when you play, larger gives the CPU more room.
+
+00:00:26.600 --> 00:00:32.000
+Play a test sound to check that you hear it.
+
+00:00:32.400 --> 00:00:37.800
+From anywhere, Help, Test audio output does the same.
+
+00:00:38.200 --> 00:00:44.200
+Crackles? Raise the buffer. Notes come late? Lower it.

@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Geen geluid, of geknetter? Open Opties, Audio-instellingen.
+
+00:00:09.000 --> 00:00:14.400
+De driver: ASIO op Windows, Core Audio op een Mac, PipeWire of ALSA op Linux.
+
+00:00:14.800 --> 00:00:20.200
+Het uitvoerapparaat is waar je LYNX hoort. Systeemstandaard volgt je computer.
+
+00:00:20.600 --> 00:00:26.200
+Buffergrootte: kleiner reageert sneller bij het spelen, groter geeft de CPU meer ruimte.
+
+00:00:26.600 --> 00:00:32.000
+Speel een testgeluid af om te controleren of je het hoort.
+
+00:00:32.400 --> 00:00:37.800
+Overal werkt Help, Audio-uitgang testen hetzelfde.
+
+00:00:38.200 --> 00:00:44.200
+Geknetter? Verhoog de buffer. Noten te laat? Verlaag hem.

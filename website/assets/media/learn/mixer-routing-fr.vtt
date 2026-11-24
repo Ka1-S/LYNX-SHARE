@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Chaque piste du Mixer va au Master. Le routage l'envoie aussi ailleurs.
+
+00:00:09.000 --> 00:00:14.400
+Sélectionnez la piste à envoyer, ici Chords.
+
+00:00:14.800 --> 00:00:20.600
+Cliquez sur la flèche sous une autre piste : Chords va maintenant là aussi.
+
+00:00:21.000 --> 00:00:26.400
+Le bouton dessous est le niveau d'envoi : la quantité qui va là.
+
+00:00:26.800 --> 00:00:32.200
+Mettez une reverb sur cette piste : un bus de reverb que toutes les pistes peuvent partager.
+
+00:00:32.600 --> 00:00:38.200
+Clic droit sur une flèche pour plus : Route to this track only, ou Sidechain to this track.
+
+00:00:38.600 --> 00:00:45.000
+Jouez : les accords prennent leur espace, et chaque piste garde son fader.
