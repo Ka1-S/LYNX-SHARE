@@ -610,6 +610,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // the workspace panels
     rack.onOpenPianoRoll = [this] { openPianoRoll(); };
+    rack.onImportMidiFile = [this] (const juce::File& file) { importMidiFileWithWindow (file); }; // (round 190qj: a .mid below the channels)
     rack.onOpenTracker = [this] (int channel) { openTracker (engine, -1, channel); }; // (round 190ob)
     rack.actionKeyText = [this] (const char* actionId) { return shortcutText (actionId); };
     // round 190mk (DE-33, FL's manual): a click on a channel's piano roll preview shows / hides the Piano roll; a right-click
@@ -3736,6 +3737,8 @@ void MainComponent::loadUiSettings()
             keeplabels::on = on;
         else if (key == "shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio (LYNX)
             PlaylistComponent::shadeFadedAudio = on;
+        else if (key == "dimUnselectedTracks") // PR #267 (round 190qj): Playlist › View › Dim unselected tracks (LYNX)
+            PlaylistComponent::dimUnselectedTracks = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -4173,6 +4176,7 @@ void MainComponent::saveUiSettings()
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
                                       + "\nkeepLabels=" + juce::String (keeplabels::on ? 1 : 0)
                                       + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
+                                      + "\ndimUnselectedTracks=" + juce::String (PlaylistComponent::dimUnselectedTracks ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -5773,6 +5777,12 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 // round 190oo (design review O-1, a LYNX extra): shade the faded part as the Clip-launch layout does
                 view.addItem (tr ("Shade faded audio (LYNX)"), true, PlaylistComponent::shadeFadedAudio, [this] {
                     PlaylistComponent::shadeFadedAudio = ! PlaylistComponent::shadeFadedAudio;
+                    playlist.headerOptionsChanged();
+                    saveUiSettings();
+                });
+                // PR #267 (round 190qj, a LYNX extra): the selected tracks stand out, the others step back
+                view.addItem (tr ("Dim unselected tracks (LYNX)"), true, PlaylistComponent::dimUnselectedTracks, [this] {
+                    PlaylistComponent::dimUnselectedTracks = ! PlaylistComponent::dimUnselectedTracks;
                     playlist.headerOptionsChanged();
                     saveUiSettings();
                 });
@@ -10748,19 +10758,27 @@ void MainComponent::importMidiFile()
         const auto file = fc.getResult();
         if (safe == nullptr || file == juce::File())
             return;
-        juce::String error;
-        const auto midi = MidiFileIo::parseFile (file, error);
-        if (! midi)
-        {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"), error);
-            return;
-        }
-        static MidiFileIo::ImportOptions remembered; // FL keeps the window's choices
-        showMidiImportDialog (file.getFileName(), *midi, remembered, false, [safe, file] (const MidiFileIo::ImportOptions& o) {
-            remembered = o;
-            if (safe != nullptr)
-                safe->importMidiFile (file, o);
-        });
+        safe->importMidiFileWithWindow (file);
+    });
+}
+
+// FL's "Import MIDI data" window for a file (File › Import › MIDI file, and a .mid dropped on the Channel rack below its
+// channels: FL 2026 opens the same window there, with its new-channel options; round 190qj)
+void MainComponent::importMidiFileWithWindow (const juce::File& file)
+{
+    juce::String error;
+    const auto midi = MidiFileIo::parseFile (file, error);
+    if (! midi)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"), error);
+        return;
+    }
+    static MidiFileIo::ImportOptions remembered; // FL keeps the window's choices
+    juce::Component::SafePointer<MainComponent> safe (this);
+    showMidiImportDialog (file.getFileName(), *midi, remembered, false, [safe, file] (const MidiFileIo::ImportOptions& o) {
+        remembered = o;
+        if (safe != nullptr)
+            safe->importMidiFile (file, o);
     });
 }
 

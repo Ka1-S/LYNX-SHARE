@@ -12785,3 +12785,8 @@ countries: es mx ar co cl pe ve
 "Recent" = "Recientes"
 "Add as {0} (default)" = "Añadir como {0} (predeterminado)"
 "Add as {0}" = "Añadir como {0}"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "(algunos clips de aquí suenan por otras pistas del mezclador: {0}; M también silencia esta pista de la Playlist)"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "Las pistas toman un tono apagado del color de acento (extra de LYNX)"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "Las pistas, las pistas del mezclador y los canales sin color propio toman un tono apagado del color de acento. Desactivado, o con el rojo propio de LYNX: el gris de FL. El punto Pistas tiene prioridad."
+"Dim unselected tracks (LYNX)" = "Oscurecer las pistas no seleccionadas (LYNX)"
+"In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "En el diseño Pattern, mientras haya pistas de la Playlist seleccionadas, las filas de las demás pistas quedan en segundo plano bajo un velo oscuro suave, para que la vista vaya a la selección. FL Studio no las oscurece: desactívalo para el aspecto de FL. También en Playlist › Ver."

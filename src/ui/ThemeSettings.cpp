@@ -120,7 +120,7 @@ void applyDrawingDots (const themes::Spec& spec)
     colour::audioClip = dot (themes::Dot::waves, audioClip);
     colour::stepOn = theme::stepOn = dot (themes::Dot::steps, colour::accent);
     colour::selection = dot (themes::Dot::selection, colour::accent);
-    colour::defaultTrack = dot (themes::Dot::tracks, juce::Colour (0xff485156)); // (issue #238: FL's grey unless set)
+    colour::defaultTrack = juce::Colour (themes::defaultTrackColour (spec)); // (issue #238: the dot, a muted accent or FL's grey)
     // round 190qh (D2-MX7): the track meters' own thresholds, when set
     colour::meterZonesOwn = spec.meterZones;
     colour::meterYellowDb = spec.meterYellowDb;
@@ -203,6 +203,8 @@ juce::String toJson (const themes::Spec& spec)
         o->setProperty ("meterYellowDb", spec.meterYellowDb);
         o->setProperty ("meterRedDb", spec.meterRedDb);
     }
+    if (! spec.tracksFromAccent) // (issue #238, round 190qj: on unless the file says off)
+        o->setProperty ("tracksFromAccent", false);
     return juce::JSON::toString (juce::var (o));
 }
 
@@ -248,6 +250,7 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
         spec.meterYellowDb = juce::jlimit (themes::meterYellowMin, themes::meterYellowMax, (float) (double) v["meterYellowDb"]);
         spec.meterRedDb = juce::jlimit (std::max (themes::meterRedMin, spec.meterYellowDb + 1.0f), themes::meterRedMax, (float) (double) v["meterRedDb"]);
     }
+    spec.tracksFromAccent = (bool) v.getProperty ("tracksFromAccent", true);
     return spec;
 }
 
@@ -642,7 +645,7 @@ public:
                                                                  &soundName, &soundButton, &soundPlay, &soundDefault, &soundNote, &slotA, &slotB, &abNote, &lookTitle,
                                                                  &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
                                                                  &optionsTitle, &clipsNoteColours, &meterZones, &meterYellowLabel, &meterYellow,
-                                                                 &meterRedLabel, &meterRed })
+                                                                 &meterRedLabel, &meterRed, &tracksFromAccent })
             add (*c);
         // round 190qh (D2-MX7, a LYNX extra next to the Meters dot): where the track meters turn yellow and red
         meterZones.setButtonText (tr ("Own meter thresholds"));
@@ -681,6 +684,11 @@ public:
         clipsNoteColours.setTooltip (tr ("Use the note color list to find random colors for new clips"));
         clipsNoteColours.setComponentID ("theme.clipsNoteColours");
         clipsNoteColours.onClick = [this] { edit ([on = clipsNoteColours.getToggleState()] (themes::Spec& s) { s.clipsUseNoteColours = on; }); };
+        // issue #238 (round 190qj, LYNX extra): tracks take a muted shade of the accent (off: FL's grey)
+        tracksFromAccent.setButtonText (tr ("Tracks take a muted shade of the accent color (LYNX extra)"));
+        tracksFromAccent.setTooltip (tr ("Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it."));
+        tracksFromAccent.setComponentID ("theme.tracksFromAccent");
+        tracksFromAccent.onClick = [this] { edit ([on = tracksFromAccent.getToggleState()] (themes::Spec& s) { s.tracksFromAccent = on; }); };
 
         // round 190je: the menus' palette (FL's classic light grey as an option, design190ia FW-16) and how strongly the
         // editors' grid lines show (Live's "Grid Line Intensity", FM-18); presets leave both alone
@@ -927,6 +935,7 @@ private:
         adjustNote.setBounds (row (18));
         optionsTitle.setBounds (row (24)); // (FL's Options, round 190od)
         clipsNoteColours.setBounds (row (24));
+        tracksFromAccent.setBounds (row (24));
 
         coloursTitle.setBounds (row (24));
         {
@@ -1074,7 +1083,7 @@ private:
             case D::meters: return theme::colour::meterLow;
             case D::waves: return theme::colour::audioClip;
             case D::text: return juce::Colour (palette.textPrimary);
-            case D::tracks: return juce::Colour (0xff485156); // (FL's grey)
+            case D::tracks: return juce::Colour (themes::defaultTrackColour (spec)); // (FL's grey or a muted accent, issue #238)
         }
         return juce::Colour (palette.textPrimary);
     }
@@ -1092,6 +1101,7 @@ private:
         meterRed.setValue (spec.meterRedDb, juce::dontSendNotification);
         for (auto* c : std::initializer_list<juce::Component*> { &meterYellow, &meterRed, &meterYellowLabel, &meterRedLabel })
             c->setAlpha (spec.meterZones ? 1.0f : 0.55f);
+        tracksFromAccent.setToggleState (spec.tracksFromAccent, juce::dontSendNotification);
         const auto palette = themes::adjustedPalette (spec);
         for (int i = 0; i < themes::dotCount; ++i)
         {
@@ -1348,6 +1358,7 @@ private:
     juce::ToggleButton meterZones; // (round 190qh)
     juce::Label meterYellowLabel, meterRedLabel;
     juce::Slider meterYellow, meterRed;
+    juce::ToggleButton tracksFromAccent; // (issue #238, round 190qj)
     juce::Label menuStyleLabel, gridLabel, lookNote;
     juce::ComboBox menuStyleBox;
     juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };

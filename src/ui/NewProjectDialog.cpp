@@ -304,6 +304,12 @@ public:
             genre.setText ("Synthwave", false);
             templates.selectRow (2);
         }
+        else
+        {
+            // the name is filled in for you, as FL 2026's Save as window does: "Project_1", "Project_2"... (round 190qj; a
+            // folder or project file already there takes the next name instead of an "already exists" error)
+            refreshAutoName();
+        }
         templateChosen();
         setSize (700, 540);
     }
@@ -451,11 +457,29 @@ private:
         return s;
     }
 
+    // FL's filled-in name (round 190qj): "Project_N" for the folder chosen; it follows the folder until the user types a
+    // name of their own
+    juce::String autoName;
+    juce::String nameBase() const { return name.getText().trim() == autoName ? juce::String() : name.getText().trim(); }
+    void refreshAutoName()
+    {
+        auto s = setup();
+        const auto next = juce::String::fromUTF8 (freeProjectName (s.folder, {}, s.ownFolder, ProjectFile::extension).c_str());
+        if (autoName.isNotEmpty() && name.getText().trim() != autoName)
+            return; // (the user's own name)
+        autoName = next;
+        name.setText (autoName, juce::dontSendNotification);
+    }
+
     void updatePath()
     {
+        if (persistent)
+            refreshAutoName();
         ownFolder.setEnabled (saveNow.getToggleState());
         folderValue.setText ("  " + (folderText.isNotEmpty() ? folderText : folder.getFullPathName()), juce::dontSendNotification);
-        const auto path = newProjectPath (setup(), ProjectFile::extension);
+        auto shown = setup();
+        shown.name = freeProjectName (shown.folder, nameBase().toStdString(), shown.ownFolder, ProjectFile::extension);
+        const auto path = newProjectPath (shown, ProjectFile::extension);
         pathNote.setText (path.empty() ? tr ("Not saved until you choose File › Save") : juce::String::fromUTF8 (path.c_str()).replaceCharacter ('/', juce::File::getSeparatorChar()),
                           juce::dontSendNotification);
         create.setEnabled (true);
@@ -479,10 +503,11 @@ private:
         const auto row = templates.getSelectedRow();
         if (row < 0 || row >= (int) templates.items.size())
             return;
-        const auto s = setup();
+        auto s = setup();
+        s.name = freeProjectName (s.folder, nameBase().toStdString(), s.ownFolder, ProjectFile::extension); // (never "already exists")
         auto song = makeSong (templates.items[(std::size_t) row]);
         applySetup (song, s);
-        if (s.info.title.empty() && name.getText().trim().isEmpty())
+        if (s.info.title.empty() && nameBase().isEmpty()) // (FL: a filled-in name is no title)
             song.info.title.clear();
 
         juce::File file;
@@ -643,5 +668,10 @@ void showNewProjectDialog (NewProjectCallback onCreate)
 std::unique_ptr<juce::Component> makeNewProjectPanel()
 {
     return std::make_unique<NewProjectPanel> (NewProjectCallback {}, false);
+}
+
+std::unique_ptr<juce::Component> makeNewProjectPanelAsShown()
+{
+    return std::make_unique<NewProjectPanel> (NewProjectCallback {}, true); // (round 190qj: the remembered folder, FL's name)
 }
 } // namespace lynx

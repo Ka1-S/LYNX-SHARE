@@ -1569,6 +1569,34 @@ int linkedInsertOf (const Song& song, int track)
     return -1;
 }
 
+std::vector<int> otherInsertsOnTrack (const Song& song, int track, int insert)
+{
+    std::vector<int> out;
+    const auto add = [&] (int channel) {
+        if (channel < 0 || channel >= (int) song.channels.size())
+            return;
+        const auto m = song.channels[(std::size_t) channel].mixerTrack;
+        if (m != insert && std::find (out.begin(), out.end(), m) == out.end())
+            out.push_back (m);
+    };
+    std::vector<char> seen (song.patterns.size(), 0);
+    for (const auto& clip : song.playlist)
+    {
+        if (clip.track != track || clip.length <= 0)
+            continue;
+        if (clip.kind == ClipKind::audio)
+            add (clip.channel);
+        else if (clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size() && ! seen[(std::size_t) clip.pattern])
+        {
+            seen[(std::size_t) clip.pattern] = 1;
+            for (const auto& n : song.patterns[(std::size_t) clip.pattern].notes)
+                add (n.channel);
+        }
+    }
+    std::sort (out.begin(), out.end());
+    return out;
+}
+
 bool isNeutral (const Song& song, int mixer)
 {
     if (! validInsert (song, mixer))

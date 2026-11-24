@@ -108,6 +108,16 @@ public:
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void filesDropped (const juce::StringArray& files, int x, int y) override;
+    // a file dragged over the rack (FL's marks): the channel the drop goes into (its name button outlined), or a new
+    // channel below the last one (a line under it)
+    void fileDragEnter (const juce::StringArray& files, int x, int y) override;
+    void fileDragMove (const juce::StringArray& files, int x, int y) override;
+    void fileDragExit (const juce::StringArray& files) override;
+    static constexpr int noDrop = -1, newChannelDrop = -2;
+    int fileDropRowForSnapshot() const noexcept { return fileDropRow; }
+    bool shiftDropForTests = false; // (a test's drop "with Shift held": FL's import without the window)
+    // a .mid dropped below the channels: FL's full "Import MIDI data" window (MainComponent::importMidiFileWithWindow)
+    std::function<void (const juce::File&)> onImportMidiFile;
 
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
@@ -372,6 +382,10 @@ private:
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
     void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
+    // A .mid dropped on a channel's row: FL's "Import MIDI data" window for that channel (`withWindow`; Shift: at once with
+    // the window's last choices), its notes into that channel's part of the current pattern. channel < 0 (below the
+    // channels): FL's full window (onImportMidiFile).
+    void importMidiOnChannel (int channel, const juce::File& file, bool withWindow);
     void openPluginWindow (int channel);
     // Freeze (round 190ay, ui/ExportDialog.h freezeChannel): the frozen channel's hint; "Unfreeze to edit" in the hint
     // bar when an edit of a frozen channel is refused (true = refused); Freeze / Re-freeze of several channels, one
@@ -408,6 +422,8 @@ private:
     void showTip (Area area, int row, bool transient);
     Area hoverArea = Area::none;
     int hoverRow = -1, hoverStep = -1;
+    int fileDropRow = noDrop;    // (a file dragged over the rack: the channel it would go into, newChannelDrop, noDrop)
+    void paintFileDropTarget (juce::Graphics& g); // the drop mark, over the rows
 
     // the control contract for the row's knobs and route box
     ui::ValueSpec specFor (Area area, int row) const;
@@ -459,6 +475,17 @@ public:
         const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
         rack.filesDropped (files, p.x, p.y);
     }
+    void fileDragEnter (const juce::StringArray& files, int x, int y) override
+    {
+        const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
+        rack.fileDragEnter (files, p.x, p.y);
+    }
+    void fileDragMove (const juce::StringArray& files, int x, int y) override
+    {
+        const auto p = rack.getLocalPoint (this, juce::Point<int> (x, y));
+        rack.fileDragMove (files, p.x, p.y);
+    }
+    void fileDragExit (const juce::StringArray& files) override { rack.fileDragExit (files); }
     bool isInterestedInDragSource (const SourceDetails& details) override { return rack.isInterestedInDragSource (details); }
     void itemDropped (const SourceDetails& details) override
     {

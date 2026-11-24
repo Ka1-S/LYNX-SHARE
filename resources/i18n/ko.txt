@@ -12785,3 +12785,8 @@ countries: kr
 "Recent" = "최근"
 "Add as {0} (default)" = "{0}(으)로 추가 (기본)"
 "Add as {0}" = "{0}(으)로 추가"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "(여기 있는 일부 클립은 다른 믹서 트랙을 통해 재생됩니다: {0}; M은 이 플레이리스트 트랙도 음소거합니다)"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "트랙에 강조 색의 차분한 색조 사용 (LYNX 추가 기능)"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "자체 색이 없는 트랙, 믹서 트랙, 채널은 강조 색의 차분한 색조를 사용합니다. 끄거나 LYNX 기본 빨강 강조 색이면 FL의 회색입니다. 트랙 점이 우선합니다."
+"Dim unselected tracks (LYNX)" = "선택하지 않은 트랙 어둡게 (LYNX)"
+"In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "Pattern 레이아웃에서 플레이리스트 트랙을 선택하는 동안 다른 트랙의 행은 옅은 어두운 막 아래로 물러나 선택에 눈이 갑니다. FL Studio는 어둡게 하지 않습니다. FL의 모습으로 하려면 끄세요. 플레이리스트 › 보기에도 있습니다."

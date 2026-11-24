@@ -12785,3 +12785,8 @@ countries: ru by kz
 "Recent" = "Недавние"
 "Add as {0} (default)" = "Добавить как {0} (по умолчанию)"
 "Add as {0}" = "Добавить как {0}"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "(некоторые клипы здесь звучат через другие дорожки микшера: {0}; M также заглушает эту дорожку плейлиста)"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "Дорожки получают приглушённый оттенок акцентного цвета (дополнение LYNX)"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "Дорожки, дорожки микшера и каналы без собственного цвета получают приглушённый оттенок акцентного цвета. Выключено или с собственным красным акцентом LYNX: серый FL. Точка «Дорожки» имеет приоритет."
+"Dim unselected tracks (LYNX)" = "Затемнять невыбранные дорожки (LYNX)"
+"In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "В макете Pattern, пока выбраны дорожки плейлиста, строки остальных дорожек уходят на второй план под лёгкой тёмной вуалью, чтобы взгляд шёл к выделению. FL Studio их не затемняет: выключите для вида FL. Также в Плейлист › Вид."

@@ -184,6 +184,10 @@ struct Spec
     // yellow and red; off = each meter keeps its own (the Mixer's: yellow at -6, red from 0)
     bool meterZones = false;
     float meterYellowDb = -6.0f, meterRedDb = 0.0f;
+    // Issue #238 (round 190qj, LYNX extra; Material's "a main colour and its muted shades"): Playlist tracks, mixer tracks
+    // and channels without a colour of their own take a muted shade of the accent instead of FL's grey, when the theme's
+    // accent is not LYNX's default (the default look stays FL's). Off: FL's grey. The Tracks dot overrides both.
+    bool tracksFromAccent = true;
 
     bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
     bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
@@ -194,6 +198,13 @@ struct Spec
     }
     bool operator== (const Spec&) const = default;
 };
+
+// Issue #238 (round 190qj): the colour drawn for tracks, mixer tracks and channels with no colour of their own: the Tracks
+// dot when set, else (tracksFromAccent, an accent other than LYNX's default) a muted shade of the accent at the
+// brightness of FL's grey, else FL's grey #485156.
+constexpr std::uint32_t flTrackGrey = 0xff485156;
+std::uint32_t mutedAccent (std::uint32_t accent); // the accent's hue, saturation <= 0.35, FL's grey's brightness
+std::uint32_t defaultTrackColour (const Spec& spec);
 
 // The palette a theme draws with: derivePalette, then its grid line intensity.
 Palette paletteFor (const Spec& spec);

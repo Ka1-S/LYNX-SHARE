@@ -591,31 +591,21 @@ private:
     {
     public:
         using IconComboBox::IconComboBox;
-        std::function<void()> onPopup;
+        // The menu a click opens instead of the box's item list (issue #203, FL's View › Scale highlighting menu). The box
+        // shows it itself, so it also has to close it: ComboBox::showPopupIfNotActive() marks the box as having a menu
+        // open before showPopup(), and ComboBox clears that mark from the result callback of the menu *it* shows. With a
+        // menu of our own, a click after the first one did nothing (the mark stayed set).
+        std::function<juce::PopupMenu()> onPopup;
         void showPopup() override
         {
-            if (! onPopup)
+            if (onPopup == nullptr)
             {
                 IconComboBox::showPopup();
                 return;
             }
-            onPopup();
-            // issue #242 (round 190od): juce::ComboBox marks its popup active before showPopup() and clears the mark only
-            // in its own menu's callback, so a box whose click opens another menu stayed "active" after that menu
-            // closed and never opened again. The menu onPopup() showed is the modal component now: its end clears it.
-            if (auto* menu = juce::Component::getCurrentlyModalComponent())
-                juce::ModalComponentManager::getInstance()->attachCallback (
-                    menu, juce::ModalCallbackFunction::create ([box = juce::Component::SafePointer<ScaleBox> (this)] (int) {
-                        if (box != nullptr)
-                            box->popupClosed();
-                    }));
-            else
-                popupClosed();
-        }
-        void popupClosed()
-        {
-            if (isPopupActive())
-                hidePopup();
+            const juce::Component::SafePointer<ScaleBox> box (this);
+            onPopup().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()),
+                                     [box] (int) { if (box != nullptr) box->hidePopup(); });
         }
     };
     // chord created on each click (like FL's "stamp"); round 190nu: a click opens the Stamp menu (FL's stamp button opens

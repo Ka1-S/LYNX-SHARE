@@ -44,4 +44,6 @@ bool saveUserTemplate (const Song& song, const juce::String& name, juce::String&
 
 // The window's content, for --snapshot mode (sample user templates, nothing saved).
 std::unique_ptr<juce::Component> makeNewProjectPanel();
+// The window as File › New shows it (the profile's remembered folder; the name filled in as FL does, round 190qj).
+std::unique_ptr<juce::Component> makeNewProjectPanelAsShown();
 } // namespace lynx

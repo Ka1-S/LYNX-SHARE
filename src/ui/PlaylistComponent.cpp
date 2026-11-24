@@ -799,6 +799,7 @@ public:
                                 juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
+        owner.paintTrackSelectionDim (g); // (over the picture: the selection changes without the lanes being painted again)
         owner.paintStickyTitles (g);
         if (! owner.gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
             owner.paintPlayhead (g);
@@ -2141,6 +2142,57 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 g.fillRectList (background);
             }
 
+            // PR #264 (FL's Playlist, checked in FL 2026 in round 190qj): the bars come in groups of 4 and every other group
+            // (5-8, 13-16...) is a shade darker, in any time signature; with the lanes' alternating shades that is FL's
+            // light/dark plaid. Round 190qj (paint gate: the PR's bg0 veil per bar blended half the grid once more, +15 %
+            // Playlist paint instructions): each lane is filled in opaque spans, the dark groups in the lane's own colour
+            // with that veil already applied, so every pixel is still painted once.
+            struct Span { int x0, x1; bool dark; };
+            std::vector<Span> spans;
+            if (fl)
+            {
+                const auto from = grid.getIntersection (paintedRows);
+                const auto tickFrom = juce::jmax ((std::int64_t) 0, (std::int64_t) xToTick (from.getX()) - bar);
+                const auto tickTo = (std::int64_t) xToTick (from.getRight()) + 1;
+                const auto groupDark = [] (int number) { return number >= 1 && ((number - 1) / 4) % 2 == 1; };
+                auto at = grid.getX();
+                std::optional<bool> dark; // (the shade left of the first bar line: that of the bar before it)
+                for (const auto& b : song.barsBetween (tickFrom, tickTo))
+                {
+                    const auto x = juce::jlimit (grid.getX(), grid.getRight(), (int) std::lround (tickToX ((double) b.tick)));
+                    if (! dark.has_value())
+                        dark = groupDark (b.number - 1);
+                    if (x > at)
+                        spans.push_back ({ at, x, *dark });
+                    at = juce::jmax (at, x);
+                    dark = groupDark (b.number);
+                }
+                if (at < grid.getRight())
+                    spans.push_back ({ at, grid.getRight(), dark.value_or (false) });
+                // merge neighbours of one shade (a group is 4 bars: 1 span instead of 4)
+                std::vector<Span> merged;
+                for (const auto& sp : spans)
+                    if (! merged.empty() && merged.back().dark == sp.dark && merged.back().x1 == sp.x0)
+                        merged.back().x1 = sp.x1;
+                    else
+                        merged.push_back (sp);
+                spans.swap (merged);
+            }
+            const auto groupShade = [] (juce::Colour c) { return c.overlaidWith (colour::bg0.withAlpha (0.30f)); };
+            const auto fillLane = [&] (juce::Colour c, int y, int h) {
+                if (spans.empty())
+                {
+                    g.setColour (c);
+                    g.fillRect (grid.getX(), y, grid.getWidth(), h);
+                    return;
+                }
+                for (const auto& sp : spans)
+                {
+                    g.setColour (sp.dark ? groupShade (c) : c);
+                    g.fillRect (sp.x0, y, sp.x1 - sp.x0, h);
+                }
+            };
+
             for (int t = 0; t < rows; ++t)
             {
                 const auto y = trackToY (t);
@@ -2166,8 +2218,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         lane = colour::bg1.interpolatedWith (colour::bg2, 0.35f);
                     if (t == hover.track && drag == Drag::none)
                         lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
-                    g.setColour (ink (lane));
-                    g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
+                    fillLane (ink (lane), y, trackHeight);
                     g.setColour (ink (colour::bg0));
                     g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
                 }
@@ -2540,6 +2591,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.setColour (colour::textPrimary);
             g.fillPath (dashed);
         }
+
+        if (! cachePainting) // (the cached picture gets it from PlayheadCache::paint)
+            paintTrackSelectionDim (g);
 
         if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
             paintStickyTitles (g);
@@ -3341,6 +3395,31 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 // draws them without the cache
 // Round 190ig (FL look, Pattern layout): the titles of the audio and automation clips that start left of the view, held at
 // its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
+void PlaylistComponent::paintTrackSelectionDim (juce::Graphics& g)
+{
+    if (! dimUnselectedTracks || selectedTracks.empty() || ! flClipLook())
+        return;
+
+    const auto grid = gridArea();
+    if (grid.isEmpty())
+        return;
+
+    juce::Graphics::ScopedSaveState state (g);
+    if (! g.reduceClipRegion (grid))
+        return;
+
+    g.setColour (juce::Colours::black.withAlpha (0.16f)); // (round 190qj: subtle; clip names and notes on them stay readable)
+    for (int t = 0; t < numTracks(); ++t)
+        if (! isTrackSelected (t))
+        {
+            const auto height = heightOf (t);
+            if (height <= 0)
+                continue;
+            g.fillRect (grid.getX(), trackToY (t), grid.getWidth(), height + laneBlockHeight (t)); // (the lanes and clips)
+            g.fillRect (0, trackToY (t), headerWidth, height);                                      // (the header too)
+        }
+}
+
 void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 {
     // round 190qe (D2-PL2): FL's Playlist ▸ View ▸ "Keep labels on screen" (on by default) — every layout's arrangement and
@@ -6443,6 +6522,19 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             {
                 // a linked header's M is lit by a muted Playlist track too (FL's LED): the first click unmutes the track
                 editTrack (track, [] (PlaylistTrack& t) { t.muted = false; });
+                return;
+            }
+            // issue #265 (round 190qj): clips on this track that play through other inserts (a pattern whose channels
+            // are routed elsewhere) would keep playing under a lit M: M then mutes the Playlist track too (FL's track
+            // mute, every clip on it), and unmutes both
+            if (onLed && ! simpleHeaders && ! autolink::otherInsertsOnTrack (engine.getSong(), track, insert).empty())
+            {
+                const auto mute = ! engine.getSong().mixer[(std::size_t) insert].muted;
+                engine.editSong ([insert, track, mute] (Song& s) {
+                    s.mixer[(std::size_t) insert].muted = mute;
+                    if (track < (int) s.playlistTracks.size())
+                        s.playlistTracks[(std::size_t) track].muted = mute;
+                });
                 return;
             }
             if (onLed || trackSolo (track).contains (p))
@@ -14993,6 +15085,15 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                     : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
                     : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
                                : tr ("Track effects: [LMB] open the effects of its mixer track");
+        // issue #265 (round 190qj): a linked track whose clips also play through other inserts says so
+        if (! simpleHeaders && (h.led || h.volume || h.pan))
+            if (const auto others = autolink::otherInsertsOnTrack (song, h.track, insert); ! others.empty())
+            {
+                juce::StringArray names;
+                for (const auto o : others)
+                    names.add (o == 0 ? tr ("Master") : juce::String (o));
+                hint.text += "  " + tr ("(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)", { names.joinIntoString (", ") });
+            }
         if (h.volume)
             hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
         else if (h.pan)

@@ -26,6 +26,9 @@ void showMidiImportDialog (const juce::String& fileName, const midiimport::Parse
 void showEventLaneMidiImportDialog (const juce::String& fileName, const midiimport::ParsedMidi& midi, const midiimport::Options& current,
                                     std::function<void (const midiimport::Options&)> onAccept);
 std::unique_ptr<juce::AlertWindow> makeMidiImportDialog();
+// The choices of the import into a channel (the Piano roll's "Import .mid into this channel..." and a .mid dropped on a
+// Channel rack row, round 190qj): FL's window remembers them, and FL's Shift+drop imports with them without the window.
+midiimport::Options& channelMidiImportOptions();
 
 // "Rename and color" dialog for patterns and channels (docs/WORKFLOW_FL.md, P1 item 4): a name field
 // and LYNX's palette (plus "automatic"); F2 inside the dialog picks a random palette color.

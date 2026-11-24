@@ -414,6 +414,32 @@ TEST (new_project_setup_and_templates)
     CHECK (templateDisplayName ("C:/T/Trap kit.lynx") == "Trap kit" && templateDisplayName (".hidden") == ".hidden");
 }
 
+// The "Empty" template is FL's empty project: one Sampler channel and nothing in the patterns. The "Default" new project
+// keeps the channel set (the New project window's "Drums and a synth on the first inserts").
+TEST (empty_template_is_one_sampler)
+{
+    using namespace lynx;
+    const auto empty = makeTemplate (builtInTemplateIndex ("Empty"));
+    CHECK (empty.channels.size() == 1);
+    if (empty.channels.size() == 1)
+    {
+        CHECK (empty.channels[0].instrument == InstrumentKind::sampler);
+        CHECK (empty.channels[0].name == "Sampler");
+        CHECK (empty.channels[0].mixerTrack == 0); // (FL 2026: "---", the Master; round 190qj)
+        CHECK (empty.channels[0].samplePath.empty());
+    }
+    CHECK (empty.patterns.size() == 1 && empty.patterns[0].notes.empty());
+    // FL's Empty.flp (round 190qj): nothing on the Master, 140 BPM; the default new project keeps its limiter
+    CHECK (empty.mixer[0].effects.empty() && empty.bpm == 140.0);
+    CHECK (! makeNewProject().mixer[0].effects.empty());
+    CHECK (makeNewProject (builtInTemplateIndex ("Empty")).channels.size() == 1);
+    // the default new project: still the channel set, with empty steps
+    const auto defaults = makeNewProject();
+    CHECK (defaults.channels.size() == 5);
+    CHECK (defaults.channels.front().name == "Kick" && defaults.channels.back().name == "Synth");
+    CHECK (defaults.patterns.size() == 1 && defaults.patterns[0].notes.empty());
+}
+
 // Issue #123: the default template's saved form (FL's Options › General › "Default template")
 TEST (default_template_choice_text_round_trip_and_rejects_paths)
 {
@@ -496,4 +522,51 @@ TEST (clipprops_bar_beat_tick_text)
     CHECK (parsePosition ("1:4", lynx::Meter (3, 4)) == -1 && parsePosition ("2:3", lynx::Meter (3, 4)) == 3 * beat + 2 * beat);
     for (std::int64_t t : { (std::int64_t) 0, beat * 7 + 33, bar * 100 + 1 })
         CHECK (parsePosition (formatPosition (t, lynx::Meter (4, 4)), lynx::Meter (4, 4)) == t && parseLength (formatLength (t, lynx::Meter (7, 4)), lynx::Meter (7, 4)) == t);
+}
+
+// FL names new projects for you (FL 2026's Save as window for a new project, seen in round 190qj: "Project_1" where a
+// "Project_1" folder was missing, "Project_2" where one was there) — the first free name in the folder, never an "already
+// exists" error (core/Templates.cpp freeProjectName, the New project window's Name field). PR #266, FL-exact in 190qj.
+TEST (new_project_names_are_filled_in_and_never_clash)
+{
+    namespace fs = std::filesystem;
+    using namespace lynx;
+    std::error_code ec;
+    const auto dir = (fs::temp_directory_path (ec) / ("lynx_newproject_" + processTempTag())).string();
+    fs::remove_all (dir, ec);
+    fs::create_directories (dir, ec);
+    const auto write = [] (const std::string& path) {
+        fs::create_directories (fs::path (path).parent_path());
+        std::ofstream out (path);
+        out << "x";
+    };
+
+    // nothing there: the name the window shows
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_1");
+    CHECK (freeProjectName (dir, "  ", true, ".lynx") == "Project_1");
+    // its folder and file taken: "Project_2", then "Project_3"
+    write (dir + "/Project_1/Project_1.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_2");
+    write (dir + "/Project_2/Project_2.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_3");
+    // an empty folder counts as taken too: the new project gets a folder of its own
+    fs::create_directories (dir + "/Project_3", ec);
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Project_4");
+
+    // without the project's own folder only the project file matters
+    write (dir + "/flat/Project_1.lynx");
+    CHECK (freeProjectName (dir + "/flat", "", false, ".lynx") == "Project_2");
+    CHECK (freeProjectName (dir + "/flat", "Sketch", false, ".lynx") == "Sketch");
+
+    // a name typed by the user that is taken gets FL's "_2", "_3"; characters the file system refuses become '_'
+    write (dir + "/My Song/My Song.lynx");
+    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song_2");
+    write (dir + "/My Song_2/My Song_2.lynx");
+    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song_3");
+    CHECK (freeProjectName (dir, "My: Song?", true, ".lynx") == "My_ Song_");
+
+    // no folder yet: the name as it is (the save window comes later)
+    CHECK (freeProjectName ({}, "", true, ".lynx") == "Project_1");
+    CHECK (freeProjectName ({}, "Sketch", true, ".lynx") == "Sketch");
+    fs::remove_all (dir, ec);
 }

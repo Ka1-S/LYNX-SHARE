@@ -318,6 +318,11 @@ bool isNeutral (const Song& song, int mixer);
 bool isNeutralFree (const Song& song, int mixer);
 // The insert a Playlist track is linked to (an audio track's; an instrument track's channel's), -1 when unassigned.
 int linkedInsertOf (const Song& song, int track);
+// Issue #265 (round 190qj): the inserts, other than `insert`, that the clips on Playlist track `track` play through (an
+// audio clip: its channel's insert; a pattern clip: the inserts of the channels it has notes for), ascending. A linked
+// track's header M / volume act on its own insert, so these clips would keep playing while it is muted (a pattern placed
+// on an audio track plays its channels where they are routed, as in FL).
+std::vector<int> otherInsertsOnTrack (const Song& song, int track, int insert);
 // Each channel's home track (-1: no track plays it).
 std::vector<int> homeTracks (const Song& song);
 // Per track (0..499): the home track whose instruments it only repeats, -1 for a track with content of its own or none.

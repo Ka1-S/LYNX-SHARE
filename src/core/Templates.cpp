@@ -5,7 +5,9 @@
 #include "core/SynthPresets.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <optional>
+#include <system_error>
 
 namespace lynx
 {
@@ -55,6 +57,16 @@ void notes (Pattern& p, int channel, std::initializer_list<std::array<int, 3>> l
         p.notes.push_back (n);
     }
 }
+
+// The "Default" new project (the New project window's first entry, and a File > New that follows LYNX's default): the
+// channel set with its inserts and the Master limiter, and EMPTY steps (round 170h2: the four-on-the-floor is the "Basic
+// beat" template). The "Empty" template is FL's: one Sampler channel on the Master, added below.
+Song defaultChannelsProject()
+{
+    auto s = Song::makeDefault();
+    s.patterns[0].notes.clear();
+    return s;
+}
 } // namespace
 
 std::vector<std::string> templateNames()
@@ -69,8 +81,19 @@ Song makeTemplate (int index)
 
     if (index == 0)
     {
+        // FL's Empty template (Data/Templates/Empty/Empty.flp, checked in FL 2026 in round 190qj): one Sampler channel with
+        // no sample (a sample dropped on it fills it) on the Master ("---", no insert), an empty pattern, empty inserts,
+        // nothing on the Master (no limiter: that is the "Basic with limiter" template's), 140 BPM
         auto s = Song::makeDefault();
+        s.channels.clear();
+        ChannelDef sampler;
+        sampler.name = "Sampler";
+        sampler.instrument = InstrumentKind::sampler;
+        sampler.mixerTrack = 0;
+        s.channels.push_back (sampler);
         s.patterns[0].notes.clear();
+        s.mixer[0].effects.clear();
+        s.bpm = 140.0;
         return s;
     }
 
@@ -141,6 +164,34 @@ std::string newProjectPath (const NewProjectSetup& setup, const char* extension)
         folder.pop_back();
     const auto name = legalProjectName (setup.name);
     return folder + "/" + (setup.ownFolder ? name + "/" : std::string()) + name + extension;
+}
+
+std::string freeProjectName (const std::string& folder, const std::string& base, bool ownFolder, const char* extension)
+{
+    // FL 2026's "Save as" window for a new project (TNewProjForm, seen in round 190qj): the name is filled in as
+    // "Project_1", "Project_2"... (the first whose project folder is not there yet); a name of the user's that is taken
+    // gets FL's "_2", "_3"... (as File › Save new version: "Song" -> "Song_2")
+    const auto series = base.find_first_not_of (" \t") == std::string::npos;
+    const auto stem = series ? std::string ("Project") : legalProjectName (base);
+    const auto candidate = [&] (int n) { return n == 0 ? stem : stem + "_" + std::to_string (series ? n : n + 1); };
+    NewProjectSetup setup;
+    setup.folder = folder;
+    setup.ownFolder = ownFolder;
+    std::error_code ec;
+    for (int n = series ? 1 : 0; n < 10000; ++n)
+    {
+        setup.name = candidate (n);
+        const auto path = newProjectPath (setup, extension);
+        if (path.empty())
+            return setup.name; // (not saved yet: no folder to clash with)
+        const std::filesystem::path file (path);
+        if (std::filesystem::exists (file, ec))
+            continue;
+        if (ownFolder && std::filesystem::exists (file.parent_path(), ec)) // (an empty or older folder there too)
+            continue;
+        return setup.name;
+    }
+    return candidate (series ? 1 : 0);
 }
 
 void applySetup (Song& song, const NewProjectSetup& setup)
@@ -349,8 +400,9 @@ NewProjectDefaults& newProjectDefaults()
 Song makeNewProject (int templateIndex)
 {
     // round 170h2 (user decision): the default new project is FL's way — the channels, their inserts and the Master
-    // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template)
-    auto song = makeTemplate (templateIndex < 0 ? 0 : templateIndex);
+    // limiter, with EMPTY steps (the four-on-the-floor stays in the "Basic beat" template). The built-in "Empty" template
+    // (index 0) is a single Sampler instead, as FL's.
+    auto song = templateIndex < 0 ? defaultChannelsProject() : makeTemplate (templateIndex);
     applyNewProjectDefaults (song, newProjectDefaults());
     adoptFlPluginLevels (song); // (the built-in templates hold no hosted plugin: every new project gets FL's levels)
     return song;

@@ -12785,3 +12785,8 @@ countries: jp
 "Recent" = "最近使用"
 "Add as {0} (default)" = "{0} として追加 (既定)"
 "Add as {0}" = "{0} として追加"
+"(some clips here play through other mixer tracks: {0}; M mutes this Playlist track too)" = "（ここにある一部のクリップは別のミキサートラックを通って再生されます: {0}。M はこのプレイリストトラックもミュートします）"
+"Tracks take a muted shade of the accent color (LYNX extra)" = "トラックにアクセントカラーの落ち着いた色合いを使う（LYNX 独自）"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "自分の色を持たないトラック、ミキサートラック、チャンネルはアクセントカラーの落ち着いた色合いになります。オフ、または LYNX 本来の赤のアクセントでは FL のグレーです。「トラック」ドットが優先されます。"
+"Dim unselected tracks (LYNX)" = "選択していないトラックを暗くする（LYNX）"
+"In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "Pattern レイアウトでプレイリストのトラックを選択している間、ほかのトラックの行は薄い暗いベールの下に下がり、選択に目が向きます。FL Studio は暗くしません。FL の見た目にするにはオフにしてください。プレイリスト › 表示 にもあります。"
