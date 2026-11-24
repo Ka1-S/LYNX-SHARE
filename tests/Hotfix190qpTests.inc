@@ -146,7 +146,7 @@ TEST (hotfix190qp_imported_fl_volume_send_and_filter_automation_play)
                     driving += a.target == target ? 1 : 0;
                 }
             CHECK (driving == 2 && target.kind == c.target.kind && target.index == c.target.index);
-            if (driving != 2 || target.kind != c.target.kind)
+            if (driving != 2 || target.kind != c.target.kind || target.index != c.target.index)
                 for (const auto& a : imported.automations)
                     std::fprintf (stderr, "    %s: imported automation \"%s\" kind %d index %d slot %d param %d, links %d\n", c.name, a.name.c_str(),
                                   (int) a.target.kind, a.target.index, a.target.slot, a.target.param, (int) a.links.size());
