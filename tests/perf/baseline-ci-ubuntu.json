@@ -161,16 +161,16 @@
    "bench/inserts50@64/cpu_norm": 1.3231822907111845,
    "bench/inserts50@64/instr_per_sample": 67058.0,
    "bench/stream@128/cpu_norm": 0.08371552620314314,
-   "bench/stream@128/instr_per_sample": 5471.0,
+   "bench/stream@128/instr_per_sample": 5627.0,
    "bench/stream@256/build_norm": 0.08866874579587843,
    "bench/stream@256/cpu_norm": 0.07729468599033816,
    "bench/stream@256/edit_norm": 0.002446034366782853,
    "bench/stream@256/import_norm": 42.989665504800335,
-   "bench/stream@256/instr_per_sample": 5176.0,
+   "bench/stream@256/instr_per_sample": 5302.0,
    "bench/stream@256/rebuild_norm": 0.031186938176481376,
    "bench/stream@256/rss_mb": 509.9,
    "bench/stream@64/cpu_norm": 0.09515073686785298,
-   "bench/stream@64/instr_per_sample": 6068.0,
+   "bench/stream@64/instr_per_sample": 6284.0,
    "bench/synth100@128/cpu_norm": 3.2505350700177336,
    "bench/synth100@128/instr_per_sample": 165136.0,
    "bench/synth100@256/build_norm": 10.078884608328746,
@@ -351,7 +351,7 @@
   "project/synth100/load_norm": 0.36206430694406916,
   "project/synth100/save_norm": 0.47554714941907594
  },
- "note": "GitHub ubuntu-24.04 runners (Tests > App ubuntu > Performance gate), measured on run 43760315288 at e42789b63. Times are divided by perfbench calibrate; runners differ in CPU model, so the thresholds are wider than the local ones. Update only for a reviewed, intended change: download the perfgate-results artifact and copy its numbers here with the reason. Rollup 0.1.30 step 9: the Xeon 6975P-C runners' paint instruction counts (paint_instr, run 44424743421 at 530dc0a7b, PERF_GATE_ONLY_METRICS=paint_instr); on that model they gate the paint cells, whose times are reported only.",
+ "note": "GitHub ubuntu-24.04 runners (Tests > App ubuntu > Performance gate), measured on run 43760315288 at e42789b63. Times are divided by perfbench calibrate; runners differ in CPU model, so the thresholds are wider than the local ones. Update only for a reviewed, intended change: download the perfgate-results artifact and copy its numbers here with the reason. Rollup 0.1.30 step 9: the Xeon 6975P-C runners' paint instruction counts (paint_instr, run 44424743421 at 530dc0a7b, PERF_GATE_ONLY_METRICS=paint_instr); on that model they gate the paint cells, whose times are reported only. Rollup 0.1.32 step 1 (round 190qn): the Xeon 6975P-C stream cells' instr_per_sample set to 0.1.31's own (main 470558faf, Tests run 45235187600: 6284 / 5627 / 5302, +3.6 / +2.9 / +2.4 % over the e42789b63 numbers, drift of the 0.1.30-0.1.31 rounds that main's gate still passed); the rollup's step 1 adds about +0.5 % there (local: +0.7 % at 64, +0.4 % at 128, +0.2 % at 256 vs v0.1.31-alpha; round 190qh lists a per-insert flag and a slot-fade check per block as its audio-thread cost when off).",
  "profile": "ci-ubuntu",
  "thresholds": {
   "build_norm": [
