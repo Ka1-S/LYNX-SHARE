@@ -30,5 +30,9 @@ void registerFileTypes();
 // ~/.local/share (no root), pointing at this AppImage, and removes them again.
 bool runningAsAppImage();
 bool appImageMenuEntryInstalled();
+// Issue #278 (round 190qr): whether an AppImage manager (Gear Lever, AppImageLauncher, appimaged) has its own menu entry
+// for this AppImage. Then LYNX writes none (setAppImageMenuEntry (true) does nothing) and registerFileTypes removes
+// LYNX's, and the switch is not offered.
+bool appImageInMenuByManager();
 bool setAppImageMenuEntry (bool on);
 } // namespace lynx
