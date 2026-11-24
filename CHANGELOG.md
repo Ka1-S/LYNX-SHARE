@@ -26,6 +26,8 @@ A hotfix for 0.1.31.
   clip you open, and a hint on an empty instrument track says how to draw a MIDI clip (Discord).
 - Fixed: Automatic colors and icons let you add only one rule (#239).
 - Fixed: right-clicking the hint bar crashed LYNX (#269).
+- Fixed: markers couldn't be deleted (#281).
+- Fixed: two LYNX entries in the Linux app menu (#278).
 - Fixed: 0.1.31 used ~7 MB more memory and more CPU right after start-up.
 
 ## 0.1.31 alpha
