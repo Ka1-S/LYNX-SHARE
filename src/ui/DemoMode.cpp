@@ -26,6 +26,7 @@
 #include "ui/MainComponent.h"
 #include "ui/MixerComponent.h"
 #include "ui/PolyEditor.h"
+#include "ui/ToolWindow.h"
 
 namespace lynx
 {
@@ -229,6 +230,96 @@ juce::Component* findInOtherWindows (juce::Component& window, const juce::String
                 if (auto* c = onboardui::findShowing (*top, key); c != nullptr && (! byId || c->getComponentID() == key))
                     return c;
             }
+    return nullptr;
+}
+
+// Round 190qx: "text:<English text>" is a showing label, button (a Settings tab too) or combo box whose own text is that
+// English text or its translation (so one script records every language, as menu: targets); "row:<English text>" is the
+// control on that label's row (the combo box, slider, switch or field to its right, as a Settings page lays them out).
+// LYNX's other windows are searched first (the newest on top: Settings, dialogs), then the main window.
+juce::String ownText (juce::Component& c)
+{
+    if (auto* label = dynamic_cast<juce::Label*> (&c))
+        return label->getText();
+    if (auto* button = dynamic_cast<juce::Button*> (&c))
+        return button->getButtonText();
+    if (auto* box = dynamic_cast<juce::ComboBox*> (&c))
+        return box->getText();
+    if (auto* field = dynamic_cast<juce::TextEditor*> (&c)) // (an empty search field by the hint it shows)
+        return field->isEmpty() ? field->getTextToShowWhenEmpty() : field->getText();
+    return {};
+}
+
+juce::Component* findTextIn (juce::Component& root, const juce::String& english, const juce::String& translated)
+{
+    for (auto* c : root.getChildren())
+    {
+        if (! c->isVisible() || c->getLocalBounds().isEmpty())
+            continue;
+        if (const auto t = menuText (ownText (*c)); t.isNotEmpty() && (t == translated || t == english))
+            return c;
+        if (auto* field = dynamic_cast<juce::TextEditor*> (c)) // (a search field by its hint, also once something is typed in it)
+            if (const auto hint = menuText (field->getTextToShowWhenEmpty()); hint.isNotEmpty() && (hint == translated || hint == english))
+                return c;
+        if (auto* inner = findTextIn (*c, english, translated))
+            return inner;
+    }
+    return nullptr;
+}
+
+juce::Component* findByText (juce::Component& window, const juce::String& englishText, bool row)
+{
+    const auto raw = englishText.trim();
+    const auto english = menuText (raw), translated = menuText (tr (raw));
+    juce::Component* found = nullptr;
+    auto& desktop = juce::Desktop::getInstance();
+    for (int i = desktop.getNumComponents(); --i >= 0 && found == nullptr;)
+        if (auto* top = desktop.getComponent (i); top != nullptr && top != window.getTopLevelComponent() && top->isShowing())
+            found = findTextIn (*top, english, translated);
+    if (found == nullptr)
+        found = findTextIn (window, english, translated);
+    if (found == nullptr || ! row)
+        return found;
+    // the row: the nearest control to the label's right whose height covers the label's middle
+    auto* parent = found->getParentComponent();
+    if (parent == nullptr)
+        return nullptr;
+    const auto from = found->getBounds();
+    juce::Component* best = nullptr;
+    for (auto* c : parent->getChildren())
+    {
+        if (c == found || ! c->isVisible() || dynamic_cast<juce::Label*> (c) != nullptr || c->getBounds().isEmpty())
+            continue;
+        const auto b = c->getBounds();
+        if (b.getX() >= from.getX() + 4 && b.getY() <= from.getCentreY() && b.getBottom() >= from.getCentreY()
+            && (best == nullptr || b.getX() < best->getX()))
+            best = c;
+    }
+    return best;
+}
+
+// Round 190qx: a panel's "Window options" button (the menu at its title: detach, maximize, close, the panel's own options,
+// How to use this...), found from the panel upwards by the button's tooltip
+juce::Component* findWithTooltip (juce::Component& root, const juce::String& tip)
+{
+    for (auto* c : root.getChildren())
+    {
+        if (! c->isVisible())
+            continue;
+        if (auto* b = dynamic_cast<juce::Button*> (c); b != nullptr && b->getTooltip() == tip)
+            return c;
+        if (auto* inner = findWithTooltip (*c, tip))
+            return inner;
+    }
+    return nullptr;
+}
+
+juce::Component* panelMenuButton (juce::Component* panel)
+{
+    const auto tip = tr ("Window options: detach, maximize, close and this panel's own settings");
+    for (auto* up = panel != nullptr ? panel->getParentComponent() : nullptr; up != nullptr; up = up->getParentComponent())
+        if (auto* b = findWithTooltip (*up, tip))
+            return b;
     return nullptr;
 }
 
@@ -445,6 +536,26 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
     const auto locate = [&window] (const juce::String& target) -> juce::Component* {
         if (target.startsWith ("menu:"))
             return findMenuItem (window, target.substring (5));
+        if (target.startsWith ("text:") || target.startsWith ("row:")) // (round 190qx)
+            return findByText (window, target.fromFirstOccurrenceOf (":", false, false), target.startsWith ("row:"));
+        if (target.startsWith ("panelmenu:")) // (round 190qx: playlist, channelRack, pianoRoll, mixer, browser)
+        {
+            const auto p = target.substring (10);
+            juce::Component* panel = p == "playlist" ? (juce::Component*) &window.playlist : p == "channelRack" ? (juce::Component*) &window.rack
+                                   : p == "pianoRoll" ? (juce::Component*) &window.pianoRoll : p == "mixer" ? (juce::Component*) &window.mixer
+                                   : p == "browser" ? (juce::Component*) &window.browser : nullptr;
+            return panel != nullptr && panel->isShowing() ? panelMenuButton (panel) : nullptr;
+        }
+        if (target == "settings" || target.startsWith ("window:")) // (round 190qx: a tool window by its ID, "settings" for Settings)
+        {
+            auto* w = findToolWindow (target == "settings" ? juce::String ("settings") : target.substring (7));
+            return w != nullptr && w->isShowing() ? w : nullptr;
+        }
+        if (target == "devices") // (round 190qx: the Clip-launch layout's detail view, its Device View page)
+        {
+            auto* detail = window.getDetailViewForSnapshot();
+            return detail != nullptr && detail->isShowing() ? detail : nullptr;
+        }
         if (auto* c = onboardui::findShowing (window, target))
             return c;
         return findInOtherWindows (window, target);
@@ -541,7 +652,24 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         }
         else if (&c == &playlist)
         {
-            if (row >= 0 && row < 1000 && column >= 0) // (a new project's Playlist draws its tracks before any of them is stored)
+            // round 190qx (Playlist › Automation lanes): row 1000 + t = track t's first lane at the 16th `column` (its whole
+            // height: "at" y picks the value, top = the highest); row 2000 + t = the "+A" button on t's header (left of its
+            // LED, shown while the pointer is over the header), which opens the add-lane menu
+            if (row >= 1000 && row < 2000 && column >= 0)
+            {
+                const auto body = playlist.laneBodyForSnapshot (row - 1000, 0).toNearestInt();
+                const auto x0 = (int) playlist.xOfTickForSnapshot ((double) column * ticksPerStep);
+                const auto x1 = (int) playlist.xOfTickForSnapshot ((double) (column + 1) * ticksPerStep);
+                if (! body.isEmpty())
+                    r = { x0, body.getY(), juce::jmax (2, x1 - x0), body.getHeight() };
+            }
+            else if (row >= 2000 && row < 3000)
+            {
+                const auto led = playlist.trackLedForSnapshot (row - 2000);
+                if (! led.isEmpty())
+                    r = { led.getX() - 22, led.getCentreY() - 7, 20, 14 };
+            }
+            else if (row >= 0 && row < 1000 && column >= 0) // (a new project's Playlist draws its tracks before any of them is stored)
             {
                 const auto band = playlist.trackRowForSnapshot (row);
                 const auto x0 = (int) playlist.xOfTickForSnapshot ((double) column * ticksPerStep);
@@ -556,6 +684,12 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
             r = row == 0 ? strips.faderRailForSnapshot (column) : row == 1 ? strips.muteAreaForSnapshot (column) : row == 2 ? strips.meterAreaForSnapshot (column)
               : row == 3 ? strips.routeArrowForSnapshot (column) : row == 4 ? strips.faderCapForSnapshot (column) : row == 5 ? strips.panAreaForSnapshot (column)
               : row == 6 ? strips.soloAreaForSnapshot (column) : row == 7 ? strips.headerAreaForSnapshot (column) : juce::Rectangle<int>();
+        }
+        else if (detailView != nullptr && &c == detailView.get())
+        {
+            // round 190qx: row 0 = device card `column`'s window button (in its title bar; the chain's first card is 0)
+            if (row == 0 && column >= 0 && column < detailView->cardCountForCheck())
+                r = detailView->windowButtonForCheck (column);
         }
         else if (clipGridView != nullptr && &c == clipGridView.get())
         {
@@ -690,7 +824,8 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         {
             const auto cell = cellOf (c);
             const auto local = cell ? pointIn (*cell) : pointIn (c.getLocalBounds());
-            const auto screen = c.localPointToGlobal (local);
+            // (round 190qx: "dx" / "dy", pixels from that point: a list's row below a search field that has no ID)
+            const auto screen = c.localPointToGlobal (local) + juce::Point<float> ((float) (double) args["dx"], (float) (double) args["dy"]);
             PeerGesture::click (*c.getTopLevelComponent(), screen, clicks, keysOf (args["mods"]), right);
             return object ({ { "clicked", true }, { "control", described } });
         }
