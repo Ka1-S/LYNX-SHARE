@@ -103,7 +103,11 @@
                 }
             }
             lynx::AutomationDisplay reference;
-            const auto meterTrack = target.kind == lynx::AutomationTargetKind::mixerSend ? target.slot : target.index;
+            // (a send: its destination; a channel's volume: the channel's insert)
+            const auto channelTarget = target.kind == lynx::AutomationTargetKind::channelVolume;
+            const auto meterTrack = target.kind == lynx::AutomationTargetKind::mixerSend ? target.slot
+                                    : channelTarget ? (target.index >= 0 && target.index < (int) song.channels.size() ? song.channels[(std::size_t) target.index].mixerTrack : -1)
+                                                    : target.index;
             float peak = 0.0f;
             auto next = std::chrono::steady_clock::now();
             const auto blocks = (int) std::ceil (ticks / (double) lynx::ppq * 60.0 / song.bpm * 48000.0 / 512.0);
@@ -254,9 +258,14 @@
         for (const auto& c : cases)
         {
             auto without = song;
+            // (every clip that drives the target: its own automations' and those linked to it among other controls)
+            const auto drives = [&c] (const lynx::Automation& a) {
+                return a.target == c.target
+                       || std::any_of (a.links.begin(), a.links.end(), [&c] (const lynx::Automation::Link& l) { return l.target == c.target; });
+            };
             for (auto& clip : without.playlist)
-                if (clip.kind == lynx::ClipKind::automation && clip.automation >= 0
-                    && without.automations[(std::size_t) clip.automation].target == c.target)
+                if (clip.kind == lynx::ClipKind::automation && clip.automation >= 0 && clip.automation < (int) without.automations.size()
+                    && drives (without.automations[(std::size_t) clip.automation]))
                     clip.muted = true;
             for (const auto& m : modes)
             {
