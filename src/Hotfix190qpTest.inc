@@ -232,6 +232,17 @@
             return n == 0 ? 0.0 : std::sqrt (s / (double) n);
         };
         juce::String result = "OK";
+        // (what the import made of every automation clip, for the report)
+        for (int a = 0; a < (int) song.automations.size(); ++a)
+        {
+            const auto& x = song.automations[(std::size_t) a];
+            int clips = 0;
+            for (const auto& c : song.playlist)
+                clips += c.kind == lynx::ClipKind::automation && c.automation == a ? 1 : 0;
+            log << "  automation " << a << " \"" << juce::String::fromUTF8 (x.name.c_str()) << "\": kind " << (int) x.target.kind << " index "
+                << x.target.index << " slot " << x.target.slot << " param " << x.target.param << ", links " << (int) x.links.size() << ", clips "
+                << clips << (x.muted ? ", muted" : "") << "\n";
+        }
         const auto cases = autoLiveCases (song, perKind);
         if (cases.empty())
             return "ERROR no automated mixer volume, send or effect parameter that moves";
