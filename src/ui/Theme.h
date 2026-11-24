@@ -90,6 +90,22 @@ inline juce::Colour audioClip { 0xff5a87b8 };
 inline juce::Colour defaultTrack { 0xff485156 };
 } // namespace colour
 
+// --- Options › Theme › "Soft look" (round 190qw, queue item 67; Discord 11-23: the flatter 0.1.29 look as a switch) -------
+// A LYNX option, off by default (the FL-like look stays the default): flat steps and plates instead of FL's keycaps and
+// gradients, track / pattern / channel / mixer colours muted towards the panels, slimmer Channel rack rows and plugin
+// header. Saved in the theme (themes::Spec::soft, "look": "soft" in a .lynxtheme); set by ThemeSettings before the palette
+// (whose stamp keys the cached tiles), so every tile drawn in the other look is redrawn.
+inline bool softLook = false;
+inline bool soft() noexcept { return softLook; }
+// A user colour (a track's, a channel's, a pattern's) as the Soft look fills with it: its saturation down to 62 % and its
+// brightness held at or under 0.5, so the colour still tells the rows apart without shouting. Unchanged when Soft is off.
+inline juce::Colour softened (juce::Colour c)
+{
+    if (! softLook || c.getAlpha() == 0)
+        return c;
+    return c.withMultipliedSaturation (0.62f).withBrightness (juce::jmin (c.getBrightness(), 0.5f));
+}
+
 // User themes (round 162d): the tokens above hold LYNX's built-in look until a theme replaces them (ui/ThemeSettings.h
 // applies one live). Code reads the tokens when it paints, so never copy one into a member or a static.
 void setPalette (const themes::Palette& palette); // the tokens only (ThemeSettings also refreshes the windows)

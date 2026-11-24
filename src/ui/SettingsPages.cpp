@@ -36,6 +36,7 @@
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/SimpleLook.h" // round 190oo (O-4)
+#include "ui/ThemeSettings.h" // round 190qw (the Soft look on the LYNX extras page)
 #include "ui/TouchInput.h" // round 190pm (P23)
 #include "ui/Updater.h"
 
@@ -243,7 +244,7 @@ public:
 
         styleLabel (scaleLabel, tr ("Interface size"));
         for (auto percent : toolbarlayout::uiScales)
-            scaleBox.addItem (juce::String (percent) + "%", percent);
+            scaleBox.addItem (juce::String (percent) + " %", percent); // (round 190qw: as Text size above it, "100 %")
         scaleBox.setSelectedId (options.uiScale, juce::dontSendNotification);
         scaleBox.onChange = [this] { change ([&] { options.uiScale = scaleBox.getSelectedId(); }); };
 
@@ -2765,6 +2766,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "simple.projectName") return ui::simplelook::projectNameShown(); // round 190oo (O-4)
     if (id == "simple.touchMode") return ui::touchmode::enabled(); // round 190pm (P23)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
+    if (id == "theme.softLook") return themeui::current().soft; // round 190qw (queue item 67)
     return false;
 }
 
@@ -2781,6 +2783,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
 
     if (workflowextras::setExtra (id, on)) // round 190iu (ui/WorkflowExtras.h): saves through its own hook
         return;
+
+    if (id == "theme.softLook") // round 190qw (queue item 67): the theme's Soft look, as Options › Theme › Appearance sets it
+    {
+        auto spec = themeui::current();
+        spec.soft = on;
+        themeui::apply (spec, persistent);
+        return;
+    }
 
     if (id == "mixer.peakValues" || id == "mixer.correlation") // round 190qh (listed in rollup 0.1.32 step 2)
     {

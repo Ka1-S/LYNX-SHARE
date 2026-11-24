@@ -405,6 +405,8 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
     {
         case ClipStyle::flTint:
         {
+            clipColour = softened (clipColour); // (round 190qw: the Soft look's muted colours)
+            trackColour = softened (trackColour);
             look.headerTop = add (clipColour, -13);
             look.headerBottom = add (clipColour, -28);
             look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
@@ -475,6 +477,7 @@ float contrast (juce::Colour a, juce::Colour b)
 
 juce::Colour colourFill (juce::Colour c, float lo, float hi)
 {
+    c = softened (c); // (round 190qw: the Soft look's muted colours)
     return c.withBrightness (juce::jlimit (lo, hi, c.getBrightness()));
 }
 
@@ -498,7 +501,8 @@ juce::String fitMiddle (const juce::String& text, const juce::Font& font, float 
         juce::String fitted;
     };
     static std::unordered_multimap<std::uint64_t, Entry> cache;
-    const auto height = std::llround ((double) font.getHeight() * 100.0);
+    // (round 190qw: and its horizontal scale, as the Playlist's FL header names narrow before they lose letters)
+    const auto height = std::llround ((double) font.getHeight() * 100.0) * 1000 + std::llround ((double) font.getHorizontalScale() * 100.0);
     const auto quarters = juce::roundToInt (width * 4.0f);
     const auto name = font.getTypefaceName(), style = font.getTypefaceStyle();
     const auto h = mix (mix (mix (mix (mix (0x9b05688c2b3e6c1full, (std::uint64_t) text.hashCode64()), (std::uint64_t) height), (std::uint64_t) (std::uint32_t) quarters),
@@ -549,6 +553,17 @@ void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, b
         return;
     const auto direct = [fill, lit] (juce::Graphics& k, juce::Rectangle<float> b) {
         using namespace colour;
+        if (softLook) // (round 190qw: the Soft look's flat step, as 0.1.29 drew it; lit: a hairline of the light edge)
+        {
+            k.setColour (fill);
+            k.fillRoundedRectangle (b, 2.0f);
+            if (lit)
+            {
+                k.setColour (fill.brighter (0.3f));
+                k.fillRect (juce::Rectangle<float> (b.getX() + 2.0f, b.getY(), b.getWidth() - 4.0f, 1.0f));
+            }
+            return;
+        }
         const auto x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
         const auto slotY = y + std::round (h * 0.25f);
         k.setColour (fill);
@@ -577,6 +592,12 @@ void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch
         return;
     const auto w = (float) firstCell.getWidth();
     const auto cell = [ghost, w] (juce::Graphics& k, juce::Rectangle<float> c, juce::Colour fill) {
+        if (! ghost && softLook) // (round 190qw: the Soft look's flat step)
+        {
+            k.setColour (fill);
+            k.fillRoundedRectangle (c, 2.0f);
+            return;
+        }
         if (! ghost)
         {
             using namespace colour; // (drawKeycap's keycap, unlit)
@@ -657,6 +678,8 @@ void drawStepStripOver (juce::Graphics& g, juce::Rectangle<int> firstCell, int p
 
 void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom)
 {
+    if (softLook) // (round 190qw: the Soft look's plates are flat, the mean of the two colours)
+        top = bottom = top.interpolatedWith (bottom, 0.5f);
     if (r.isEmpty() || ! g.clipRegionIntersects (r.getSmallestIntegerContainer()))
         return;
     const auto direct = [corner, top, bottom, squareBottom] (juce::Graphics& k, juce::Rectangle<float> b) {
@@ -1861,6 +1884,15 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
         return;
     }
 
+    // round 190qw (design190oj WG-8): a close button labelled with the "×" glyph (welcome card, Next-3 card, tours, the
+    // Lyrics / Finish / Start-from panels, Browser search, automation rows...) gets the vector close icon: the text glyph was
+    // 5 px tall in a 30 px button (100 %) and read as a dot; the icon is 10 px at 100 % and scales crisply
+    if (button.getButtonText() == juce::String::fromUTF8 ("\xc3\x97"))
+    {
+        const auto side = juce::jlimit (8.0f, 14.0f, (float) juce::jmin (button.getWidth(), button.getHeight()) * 0.42f);
+        icons::draw (g, Icon::close, button.getLocalBounds().toFloat().withSizeKeepingCentre (side * 24.0f / 11.0f, side * 24.0f / 11.0f), fg);
+        return;
+    }
     g.drawFittedText (button.getButtonText(), area, juce::Justification::centred, 2, 0.85f);
     tooltipIfCut (button, button, font, button.getButtonText(), area, 2, 0.85f);
 }
@@ -2283,10 +2315,16 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
 
 // --- sliders ---------------------------------------------------------------------------------------
 
+// A range symmetric round 0 (pan, pitch): the knobs draw their arc and (round 190qw) the linear sliders their fill from the centre
+static bool bipolarRange (const juce::Slider& slider)
+{
+    return slider.getMinimum() < 0.0 && slider.getMaximum() > 0.0
+           && std::abs (slider.getMinimum() + slider.getMaximum()) < 1e-6 * (slider.getMaximum() - slider.getMinimum());
+}
+
 void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float pos, float, float, juce::Slider& slider)
 {
-    const auto bipolar = slider.getMinimum() < 0.0 && slider.getMaximum() > 0.0
-                         && std::abs (slider.getMinimum() + slider.getMaximum()) < 1e-6 * (slider.getMaximum() - slider.getMinimum());
+    const auto bipolar = bipolarRange (slider);
     if (const auto* skinned = slider.getProperties().getVarPointer (skin::sliderProperty)) // a plugin page's knob (ui/PluginSkin.h)
     {
         const auto packed = (int) slider.getProperties().getWithDefault (skin::styleProperty, 0);
@@ -2359,7 +2397,13 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, 
     {
         const auto track = juce::Rectangle<float> (bounds.getCentreX() - trackWidth / 2, bounds.getY(), trackWidth, bounds.getHeight());
         fillRounded (g, track, trackWidth / 2, bg0);
-        fillRounded (g, track.withTop (sliderPos), trackWidth / 2, trackColour.withAlpha (0.85f));
+        if (bipolarRange (slider)) // (round 190qw, design190oj WG-20: from the centre, as the knobs)
+        {
+            const auto zero = (float) slider.getPositionOfValue (0.0);
+            fillRounded (g, track.withTop (juce::jmin (zero, sliderPos)).withBottom (juce::jmax (zero, sliderPos)), trackWidth / 2, trackColour.withAlpha (0.85f));
+        }
+        else
+            fillRounded (g, track.withTop (sliderPos), trackWidth / 2, trackColour.withAlpha (0.85f));
 
         // fader cap
         const auto capWidth = juce::jmin (bounds.getWidth() - 2.0f, 26.0f);
@@ -2373,7 +2417,13 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, 
     {
         const auto track = juce::Rectangle<float> (bounds.getX(), bounds.getCentreY() - trackWidth / 2, bounds.getWidth(), trackWidth);
         fillRounded (g, track, trackWidth / 2, bg0);
-        fillRounded (g, track.withRight (sliderPos), trackWidth / 2, trackColour.withAlpha (0.85f));
+        if (bipolarRange (slider)) // (round 190qw, WG-20: from the centre, as the knobs)
+        {
+            const auto zero = (float) slider.getPositionOfValue (0.0);
+            fillRounded (g, track.withLeft (juce::jmin (zero, sliderPos)).withRight (juce::jmax (zero, sliderPos)), trackWidth / 2, trackColour.withAlpha (0.85f));
+        }
+        else
+            fillRounded (g, track.withRight (sliderPos), trackWidth / 2, trackColour.withAlpha (0.85f));
 
         const auto thumb = juce::Rectangle<float> (12.0f, 12.0f).withCentre ({ sliderPos, bounds.getCentreY() });
         g.setColour (active ? juce::Colour (0xfff4f5f7) : juce::Colour (0xffd4d7dd));
@@ -2449,8 +2499,10 @@ void LookAndFeel::drawTabButton (juce::TabBarButton& button, juce::Graphics& g, 
 
     if (front)
         fillRounded (g, area.reduced (2.0f, 4.0f), radius::md, bg3);
-    else if (isMouseOver || isMouseDown)
-        fillRounded (g, area.reduced (2.0f, 4.0f), radius::md, bg2);
+    else if (isMouseDown) // (round 190qw: the one state language, pressed = the inset colour)
+        fillRounded (g, area.reduced (2.0f, 4.0f), radius::md, bg0);
+    else if (isMouseOver) // (round 190qw: bg2 did not show on the bg2 tab bars, e.g. Settings: a lift towards the front tab's bg3)
+        fillRounded (g, area.reduced (2.0f, 4.0f), radius::md, bg2.interpolatedWith (bg4, 0.5f));
 
     if (front)
     {

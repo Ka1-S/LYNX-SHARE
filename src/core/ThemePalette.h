@@ -188,13 +188,16 @@ struct Spec
     // and channels without a colour of their own take a muted shade of the accent instead of FL's grey, when the theme's
     // accent is not LYNX's default (the default look stays FL's). Off: FL's grey. The Tracks dot overrides both.
     bool tracksFromAccent = true;
+    // Round 190qw (queue item 67): the Soft look (ui/Theme.h theme::softLook): flat steps and plates, muted user colours,
+    // slimmer Channel rack rows and plugin header. A LYNX option, off by default
+    bool soft = false;
 
     bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
     bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
     bool isDefaultLook() const noexcept
     {
         return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots()
-               && ! clipsUseNoteColours && ! meterZones;
+               && ! clipsUseNoteColours && ! meterZones && ! soft;
     }
     bool operator== (const Spec&) const = default;
 };

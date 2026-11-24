@@ -482,6 +482,7 @@ public:
             // (round 190oj CS-26: with no track the knobs looked live next to a greyed Save and preset)
             blend.setDimmed (true);
             reverb.setDimmed (true);
+            echo.setDimmed (true); // (round 190qw: Echo too)
             emptyHint.setText (tr ("Select a track to see its effects."), juce::dontSendNotification);
             layoutStrip();
             return;
@@ -518,6 +519,7 @@ public:
         blend.setValue (mixer.chainBlend);
         blend.setDimmed (fx.empty());
         reverb.setDimmed (! reverb.isEnabled());
+        echo.setDimmed (! echo.isEnabled()); // (round 190qw)
         addCard.setEnabled ((int) fx.size() < maxEffectSlots);
         emptyHint.setText (fx.empty() ? tr ("No effects yet. Press + to add one, or pick a preset.") : juce::String(), juce::dontSendNotification);
         layoutStrip();

@@ -1408,9 +1408,10 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     const auto enabled = isEnabled();
     const auto h = ! enabled ? 0.0f : isTimerRunning() ? hover : (highlighted ? 1.0f : 0.0f);
 
-    // the fill: the tile at rest, then the state over it
-    auto fill = colour::bg3;
-    auto edge = colour::border;
+    // the fill: the tile at rest, then the state over it (round 190qw: the Soft look has no tile at rest, as 0.1.29's flat
+    // toolbar icons; hover, pressed and on still show one)
+    auto fill = theme::soft() ? colour::bg3.withAlpha (0.0f) : colour::bg3;
+    auto edge = theme::soft() ? colour::border.withAlpha (0.0f) : colour::border;
     if (down && enabled)
     {
         fill = colour::bg0;
@@ -1633,7 +1634,9 @@ void IconButton::paintButtonBody (juce::Graphics& g, bool highlighted, bool down
     const auto isSwitch = actsAsSwitch();
 
     // one state rule for every button kind (round 190je, core/ThemePalette.h buttonLook)
-    const auto kind = ! flat ? themes::ButtonKind::secondary : isSwitch ? themes::ButtonKind::flatToggle : themes::ButtonKind::flatMomentary;
+    // (round 190qw: in the Soft look an icon-only button is flat at rest too, as 0.1.29 drew the panels' tool icons)
+    const auto flatNow = flat || (theme::soft() && text.isEmpty() && ! primary);
+    const auto kind = ! flatNow ? themes::ButtonKind::secondary : isSwitch ? themes::ButtonKind::flatToggle : themes::ButtonKind::flatMomentary;
     auto state = buttonColours (kind, on, h, down, enabled);
     const auto ownOn = onColour != colour::accent; // a button with "on" colours of its own (bg6 + a red icon, a wash)
     if (on && enabled && (ownOn || flat))

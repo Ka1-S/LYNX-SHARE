@@ -1208,9 +1208,10 @@ void PianoRollComponent::resized()
     if (stackingWas != stackingEnabled())
         return loadStackedLanes(); // (it lays everything out again)
     const auto offered = stackingWas && velocityHeight >= 24 && ! mpeStacked;
-    const auto buttonSide = 20, chooserWidth = keyboardWidth - 4 - (offered ? buttonSide + 2 : 0);
+    // (round 190qw: the "+" under the chooser, which keeps the keyboard's width: beside it the chooser was cut to "V...")
+    const auto buttonSide = 20, chooserWidth = keyboardWidth - 4;
     laneBox.setBounds (2, velocityArea().getY() + 4, chooserWidth, 20);
-    addLaneButton.setBounds (2 + chooserWidth + 2, velocityArea().getY() + 4, buttonSide, buttonSide);
+    addLaneButton.setBounds (2, velocityArea().getY() + 4 + 20 + 3, buttonSide, buttonSide);
     laidFooter = liveFooterHeight();
     if (const auto footer = laidFooter; footer > 0)
     {

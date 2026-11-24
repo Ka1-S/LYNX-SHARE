@@ -235,7 +235,10 @@ public:
     bool isShown (int row) const;          // not hidden by the filter
     std::function<void()> onFilterChanged; // the title shows the filter's name and the graph editor's state
 
-    static constexpr int rowHeight = 30;
+    // round 190qw: 30 px (the default), 26 px in the Soft look (Options › Theme › Look; set by lookAndFeelChanged)
+    static inline int rowHeight = 30;
+    static int rowHeightForLook() noexcept;
+    void lookAndFeelChanged() override;
     static constexpr int muteWidth = 26;
     static constexpr int knobWidth = 28;
     static constexpr int routeWidth = 30;
