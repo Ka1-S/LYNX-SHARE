@@ -1977,6 +1977,17 @@ public:
             return;
         }
 
+        if (args.contains ("--autolive190qp"))
+        {
+            // LYNX --autolive190qp <project.flp|.lynx> report.txt [--per-kind N] [--all-modes] (round 190qp, issue #253): the
+            // project's automated mixer volumes, send levels and effect parameters heard and shown through the app's engine
+            // (src/Hotfix190qpTest.inc)
+            const auto i = args.indexOf ("--autolive190qp");
+            const auto perKind = args.contains ("--per-kind") ? args[args.indexOf ("--per-kind") + 1].getIntValue() : 2;
+            runAutoLive190qpTest (args[i + 1].unquoted(), args[i + 2].unquoted(), perKind, args.contains ("--all-modes"));
+            return;
+        }
+
         if (args.contains ("--hwheel254test"))
         {
             // LYNX --hwheel254test report.txt (round 190ou, issue #254): the horizontal wheel in the Playlist (three layouts),
@@ -9429,6 +9440,11 @@ private:
         // engine, render-ahead off and on; Transistor Bass when FL Studio is here, LYNX Synth always)
         juce::String issue258Log;
         const auto issue258Result = issue258Check (issue258Log);
+        // round 190qp (0.1.31.1, issue #253 / Discord): an imported FL project's mixer volume, send level and Fruity Filter
+        // cutoff automation heard and shown through the app's engine, as imported, with a flat lane added and with the
+        // clips moved into lanes, render-ahead off / on, Clip-launch's override (src/Hotfix190qpTest.inc)
+        juce::String autolive190qpLog;
+        const auto autolive190qpResult = autoLiveCheck (autoLiveFlSong(), autolive190qpLog, 2, true);
 
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
@@ -10657,7 +10673,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && autolive190qpResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -10771,6 +10787,7 @@ private:
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
+               << "autolive190qp=" << autolive190qpResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -20609,6 +20626,7 @@ private:
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
+#include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

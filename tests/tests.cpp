@@ -18108,4 +18108,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Jsfx190pjTests.inc" // round 190pj (0.1.32): JSFX support stages 1-2 (issue #241)
 #include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
+#include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
