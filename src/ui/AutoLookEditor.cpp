@@ -71,6 +71,33 @@ public:
     }
 };
 
+// issue #239 (round 190qo): moves a rule up or down the list (the first matching rule wins, so the order matters); a
+// LYNX vector triangle, drawn like the Settings find bar's arrows
+class MoveButton final : public juce::Button
+{
+public:
+    explicit MoveButton (bool upwards) : juce::Button ({}), up (upwards) {}
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        using namespace theme;
+        const auto r = getLocalBounds().toFloat().reduced (1.5f);
+        g.setColour (! isEnabled() ? colour::bg2 : down ? colour::bg5 : over ? colour::bg4 : colour::bg3);
+        g.fillRoundedRectangle (r, 3.0f);
+        const auto t = r.withSizeKeepingCentre (9.0f, 5.0f);
+        juce::Path p;
+        if (up)
+            p.addTriangle (t.getX(), t.getBottom(), t.getRight(), t.getBottom(), t.getCentreX(), t.getY());
+        else
+            p.addTriangle (t.getX(), t.getY(), t.getRight(), t.getY(), t.getCentreX(), t.getBottom());
+        g.setColour (isEnabled() ? colour::textPrimary : colour::textDisabled);
+        g.fillPath (p);
+    }
+
+private:
+    bool up;
+};
+
 juce::String targetsText (int targets)
 {
     if (targets == autolook::everything)
@@ -91,7 +118,9 @@ struct AutoLookEditor::Row
     juce::ComboBox match;
     juce::TextEditor text;
     SwatchButton colour, icon;
-    juce::TextButton targets, remove;
+    juce::TextButton targets;
+    MoveButton moveUp { true }, moveDown { false };
+    juce::TextButton remove;
 };
 
 AutoLookEditor::AutoLookEditor (AudioEngine& e, bool keep) : engine (e), persistent (keep)
@@ -113,6 +142,7 @@ AutoLookEditor::AutoLookEditor (AudioEngine& e, bool keep) : engine (e), persist
     note.setMinimumHorizontalScale (1.0f);
     addAndMakeVisible (note);
     addButton.setButtonText (tr ("Add rule"));
+    addButton.setComponentID ("autoLook.add");
     addButton.onClick = [this] {
         autolook::Rule r;
         r.text = tr ("Kick").toStdString();
@@ -120,8 +150,8 @@ AutoLookEditor::AutoLookEditor (AudioEngine& e, bool keep) : engine (e), persist
         r.icon = trackicons::flIndexOf (trackicons::Icon::kick);
         autolook::current().list.push_back (r);
         autolook::current().on = true;
-        changed (true);
-        refresh();
+        changed();
+        refresh(); // (issue #239: the rows first, then the page's layout, so Add rule moves below the new row)
         if (! rows.empty())
             rows.back()->text.grabKeyboardFocus();
     };
@@ -154,10 +184,29 @@ void AutoLookEditor::refresh()
 {
     const auto& rules = autolook::current();
     enable.setToggleState (rules.on, juce::dontSendNotification);
+    const auto before = rows.size();
     rows.clear();
     for (int i = 0; i < (int) rules.list.size(); ++i)
         addRow (i);
     resized();
+    // issue #239 (round 190qo): a row more or less changes the editor's height. The page used to lay itself out before
+    // the new row existed, so the editor kept its old height and clipped "Add rule" (and the buttons) under the new row:
+    // after the first rule there was no way to add a second one until Settings was opened again.
+    if (rows.size() != before && onHeightChange)
+        onHeightChange();
+}
+
+void AutoLookEditor::moveRule (int index, int by)
+{
+    auto& list = autolook::current().list;
+    const auto to = index + by;
+    if (index < 0 || to < 0 || index >= (int) list.size() || to >= (int) list.size())
+        return;
+    std::swap (list[(std::size_t) index], list[(std::size_t) to]);
+    changed();
+    refresh();
+    if (to < (int) rows.size()) // (the focus follows the rule, so the arrow can be pressed again)
+        (by < 0 ? rows[(std::size_t) to]->moveUp : rows[(std::size_t) to]->moveDown).grabKeyboardFocus();
 }
 
 void AutoLookEditor::addRow (int index)
@@ -244,33 +293,64 @@ void AutoLookEditor::addRow (int index)
             });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&row.targets));
     };
+    row.moveUp.setTooltip (tr ("Move this rule up (the first matching rule wins)"));
+    row.moveDown.setTooltip (tr ("Move this rule down"));
+    row.moveUp.setEnabled (index > 0);
+    row.moveDown.setEnabled (index + 1 < (int) autolook::current().list.size());
+    row.moveUp.setComponentID ("autoLook.up" + juce::String (index));
+    row.moveDown.setComponentID ("autoLook.down" + juce::String (index));
+    // (async: the click's own button is deleted by refresh())
+    row.moveUp.onClick = [this, index] {
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<AutoLookEditor> (this), index] {
+            if (safe != nullptr)
+                safe->moveRule (index, -1);
+        });
+    };
+    row.moveDown.onClick = [this, index] {
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<AutoLookEditor> (this), index] {
+            if (safe != nullptr)
+                safe->moveRule (index, 1);
+        });
+    };
+    row.remove.setComponentID ("autoLook.remove" + juce::String (index));
     row.remove.setButtonText (juce::String (juce::CharPointer_UTF8 ("\xc3\x97")));
     row.remove.setTooltip (tr ("Remove this rule"));
     row.remove.onClick = [this, index] {
         auto& list = autolook::current().list;
         if (index < (int) list.size())
             list.erase (list.begin() + index);
-        changed (true);
+        changed();
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<AutoLookEditor> (this)] {
             if (safe != nullptr)
                 safe->refresh();
         });
     };
-    for (auto* c : std::initializer_list<juce::Component*> { &row.match, &row.text, &row.colour, &row.icon, &row.targets, &row.remove })
+    for (auto* c : std::initializer_list<juce::Component*> { &row.match, &row.text, &row.colour, &row.icon, &row.targets, &row.moveUp,
+                                                                     &row.moveDown, &row.remove })
         addAndMakeVisible (*c);
+}
+
+int AutoLookEditor::noteHeight (int width) const
+{
+    // (round 190qo: the note as many lines as it wraps to at this width, as the page measures its own notes; it was
+    // two lines always, so a longer translation or a narrow window cut its last line)
+    juce::AttributedString text (note.getText());
+    text.setFont (note.getFont());
+    juce::TextLayout fitted;
+    fitted.createLayout (text, (float) juce::jmax (40, width - noteIndent - juce::jmax (8, note.getBorderSize().getLeftAndRight() + 2)));
+    return 4 + 15 * juce::jmax (2, fitted.getNumLines());
 }
 
 int AutoLookEditor::heightFor (int width) const
 {
-    juce::ignoreUnused (width);
-    return 26 + 34 + (int) rows.size() * (rowHeight + gap) + 30 + 4;
+    return 26 + noteHeight (width) + (int) rows.size() * (rowHeight + gap) + 30 + 4;
 }
 
 void AutoLookEditor::resized()
 {
     auto r = getLocalBounds();
     enable.setBounds (r.removeFromTop (26));
-    note.setBounds (r.removeFromTop (34).withTrimmedLeft (27));
+    note.setBounds (r.removeFromTop (noteHeight (getWidth())).withTrimmedLeft (noteIndent));
     for (auto& row : rows)
     {
         auto line = r.removeFromTop (rowHeight);
@@ -278,6 +358,10 @@ void AutoLookEditor::resized()
         row->match.setBounds (line.removeFromLeft (150));
         line.removeFromLeft (6);
         row->remove.setBounds (line.removeFromRight (rowHeight));
+        line.removeFromRight (4);
+        row->moveDown.setBounds (line.removeFromRight (22));
+        line.removeFromRight (2);
+        row->moveUp.setBounds (line.removeFromRight (22));
         line.removeFromRight (6);
         row->targets.setBounds (line.removeFromRight (130));
         line.removeFromRight (6);
