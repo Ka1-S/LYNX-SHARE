@@ -12,6 +12,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "ui/ImageCaches.h"
 #include "ui/PaintAB.h"
 
 namespace lynx::paintstamp
@@ -34,6 +35,7 @@ inline void stamp (juce::Graphics& g, const juce::String& key, juce::Rectangle<i
     const auto full = key + "|" + juce::String (area.getWidth()) + "x" + juce::String (area.getHeight()) + "@" + juce::String (scale, 3)
                       + (background.has_value() ? "|" + juce::String::toHexString ((juce::int64) background->getARGB()) : juce::String());
     static std::unordered_map<juce::String, juce::Image> cache;
+    static const bool registered = ui::registerImageCache ([] { cache.clear(); }); (void) registered; // (a plugin empties it before its DLL unloads: round 180b)
     auto it = cache.find (full);
     if (it == cache.end())
     {
