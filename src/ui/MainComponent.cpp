@@ -1242,6 +1242,7 @@ MainComponent::~MainComponent()
     // member it was destroyed after `workspace` (declared later, destroyed first), and its destructor leaves the style
     // (SimpleWorkflow::left): Host::setTitleAccessory then reached the destroyed Workspace's panel frames — an access
     // violation in PanelFrame::setAccessory on every close (and the setup wizard's "Restart now") in the Simple layout.
+    playlist.onArrangementTrackChosen = nullptr; // (hotfix 0.1.31.1: it reaches the clip grid)
     if (simpleWorkflow != nullptr)
     {
         playlist.onTrackEffects = nullptr;
@@ -5005,6 +5006,12 @@ void MainComponent::makeDetailView()
         else if (pick == GridPick::openTrack)
             detailView->setPage (DetailView::Page::devices);
     });
+    // hotfix 0.1.31.1 (kainproctor): a track chosen in the Arrangement is the grid's selected track as well, so the Device
+    // View shows its devices (Live: one selected track for both views)
+    playlist.onArrangementTrackChosen = [this] (int track) {
+        if (isClipLaunchWorkflow() && clipGridView != nullptr)
+            selectClipGridTrack (*clipGridView, track);
+    };
     const auto selected = clipGridSelection (*clipGridView);
     detailView->showSelection (selected.first, selected.second);
 }

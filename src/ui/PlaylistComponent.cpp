@@ -6613,6 +6613,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     bool rightEdge = false, leftEdge = false;
     const auto hit = clipAt (e.x, e.y, rightEdge, leftEdge);
     const auto tool = tools.getTool();
+    // hotfix 0.1.31.1: the Clip-launch Arrangement (Live) — a click on a clip or on a lane selects that track (the Device
+    // View follows; the hook is the main window's, which acts only while a Device View exists)
+    if (onArrangementTrackChosen && ! flmods::ctrl (e.mods))
+        chooseArrangementTrack (hit >= 0 ? engine.getSong().playlist[(std::size_t) hit].track : yToTrack (e.y));
 
     // Performance mode (round 165m): while the song plays, a click on a clip of the performance zone launches it (the
     // button's release is the release of the Hold modes) and a right-click stops its track; Ctrl / Alt edit as usual
@@ -10115,6 +10119,17 @@ void PlaylistComponent::followLinkedTrack (int track)
         insert = t.mixerTrack;
     if (insert > 0 && insert < (int) engine.getSong().mixer.size() && onLinkedMixerTrack)
         onLinkedMixerTrack (insert);
+    chooseArrangementTrack (track);
+}
+
+void PlaylistComponent::chooseArrangementTrack (int track)
+{
+    if (! onArrangementTrackChosen || track < 0 || track >= numTracks())
+        return;
+    if (projection.isChild (track)) // (an automation lane: its owner track)
+        track = projection.ownerOf (track);
+    if (track >= 0)
+        onArrangementTrackChosen (track);
 }
 
 std::vector<int> PlaylistComponent::bandTargets (int track) const

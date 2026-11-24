@@ -35,6 +35,10 @@ juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 bool clipGridDrag (const juce::var& description, int& track, int& scene);
 // The grid's selected track and scene ({ 0, 0 } before any click).
 std::pair<int, int> clipGridSelection (juce::Component& grid);
+// Hotfix 0.1.31.1 (Live: one selected track for the Session and the Arrangement): the track chosen in the Arrangement
+// becomes the grid's selected track, as a click on its column title (the pick listener hears GridPick::select, so the
+// Device View shows that track's devices)
+void selectClipGridTrack (juce::Component& grid, int track);
 // round 190lr (DL-109): the tracks selected together with Shift / Ctrl+click on their titles (one: the selected track)
 std::vector<int> clipGridSelectedTracks (juce::Component& grid);
 void clipGridSelectTracksForSnapshot (juce::Component& grid, std::vector<int> tracks);

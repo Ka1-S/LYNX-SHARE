@@ -3103,6 +3103,21 @@ public:
         return { columnX (track), rowY (scene), columnWidth, rowHeight };
     }
     std::pair<int, bool> sceneSelectionForSnapshot() const { return { selectedScene, sceneSelected }; }
+    // hotfix 0.1.31.1: a track chosen in the Arrangement (its title, a clip or a lane clicked) is the selected track here
+    // too, as a click on its column title: Live keeps one selected track for both views, and the Device View shows it
+    void selectTrackFromArrangement (int t)
+    {
+        if (t < 0 || t >= launcher::maxTracks)
+            return;
+        trackSet.clear();
+        selectedTrack = t;
+        sceneSelected = false;
+        titleSelected = true;
+        repaint();
+        if (mixer != nullptr)
+            mixer->repaint();
+        notify (GridPick::select);
+    }
     void selectSlotForSnapshot (int track, int scene)
     {
         selectedTrack = track;
@@ -3957,6 +3972,12 @@ std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid)
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         return g->sceneSelectionForSnapshot();
     return { -1, false };
+}
+
+void selectClipGridTrack (juce::Component& grid, int track)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectTrackFromArrangement (track);
 }
 
 void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene)

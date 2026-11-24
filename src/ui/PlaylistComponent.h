@@ -458,6 +458,13 @@ public:
     // round 190ft (FL FUN_012e3aa0): a header click made an audio / instrument track the only selected one: its mixer
     // track (the main window makes it the mixer's current track when the mixer is showing)
     std::function<void (int insert)> onLinkedMixerTrack;
+    // Hotfix 0.1.31.1 (kainproctor, Discord): wherever a Device View shows (the Clip-launch layout, with Live's look or the
+    // classic one) a track chosen here — its
+    // header clicked alone, a clip or an empty spot of its lane clicked — is the selected track (Live 12 manual: the Device
+    // View shows the selected track's devices; one selection for Session and Arrangement). An automation lane chooses its
+    // owner track.
+    std::function<void (int track)> onArrangementTrackChosen;
+    void chooseArrangementTrack (int track); // (also the tests' way in)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
     // round 190jc (design190ia SG-2): the round "+" under the Simple tracks (the New-track chooser, as "+ Add track")
