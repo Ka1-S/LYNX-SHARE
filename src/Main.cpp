@@ -29588,6 +29588,17 @@ private:
         juce::String text;
         text << "project: " << project.getFullPathName() << "\nLYNX " << getApplicationVersion() << ", " << juce::SystemStats::getCpuModel()
              << ", window " << ui.getWidth() << "x" << ui.getHeight() << "\n";
+        // LYNX_PAINTBENCH_MIXER_EXTRAS=0|1 (rollup 0.1.32 step 2): round 190qh's peak values and correlation bars off / on
+        // (on by default since 0.1.32), for an A/B of their paint cost
+        if (const auto extras = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_MIXER_EXTRAS", {}); extras.isNotEmpty())
+        {
+            if (lynx::mixeroptions::setShowPeakValues && lynx::mixeroptions::setShowCorrelation)
+            {
+                lynx::mixeroptions::setShowPeakValues (extras.getIntValue() != 0);
+                lynx::mixeroptions::setShowCorrelation (extras.getIntValue() != 0);
+            }
+            text << "mixer peak values / correlation " << (extras.getIntValue() != 0 ? "on" : "off") << " (LYNX_PAINTBENCH_MIXER_EXTRAS)\n";
+        }
         if (project.existsAsFile())
         {
             // (round perfgate190id) the time to open it headless, and the memory after

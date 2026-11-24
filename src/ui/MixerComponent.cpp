@@ -4947,13 +4947,14 @@ float loudnessBarPosition (float lufs) noexcept
 constexpr int loudnessRowsTop = 24, loudnessRowHeight = 16;
 } // namespace
 
-void MixerStrips::paintCorrelation (juce::Graphics& g, int t) const
+void MixerStrips::paintCorrelation (juce::Graphics& g, int t, bool overPicture) const
 {
     using namespace theme;
     const auto area = correlationArea (t);
     if (area.isEmpty())
         return;
-    theme::fillRoundRect (g, area.toFloat(), 1.5f, colour::bg0);
+    if (! overPicture)
+        theme::fillRoundRect (g, area.toFloat(), 1.5f, colour::bg0);
     const auto mid = (float) area.getCentreX();
     const auto half = (float) area.getWidth() * 0.5f - 1.0f;
     const auto v = juce::jlimit (-1.0f, 1.0f, shownCorrelation (t));
@@ -4968,13 +4969,14 @@ void MixerStrips::paintCorrelation (juce::Graphics& g, int t) const
     g.fillRect (juce::Rectangle<float> (mid - 0.5f, (float) area.getY() - 1.0f, 1.0f, (float) area.getHeight() + 2.0f));
 }
 
-void MixerStrips::paintPeakValue (juce::Graphics& g, int t) const
+void MixerStrips::paintPeakValue (juce::Graphics& g, int t, bool overPicture) const
 {
     using namespace theme;
     const auto area = peakValueArea (t);
     if (area.isEmpty())
         return;
-    theme::fillRoundRect (g, area.toFloat(), 2.0f, colour::bg0);
+    if (! overPicture)
+        theme::fillRoundRect (g, area.toFloat(), 2.0f, colour::bg0);
     const auto peak = heldPeak (t);
     g.setFont (font (9.0f, true));
     if (peak <= 1.0e-5f)
@@ -5395,26 +5397,32 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         const auto bars = nameBars (t);
         const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
         const auto barsShown = ! bars.isEmpty() && bars.intersects (clip) && g.clipRegionIntersects (bars);
-        // round 190qh: the correlation bar and the peak value box over the picture
+        // round 190qh: the correlation bar and the peak value box over the picture (their boxes are in it)
         const auto corr = correlationArea (t), peakBox = peakValueArea (t);
-        const auto extrasShown = (! corr.isEmpty() && g.clipRegionIntersects (corr)) || (! peakBox.isEmpty() && g.clipRegionIntersects (peakBox));
-        if (extrasShown)
-        {
-            const juce::Graphics::ScopedSaveState state (g);
-            if (dockOf (t) == MixerDock::middle)
-                for (const auto& r : pinned)
-                    g.excludeClipRegion (r);
-            if (! corr.isEmpty())
-                paintCorrelation (g, t);
-            if (! peakBox.isEmpty())
-                paintPeakValue (g, t);
-        }
-        if (! meterShown && ! barsShown)
+        const auto corrShown = ! corr.isEmpty() && g.clipRegionIntersects (corr);
+        const auto peakShown = ! peakBox.isEmpty() && g.clipRegionIntersects (peakBox);
+        if (! meterShown && ! barsShown && ! corrShown && ! peakShown)
             continue;
-        const juce::Graphics::ScopedSaveState state (g);
+        // rollup 0.1.32 step 2 (190qh's extras on by default): one saved state per strip, and only for a strip that a pinned
+        // dock block covers part of (the others draw straight: nothing to exclude)
+        auto covered = false;
         if (dockOf (t) == MixerDock::middle)
+        {
+            const auto column = meters.getUnion (bars).getUnion (corr).getUnion (peakBox);
+            for (const auto& r : pinned)
+                covered = covered || r.intersects (column);
+        }
+        std::optional<juce::Graphics::ScopedSaveState> state;
+        if (covered)
+        {
+            state.emplace (g);
             for (const auto& r : pinned)
                 g.excludeClipRegion (r);
+        }
+        if (corrShown)
+            paintCorrelation (g, t, true);
+        if (peakShown)
+            paintPeakValue (g, t, true);
         if (meterShown && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
             paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
         else if (meterShown)
