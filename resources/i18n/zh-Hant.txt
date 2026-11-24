@@ -12730,3 +12730,11 @@ countries: tw hk mo
 "Number of effect slots on new mixer tracks" = "新混音器軌道的效果槽位數"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每個插入通道有 10 個效果槽位：第 10 個之後槽位中的效果將被省略：{0}"
 "This insert has no free slot ({0} effects)" = "此插入通道沒有空槽（{0} 個效果）"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改進。只改變外觀的預設開啟；會改變按鍵、按一下或拖曳作用的預設關閉，因此在你開啟其中一項之前，LYNX SHARE 的操作與 FL Studio 相同。每個開關與其所在行指明位置的設定是同一個設定。"
+"FL-exact (turn all LYNX extras off)" = "與 FL 相同（關閉所有 LYNX 附加功能）"
+"Recommended" = "建議"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "關閉所有 LYNX 附加功能：LYNX SHARE 與 FL Studio 相同（Esc 關閉取得焦點的視窗和起始頁保留，與 FL Studio 一樣）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "每個 LYNX 附加功能恢復預設：只改變外觀的開啟，其餘關閉"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "比其樣式更長的樣式片段會重複播放樣式直到片段結束；FL Studio 只播放一次，之後無聲。預設開啟。「一般」頁面中也有。"

@@ -12730,3 +12730,11 @@ countries: ru by kz
 "Number of effect slots on new mixer tracks" = "Число слотов эффектов у новых дорожек микшера"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "В этой версии 10 слотов эффектов на инсерт: эффекты в слотах после 10-го не сохраняются: {0}"
 "This insert has no free slot ({0} effects)" = "В этом инсерте нет свободного слота ({0} эффектов)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Собственные улучшения LYNX. Те, что меняют только то, что вы видите, включены по умолчанию; те, что меняют действие клавиши, щелчка или перетаскивания, выключены, поэтому LYNX SHARE работает как FL Studio, пока вы не включите какое-нибудь. Каждый переключатель — та же настройка, что и в месте, названном в его строке."
+"FL-exact (turn all LYNX extras off)" = "Как в FL (выключить все дополнения LYNX)"
+"Recommended" = "Рекомендуемые"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Все дополнения LYNX выключены: LYNX SHARE как FL Studio (закрытие окна в фокусе клавишей Esc и стартовая страница остаются, как в FL Studio)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Каждое дополнение LYNX по умолчанию: меняющие только внешний вид включены, остальные выключены"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Клип паттерна длиннее своего паттерна играет паттерн заново до конца клипа; FL Studio играет его один раз, а затем молчит. Включено по умолчанию. Также на странице «Общие»."

@@ -12730,3 +12730,11 @@ countries: pl
 "Number of effect slots on new mixer tracks" = "Liczba slotów efektów w nowych ścieżkach miksera"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Ta wersja ma 10 slotów efektów na insert: efekty w slotach po 10. są pominięte: {0}"
 "This insert has no free slot ({0} effects)" = "Ten insert nie ma wolnego slotu ({0} efektów)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Własne ulepszenia LYNX. Te, które zmieniają tylko to, co widzisz, są domyślnie włączone; te, które zmieniają działanie klawisza, kliknięcia lub przeciągnięcia, są wyłączone, więc LYNX SHARE działa jak FL Studio, dopóki którejś nie włączysz. Każdy przełącznik to to samo ustawienie co w miejscu wskazanym w jego wierszu."
+"FL-exact (turn all LYNX extras off)" = "Jak w FL (wyłącz wszystkie dodatki LYNX)"
+"Recommended" = "Zalecane"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Wszystkie dodatki LYNX wyłączone: LYNX SHARE jak FL Studio (zamykanie aktywnego okna klawiszem Esc i strona startowa zostają, jak w FL Studio)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Każdy dodatek LYNX na wartości domyślnej: te, które zmieniają tylko wygląd, włączone, reszta wyłączona"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Klip patternu dłuższy niż jego pattern odtwarza pattern ponownie aż do końca klipu; FL Studio odtwarza go raz, a potem milknie. Domyślnie włączone. Także na stronie Ogólne."

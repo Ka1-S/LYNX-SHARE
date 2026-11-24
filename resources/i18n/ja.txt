@@ -12730,3 +12730,11 @@ countries: jp
 "Number of effect slots on new mixer tracks" = "新しいミキサートラックのエフェクトスロット数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "このバージョンのエフェクトスロットはインサートあたり 10 個です。スロット 10 より後のエフェクトは含まれません: {0}"
 "This insert has no free slot ({0} effects)" = "このインサートには空きスロットがありません（エフェクト {0} 個）"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 独自の改良です。見た目だけを変えるものは初期設定でオン、キー・クリック・ドラッグの動作を変えるものはオフなので、どれかをオンにするまで LYNX SHARE は FL Studio と同じように動作します。各スイッチは、その行に書かれた場所にある設定と同じものです。"
+"FL-exact (turn all LYNX extras off)" = "FL と同じ（LYNX の追加機能をすべてオフ）"
+"Recommended" = "おすすめ"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "LYNX の追加機能をすべてオフ: LYNX SHARE を FL Studio と同じに（Esc でフォーカス中のウィンドウを閉じる機能とスタートページは、FL Studio と同じく残ります）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "LYNX の追加機能をすべて初期設定に: 見た目だけを変えるものはオン、それ以外はオフ"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "パターンより長くしたパターンクリップは、クリップの終わりまでパターンを繰り返し再生します。FL Studio は一度だけ再生し、その後は無音です。初期設定でオン。「全般」ページにもあります。"

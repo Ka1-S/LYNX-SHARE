@@ -10,6 +10,11 @@ The short version of each release. The full notes, with measurements, known issu
   "+" tab under it adds a slot, and Options › General settings sets how many slots new mixer tracks get. PR #260 by
   @codewithamoako.
 
+**Changed**
+- LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
+  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout); extras you
+  switched yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
+
 ## 0.1.31 alpha
 
 **Performance**

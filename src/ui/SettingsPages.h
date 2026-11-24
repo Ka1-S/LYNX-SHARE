@@ -51,7 +51,7 @@ struct GeneralOptions
     bool detachNewPlugins = false;
     bool autoSelectLinked = true; // FL's General › "Auto select linked modules" (on, round 187a)
     // round 177d (pain point 10, LYNX's own; off = FL, which shows the value in the hint bar only): the value of the
-    // control under the mouse also shows next to the cursor
+    // control under the mouse also shows next to the cursor (round 190qk: stays off by default — it cost idle CPU in --uiperf)
     bool hoverValues = false;
     int editPatternsIn = 0;     // 0 = Piano Roll when it has notes, 1 = Channel Rack, 2 = Piano Roll
     int undoLevels = prefs::defaultUndoLevels;

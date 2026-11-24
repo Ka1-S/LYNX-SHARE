@@ -12864,3 +12864,11 @@ countries: br
 "Number of effect slots on new mixer tracks" = "Número de slots de efeito nas novas trilhas do mixer"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Esta versão tem 10 slots de efeito por insert: os efeitos nos slots depois do 10 ficam de fora: {0}"
 "This insert has no free slot ({0} effects)" = "Este insert não tem slot livre ({0} efeitos)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Melhorias próprias do LYNX. As que só mudam o que você vê vêm ligadas; as que mudam o que uma tecla, um clique ou um arrasto faz vêm desligadas, então o LYNX SHARE funciona como o FL Studio até você ligar alguma. Cada chave é a mesma configuração do lugar que a linha indica."
+"FL-exact (turn all LYNX extras off)" = "Igual ao FL (desligar todos os extras do LYNX)"
+"Recommended" = "Recomendado"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Todos os extras do LYNX desligados: o LYNX SHARE como o FL Studio (Esc fechando a janela em foco e a página inicial ficam, como no FL Studio)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Cada extra do LYNX no seu padrão: os que só mudam a aparência ligados, o resto desligado"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Um clipe de pattern mais longo que o seu pattern toca o pattern de novo até o clipe acabar; o FL Studio toca uma vez e fica em silêncio depois. Ligado por padrão. Também na página Geral."

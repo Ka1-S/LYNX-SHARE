@@ -12730,3 +12730,11 @@ countries: tr
 "Number of effect slots on new mixer tracks" = "Yeni mikser kanallarındaki efekt slotu sayısı"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Bu sürümde insert başına 10 efekt slotu var: 10. slottan sonraki efektler dışarıda kalır: {0}"
 "This insert has no free slot ({0} effects)" = "Bu insertte boş slot yok ({0} efekt)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX'in kendi iyileştirmeleri. Yalnızca gördüğünüzü değiştirenler varsayılan olarak açıktır; bir tuşun, tıklamanın veya sürüklemenin yaptığını değiştirenler kapalıdır, böylece birini açana kadar LYNX SHARE, FL Studio gibi çalışır. Her anahtar, satırında adı geçen yerdeki ayarın aynısıdır."
+"FL-exact (turn all LYNX extras off)" = "FL ile aynı (tüm LYNX ekstralarını kapat)"
+"Recommended" = "Önerilen"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Tüm LYNX ekstraları kapalı: LYNX SHARE, FL Studio gibi (Esc ile odaktaki pencereyi kapatma ve başlangıç sayfası, FL Studio'daki gibi kalır)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Her LYNX ekstrası varsayılanında: yalnızca görünümü değiştirenler açık, geri kalanı kapalı"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Pattern'inden uzun yapılan bir pattern klibi, klip bitene kadar pattern'i yeniden çalar; FL Studio bir kez çalar ve sonra sessiz kalır. Varsayılan olarak açık. Genel sayfasında da var."

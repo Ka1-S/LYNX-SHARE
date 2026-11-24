@@ -205,7 +205,7 @@
             if (projectPath.isNotEmpty())
                 ui.openFile (juce::File (projectPath));
             settle();
-            check ("O-4 / O-5: off by default", ! ui::simplelook::projectNameShown() && ! livescale::shown);
+            check ("O-4 / O-5: on by default (round 190qk)", ui::simplelook::projectNameShown() && livescale::shown);
             ui.selectTabForSnapshot (2);
             ui.setLayoutStyle (layoutstyle::Style::simple);
             ui.resetLayoutForStyle();
@@ -218,7 +218,7 @@
                 both (ui, ui.getToolbarBoundsForSnapshot().withHeight (ui.getToolbarBoundsForSnapshot().getHeight() + 40), juce::String ("s-topbar-name-") + (on ? "on" : "off"));
                 both (ui, ui.getLocalBounds(), juce::String ("s-desktop-name-") + (on ? "on" : "off")); // (CS-24: the FL tracks' S / volume / pan)
             }
-            ui::simplelook::projectNameShown() = false;
+            ui::simplelook::projectNameShown() = true; // (the default since round 190qk)
             ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
             ui.resetLayoutForStyle();
             pump (400);
@@ -235,7 +235,7 @@
             ui.repaint();
             pump (200);
             both (ui, ui.getToolbarBoundsForSnapshot(), "c-toolbar-scale-on-key");
-            livescale::shown = false;
+            livescale::shown = true; // (the default since round 190qk)
             ui.setLayoutStyle (layoutstyle::Style::pattern);
             settle();
         }

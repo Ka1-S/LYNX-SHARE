@@ -1,12 +1,13 @@
 #pragma once
 
-// Settings › "LYNX extras" (round 190am, decision D7): the list of LYNX's own improvements that are landed but off by
-// default, so FL Studio's look and behaviour stay untouched until someone asks for them. The page shows each one with
-// a switch and one line of explanation.
+// Settings › "LYNX extras" (round 190am, decision D7): the list of LYNX's own improvements, each with a switch and one
+// line of explanation on the page. Until 0.1.31 every one was off by default; since round 190qk (the owner's policy of
+// 2026-11-23) the ones that only change the look are on, and core/ExtrasDefaults.h says which are on and how an existing
+// profile follows a default (the page's "FL-exact" and "Recommended" buttons use it too).
 //
 // This is only the list: every switch reads and writes the preference the feature already has (the same variable and
-// the same settings key as its menu item or Settings page), so there is no second place where the state lives. An
-// extra that is off by default and has its own switch elsewhere belongs here; add it when it lands.
+// the same settings key as its menu item or Settings page), so there is no second place where the state lives. Every
+// LYNX extra with its own switch elsewhere belongs here, on or off by default; add it when it lands.
 //
 // No JUCE: tested in tests/Extras190amTests.inc. The texts are English keys (TR_NOOP), translated by the page.
 
@@ -96,6 +97,11 @@ inline constexpr Item items[] = {
     { "general.hoverValues", TR_NOOP ("Editing"), TR_NOOP ("Show a control's value next to the mouse when hovering over it (LYNX)"),
       TR_NOOP ("The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page."),
       "ui-options.txt:hoverValues" },
+    // issue #25 (the owner's choice, round 168k): FL plays a pattern clip stretched past its pattern once and is silent after;
+    // on by default since then (round 190qk: listed here, so Settings › LYNX extras' "FL-exact" turns it off too)
+    { "general.stretchedClipsLoop", TR_NOOP ("Editing"), TR_NOOP ("Stretched pattern clips loop their pattern (LYNX)"),
+      TR_NOOP ("A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page."),
+      "ui-options.txt:stretchedClipsLoop" },
     // round 190lo: the polyphonic note editor's clips with edits get their notes' masks built on a background thread at open
     { "polyEdit.prepareOnOpen", TR_NOOP ("Editing"), TR_NOOP ("Prepare edited clips when a project opens (LYNX)"),
       TR_NOOP ("When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu."),

@@ -12730,3 +12730,11 @@ countries: de at ch li lu
 "Number of effect slots on new mixer tracks" = "Anzahl der Effekt-Slots neuer Mixer-Spuren"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Diese Version hat 10 Effekt-Slots pro Insert: Die Effekte in den Slots nach Slot 10 fallen weg: {0}"
 "This insert has no free slot ({0} effects)" = "Dieser Insert hat keinen freien Slot ({0} Effekte)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX-eigene Verbesserungen. Die, die nur ändern, was du siehst, sind standardmäßig an; die, die ändern, was eine Taste, ein Klick oder ein Ziehen tut, sind aus, sodass LYNX SHARE wie FL Studio arbeitet, bis du eine einschaltest. Jeder Schalter ist dieselbe Einstellung wie an dem Ort, den seine Zeile nennt."
+"FL-exact (turn all LYNX extras off)" = "Wie FL (alle LYNX-Extras ausschalten)"
+"Recommended" = "Empfohlen"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Alle LYNX-Extras aus: LYNX SHARE wie FL Studio (Esc schließt das fokussierte Fenster und die Startseite bleiben, wie FL Studio sie hat)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Jedes LYNX-Extra auf seinem Standard: die, die nur das Aussehen ändern, an, der Rest aus"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Ein Pattern-Clip, der länger als sein Pattern ist, spielt das Pattern erneut, bis der Clip endet; FL Studio spielt es einmal und bleibt danach still. Standardmäßig an. Auch auf der Seite Allgemein."

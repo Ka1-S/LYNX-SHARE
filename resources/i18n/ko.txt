@@ -12730,3 +12730,11 @@ countries: kr
 "Number of effect slots on new mixer tracks" = "새 믹서 트랙의 이펙트 슬롯 수"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "이 버전은 인서트당 이펙트 슬롯이 10개입니다. 10번 이후 슬롯의 이펙트는 빠집니다: {0}"
 "This insert has no free slot ({0} effects)" = "이 인서트에는 빈 슬롯이 없습니다 (이펙트 {0}개)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX만의 개선 기능입니다. 보이는 것만 바꾸는 기능은 기본적으로 켜져 있고, 키·클릭·드래그의 동작을 바꾸는 기능은 꺼져 있어, 하나를 켜기 전까지 LYNX SHARE는 FL Studio처럼 동작합니다. 각 스위치는 해당 줄에 적힌 곳에 있는 설정과 같은 설정입니다."
+"FL-exact (turn all LYNX extras off)" = "FL과 동일 (LYNX 추가 기능 모두 끄기)"
+"Recommended" = "권장"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "LYNX 추가 기능 모두 끄기: LYNX SHARE를 FL Studio처럼 (Esc로 포커스된 창 닫기와 시작 페이지는 FL Studio처럼 유지됩니다)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "모든 LYNX 추가 기능을 기본값으로: 모양만 바꾸는 기능은 켜고 나머지는 끄기"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "패턴보다 길게 만든 패턴 클립은 클립이 끝날 때까지 패턴을 다시 재생합니다. FL Studio는 한 번만 재생하고 그 뒤로는 무음입니다. 기본적으로 켜짐. 일반 페이지에도 있습니다."

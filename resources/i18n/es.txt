@@ -12730,3 +12730,11 @@ countries: es mx ar co cl pe ve
 "Number of effect slots on new mixer tracks" = "Número de ranuras de efecto en las pistas nuevas del mezclador"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Esta versión tiene 10 ranuras de efecto por insert: los efectos de las ranuras después de la 10 se omiten: {0}"
 "This insert has no free slot ({0} effects)" = "Este insert no tiene ranuras libres ({0} efectos)"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Mejoras propias de LYNX. Las que solo cambian lo que ves vienen activadas; las que cambian lo que hace una tecla, un clic o un arrastre vienen desactivadas, así que LYNX SHARE funciona como FL Studio hasta que actives alguna. Cada interruptor es el mismo ajuste que en el lugar que indica su línea."
+"FL-exact (turn all LYNX extras off)" = "Igual que FL (desactivar todos los extras de LYNX)"
+"Recommended" = "Recomendado"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "Todos los extras de LYNX desactivados: LYNX SHARE como FL Studio (Esc cerrando la ventana con el foco y la página de inicio se mantienen, como en FL Studio)"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "Cada extra de LYNX en su valor predeterminado: los que solo cambian el aspecto activados, el resto desactivados"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "Un clip de patrón más largo que su patrón vuelve a tocar el patrón hasta que termina el clip; FL Studio lo toca una vez y después queda en silencio. Activado por defecto. También en la página General."
