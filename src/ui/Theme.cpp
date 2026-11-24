@@ -1887,7 +1887,9 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
     // round 190qw (design190oj WG-8): a close button labelled with the "×" glyph (welcome card, Next-3 card, tours, the
     // Lyrics / Finish / Start-from panels, Browser search, automation rows...) gets the vector close icon: the text glyph was
     // 5 px tall in a 30 px button (100 %) and read as a dot; the icon is 10 px at 100 % and scales crisply
-    if (button.getButtonText() == juce::String::fromUTF8 ("\xc3\x97"))
+    // (compared as one character: no string is made on every paint)
+    const auto text = button.getButtonText(); // (a reference-counted copy)
+    if (auto c = text.getCharPointer(); *c == (juce::juce_wchar) 0xd7 && (++c).isEmpty())
     {
         const auto side = juce::jlimit (8.0f, 14.0f, (float) juce::jmin (button.getWidth(), button.getHeight()) * 0.42f);
         icons::draw (g, Icon::close, button.getLocalBounds().toFloat().withSizeKeepingCentre (side * 24.0f / 11.0f, side * 24.0f / 11.0f), fg);
