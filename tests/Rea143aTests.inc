@@ -155,9 +155,13 @@ TEST (rea143_mixer_track_menu_operations)
     s.setRoute (2, 3, true);
     s.setRoute (4, 3, true);
     s.setRoute (5, 2, true);
-    // "Reset selected track(s) to default": the controls, not the name or the routing
+    a.effects.resize (2);
+    a.effects[1].row = 4;
+    a.chainBlend = 0.5f;
+    // "Reset selected track(s) to default": the controls and the effects (FL's Default.fst), not the name or the routing
     mixerops::resetToDefault (s, { 2 });
     CHECK (a.volume == unityFader && a.pan == 0.0f && a.stereo == 0.0f && ! a.invertPhase && ! a.muted && a.eq == TrackEq {});
+    CHECK (a.effects.empty() && a.chainBlend == 1.0f);
     CHECK (a.name == "Drums" && s.routes (2, 3));
     // the "Select" submenu's lists
     CHECK ((mixerops::destinationsOf (s, 2) == std::vector<int> { 0, 3 }));
