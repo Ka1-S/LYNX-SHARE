@@ -337,9 +337,10 @@ struct PluginRow
     bool favourite = false;
     std::string bits = {}; // FL's Bits column (Windows, round 176a): "64", "32" or "32+64"
     bool separate = false; // round 190gg (LYNX-own): on the "always run in a separate process" list
+    bool hidden = false;   // round 190qi (LYNX-own): left out of the plugin lists (core/PluginPicks.h)
 };
 
-enum class PluginFilter { all, instruments, effects, favourites, failed };
+enum class PluginFilter { all, instruments, effects, favourites, failed, hidden };
 enum class PluginSort { name, vendor, format, type, status };
 
 // The rows to show (indices into `rows`): those passing `filter` whose name, vendor, format, category or file

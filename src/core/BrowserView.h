@@ -89,9 +89,32 @@ inline constexpr const char* pluginsRootId = "@plugins";
 // Whether a root is shown in the Sample browser before the user chose (only sample / audio places).
 bool sampleBrowserShowsByDefault (RootKind kind);
 
+// --- round 190qi (DETAILS-2 D2-BR5, LYNX-own; FL users ask for it, IL forum p=1988900): Browser ▾ › "File types" and
+// "Hide folders named..." ------------------------------------------------------------------------------------------------
+// The file types the menu offers, in groups (each a lower-case extension the Browser lists).
+struct TypeGroup
+{
+    const char* name; // English (the UI translates it)
+    std::vector<std::string> extensions;
+};
+const std::vector<TypeGroup>& typeGroups();
+// Whether `fileName` passes the user's types (lower-case extensions; none chosen = every type).
+bool typeChosen (const std::string& fileName, const std::set<std::string>& types);
+// "Backup, old*,  .git" -> {"Backup", "old*", ".git"} (trimmed, empty ones and repeats dropped, ASCII case ignored)
+std::vector<std::string> parseFolderNames (const std::string& text);
+std::string joinFolderNames (const std::vector<std::string>& names); // "Backup, old*"
+// Whether a folder named `name` is hidden: one of `names` equal to it (ASCII case ignored), '*' standing for any run of
+// characters ("old*", "*_bak").
+bool folderNameHidden (const std::string& name, const std::vector<std::string>& names);
+// Whether a path ('/' or '\\' between names) goes through a hidden folder below `root` (its own path; "" = check
+// every folder of the path but the last name, the file's own).
+bool pathHidden (const std::string& path, const std::string& root, const std::vector<std::string>& names);
+
 struct View
 {
     std::set<std::string> hidden; // ids of the hidden roots (a folder's path, or projectRootId / pluginsRootId)
+    std::set<std::string> types;  // round 190qi: the file types the user chose (lower-case extensions; empty = all)
+    std::vector<std::string> hiddenFolderNames; // round 190qi: folders with these names are left out (patterns)
     std::set<std::string> excluded; // folders left out of a merged root (their paths; round 178a)
     ContentFilter filter = ContentFilter::all;
     bool open = false;            // the Sample browser window was open (unused for the main Browser)

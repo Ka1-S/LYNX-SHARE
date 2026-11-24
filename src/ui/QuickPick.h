@@ -76,6 +76,12 @@ std::vector<Pick> renamedGenerators (AudioEngine& engine, std::function<void (Ch
 // was added.
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (EffectSlot)> add);
 bool addFolderGroups (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> add);
+// Round 190qi (core/PluginPicks.h): the plugins picked last (Plugin host's recentPlugins, not hidden) under a "Recent"
+// heading, newest first; returns whether any was added. effectKey: the Plugin database key of a slot's effect (its
+// plugin's identifier, "lynx:fx:<name>"; "" for a LYNX stand-in of a third-party plugin).
+bool addRecentItems (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (EffectSlot)> add);
+bool addRecentItems (juce::PopupMenu& menu, AudioEngine& engine, std::function<void (ChannelDef)> add);
+std::string effectKey (const EffectSlot& slot);
 // FL's view switch at the bottom of those menus (radio items Categories / Simple / Tree)
 void addFolderViewItems (juce::PopupMenu& menu, AudioEngine& engine);
 // Whether the plugin with this database key ("lynx:fx:Facet EQ") sits in one of the user's folders (it is then listed

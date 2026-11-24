@@ -541,6 +541,15 @@ public:
     const std::set<std::string>& favourites() const noexcept { return favouriteIds; }
     void setFavourite (const std::string& id, bool favourite);
 
+    // Round 190qi (core/PluginPicks.h, LYNX-own): the plugins picked last (keys: identifier strings, or "lynx:fx:" /
+    // "lynx:gen:" keys of LYNX's own), newest first, at most 8; and the plugins the user hid from the pickers in the
+    // Plugin manager (projects still load them). Saved in plugin-recent.txt / plugin-hidden.txt. UI thread.
+    const std::vector<std::string>& recentPlugins() const noexcept { return recentKeys; }
+    void notePluginPicked (const std::string& key);
+    const std::set<std::string>& hiddenPlugins() const noexcept { return hiddenIds; }
+    bool isHidden (const std::string& id) const { return hiddenIds.count (id) > 0; }
+    void setHidden (const std::string& id, bool hidden);
+
     // Names the user gave plugins (FL's renamed Plugin database entries, issue #11; core/Preferences.h): the
     // Browser's Plugin database shows them and the slot / channel menus list them first, picked by their first
     // character. Saved in %APPDATA%\LYNX\plugin-names.txt. UI thread.
@@ -738,6 +747,8 @@ private:
     bool flDbLoaded = false;
 
     std::set<std::string> favouriteIds;
+    std::vector<std::string> recentKeys; // round 190qi
+    std::set<std::string> hiddenIds;
     std::map<std::string, std::string> userNames;
     plugincatalog::Folders userFolders;
 

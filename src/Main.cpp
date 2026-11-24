@@ -136,6 +136,8 @@
 #include "engine/AacEncoder.h"
 #include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
+#include "core/MidiPreview.h" // round 190qi
+#include "core/PluginPicks.h" // round 190qi
 #include "engine/PluginHost.h"
 #include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
@@ -3639,6 +3641,21 @@ public:
             const auto r = hotfix190qpWfCheck (prefix);
             juce::File (prefix + "-checks.txt").replaceWithText ("hotfix190qp_wf=" + r + "\n");
             setApplicationReturnValue (r == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
+        // --pickerpaint190qi <report> (round 190qi): the plugin lists' and the Browser's paint cost, src/PickerPaintBench190qi.inc
+        if (args.contains ("--pickerpaint190qi"))
+        {
+            runPickerPaint190qi (juce::File (args[args.indexOf ("--pickerpaint190qi") + 1].unquoted()));
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+        // --picker190qishot <folder> (round 190qi, picker and Browser quality of life): src/Picker190qiShot.inc
+        if (args.contains ("--picker190qishot"))
+        {
+            setApplicationReturnValue (runPicker190qiShot (juce::File (args[args.indexOf ("--picker190qishot") + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -7338,6 +7355,9 @@ private:
                                                                       : "CHANGED 0x" + juce::String::toHexString ((juce::int64) fpModeBeforeJsfx) + " -> 0x"
                                                                             + juce::String::toHexString ((juce::int64) fpModeAfterJsfx) + " (put back)";
 
+        // round 190qi: the slot menu's Recent section, a plugin hidden from the lists, one row per plugin's formats, a MIDI
+        // file's preview schedule (src/Picker190qiShot.inc)
+        const auto picker190qiResult = picker190qiSelfTest (juce::File::getSpecialLocation (juce::File::tempDirectory));
         // round 190ap: the Versions panel's list of files, and its labels on disk beside them
         const auto versionsResult = lynx::versionsSelfTest();
         // round 190ap: a project opened with its plugins off creates none of them and saves their settings unchanged
@@ -11137,7 +11157,7 @@ private:
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
                         && generatorSmartResult.startsWith ("OK") && jsfxResult.startsWith ("OK") && jsfxFpResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
-                        && editorHolesResult.startsWith ("OK");
+                        && editorHolesResult.startsWith ("OK") && picker190qiResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -11197,6 +11217,7 @@ private:
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "jsfx190pj=" << jsfxResult << "\n"
                << "jsfx_fp_environment=" << jsfxFpResult << "\n"
+               << "picker190qi=" << picker190qiResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
                << "missing_files_rows=" << missingFilesResult << "\n"
@@ -21181,6 +21202,8 @@ private:
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
+#include "Picker190qiShot.inc" // round 190qi (TOP-NEXT R6): picker and Browser quality of life
+#include "PickerPaintBench190qi.inc" // round 190qi: the plugin lists' and the Browser's paint gate
 #include "RackAuto190owShot.inc" // round 190ow (PAT-7 rest, DE-123: the automation clip rows at work)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)

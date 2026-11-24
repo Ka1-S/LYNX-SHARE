@@ -88,6 +88,8 @@
 #include "ui/ToolWindow.h"
 #include "ui/WorkflowExtras.h" // round 190iu (issue #191.6)
 #include "ui/LoopInfo.h" // round 190kx
+#include "core/MidiPreview.h"   // round 190qi
+#include "engine/MidiFileIo.h" // round 190qi
 
 namespace lynx
 {
@@ -674,6 +676,7 @@ private:
 
 // round 190iz: the tab icons, the row star, the TAGS button, the tags panel, the Live sidebar
 #include "ui/BrowserTagsLive.inc"
+#include "ui/BrowserQol190qi.inc" // round 190qi: MIDI preview, search completion, file types
 #include "ui/LoopBrowserPanel.inc" // round gaps190kf
 
 class BrowserComponent::FileTree final : public juce::Component,
@@ -1077,6 +1080,7 @@ public:
             root->children.push_back (std::move (n));
         }
         selected = hovered = -1;
+        marked.clear(); // (round 190qi)
         rebuild();
     }
 
@@ -1295,6 +1299,7 @@ public:
             flatNodes.push_back (std::move (n));
         }
         selected = hovered = -1;
+        marked.clear(); // (round 190qi)
         rebuild();
     }
 
@@ -1305,6 +1310,7 @@ public:
         status = newStatus;
         flatNodes = std::move (nodes);
         selected = hovered = -1;
+        marked.clear(); // (round 190qi)
         rebuild();
     }
 
@@ -1467,6 +1473,7 @@ public:
         };
         close (*root);
         selected = hovered = -1;
+        marked.clear(); // (round 190qi)
         rebuild();
     }
 
@@ -1697,6 +1704,11 @@ public:
                 g.fillRect (r);
                 g.setColour (accent);
                 g.fillRect (r.withWidth (2));
+            }
+            else if (isMarked (n)) // (round 190qi: the multi-selection)
+            {
+                g.setColour (accentMuted.withMultipliedAlpha (0.8f));
+                g.fillRect (r);
             }
             else if (i == hovered)
             {
@@ -2022,6 +2034,32 @@ public:
             repaintRow (row);
             return;
         }
+        // round 190qi: Ctrl+click / Shift+click mark files for a batch (right-click › "Add tag..." tags them all)
+        if (e.mods.isLeftButtonDown() && ! e.mods.isPopupMenu() && (e.mods.isCommandDown() || e.mods.isShiftDown()) && markable (n))
+        {
+            if (e.mods.isShiftDown() && juce::isPositiveAndBelow (selected, (int) rows.size()))
+            {
+                marked.clear();
+                for (int i = juce::jmin (selected, row); i <= juce::jmax (selected, row); ++i)
+                    if (markable (*rows[(std::size_t) i]))
+                        marked.push_back (itemOf (*rows[(std::size_t) i]));
+                repaint();
+                return;
+            }
+            if (marked.empty() && juce::isPositiveAndBelow (selected, (int) rows.size()) && selected != row && markable (*rows[(std::size_t) selected]))
+                marked.push_back (itemOf (*rows[(std::size_t) selected]));
+            const auto item = itemOf (n);
+            if (const auto it = std::find (marked.begin(), marked.end(), item); it != marked.end())
+                marked.erase (it);
+            else
+                marked.push_back (item);
+            select (row, false);
+            repaint();
+            return;
+        }
+        if (! e.mods.isPopupMenu() || ! isMarked (n))
+            clearMarks();
+
         if (e.mods.isAltDown() && ! n.folder)
             browser.askPreview (0.0, true);
 
@@ -2513,7 +2551,7 @@ private:
 
         for (const auto& f : folders)
         {
-            if (f.isHidden() || f.getFileName().startsWithChar ('.'))
+            if (f.isHidden() || f.getFileName().startsWithChar ('.') || browser.hidesFolderNamed (f.getFileName())) // (round 190qi)
                 continue;
             const auto also = alsoOf.count (f.getFullPathName()) ? alsoOf[f.getFullPathName()] : juce::Array<juce::File>();
             if (browser.filterHides (f) && std::all_of (also.begin(), also.end(), [this] (const juce::File& a) { return browser.filterHides (a); }))
@@ -3295,6 +3333,41 @@ private:
     juce::Array<juce::File> bases;
     juce::String status, pendingKey;
     int selected = -1, hovered = -1, pressedRow = -1;
+public:
+    // Round 190qi: the multi-selection — Ctrl+click adds / removes a file (or Plugin database entry), Shift+click the
+    // files from the selected row to it; their items (itemOf), in the order picked. A plain click or a new list ends it.
+    // Right-click › "Add tag..." then tags them all.
+    std::vector<std::string> marked;
+    bool isMarked (const Node& n) const
+    {
+        if (marked.empty())
+            return false;
+        const auto item = itemOf (n);
+        return ! item.empty() && std::find (marked.begin(), marked.end(), item) != marked.end();
+    }
+    static bool markable (const Node& n) { return ! n.folder && n.thumbPart < 0 && ! itemOf (n).empty() && (n.kind == Kind::file || n.kind == Kind::plugin); }
+    void clearMarks()
+    {
+        if (marked.empty())
+            return;
+        marked.clear();
+        repaint();
+    }
+    // the names of the folders listed so far (the search box's completion)
+    void folderNames (std::vector<std::string>& out) const
+    {
+        std::function<void (const Node&)> walk = [&] (const Node& n) {
+            for (const auto& c : n.children)
+                if (c != nullptr && c->folder && c->kind == Kind::fsFolder)
+                {
+                    out.push_back ((c->label.isNotEmpty() ? c->label : c->file.getFileName()).toStdString());
+                    walk (*c);
+                }
+        };
+        if (root != nullptr)
+            walk (*root);
+    }
+private:
     int dropRow = -1; // the folder files dragged in from the system would be copied to
     bool dragStarted = false;
     bool overStar = false; // (round 190iz: the mouse is on the hovered row's star)
@@ -3424,13 +3497,15 @@ public:
     void updateControls()
     {
         const auto playing = isPlaying();
-        const auto show = isAudio (file) && (playing || isMouseOver (true));
+        const auto show = (isAudio (file) || isMidiFile190qi (file)) && (playing || isMouseOver (true));
         if (playing != shownPlaying) // (only on a change: this runs on every timer tick)
         {
             shownPlaying = playing;
             browser.stopButton.setIcon (playing ? Icon::stop : Icon::play);
             browser.stopButton.setPrimary (playing);
-            const auto text = playing ? tr ("Stop the sample preview") : tr ("Play the sample preview");
+            const auto midi = isMidiFile190qi (file);
+            const auto text = playing ? (midi ? tr ("Stop the MIDI preview") : tr ("Stop the sample preview"))
+                                      : (midi ? tr ("Play the MIDI file on the selected channel") : tr ("Play the sample preview"));
             browser.stopButton.setTooltip (text);
             ui::setHint (browser.stopButton, text, true);
         }
@@ -3458,6 +3533,8 @@ public:
     {
         if (isPlaying())
             browser.stopPreview();
+        else if (isMidiFile190qi (file)) // (round 190qi)
+            browser.fileSelected (file, true);
         else if (isAudio (file))
         {
             browser.askPreview (0.0, true); // (FL's Preview Player: Play plays the whole sample)
@@ -3482,7 +3559,22 @@ public:
             seconds = 0.0;
             info.clear();
 
-            if (isAudio (f))
+            midiNotes.clear();
+            if (isMidiFile190qi (f)) // round 190qi: the notes, drawn as a small piano roll, at the project's tempo
+            {
+                juce::String error;
+                if (auto notes = MidiFileIo::loadNotes (f, 0, error); notes.has_value() && ! notes->empty())
+                {
+                    midiNotes = std::move (*notes);
+                    const auto events = midipreview::schedule (midiNotes, juce::jmax (10.0, browser.engine.getSong().bpm), 600.0);
+                    seconds = midipreview::lengthMs (events) / 1000.0;
+                    info = tr ("{0} notes", { juce::String ((int) midiNotes.size()) }) + "  " + juce::String (seconds, seconds < 10.0 ? 2 : 1) + " s  "
+                           + tr ("{0} BPM", { juce::String (browser.engine.getSong().bpm, 0) });
+                }
+                else
+                    info = tr ("No notes");
+            }
+            else if (isAudio (f))
                 if (const auto sample = browser.engine.getSampleLibrary().load (f.getFullPathName()); sample != nullptr && sample->frames() > 0)
                 {
                     // 256 peaks over the whole file
@@ -3530,6 +3622,11 @@ public:
         g.fillRect (0, 0, getWidth(), 1);
         auto area = getLocalBounds().reduced (6, 4).withTrimmedTop (1);
 
+        if (isMidiFile190qi (file)) // round 190qi
+        {
+            paintMidi (g, area);
+            return;
+        }
         if (file == juce::File() || ! isAudio (file))
         {
             g.setColour (textDisabled);
@@ -3591,8 +3688,59 @@ public:
         }
     }
 
+    // Round 190qi: a MIDI file's notes as a small piano roll (its lowest to highest key), what has played in the accent
+    void paintMidi (juce::Graphics& g, juce::Rectangle<int> area)
+    {
+        using namespace theme::colour;
+        auto top = area.removeFromTop (14);
+        g.setFont (theme::font (theme::type::caption, true));
+        g.setColour (textPrimary);
+        g.drawText (file.getFileNameWithoutExtension(), top, juce::Justification::centredLeft, true);
+        g.setFont (theme::font (theme::type::caption));
+        g.setColour (textSecondary);
+        g.drawText (info, top, juce::Justification::centredRight, true);
+        area.removeFromTop (2);
+        g.setColour (bg0);
+        g.fillRoundedRectangle (area.toFloat(), theme::radius::sm);
+        if (midiNotes.empty())
+            return;
+        const auto box = area.toFloat().reduced (3.0f, 3.0f);
+        std::int64_t first = midiNotes.front().start, last = first;
+        int low = 127, high = 0;
+        for (const auto& n : midiNotes)
+        {
+            first = std::min (first, n.start);
+            last = std::max (last, n.start + n.length);
+            low = juce::jmin (low, n.key);
+            high = juce::jmax (high, n.key);
+        }
+        const auto span = (double) juce::jmax<std::int64_t> (1, last - first);
+        const auto keys = (float) juce::jmax (12, high - low + 1);
+        const auto rowH = box.getHeight() / keys;
+        const auto progress = position();
+        const auto playedX = box.getX() + box.getWidth() * (float) progress;
+        for (const auto& n : midiNotes)
+        {
+            const auto x = box.getX() + box.getWidth() * (float) ((double) (n.start - first) / span);
+            const auto w = juce::jmax (1.0f, box.getWidth() * (float) ((double) n.length / span));
+            const auto y = box.getBottom() - rowH * (float) (n.key - low + 1) - (keys - (float) (high - low + 1)) * rowH * 0.5f;
+            g.setColour (progress > 0.0 && x <= playedX ? accent : textSecondary.withAlpha (0.75f));
+            g.fillRect (x, y, w, juce::jmax (1.0f, rowH - 0.5f));
+        }
+        if (progress > 0.0)
+        {
+            g.setColour (textPrimary);
+            g.fillRect (playedX, box.getY(), 1.0f, box.getHeight());
+        }
+    }
+
     void mouseDown (const juce::MouseEvent& e) override
     {
+        if (isMidiFile190qi (file) && e.mods.isLeftButtonDown()) // (round 190qi: a click plays it again from the start)
+        {
+            browser.fileSelected (file, true);
+            return;
+        }
         if (! isAudio (file) || ! e.mods.isLeftButtonDown())
             return;
         // round 190iz: FL's Shift+Click (and a click in the Clip-launch layout, Live's scrub area) plays from the mouse
@@ -3619,6 +3767,12 @@ public:
     ui::Hint hintAt (juce::Point<int>) override
     {
         ui::Hint h;
+        if (isMidiFile190qi (file)) // (round 190qi)
+        {
+            h.text = tr ("MIDI preview: the file's notes on the selected channel at the project's tempo  [LMB] play again");
+            h.value = info;
+            return h;
+        }
         h.text = isAudio (file) ? (browser.isLiveLayout() ? tr ("Sample preview: [LMB] play from there  [Alt+LMB] to the end  drag it like a file in the list")
                                                           : tr ("Sample preview: [LMB] hear it again  [Shift+LMB] from there  [Alt+LMB] to the end  drag it like a file in the list"))
                                 : tr ("Sample preview");
@@ -3652,6 +3806,8 @@ public:
 private:
     double position() const
     {
+        if (isMidiFile190qi (file)) // (round 190qi: the MIDI preview says where it is; 0 when it isn't playing this file)
+            return browser.midiPreview != nullptr && browser.midiPreview->isPlaying (file) ? browser.midiPreview->progress() : (startedAt > 0.0 ? 1.0 : 0.0);
         if (startedAt <= 0.0 || seconds <= 0.0)
             return 0.0;
         // "Preview in time" (round 190aq): the stretched preview starts later (its stretch, then its beat) and lasts
@@ -3692,6 +3848,7 @@ private:
     juce::String info;
     bool dragging = false;
     std::optional<bool> shownPlaying; // the Play / Stop state the button shows
+    std::vector<Note> midiNotes;      // round 190qi: a MIDI file's notes (its preview)
 };
 
 // --- the browser -------------------------------------------------------------------------------------
@@ -3879,6 +4036,15 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     searchBox.setComponentID ("browser.search"); // (round 190pl: --demo)
     searchBox.addListener (this);
     searchBox.setEscapeAndReturnKeysConsumed (true);
+    // round 190qi: Tab completes the last word (a tag after '#', a folder name), the rest shown greyed after the text
+    searchGhost = std::make_unique<SearchGhost> (searchBox);
+    searchBox.addChildComponent (*searchGhost);
+    {
+        auto keys = std::make_unique<SearchTabKeys>();
+        keys->accept = [this] { return acceptSearchSuggestion(); };
+        searchKeys = std::move (keys);
+        searchBox.addKeyListener (searchKeys.get());
+    }
     ui::setHint (searchBox, tr ("Search the selected folder (or every folder) and below; in PROJECT, the project's items: words must all match; "
                                 "OR, -word (not), \"exact phrase\", * and ? wildcards  [Enter] to the results  [Esc] clear"));
     addAndMakeVisible (searchBox);
@@ -4550,7 +4716,8 @@ void BrowserComponent::saveView() const
 bool BrowserComponent::lists (const juce::File& file) const
 {
     // (round 190iz: under the tab's / Live entry's own filter: PRESETS, SOUNDS, Samples...)
-    return browserview::listed (file.getFileName().toStdString(), activeFilter()) || file.isDirectory();
+    return (browserview::listed (file.getFileName().toStdString(), activeFilter()) && browserview::typeChosen (file.getFileName().toStdString(), view.types))
+           || file.isDirectory();
 }
 
 std::shared_ptr<const search::FolderMatches> BrowserComponent::filterMatches() const
@@ -4624,12 +4791,17 @@ void BrowserComponent::refreshViewButton()
         hidden += id == browserview::projectRootId || id == browserview::pluginsRootId
                           || allRoots.contains (juce::File (juce::String::fromUTF8 (id.c_str())))
                       ? 1 : 0;
-    viewButton.setToggleState (filtered || hidden > 0, juce::dontSendNotification);
+    const auto ownTypes = ! view.types.empty() || ! view.hiddenFolderNames.empty(); // (round 190qi)
+    viewButton.setToggleState (filtered || hidden > 0 || ownTypes, juce::dontSendNotification);
     juce::String text = tr ("Browser options: what to list, which folders to show");
     if (filtered)
         text << "  (" << tr (browserview::contentFilterLabel (view.filter)) << ")";
     if (hidden > 0)
         text << "  (" << (hidden == 1 ? tr ("1 folder hidden") : tr ("{0} folders hidden", { juce::String (hidden) })) << ")";
+    if (! view.types.empty())
+        text << "  (" << tr ("some file types") << ")";
+    if (! view.hiddenFolderNames.empty())
+        text << "  (" << tr ("folders hidden by name") << ")";
     viewButton.setTooltip (text);
     ui::setHint (viewButton, text, true);
 }
@@ -4656,6 +4828,24 @@ void BrowserComponent::addViewItems (juce::PopupMenu& menu)
         });
     }
     menu.addSubMenu (tr ("Show") + ": " + tr (browserview::contentFilterLabel (view.filter)), filters);
+    // round 190qi (LYNX-own, FL users' request): the kinds of files listed, and folders left out by their names
+    {
+        std::size_t every = 0;
+        for (const auto& group : browserview::typeGroups())
+            every += group.extensions.size();
+        menu.addItem (view.types.empty() ? tr ("File types...")
+                                         : tr ("File types... ({0} of {1})", { juce::String ((int) view.types.size()), juce::String ((int) every) }),
+                      [safe] {
+                          if (safe != nullptr)
+                              safe->showFileTypesDialog();
+                      });
+        const auto names = juce::String::fromUTF8 (browserview::joinFolderNames (view.hiddenFolderNames).c_str());
+        menu.addItem (names.isEmpty() ? tr ("Hide folders named...") : tr ("Hide folders named... ({0})", { names.length() > 30 ? names.substring (0, 28) + "..." : names }),
+                      [safe] {
+                          if (safe != nullptr)
+                              safe->askHiddenFolderNames();
+                      });
+    }
 
     // which top-level entries are shown and the user's own folders: a window (round 164; a checklist sub-menu before)
     menu.addItem (tr ("Show folders..."), [safe] {
@@ -5625,6 +5815,11 @@ BrowserComponent::~BrowserComponent()
         loopInfo->removeChangeListener (this);
     focusWatcher.reset();
     engine.previewFile ({});
+    midiPreview.reset(); // (round 190qi: its sounding notes end)
+    if (searchKeys != nullptr)
+        searchBox.removeKeyListener (searchKeys.get());
+    if (searchGhost != nullptr)
+        searchBox.removeChildComponent (searchGhost.get());
 }
 
 void BrowserComponent::waitForListing (int)
@@ -5748,6 +5943,23 @@ void BrowserComponent::fileSelected (const juce::File& file, bool preview)
         details->show (file);
         if (! wasVisible)
             resized();
+    }
+
+    // round 190qi: a MIDI file plays on the selected channel at the project's tempo (core/MidiPreview.h); any other
+    // preview ends it
+    if (preview || isMidiFile190qi (file))
+        stopMidiPreview();
+    if (isMidiFile190qi (file))
+    {
+        if (preview && file.existsAsFile())
+        {
+            engine.previewFile ({}); // (the sample preview stops, as one preview replaces another)
+            startMidiPreview (file);
+        }
+        strip->show (file, preview);
+        tree->repaint();
+        results->repaint();
+        return;
     }
 
     if (preview && file.hasFileExtension ("sf2;sf3;sfz") && file.existsAsFile())
@@ -6271,6 +6483,14 @@ void BrowserComponent::textEditorTextChanged (juce::TextEditor&)
 {
     searchPending = true;
     startTimer (250); // search once typing pauses
+    updateSearchSuggestion(); // (round 190qi)
+}
+
+void BrowserComponent::textEditorFocusLost (juce::TextEditor&)
+{
+    searchSuggestion.clear(); // (round 190qi: the greyed completion shows only while typing)
+    if (searchGhost != nullptr)
+        searchGhost->setRest ({});
 }
 
 void BrowserComponent::textEditorEscapeKeyPressed (juce::TextEditor&)
@@ -6407,7 +6627,7 @@ juce::Array<juce::File> BrowserComponent::collectionMatches (const juce::String&
     juce::Array<juce::File> out;
     for (const auto& item : collectionStore().search (query.toStdString(), &names))
         if (! collections::isPluginItem (item))
-            if (const juce::File f (juce::String::fromUTF8 (item.c_str())); f.existsAsFile() && (activeFilter() == browserview::ContentFilter::all || lists (f)))
+            if (const juce::File f (juce::String::fromUTF8 (item.c_str())); f.existsAsFile() && (activeFilter() == browserview::ContentFilter::all || lists (f)) && ! userHides (f))
                 out.add (f);
     return out;
 }
@@ -6421,7 +6641,7 @@ void BrowserComponent::searchAnswered (const search::SearchResult& r, const juce
     // files found by their own names
     auto found = collectionMatches (query);
     for (const auto& path : r.paths)
-        if (juce::File f (juce::String::fromUTF8 (path.c_str())); activeFilter() == browserview::ContentFilter::all || lists (f))
+        if (juce::File f (juce::String::fromUTF8 (path.c_str())); (activeFilter() == browserview::ContentFilter::all || lists (f)) && ! userHides (f))
             found.addIfNotAlreadyThere (f);
 
     // (partial answers and re-searches keep the selection and the scroll position)
@@ -6574,7 +6794,7 @@ void BrowserComponent::similarAnswered (const similarity::Result& r)
     juce::Array<juce::File> found;
     juce::StringArray details;
     for (const auto& m : r.matches)
-        if (juce::File f (juce::String::fromUTF8 (m.path.c_str())); activeFilter() == browserview::ContentFilter::all || lists (f))
+        if (juce::File f (juce::String::fromUTF8 (m.path.c_str())); (activeFilter() == browserview::ContentFilter::all || lists (f)) && ! userHides (f))
         {
             found.add (f);
             details.add (juce::String (similarity::percent (m.distance)) + "%");
@@ -6680,6 +6900,7 @@ bool BrowserComponent::renameSelectedPlugin()
 void BrowserComponent::stopPreview()
 {
     engine.previewFile ({});
+    stopMidiPreview(); // (round 190qi)
     if (strip != nullptr)
         strip->stop();
     tree->repaint();
@@ -7088,23 +7309,56 @@ void BrowserComponent::addTagItems (juce::PopupMenu& menu, const std::string& it
     if (item.empty())
         return;
     juce::Component::SafePointer<BrowserComponent> safe (this);
+    // round 190qi: a right-click on one of several marked rows acts on all of them
+    std::vector<std::string> items { item };
+    for (auto* list : { tree.get(), results.get() })
+        if (list != nullptr && list->marked.size() > 1 && std::find (list->marked.begin(), list->marked.end(), item) != list->marked.end())
+            items = list->marked;
     // FL's Tags section: Favorite (LYNX's Starred / the collections, above), Tags ▸, Add tag, Edit tags
-    juce::PopupMenu tags;
     const auto shown = shownTags(); // (round 190ke: with LYNX content's tags in the Simple layout)
-    for (const auto& t : shown.all())
-    {
-        const auto name = juce::String::fromUTF8 (t.name.c_str());
-        tags.addItem (name, true, shown.has (item, t.name), [safe, item, name] {
-            if (safe != nullptr)
-                safe->setTagged (item, name, ! tagStore().has (item, name.toStdString()));
-        });
-    }
+    // round 190qi: "a/b" tags as submenus (a group's own tag first in it); ticked when every item has it, a click puts it
+    // on every item (or takes it off them all when they all have it)
+    std::function<void (juce::PopupMenu&, const std::vector<browsertags::TagNode>&)> addNodes = [&] (juce::PopupMenu& m, const std::vector<browsertags::TagNode>& nodes) {
+        for (const auto& node : nodes)
+        {
+            const auto path = node.path;
+            const auto all = std::all_of (items.begin(), items.end(), [&shown, &path] (const std::string& i) { return shown.has (i, path); });
+            const auto name = juce::String::fromUTF8 (node.name.c_str());
+            auto act = [safe, items, path, all] {
+                if (safe == nullptr)
+                    return;
+                auto changed = false;
+                for (const auto& i : items)
+                    changed = tagStore().set (i, path, ! all) || changed;
+                if (changed)
+                {
+                    saveTags();
+                    safe->tagsChanged();
+                }
+            };
+            if (node.children.empty())
+            {
+                m.addItem (name, true, all, act);
+                continue;
+            }
+            juce::PopupMenu sub;
+            if (node.exists)
+            {
+                sub.addItem (name, true, all, act);
+                sub.addSeparator();
+            }
+            addNodes (sub, node.children);
+            m.addSubMenu (name, sub, true, nullptr, all && node.exists);
+        }
+    };
+    juce::PopupMenu tags;
+    addNodes (tags, browsertags::tagTree (shown.all()));
     if (tags.getNumItems() == 0)
         tags.addItem (tr ("(no tags yet)"), false, false, nullptr);
     menu.addSubMenu (tr ("Tags"), tags);
-    menu.addItem (tr ("Add tag..."), [safe, item] {
+    menu.addItem (items.size() > 1 ? tr ("Add tag to {0} items...", { juce::String ((int) items.size()) }) : tr ("Add tag..."), [safe, items] {
         if (safe != nullptr)
-            safe->askAddTag (item);
+            safe->askAddTag (items);
     });
     menu.addItem (tr ("Edit tags..."), ! tagStore().names.empty(), false, [safe] {
         if (safe != nullptr)
@@ -7494,5 +7748,6 @@ void BrowserComponent::savePrefs() const
     prefsFile().getParentDirectory().createDirectory();
     prefsFile().replaceWithText (text);
 }
+#include "ui/BrowserQol190qiParts.inc" // round 190qi: the parts that need the tree
 #include "ui/LoopBrowserParts.inc" // round gaps190kf
 } // namespace lynx

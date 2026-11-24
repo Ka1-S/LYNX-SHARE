@@ -78,6 +78,128 @@ bool listed (const std::string& fileName, ContentFilter filter)
     }
 }
 
+const std::vector<TypeGroup>& typeGroups()
+{
+    static const std::vector<TypeGroup> groups {
+        { "Audio", { "wav", "flac", "ogg", "mp3", "aif", "aiff", "wv", "ncw", "speech" } },
+        { "MIDI", { "mid", "midi" } },
+        { "Projects", { "lynx", "flp" } },
+        { "Presets", { "fst" } },
+        { "SoundFonts and instruments", { "sf2", "sf3", "dwp", "dwb", "gig" } },
+    };
+    return groups;
+}
+
+bool typeChosen (const std::string& fileName, const std::set<std::string>& types)
+{
+    return types.empty() || types.count (extensionOf (fileName)) > 0;
+}
+
+namespace
+{
+std::string lowerAscii (std::string s)
+{
+    for (auto& c : s)
+        c = (char) std::tolower ((unsigned char) c);
+    return s;
+}
+
+std::string trimmed (const std::string& s)
+{
+    const auto a = s.find_first_not_of (" \t");
+    const auto b = s.find_last_not_of (" \t");
+    return a == std::string::npos ? std::string() : s.substr (a, b - a + 1);
+}
+
+// '*' = any run of characters (both lower-case already)
+bool globMatches (const std::string& text, const std::string& pattern)
+{
+    std::size_t t = 0, p = 0, star = std::string::npos, mark = 0;
+    while (t < text.size())
+    {
+        if (p < pattern.size() && pattern[p] == '*')
+        {
+            star = p++;
+            mark = t;
+        }
+        else if (p < pattern.size() && pattern[p] == text[t])
+        {
+            ++p;
+            ++t;
+        }
+        else if (star != std::string::npos)
+        {
+            p = star + 1;
+            t = ++mark;
+        }
+        else
+            return false;
+    }
+    while (p < pattern.size() && pattern[p] == '*')
+        ++p;
+    return p == pattern.size();
+}
+} // namespace
+
+std::vector<std::string> parseFolderNames (const std::string& text)
+{
+    std::vector<std::string> out;
+    std::istringstream in (text);
+    for (std::string part; std::getline (in, part, ',');)
+    {
+        auto name = trimmed (part);
+        name.erase (std::remove_if (name.begin(), name.end(), [] (char c) { return c == '\n' || c == '\r' || c == '\t' || c == '/' || c == '\\'; }), name.end());
+        if (name.empty() || name.find_first_not_of ('*') == std::string::npos) // ("*" alone would hide everything)
+            continue;
+        if (std::none_of (out.begin(), out.end(), [&name] (const std::string& o) { return lowerAscii (o) == lowerAscii (name); }))
+            out.push_back (name);
+    }
+    return out;
+}
+
+std::string joinFolderNames (const std::vector<std::string>& names)
+{
+    std::string out;
+    for (const auto& n : names)
+        out += (out.empty() ? "" : ", ") + n;
+    return out;
+}
+
+bool folderNameHidden (const std::string& name, const std::vector<std::string>& names)
+{
+    if (names.empty() || name.empty())
+        return false;
+    const auto lowered = lowerAscii (name);
+    return std::any_of (names.begin(), names.end(), [&lowered] (const std::string& n) { return globMatches (lowered, lowerAscii (n)); });
+}
+
+bool pathHidden (const std::string& path, const std::string& root, const std::vector<std::string>& names)
+{
+    if (names.empty())
+        return false;
+    auto rest = path;
+    if (! root.empty() && path.size() > root.size() && lowerAscii (path.substr (0, root.size())) == lowerAscii (root))
+        rest = path.substr (root.size());
+    std::vector<std::string> parts;
+    std::string part;
+    for (const auto c : rest)
+    {
+        if (c == '/' || c == '\\')
+        {
+            if (! part.empty())
+                parts.push_back (part);
+            part.clear();
+        }
+        else
+            part += c;
+    }
+    // (the last name is the file's own; a folder's path ends in its own name, which is checked too when it ends in a slash)
+    for (const auto& p : parts)
+        if (folderNameHidden (p, names))
+            return true;
+    return false;
+}
+
 bool sampleBrowserShowsByDefault (RootKind kind)
 {
     return kind == RootKind::flSamples || kind == RootKind::music || kind == RootKind::downloads || kind == RootKind::user;
@@ -101,6 +223,10 @@ std::string View::toText() const
         out << "hidden=" << id << "\n";
     for (const auto& path : excluded)
         out << "excluded=" << path << "\n";
+    for (const auto& t : types)
+        out << "type=" << t << "\n";
+    for (const auto& n : hiddenFolderNames)
+        out << "hideFolder=" << n << "\n";
     return out.str();
 }
 
@@ -131,6 +257,18 @@ View View::fromText (const std::string& text)
             v.hidden.insert (value);
         else if (key == "excluded" && ! value.empty())
             v.excluded.insert (value);
+        else if (key == "type" && ! value.empty())
+        {
+            auto t = value;
+            std::transform (t.begin(), t.end(), t.begin(), [] (unsigned char c) { return (char) std::tolower (c); });
+            v.types.insert (t);
+        }
+        else if (key == "hideFolder" && ! value.empty())
+        {
+            for (const auto& n : parseFolderNames (value))
+                if (std::find (v.hiddenFolderNames.begin(), v.hiddenFolderNames.end(), n) == v.hiddenFolderNames.end())
+                    v.hiddenFolderNames.push_back (n);
+        }
         else if (key == "bounds")
         {
             int n[4] {};

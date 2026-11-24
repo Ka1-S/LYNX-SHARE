@@ -18121,3 +18121,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)
 #include "Feel190qeTests.inc" // round 190qe (0.1.32): edge scroll (FL law), view stack, zoom glide and anchor, selection history, keep labels
+#include "Picker190qiTests.inc" // round 190qi (0.1.32 R6): Recent / Hidden / one row per plugin, MIDI preview, file types, Tab completion, tag tree
