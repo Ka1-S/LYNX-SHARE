@@ -70,11 +70,7 @@ bool& clickFreeEditing()
 
 // round 190ld (DP-58, owner decision PL2): FL Edison's wheel (zoom; Shift+wheel scrolls) by default; View › "Wheel
 // scrolls (LYNX)" switches every audio editor of the session to LYNX's earlier mapping (wheel scrolls, Ctrl+wheel zooms)
-bool& wheelScrollsLynx()
-{
-    static bool on = false;
-    return on;
-}
+bool& wheelScrollsLynx() { return audioEditorWheelScrollsLynx(); }
 
 // one clipboard for every editor window (copy in one, paste in another); Tools › Clipboard saves it (round 181b)
 ae::Audio& clipboard()
@@ -6877,5 +6873,10 @@ juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)
     };
     walk (editor->mainMenu(), {});
     return lines;
+}
+bool& audioEditorWheelScrollsLynx()
+{
+    static bool on = false;
+    return on;
 }
 } // namespace lynx

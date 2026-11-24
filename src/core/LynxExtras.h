@@ -44,6 +44,14 @@ inline constexpr Item items[] = {
     { "mixer.followPlaylist", TR_NOOP ("Mixer"), TR_NOOP ("Mixer groups follow the Playlist (LYNX)"),
       TR_NOOP ("The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu."),
       "ui-options.txt:mixerFollowPlaylist" },
+    // round 190qh (D2-VF5, D2-MX3; listed in rollup 0.1.32 step 2, on by default: owner 2026-11-23, visual only): FL 2026
+    // shows a strip's peak in the hint bar only and has no correlation meter
+    { "mixer.peakValues", TR_NOOP ("Mixer"), TR_NOOP ("Peak values under meters (LYNX)"),
+      TR_NOOP ("Each Mixer strip shows its highest peak since a reset, in dBFS, in a box under its meter: a click resets it, Alt+click resets every one. The meters get a little shorter. FL Studio has no such box: switch this off for FL's look. Also in the Mixer menu › View."),
+      "ui-options.txt:mixerPeakValues" },
+    { "mixer.correlation", TR_NOOP ("Mixer"), TR_NOOP ("Correlation bars (LYNX)"),
+      TR_NOOP ("A thin bar under each Mixer strip's meter shows the stereo correlation of its output, from −1 to +1 (green to the right, red to the left), measured only while the bars show. FL Studio has no such bar: switch this off for FL's look. Also in the Mixer menu › View."),
+      "ui-options.txt:mixerCorrelation" },
     { "playlist.automationLanes", TR_NOOP ("Playlist"), TR_NOOP ("Automation lanes"),
       TR_NOOP ("Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu."),
       "ui-options.txt:automationLanes" },
@@ -214,6 +222,15 @@ inline constexpr Item items[] = {
     { "export.doneWindow", TR_NOOP ("Export"), TR_NOOP ("Show a window when an export finishes"),
       TR_NOOP ("A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export."),
       "ui-options.txt:exportDoneWindow" },
+    // round 190ld (DP-58, owner decision PL2; listed in rollup 0.1.32 step 2, off: it changes FL's wheel gesture): FL's
+    // Edison zooms with the wheel
+    { "audioEditor.wheelScrolls", TR_NOOP ("Audio editor"), TR_NOOP ("Wheel scrolls (LYNX)"),
+      TR_NOOP ("In the audio editor the mouse wheel scrolls and Ctrl+wheel zooms, as in LYNX's earlier versions. Off, as in FL Studio's Edison: the wheel zooms around the mouse and Shift+wheel scrolls. Also in the audio editor's View menu."),
+      "ui-options.txt:audioEditorWheelScrolls" },
+    // round 190qg (listed in rollup 0.1.32 step 2, off: it moves every toolbar button; round 190qk's EXTRAS.md § 5)
+    { "toolbar.grouped", TR_NOOP ("Toolbar"), TR_NOOP ("Grouped look (framed panels, steady spacing)"),
+      TR_NOOP ("The main toolbar draws each panel in a raised frame and keeps the panels in their places when the window is resized (the spare room goes into one gap). Off, as in FL Studio: sunk panels spread over the width. Pattern layout. Also in the toolbar's right-click menu."),
+      "ui-options.txt:toolbarGrouped" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

@@ -20,6 +20,9 @@ namespace lynx
 {
 // An empty editor (Tools menu): record into it or open a file.
 void openAudioEditor (AudioEngine& engine);
+// View › "Wheel scrolls (LYNX)" (round 190ld; off = FL Edison's wheel): every audio editor of the session; kept in
+// ui-options.txt "audioEditorWheelScrolls" and on Settings › LYNX extras (rollup 0.1.32 step 2)
+bool& audioEditorWheelScrollsLynx();
 // A file (the Browser).
 void openAudioEditor (AudioEngine& engine, const juce::File& file);
 // The sample of a channel (a Sampler channel or the channel of a Playlist audio clip); the edit can go back to it.

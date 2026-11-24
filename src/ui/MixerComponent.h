@@ -97,6 +97,8 @@ extern std::function<void (bool)> setShowUsedOnly;
 extern std::function<void (bool)> setShowLoudness;
 // Shows or hides the insert effects list on the strips (issue #154 part 2, round 190io).
 extern std::function<void (bool)> setShowStripInserts;
+// Shows or hides the peak values / correlation bars under the meters (round 190qh; Settings › LYNX extras, rollup 0.1.32).
+extern std::function<void (bool)> setShowPeakValues, setShowCorrelation;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
@@ -203,12 +205,13 @@ public:
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
     static inline bool showLoudness = false;
     void setShowLoudness (bool on);
-    // Round 190qh (LYNX extras, off by default; ui-options.txt "mixerPeakValues" / "mixerCorrelation"): View › "Peak
+    // Round 190qh (LYNX extras, on by default since rollup 0.1.32 step 2 — the owner's policy 11-23, visual only;
+    // ui-options.txt "mixerPeakValues" / "mixerCorrelation"): View › "Peak
     // values under meters" (D2-VF5: each strip's highest peak since a reset, in dBFS, in a box under its meter; a click
     // resets it, Alt+click every one) and View › "Correlation bars" (D2-MX3: the stereo correlation of each strip's
     // output, −1 … +1, a thin bar under its meter; summed from the meters' tap only while shown)
-    static inline bool showPeakValues = false;
-    static inline bool showCorrelation = false;
+    static inline bool showPeakValues = true;
+    static inline bool showCorrelation = true;
     static constexpr int correlationRowHeight = 6, peakRowHeight = 13;
     static int extrasHeight() noexcept { return (showCorrelation ? correlationRowHeight : 0) + (showPeakValues ? peakRowHeight : 0); }
     void setShowPeakValues (bool on);

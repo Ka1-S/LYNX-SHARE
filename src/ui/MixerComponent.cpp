@@ -4719,7 +4719,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             if (mixeroptions::changed)
                 mixeroptions::changed();
         });
-        // round 190qh: LYNX extras (off by default), and every meter's clip light at once (also Alt+click on a meter)
+        // round 190qh: LYNX extras (on by default since rollup 0.1.32), and every meter's clip light at once (also Alt+click
+        // on a meter)
         view.addSeparator();
         view.addItem (tr ("Peak values under meters (LYNX)"), true, showPeakValues, [this] {
             setShowPeakValues (! showPeakValues);
@@ -6254,6 +6255,7 @@ std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
 std::function<void (bool)> setShowStripInserts;
+std::function<void (bool)> setShowPeakValues, setShowCorrelation; // (rollup 0.1.32 step 2)
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 std::function<void (std::vector<int>)> selectPlaylistTracks;
 

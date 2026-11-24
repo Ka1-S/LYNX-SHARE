@@ -18,10 +18,12 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 4);
-    // the four turned on are views only (none changes a key, click, file or sound)
+    CHECK (std::size (extras::onSince0132) == 8);
+    // the eight turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
+    // and PR #268's veils and round 190qh's two Mixer views)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
-                            "simple.projectName", "controlBar.liveScale" })
+                            "simple.projectName", "controlBar.liveScale", "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks",
+                            "mixer.peakValues", "mixer.correlation" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",
@@ -29,7 +31,10 @@ TEST (extras190qk_default_lists)
                             "playlist.midiDrop", "project.linkTracks", "project.clipLaunchStrips", "mixer.followPlaylist",
                             "mixer.keepLostLinks", "record.lastLoopPassPlays", "playlist.clipLanesFolded", "mixer.loudness", "midi.gamepad",
                             "polyEdit.prepareOnOpen", "layout.trackOnly",
-                            "playlist.shadeFadedAudio", "general.hoverValues" }) // (visual, but over the paint / idle CPU gates)
+                            "playlist.shadeFadedAudio", "general.hoverValues", // (visual, but over the paint / idle CPU gates)
+                            // rollup 0.1.32 step 2: rounds 190qo, 190qr, 190ld's audio editor wheel, 190qg's Grouped toolbar
+                            "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition", "playlist.gainHandleFollowsView",
+                            "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped" })
         CHECK (! extras::defaultOn (id) && ! extras::flExactOn (id));
     // FL-exact: FL's own two on, the stretched clips' loop (issue #25) off
     CHECK (extras::flExactOn ("general.escCloses") && extras::flExactOn ("general.startPage"));

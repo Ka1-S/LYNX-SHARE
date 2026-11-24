@@ -38,6 +38,11 @@ inline constexpr std::string_view onSince0132[] = {
     "playlist.trackInserts",    // the effects column on linked track headers (only while tracks are linked)
     "simple.projectName",       // the project's name at the top of the Simple layout (BandLab)
     "controlBar.liveScale",     // Live 12's scale switch, root and mode in the Clip-launch control bar (Live)
+    // rollup 0.1.32 step 2 (the owner's policy 11-23): visual only, on from the start
+    "playlist.dimUnselectedTracks", // PR #267: the other tracks step back while tracks are selected
+    "playlist.darkenMutedTracks",   // PR #268: a switched-off track's whole row steps back
+    "mixer.peakValues",             // round 190qh: each strip's peak since a reset under its meter
+    "mixer.correlation",            // round 190qh: a stereo correlation bar under each meter
 };
 // On by default before 0.1.32 too: FL Studio's own behaviour (Esc, the start page), the Simple layout's loops (BandLab),
 // and the stretched clips' loop (issue #25, the owner's choice)

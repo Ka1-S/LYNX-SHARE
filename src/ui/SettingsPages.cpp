@@ -30,6 +30,7 @@
 #include "ui/MapMode.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/AudioEditor.h" // (rollup 0.1.32 step 2: the audio editor's wheel extra)
 #include "ui/NewProjectDialog.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
@@ -2742,6 +2743,10 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
     if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
+    if (id == "mixer.peakValues") return MixerStrips::showPeakValues;   // (round 190qh; rollup 0.1.32 step 2)
+    if (id == "mixer.correlation") return MixerStrips::showCorrelation;
+    if (id == "audioEditor.wheelScrolls") return audioEditorWheelScrollsLynx(); // (round 190ld)
+    if (id == "toolbar.grouped") return hooks.toolbarGrouped ? hooks.toolbarGrouped() : false; // (round 190qg)
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
@@ -2777,7 +2782,26 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     if (workflowextras::setExtra (id, on)) // round 190iu (ui/WorkflowExtras.h): saves through its own hook
         return;
 
-    if (id == "mixer.loudness")
+    if (id == "mixer.peakValues" || id == "mixer.correlation") // round 190qh (listed in rollup 0.1.32 step 2)
+    {
+        const auto& set = id == "mixer.peakValues" ? mixeroptions::setShowPeakValues : mixeroptions::setShowCorrelation;
+        if (set)
+            set (on);
+        else
+            (id == "mixer.peakValues" ? MixerStrips::showPeakValues : MixerStrips::showCorrelation) = on;
+        saved();
+    }
+    else if (id == "audioEditor.wheelScrolls") // round 190ld (listed in rollup 0.1.32 step 2): every audio editor of the session
+    {
+        audioEditorWheelScrollsLynx() = on;
+        saved();
+    }
+    else if (id == "toolbar.grouped") // round 190qg (listed in rollup 0.1.32 step 2; the main window saves its layout)
+    {
+        if (hooks.setToolbarGrouped)
+            hooks.setToolbarGrouped (on);
+    }
+    else if (id == "mixer.loudness")
     {
         if (mixeroptions::setShowLoudness)
             mixeroptions::setShowLoudness (on);

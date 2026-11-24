@@ -12,8 +12,9 @@ The short version of each release. The full notes, with measurements, known issu
 
 **Changed**
 - LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
-  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout); extras you
-  switched yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
+  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, the Mixer's
+  peak values and correlation bars, dimmed unselected and darkened switched-off Playlist tracks); extras you switched
+  yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
 
 ## 0.1.31.1 alpha — fixes
 

@@ -322,6 +322,14 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
             safe->mixer.getStripsForSnapshot().setShowStripInserts (on);
     };
+    mixeroptions::setShowPeakValues = [safe = juce::Component::SafePointer<MainComponent> (this)] (bool on) { // (rollup 0.1.32 step 2)
+        if (safe != nullptr)
+            safe->mixer.getStripsForSnapshot().setShowPeakValues (on);
+    };
+    mixeroptions::setShowCorrelation = [safe = juce::Component::SafePointer<MainComponent> (this)] (bool on) {
+        if (safe != nullptr)
+            safe->mixer.getStripsForSnapshot().setShowCorrelation (on);
+    };
     mixeroptions::selectPlaylistTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks) {
         if (safe != nullptr)
             safe->playlist.selectTracks (tracks);
@@ -4167,6 +4175,8 @@ void MainComponent::loadUiSettings()
             MixerStrips::showPeakValues = on;
         else if (key == "mixerCorrelation") // round 190qh (D2-MX3)
             MixerStrips::showCorrelation = on;
+        else if (key == "audioEditorWheelScrolls") // round 190ld's View › "Wheel scrolls (LYNX)", kept since rollup 0.1.32 step 2
+            audioEditorWheelScrollsLynx() = on;
         else if (key == "mixerLoudness") // round 190am (also starts the measurement)
             mixer.getStripsForSnapshot().setShowLoudness (on);
         else if (key == "grossBeatFlLocator") // round 190jd: Gross Beat's locator in FL's colours
@@ -4395,7 +4405,7 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeOn=" + juce::String (engine.getTransport().metronome.load() ? 1 : 0)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
-                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerPeakValues=" + juce::String (MixerStrips::showPeakValues ? 1 : 0) + "\nmixerCorrelation=" + juce::String (MixerStrips::showCorrelation ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
+                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerPeakValues=" + juce::String (MixerStrips::showPeakValues ? 1 : 0) + "\nmixerCorrelation=" + juce::String (MixerStrips::showCorrelation ? 1 : 0) + "\naudioEditorWheelScrolls=" + juce::String (audioEditorWheelScrollsLynx() ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
     // round 190qk (core/ExtrasDefaults.h): the LYNX extras the user set, so the others follow a new default
@@ -10543,6 +10553,14 @@ SettingsHooks MainComponent::settingsHooks()
     };
     hooks.runAction = [safe] (const std::string& id) { return safe != nullptr && safe->runAction (id); };
     hooks.linkToggleShown = [safe] { return safe != nullptr && safe->toolbarLayout.isShown (toolbarlayout::Group::link); };
+    hooks.toolbarGrouped = [safe] { return safe != nullptr && safe->toolbarLayout.grouped; }; // (rollup 0.1.32 step 2: the extras page)
+    hooks.setToolbarGrouped = [safe] (bool on) {
+        if (safe == nullptr || safe->toolbarLayout.grouped == on)
+            return;
+        auto layout = safe->toolbarLayout;
+        layout.grouped = on;
+        safe->setToolbarLayout (layout);
+    };
     hooks.showLinkToggle = [safe] (bool on) {
         if (safe != nullptr)
             safe->showLinkToggle (on);

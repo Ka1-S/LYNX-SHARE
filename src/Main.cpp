@@ -9635,6 +9635,16 @@ private:
             pitchClip.points = { { 0, 0.5f }, { lynx::ppq, 0.75f } };
             song.automations.push_back (oscClip);
             song.automations.push_back (pitchClip);
+            // rollup 0.1.32 step 2: round 190qo's engine revision 5 (issue #271): a SoundFont channel with a slide note and a
+            // quiet note, a BooBass channel with a quiet note
+            const auto fontChannel = (int) song.channels.size();
+            lynx::ChannelDef font, boo;
+            font.name = "SoundFont 190qv";
+            font.instrument = lynx::InstrumentKind::soundfont;
+            boo.name = "BooBass 190qv";
+            boo.instrument = lynx::InstrumentKind::boobass;
+            song.channels.push_back (font);
+            song.channels.push_back (boo);
 
             if (song.patterns.empty())
                 song.patterns.emplace_back();
@@ -9646,18 +9656,27 @@ private:
             conditioned.cycle = 4, conditioned.cycleMask = 2; // 2:4
             notes.push_back (ratchet);
             notes.push_back (conditioned);
+            lynx::Note fontNote, fontSlide, booNote;
+            fontNote.channel = fontChannel, fontNote.key = 48, fontNote.start = 0, fontNote.length = 2 * lynx::ppq, fontNote.velocity = 0.3f;
+            fontSlide.channel = fontChannel, fontSlide.key = 55, fontSlide.start = lynx::ppq, fontSlide.length = lynx::ppq / 2, fontSlide.slide = true;
+            booNote.channel = fontChannel + 1, booNote.key = 36, booNote.start = 0, booNote.length = lynx::ppq, booNote.velocity = 0.4f;
+            notes.push_back (fontNote);
+            notes.push_back (fontSlide);
+            notes.push_back (booNote);
 
             const char* const lines[] = { "This release holds 10 effect slots", "{0} note(s) with ratchets become their strikes",
                                           "{0} note(s) with a Condition", "Automation of a channel's Pitch knob does nothing",
                                           "Automation of 3x Osc's parameters does nothing", "Effector's newer Kilohearts laws",
-                                          "Effector's Kilohearts Flanger and Dual Delay laws" };
+                                          "Effector's Kilohearts Flanger and Dual Delay laws",
+                                          "Slide notes move only the pitch on these channels", // (round 190qo, revision 5)
+                                          "SoundFont channels play low velocities much quieter", "BooBass plays every note at full level" };
             const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* begin) {
                 return (int) std::count_if (c.lost.begin(), c.lost.end(), [begin] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (begin); });
             };
             const auto rels = lynx::olderlynx::releases();
             if (oscParam < 0)
                 rollup032Result = "ERROR set-up: no 3x Osc FL target";
-            else if (song.channels[(std::size_t) first].engineRev != 5) // (round 190qo: 5, issue #271's slide velocity)
+            else if (song.channels[(std::size_t) first].engineRev != 5 || song.channels[(std::size_t) fontChannel].engineRev != 5) // (round 190qo: 5, issue #271's slide velocity)
                 rollup032Result = "ERROR set-up: a new channel is not at revision 5";
             else if (rels.size() != 4 || rels[0] != "0.1.31" || rels[1] != "0.1.30" || rels[2] != "0.1.28" || rels[3] != "0.1.27")
                 rollup032Result = "ERROR the release list: " + rels.joinIntoString (" ");
@@ -9699,7 +9718,7 @@ private:
                 const auto maxRev = rel == "0.1.31" ? 3 : rel == "0.1.30" ? 2 : 0;
                 const auto revOk = std::all_of (old->channels.begin(), old->channels.end(), [maxRev] (const lynx::ChannelDef& c) { return c.engineRev <= maxRev; })
                                    && (rel != "0.1.28" || ! copy.json.contains ("engineRev"))
-                                   && (rel != "0.1.31" || old->channels[(std::size_t) first].engineRev == 3);
+                                   && (rel != "0.1.31" || (old->channels[(std::size_t) first].engineRev == 3 && old->channels[(std::size_t) fontChannel].engineRev == 3));
                 if (! root["savedBy"].toString().equalsIgnoreCase (rel))
                     rollup032Result = "ERROR the copy for " + rel + " is stamped " + root["savedBy"].toString();
                 else if (fx.size() != 10 || copy.json.contains ("slotRows") || ! detached)

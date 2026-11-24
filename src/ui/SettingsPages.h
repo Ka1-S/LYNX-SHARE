@@ -98,6 +98,8 @@ struct SettingsHooks
     // Settings › Link's "Show Link Toggle" (round 190gl): the main toolbar's Link toggle shown, and showing / hiding it
     std::function<bool()> linkToggleShown;
     std::function<void (bool)> showLinkToggle;
+    std::function<bool()> toolbarGrouped;            // the toolbar's Grouped look (round 190qg; the LYNX extras page)
+    std::function<void (bool)> setToolbarGrouped;
 };
 
 // Settings pages (Settings window, ui/SettingsDialog.cpp)
