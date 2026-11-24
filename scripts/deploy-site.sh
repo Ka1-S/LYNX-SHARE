@@ -12,10 +12,11 @@ SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 "$SCRIPTS/site-media.sh" || { echo "deploy-site: the tutorial videos (media branch, website/_src/learn/media.json) are not in place: not deploying" >&2; exit 1; }
 cd "$SCRIPTS/../website"
 TARGET="$(update_target)" || { echo "deploy-site: can't read the update address $UPDATE_ADDRESS: not deploying, try again" >&2; exit 1; }
+TARGET_ARM="$(update_target_aarch64)" || { echo "deploy-site: can't read the update address $UPDATE_ADDRESS_AARCH64: not deploying, try again" >&2; exit 1; }
 [[ -d update ]] && echo "deploy-site: leaving website/update out of the archive (the live target stays)"
 USER_=u258086853; DOMAIN=lynx-share.com
 ZIP=$(mktemp -d)/lynx-site.zip
-HT="$(mktemp)"; [[ -n "$TARGET" ]] && update_htaccess "$TARGET" > "$HT"
+HT="$(mktemp)"; [[ -n "$TARGET" ]] && update_htaccess "$TARGET" "$TARGET_ARM" > "$HT" # (round 190qp: the arm64 redirect kept too)
 ZIP="$ZIP" HT="$HT" TARGET="$TARGET" python3 -c "
 import zipfile,os
 z=zipfile.ZipFile(os.environ['ZIP'],'w',zipfile.ZIP_DEFLATED)
