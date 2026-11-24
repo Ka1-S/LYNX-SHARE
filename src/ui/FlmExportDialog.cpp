@@ -1,4 +1,5 @@
 #include "ui/FlmExportDialog.h"
+#include "ui/Notices.h" // round 190qx
 
 #include <map>
 
@@ -143,7 +144,7 @@ void showFlmExportDialog (AudioEngine& engine, juce::Component* parent, const ju
                                                                            safe.getComponent());
                                    return;
                                }
-                               ui::postHint ({ tr ("Saved a copy for FL Studio Mobile"), target.getFileName() }, 6000);
+                               ui::savedFile (tr ("Saved a copy for FL Studio Mobile"), target); // (round 190qx)
                            });
     }), true);
 }

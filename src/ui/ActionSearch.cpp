@@ -231,7 +231,8 @@ private:
             case actionsearch::Kind::action: return juce::String::fromUTF8 (e.where.c_str());
             case actionsearch::Kind::menu: return juce::String::fromUTF8 (e.where.c_str());
             case actionsearch::Kind::extra: return tr ("LYNX extras") + " > " + juce::String::fromUTF8 (e.where.c_str());
-            case actionsearch::Kind::setting: return tr ("Settings");
+            case actionsearch::Kind::setting: // (round 190qx: an option shows its page and section)
+                return e.where.empty() ? tr ("Settings") : juce::String::fromUTF8 (e.where.c_str());
             case actionsearch::Kind::recent: return tr ("Recent projects");
         }
         return {};

@@ -846,6 +846,42 @@ public:
         dimSlider.onValueChange = [this] { edit ([v = (float) dimSlider.getValue() / 100.0f] (themes::Spec& s) { s.dim = v; }, false); };
         styleNote (imageName, {});
 
+        // round 190qx: one-line tooltips where a control had neither a tooltip nor a note, and the words people type into
+        // Settings' find bar (English, not translated)
+        {
+            const auto words = [] (juce::Component& c, const char* text) { c.getProperties().set ("lynxSearchText", text); };
+            words (presetNote, "theme preset skin colors colours dark light");
+            resetButton.setTooltip (tr ("Back to LYNX SHARE's default theme"));
+            const juce::String knobTips[] = { tr ("Turns every color of the theme around the color wheel (double-click: 0)"),
+                                              tr ("Makes the theme's colors stronger or greyer (double-click: 0)"),
+                                              tr ("Makes the whole theme lighter or darker (double-click: 0)"),
+                                              tr ("More or less difference between the light and the dark parts (double-click: 0)"),
+                                              tr ("Makes the text lighter or darker against the panels (double-click: 0)") };
+            for (int i = 0; i < knobCount; ++i)
+                knobs[(std::size_t) i].setTooltip (knobTips[i]);
+            meterYellow.setTooltip (tr ("Track meters turn yellow from this level"));
+            meterRed.setTooltip (tr ("Track meters turn red from this level"));
+            words (meterZones, "meter colors clip red yellow peak level");
+            accentWell.setTooltip (tr ("The color of selections, lit buttons and highlights. Click: edit it with the picker below"));
+            backgroundWell.setTooltip (tr ("The color of the panels. Click: edit it with the picker below"));
+            workspaceWell.setTooltip (tr ("The color behind the panels. Click: edit it with the picker below"));
+            autoWorkspace.setTooltip (tr ("On: the workspace color is worked out from the background color"));
+            imageButton.setTooltip (tr ("Choose a picture to show behind the panels"));
+            words (imageButton, "wallpaper background image picture");
+            removeImage.setTooltip (tr ("Removes the workspace image"));
+            imageList.setTooltip (tr ("The images in the Backgrounds folder: pick one to show it behind the panels"));
+            fitBox.setTooltip (tr ("How the image fills the workspace"));
+            opacitySlider.setTooltip (tr ("How strongly the image shows (0 %: hidden)"));
+            dimSlider.setTooltip (tr ("Darkens the image so the panels stay easy to read"));
+            menuStyleBox.setTooltip (tr ("The colors of every menu: LYNX's dark menus or FL Studio's classic light grey ones"));
+            words (menuStyleBox, "menu light dark FL classic grey");
+            words (gridSlider, "grid lines contrast piano roll playlist");
+            soundButton.setTooltip (tr ("Choose an audio file of 30 seconds or less to play at start-up"));
+            soundPlay.setTooltip (tr ("Plays the startup sound now"));
+            soundDefault.setTooltip (tr ("Back to LYNX SHARE's own startup sound"));
+            words (soundButton, "startup sound jingle intro");
+        }
+
         refresh();
         select (&accentWell);
     }
