@@ -1,5 +1,5 @@
 ---
-source: 979232caef
+source: add9ced36a
 ---
 LYNX SHARE mantiene el diseño que ya conoces: un Channel Rack, patrones, una Playlist y un Mixer, con las mismas teclas. Abre proyectos `.flp` directamente y puede escribir uno de vuelta.
 
@@ -14,7 +14,7 @@ LYNX SHARE es un programa independiente. No está afiliado a Image-Line, ni cuen
 Qué es distinto de FL Studio:
 
 - Los plugins propios de FL Studio suenan con motores que LYNX SHARE recreó, cada uno con un nivel de calidad (abajo). No hace falta FL Studio para abrir un `.flp`.
-- Las incorporaciones propias de LYNX SHARE están desactivadas hasta que las actives en `Opciones › Extras de LYNX...`.
+- Las incorporaciones propias de LYNX SHARE que cambian lo que hacen las teclas, los clics o los archivos están desactivadas hasta que las actives en `Opciones › Extras de LYNX...`; las que solo cambian el aspecto están activadas, y el botón **Igual que FL** de la página las desactiva todas.
 - Otros dos diseños funcionan sobre el mismo proyecto: el de lanzamiento de clips (una cuadrícula de clips con escenas) y el Simple (una ventana con pistas, loops y grabación rápida).
 - Una [sesión en línea](/learn/online-session/) reúne hasta 4 personas en un proyecto, en directo.
 

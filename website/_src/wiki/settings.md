@@ -97,7 +97,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 
 ## LYNX extras
 
-`Options › LYNX extras...`. LYNX SHARE's own additions in one place. All are off by default. Each switch is the same setting as in the menu or page its line names.
+`Options › LYNX extras...`. LYNX SHARE's own additions in one place. The ones that only change the look are on by default, the rest are off. **FL-exact** turns every extra off, **Recommended** puts each one back at its default. Each switch is the same setting as in the menu or page its line names.
 
 | Setting | What it does |
 |---|---|

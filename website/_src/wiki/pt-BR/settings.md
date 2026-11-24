@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![A página General da janela Configurações, com as abas de página ao longo do topo](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 
 ## LYNX extras
 
-`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. Todas vêm desligadas por padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita.
+`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. As que só mudam o visual vêm ligadas por padrão, as demais vêm desligadas. **Igual ao FL** desliga todos os extras, **Recomendado** devolve cada um ao seu padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita.
 
 | Configuração | O que faz |
 |---|---|

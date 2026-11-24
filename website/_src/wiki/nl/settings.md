@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 
 ## LYNX extras
 
-`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. Alle staan standaard uit. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
+`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. De extra's die alleen het uiterlijk veranderen staan standaard aan, de rest staat uit. **Als FL** zet elk extra uit, **Aanbevolen** zet ze allemaal terug op hun standaard. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
 
 | Instelling | Wat het doet |
 |---|---|

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="0932c30d";
+window.LYNX_LANG=lang;window.LYNX_V="1d78f560";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=0932c30d">
+<link rel="stylesheet" href="/assets/site.css?v=1d78f560">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -94,7 +94,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="your-first-steps">Your first steps</h2>
 <ol><li><strong>Pick the layout.</strong> The first time LYNX SHARE starts, a welcome card asks where you are coming from. Click <code>FL Studio</code>: you get the Pattern layout, the default, with the Channel Rack, Piano roll, Playlist and Mixer. Skip on the card does the same.</li><li><strong>Open a project.</strong> Open one of your <code>.flp</code> projects (below), or click steps in the Channel Rack to make a beat.</li><li><strong>Find your plugins.</strong> LYNX SHARE scans the usual plugin folders in the background. For a folder of your own, open <code>Options › Plugin manager...</code>, click <code>Plugin folders...</code>, add it and click <code>Find new plugins</code>.</li></ol>
 <p>What is different from FL Studio:</p>
-<ul><li>FL Studio's own plugins play on engines LYNX SHARE recreated, each with a quality level (below). FL Studio itself is not needed to open a <code>.flp</code>.</li><li>LYNX SHARE's own additions are off until you switch them on in <code>Options › LYNX extras...</code>.</li><li>Two more layouts work on the same project: Clip-launch (a clip grid with scenes) and Simple (one window with tracks, loops and quick recording).</li><li>An <a href="/learn/online-session/">online session</a> puts up to 4 people in one project, live.</li></ul>
+<ul><li>FL Studio's own plugins play on engines LYNX SHARE recreated, each with a quality level (below). FL Studio itself is not needed to open a <code>.flp</code>.</li><li>LYNX SHARE's own additions that change what keys, clicks or files do are off until you switch them on in <code>Options › LYNX extras...</code>; the ones that only change the look are on, and the page's <strong>FL-exact</strong> button turns them all off.</li><li>Two more layouts work on the same project: Clip-launch (a clip grid with scenes) and Simple (one window with tracks, loops and quick recording).</li><li>An <a href="/learn/online-session/">online session</a> puts up to 4 people in one project, live.</li></ul>
 <h2 id="open-a-flp-project">Open a .flp project</h2>
 <ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the <code>.flp</code>.</li><li>LYNX SHARE resolves the project's plugins and samples, then opens it. The title shows &quot;(imported from FL Studio)&quot;.</li><li>Choose <code>Help › Last FL Studio import report</code> to read what was approximated, left out or not found.</li><li>Choose <code>Help › Missing files...</code> to see the missing samples and plugins.</li><li>Choose <code>File › Save</code>. It asks where to write a <code>.lynx</code> file. The <code>.flp</code> itself is never written.</li></ol>
 <h2 id="what-maps-to-what">What maps to what</h2>
@@ -129,8 +129,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=0932c30d" defer></script>
-<script src="/assets/wiki.js?v=0932c30d" defer></script>
-<script src="/assets/motion.js?v=0932c30d" defer></script>
+<script src="/assets/site.js?v=1d78f560" defer></script>
+<script src="/assets/wiki.js?v=1d78f560" defer></script>
+<script src="/assets/motion.js?v=1d78f560" defer></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![La página General de la ventana Configuración, con las pestañas de página arriba](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 
 ## LYNX extras
 
-`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Todas están desactivadas por defecto. Cada interruptor es el mismo ajuste que está en el menú o la página que nombra su línea.
+`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Las que solo cambian el aspecto están activadas por defecto y el resto desactivadas. **Igual que FL** desactiva todos los extras, **Recomendado** devuelve cada uno a su valor por defecto. Cada interruptor es el mismo ajuste que está en el menú o la página que nombra su línea.
 
 | Ajuste | Qué hace |
 |---|---|

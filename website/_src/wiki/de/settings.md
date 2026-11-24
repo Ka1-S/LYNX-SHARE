@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![Die Seite Allgemein des Einstellungsfensters, mit den Seitenreitern oben](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Das Einstellungsfenster hat acht Seiten: Audio, MIDI, Allgemein, Theme, Dateien,
 
 ## LYNX extras
 
-`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Alle sind standardmäßig aus. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt.
+`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Die, die nur das Aussehen ändern, sind standardmäßig an, die übrigen aus. **Wie FL** schaltet alle Extras aus, **Empfohlen** setzt jedes auf seinen Standard zurück. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt.
 
 | Einstellung | Was sie macht |
 |---|---|

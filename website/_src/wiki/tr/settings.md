@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![Settings penceresinin General sayfası, üstte sayfa sekmeleri](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Ayarlar penceresinin sekiz sayfası vardır: Audio, MIDI, General, Theme, Files,
 
 ## LYNX extras
 
-`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek yerde. Hepsi varsayılan olarak kapalıdır. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır.
+`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek yerde. Yalnızca görünümü değiştirenler varsayılan olarak açık, diğerleri kapalıdır. **FL ile aynı** tüm ekstraları kapatır, **Önerilen** her birini varsayılanına döndürür. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır.
 
 | Ayar | Ne yapar |
 |---|---|

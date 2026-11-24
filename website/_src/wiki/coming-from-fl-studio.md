@@ -16,7 +16,7 @@ LYNX SHARE is an independent program. It is not affiliated with, endorsed or spo
 What is different from FL Studio:
 
 - FL Studio's own plugins play on engines LYNX SHARE recreated, each with a quality level (below). FL Studio itself is not needed to open a `.flp`.
-- LYNX SHARE's own additions are off until you switch them on in `Options › LYNX extras...`.
+- LYNX SHARE's own additions that change what keys, clicks or files do are off until you switch them on in `Options › LYNX extras...`; the ones that only change the look are on, and the page's **FL-exact** button turns them all off.
 - Two more layouts work on the same project: Clip-launch (a clip grid with scenes) and Simple (one window with tracks, loops and quick recording).
 - An [online session](/learn/online-session/) puts up to 4 people in one project, live.
 

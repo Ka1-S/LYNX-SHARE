@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![La pagina Generale della finestra Impostazioni, con le schede delle pagine in alto](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ La finestra Impostazioni ha otto pagine: Audio, MIDI, Generale, Tema, File, LYNX
 
 ## LYNX extras
 
-`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un unico posto. Tutte sono disattivate per impostazione predefinita. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga indica.
+`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un unico posto. Quelle che cambiano solo l'aspetto sono attive per impostazione predefinita, le altre sono disattivate. **Come FL** disattiva tutti gli extra, **Consigliato** riporta ciascuno al suo valore predefinito. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga indica.
 
 | Impostazione | Cosa fa |
 |---|---|

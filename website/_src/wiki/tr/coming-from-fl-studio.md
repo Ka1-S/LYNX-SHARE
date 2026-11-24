@@ -1,5 +1,5 @@
 ---
-source: 979232caef
+source: add9ced36a
 ---
 LYNX SHARE bildiğiniz iş akışını korur: Channel Rack, pattern'ler, Playlist ve Mixer, aynı tuşlarla. `.flp` projelerini doğrudan açar ve geri yazabilir.
 
@@ -14,7 +14,7 @@ LYNX SHARE bağımsız bir programdır. Image-Line ile bağlantısı yoktur, Ima
 FL Studio'dan farklı olanlar:
 
 - FL Studio'nun kendi plugin'leri LYNX SHARE'in yeniden oluşturduğu motorlarda çalar ve her birinin bir kalite seviyesi vardır (aşağıda). Bir `.flp` açmak için FL Studio'nun kendisi gerekmez.
-- LYNX SHARE'in kendi eklentileri, `Seçenekler › LYNX ekstraları...` içinde açana kadar kapalıdır.
+- LYNX SHARE'in tuşların, tıklamaların veya dosyaların ne yaptığını değiştiren kendi eklentileri, `Seçenekler › LYNX ekstraları...` içinde açana kadar kapalıdır; yalnızca görünümü değiştirenler açıktır ve sayfadaki **FL ile aynı** düğmesi hepsini kapatır.
 - Aynı proje üzerinde iki yerleşim daha çalışır: Klip başlatma (sahneli bir klip ızgarası) ve Basit (izler, loop'lar ve hızlı kayıt olan tek bir pencere).
 - Bir [çevrimiçi oturum](/learn/online-session/) en fazla 4 kişiyi tek bir projede canlı olarak buluşturur.
 

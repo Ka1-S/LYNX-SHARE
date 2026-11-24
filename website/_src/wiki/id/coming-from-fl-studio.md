@@ -1,5 +1,5 @@
 ---
-source: 979232caef
+source: add9ced36a
 ---
 LYNX SHARE mempertahankan alur kerja yang sudah kamu kenal: Channel Rack, pattern, Playlist, dan Mixer, dengan tombol yang sama. Program ini membuka proyek `.flp` secara langsung dan bisa menulisnya kembali.
 
@@ -14,7 +14,7 @@ LYNX SHARE adalah program independen. Program ini tidak berafiliasi dengan, didu
 Yang berbeda dari FL Studio:
 
 - Plugin bawaan FL Studio dimainkan di engine yang dibuat ulang LYNX SHARE, masing-masing dengan tingkat kualitas (di bawah). FL Studio sendiri tidak diperlukan untuk membuka `.flp`.
-- Tambahan khas LYNX SHARE mati sampai kamu menyalakannya di `Opsi › Ekstra LYNX...`.
+- Tambahan khas LYNX SHARE yang mengubah fungsi tombol, klik, atau file mati sampai kamu menyalakannya di `Opsi › Ekstra LYNX...`; yang hanya mengubah tampilan menyala, dan tombol **Sama seperti FL** di halaman mematikan semuanya.
 - Dua tata letak lain bekerja di proyek yang sama: Clip-launch (kisi klip dengan scene) dan Sederhana (satu jendela dengan track, loop, dan perekaman cepat).
 - [Sesi online](/learn/online-session/) menempatkan sampai 4 orang dalam satu proyek, secara langsung.
 

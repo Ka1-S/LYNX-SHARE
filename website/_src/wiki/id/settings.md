@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![Halaman Umum di jendela Pengaturan, dengan tab halaman di bagian atas](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Jendela Pengaturan punya delapan halaman: Audio, MIDI, Umum, Tema, File, Ekstra 
 
 ## Ekstra LYNX
 
-`Opsi › Ekstra LYNX...`. Tambahan khas LYNX SHARE di satu tempat. Semuanya mati secara bawaan. Tiap sakelar adalah pengaturan yang sama dengan yang ada di menu atau halaman yang disebut barisnya.
+`Opsi › Ekstra LYNX...`. Tambahan khas LYNX SHARE di satu tempat. Yang hanya mengubah tampilan menyala secara bawaan, sisanya mati. **Sama seperti FL** mematikan semua ekstra, **Direkomendasikan** mengembalikan tiap ekstra ke nilai bawaannya. Tiap sakelar adalah pengaturan yang sama dengan yang ada di menu atau halaman yang disebut barisnya.
 
 | Pengaturan | Fungsinya |
 |---|---|

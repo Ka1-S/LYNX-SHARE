@@ -1,5 +1,5 @@
 ---
-source: 69754c6d42
+source: d574d72a95
 ---
 ![Strona Ogólne okna Ustawienia, z kartami stron na górze](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 
 ## Dodatki LYNX
 
-`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Wszystkie są domyślnie wyłączone. Każdy przełącznik to to samo ustawienie, co w menu lub na stronie, którą wymienia jego wiersz.
+`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Te, które zmieniają tylko wygląd, są domyślnie włączone, pozostałe wyłączone. **Jak w FL** wyłącza wszystkie dodatki, **Zalecane** przywraca każdy do ustawienia domyślnego. Każdy przełącznik to to samo ustawienie, co w menu lub na stronie, którą wymienia jego wiersz.
 
 | Ustawienie | Co robi |
 |---|---|
