@@ -6535,7 +6535,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         switch (ruler::press (press))
         {
             case ruler::Action::markerMenu:
-                showRulerMenu (e.x);
+                showRulerMenu (e.x, e.y);
                 return;
 
             case ruler::Action::zoomRange:
@@ -8302,7 +8302,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     else if (drag == Drag::loop && rulerMenuOnClick && ruler::isClick (e.getDistanceFromDragStartX(), e.getDistanceFromDragStartY()))
     {
         rulerMenuOnClick = false;
-        showRulerMenu (e.getMouseDownX());
+        showRulerMenu (e.getMouseDownX(), e.getMouseDownY());
     }
     else if (drag == Drag::loop && rulerDoubleDrag && engine.getSong().hasLoop())
     {
@@ -11024,14 +11024,15 @@ void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
                              true);
 }
 
-juce::PopupMenu PlaylistComponent::rulerMenu (int x)
+juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
 {
     const auto& song = engine.getSong();
     const auto tick = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
 
-    // marker near the click (up to 6 px)
-    int near = -1;
-    for (int i = 0; i < (int) song.markers().size(); ++i)
+    // the marker whose tag was pressed (issue #281, round 190qr: the whole tag, as FL; it was only 6 px around the
+    // marker's line, so a right-click on its name gave the menu without "Delete"), else one near the click (up to 6 px)
+    int near = y >= 0 ? markerTagAt (x, y) : -1;
+    for (int i = 0; near < 0 && i < (int) song.markers().size(); ++i)
         if (std::abs (tickToX ((double) song.markers()[(std::size_t) i].tick) - x) <= 6.0)
             near = i;
 
@@ -11178,6 +11179,11 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
             editTempoMarker (sg.hasLoop() ? sg.loopStart : snap ((double) songPositionTick(), true), -1);
         });
         timeMarkers.addItem (tr ("Place loop") + "\tShift+T", [this] { runAction ("playlist.markerLoop"); });
+        // issue #281 (round 190qr): FL's Time markers › Delete, between Place loop and Change to marker loop
+        timeMarkers.addItem (tr ("Delete"), ! song.markers().empty(), false, [this] {
+            engine.editSong ([] (Song& s) { markers::deleteInSelection (s); });
+            repaint();
+        });
         timeMarkers.addItem (tr ("Change to marker loop"), song.hasLoop(), false, [this] {
             engine.editSong ([] (Song& s) { markers::changeToMarkerLoop (s); });
         });
@@ -11195,6 +11201,14 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
     {
         menu.addSeparator();
         menu.addSectionHeader (markerLabel (song.markers()[(std::size_t) near]));
+        // FL's marker menu (FL 2026, round 190qr shot 281-fl-marker-menu.png): the header, Delete, Rename..., ...
+        menu.addItem (tr ("Delete"), [this, near] {
+            engine.editSong ([near] (Song& s) {
+                if (near < (int) s.markers().size())
+                    s.markers().erase (s.markers().begin() + near);
+            });
+            repaint();
+        });
         menu.addItem (tr ("Rename marker..."), [this, near] { editMarkerName (0, near); });
         menu.addItem (tr ("Place loop (from this marker to the next)"), [this, near] {
             engine.editSong ([near] (Song& s) {
@@ -11234,12 +11248,6 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
                 });
             menu.addSubMenu (tr ("Marker action"), action);
         }
-        menu.addItem (tr ("Remove marker"), [this, near] {
-            engine.editSong ([near] (Song& s) {
-                if (near < (int) s.markers().size())
-                    s.markers().erase (s.markers().begin() + near);
-            });
-        });
     }
 
     if (song.hasLoop())
@@ -11288,9 +11296,9 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x)
     return menu;
 }
 
-void PlaylistComponent::showRulerMenu (int x)
+void PlaylistComponent::showRulerMenu (int x, int y)
 {
-    rulerMenu (x).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 // Round 190ol (P6): the Simple layout's "Change time signature here...": numerator 1-16, denominator 2 / 4 / 8 / 16, the

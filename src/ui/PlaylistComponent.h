@@ -793,9 +793,11 @@ private:
     std::vector<int> sortClips (std::vector<int> placed = {}); // returns where the placed clips are now
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
-    void showRulerMenu (int x);                           // markers, time signature and loop
+    void showRulerMenu (int x, int y = -1);               // markers, time signature and loop
 public:
-    juce::PopupMenu rulerMenu (int x);                    // (round 190ol: the menu itself, also for the shots)
+    // (round 190ol: the menu itself, also for the shots). Issue #281 (round 190qr): `y` is the press; on a marker's tag
+    // (markerTagAt) the menu is that marker's, wherever on the tag, as FL's
+    juce::PopupMenu rulerMenu (int x, int y = -1);
 private:
     static juce::String markerLabel (const Marker& m);   // the text of a marker's tag on the ruler
     int markerTagAt (int x, int y) const;                 // the marker whose tag is under (x, y), or -1
