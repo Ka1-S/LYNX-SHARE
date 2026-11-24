@@ -157,12 +157,12 @@
             pl.mouseDrag (event (pl, boxTo, boxFrom, left, true));
             frames (pl, 20000.0, 1500.0);
             const auto visibleBars = (double) grid.getWidth() / 64.0;
-            const auto far = clipOf (2, (std::int64_t) std::ceil (visibleBars / 2.0 + 1.0) * 2 * bar);
+            const auto farClip = clipOf (2, (std::int64_t) std::ceil (visibleBars / 2.0 + 1.0) * 2 * bar);
             const auto sel = pl.clipSelectionForSnapshot();
             const auto first0 = clipOf (1, 2 * bar);
             check ("Playlist (Pattern): a selection box past the edge selects the clips that came into view (" + juce::String ((int) sel.size())
                        + " clips) and keeps its corner at bar 2.5",
-                   far >= 0 && std::find (sel.begin(), sel.end(), far) != sel.end() && std::find (sel.begin(), sel.end(), first0) != sel.end());
+                   farClip >= 0 && std::find (sel.begin(), sel.end(), farClip) != sel.end() && std::find (sel.begin(), sel.end(), first0) != sel.end());
             pl.mouseUp (event (pl, boxTo, boxFrom, {}, true));
             pl.setToolForSnapshot (EditTool::pencil);
 

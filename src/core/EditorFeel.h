@@ -212,8 +212,8 @@ struct View
 
 inline bool same (const View& a, const View& b) noexcept
 {
-    auto near = [] (double x, double y) { return std::abs (x - y) <= 1e-6 * std::max ({ 1.0, std::abs (x), std::abs (y) }); };
-    return near (a.scroll, b.scroll) && near (a.pixelsPerUnit, b.pixelsPerUnit) && std::abs (a.scrollY - b.scrollY) < 0.5;
+    auto approx = [] (double x, double y) { return std::abs (x - y) <= 1e-6 * std::max ({ 1.0, std::abs (x), std::abs (y) }); };
+    return approx (a.scroll, b.scroll) && approx (a.pixelsPerUnit, b.pixelsPerUnit) && std::abs (a.scrollY - b.scrollY) < 0.5;
 }
 
 class Stack
