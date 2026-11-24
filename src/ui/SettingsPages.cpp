@@ -14,6 +14,7 @@
 #include "core/RenderAhead.h"
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
+#include "core/ExtrasDefaults.h" // round 190qk: the FL-exact / Recommended buttons
 #include "core/LynxExtras.h"
 #include "core/Templates.h" // round 190oo (CS O-2: newProjectDefaults)
 #include "ui/PolyEditor.h"
@@ -763,8 +764,12 @@ private:
         followLayoutStyle();
         if (isVisible() && hooks.getGeneral)
         {
-            options.hoverValues = hooks.getGeneral().hoverValues;
+            const auto now = hooks.getGeneral();
+            options.hoverValues = now.hoverValues;
             hoverValues.setToggleState (options.hoverValues, juce::dontSendNotification);
+            options.stretchedClipsLoop = now.stretchedClipsLoop; // (round 190qk: listed on the extras page too)
+            clipsLoop.setToggleState (options.stretchedClipsLoop, juce::dontSendNotification);
+            escCloses.setToggleState (escclose::enabled(), juce::dontSendNotification);
         }
     }
 
@@ -2485,10 +2490,20 @@ class ExtrasPage final : public ScrollingPage
 public:
     ExtrasPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
     {
-        styleNote (intro, tr ("LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio "
-                              "until you switch one on. Each switch is the same setting as in the place its line names."));
+        styleNote (intro, tr ("LYNX's own improvements. The ones that only change what you see are on by default; the ones that change "
+                              "what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. "
+                              "Each switch is the same setting as in the place its line names."));
         intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         add (intro);
+        // round 190qk (owner's policy 11-23): every extra off at once, or each back at its default (core/ExtrasDefaults.h)
+        flExact.setComponentID ("extras.flExact");
+        flExact.setTooltip (tr ("Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)"));
+        flExact.onClick = [this] { setAll (true); };
+        recommended.setComponentID ("extras.recommended");
+        recommended.setTooltip (tr ("Every LYNX extra at its default: the ones that only change the look on, the rest off"));
+        recommended.onClick = [this] { setAll (false); };
+        add (flExact);
+        add (recommended);
         std::string_view section;
         for (const auto& item : extras::items)
         {
@@ -2541,6 +2556,17 @@ public:
             return juce::jmax (1, fitted.getNumLines());
         };
         intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
+        {
+            // (each button as wide as its text: translations differ a lot)
+            const auto widthOf = [this] (juce::TextButton& b) {
+                return juce::jlimit (90, Rows::h (420), juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                                                             getLookAndFeel().getTextButtonFont (b, Rows::h (26)), b.getButtonText())) + 28);
+            };
+            auto row = r.full (26);
+            flExact.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (flExact))));
+            row.removeFromLeft (8);
+            recommended.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (recommended))));
+        }
         const SectionTitle* title = nullptr;
         for (auto& row : rows)
         {
@@ -2574,11 +2600,25 @@ private:
             row->toggle.setToggleState (lynxExtraOn (engine, hooks, row->id), juce::dontSendNotification);
     }
 
+    // round 190qk: "FL-exact" (every extra off, FL's own two on) or "Recommended" (each at its default; the extras then
+    // follow the defaults of later versions again, as in a new profile)
+    void setAll (bool flExactValues)
+    {
+        for (const auto& item : extras::items)
+            setLynxExtra (engine, hooks, item.id, flExactValues ? extras::flExactOn (item.id) : extras::defaultOn (item.id), persistent);
+        if (! flExactValues)
+            extras::userSet().clear();
+        if (mixeroptions::changed) // (the main window writes ui-options.txt, the user-set list with it)
+            mixeroptions::changed();
+        refresh();
+    }
+
     static constexpr int noteIndent = 27; // under the caption, past the check box
     AudioEngine& engine;
     SettingsHooks hooks;
     bool persistent;
     juce::Label intro;
+    juce::TextButton flExact { tr ("FL-exact (turn all LYNX extras off)") }, recommended { tr ("Recommended") };
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
     SectionTitle autoLookTitle { tr ("Automatic colors and icons") };
@@ -2711,6 +2751,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "general.stretchedClipsLoop") return stretchedClipsLoop(); // (round 190qk: issue #25's switch, listed)
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
     if (id == "project.clipLaunchStrips") return newProjectDefaults().clipLaunchStrips; // (round 190oo CS O-2)
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
@@ -2832,6 +2873,17 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             options.hoverValues = on;
             hooks.setGeneral (options);
         }
+    }
+    else if (id == "general.stretchedClipsLoop") // round 190qk (issue #25): the General page's switch, as it applies it
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.stretchedClipsLoop = on;
+            hooks.setGeneral (options);
+        }
+        else
+            setStretchedClipsLoop (on);
     }
     else if (id == "project.linkTracks") // round 190gz: the new projects' default (the open project: Settings › Project)
     {

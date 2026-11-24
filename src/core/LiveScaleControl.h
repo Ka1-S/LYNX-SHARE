@@ -1,6 +1,6 @@
 #pragma once
 
-// Round 190oo (O-5, design review CS-8's full form; LYNX extra, off by default): Live 12's three-part scale control in the
+// Round 190oo (O-5, design review CS-8's full form; LYNX extra, on by default since round 190qk): Live 12's three-part scale control in the
 // Clip-launch control bar instead of the one key box — the scale switch ("♭#", drawn as LYNX vectors), the root chooser
 // ("C ▾") and the mode chooser ("Major ▾"), the two choosers dimmed while the switch is off
 // (design190ia/shots/ref/live-arrangement-audiolane.png: 17 + 44 + 66 px with 2 px gaps at Live's 100 %). It edits the
@@ -12,7 +12,7 @@
 
 namespace lynx::livescale
 {
-inline bool shown = false; // ui-options.txt liveScaleControl (Settings › LYNX extras, the Key menu)
+inline bool shown = true; // (round 190qk: on by default) ui-options.txt liveScaleControl (Settings › LYNX extras, the Key menu)
 
 inline constexpr int toggleWidth = 18, gap = 2;
 inline constexpr int rootShare = 52, modeShare = 70; // (the choosers split the rest as Live's 44 : 66, rounded up)

@@ -16,13 +16,13 @@ inline bool& largeControls()
     return on;
 }
 
-// Round 190oo (design review 2, option O-4 / CS-28, a LYNX extra, off by default): the project's name centred at the
+// Round 190oo (design review 2, option O-4 / CS-28, a LYNX extra, on by default since round 190qk): the project's name centred at the
 // top of the Simple layout's top bar, over the capsules, as BandLab shows "New Project" (View › "Project name at the
 // top (BandLab)" in the Simple layout; Settings › LYNX extras "simple.projectName"; ui-options.txt simpleProjectName).
-// Off: the top bar is as before.
+// Off: the top bar without it.
 inline bool& projectNameShown()
 {
-    static bool on = false;
+    static bool on = true; // (round 190qk: on by default, core/ExtrasDefaults.h)
     return on;
 }
 

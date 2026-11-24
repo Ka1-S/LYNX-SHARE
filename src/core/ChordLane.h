@@ -438,7 +438,7 @@ inline bool& laneOn() noexcept
 // position instead of the scale
 inline bool& pianoRollHighlight() noexcept
 {
-    static bool on = false;
+    static bool on = true; // (round 190qk: on by default, core/ExtrasDefaults.h; a song without chords shows the scale)
     return on;
 }
 } // namespace lynx::chordlane

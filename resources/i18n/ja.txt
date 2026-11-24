@@ -12815,3 +12815,11 @@ countries: jp
 "A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export." = "書き出したファイルをピークレベルと共に表示し、フォルダーで表示するボタンを備えたウィンドウです。オフ（FL Studio と同じ）：ヒントバーが数秒間知らせます。ファイル › エクスポートにもあります。"
 "The clip gain handle stays in view" = "クリップのゲインハンドルを常に表示"
 "An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu." = "オーディオクリップのゲインハンドル（下端の半円）は、クリップの中央がスクロールで見えなくなると、クリップの見えている部分の中央に移動するので、どのズームでも操作できます。オフ（FL Studio と同じ）：クリップの中央に留まります。ゲインハンドルの右クリックメニューにもあります。"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 独自の改良です。見た目だけを変えるものは初期設定でオン、キー・クリック・ドラッグの動作を変えるものはオフなので、どれかをオンにするまで LYNX SHARE は FL Studio と同じように動作します。各スイッチは、その行に書かれた場所にある設定と同じものです。"
+"FL-exact (turn all LYNX extras off)" = "FL と同じ（LYNX の追加機能をすべてオフ）"
+"Recommended" = "おすすめ"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "LYNX の追加機能をすべてオフ: LYNX SHARE を FL Studio と同じに（Esc でフォーカス中のウィンドウを閉じる機能とスタートページは、FL Studio と同じく残ります）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "LYNX の追加機能をすべて初期設定に: 見た目だけを変えるものはオン、それ以外はオフ"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "パターンより長くしたパターンクリップは、クリップの終わりまでパターンを繰り返し再生します。FL Studio は一度だけ再生し、その後は無音です。初期設定でオン。「全般」ページにもあります。"

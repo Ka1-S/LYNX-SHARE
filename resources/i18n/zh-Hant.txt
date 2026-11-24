@@ -12815,3 +12815,11 @@ countries: tw hk mo
 "A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export." = "視窗列出寫入的檔案及其峰值電平，並提供在資料夾中顯示的按鈕。關閉（與 FL Studio 相同）：提示列顯示幾秒鐘。也在 檔案 › 匯出 中。"
 "The clip gain handle stays in view" = "片段增益控點保持可見"
 "An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu." = "當音訊片段的中間捲出視圖時，其增益控點（底邊上的半圓）會移到片段可見部分的中間，在任何縮放下都能拖到。關閉（與 FL Studio 相同）：它留在片段中間。也在增益控點的右鍵選單中。"
+
+# round 190qk: LYNX extras on by default (owner's policy 11-23), FL-exact / Recommended buttons
+"LYNX's own improvements. The ones that only change what you see are on by default; the ones that change what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改進。只改變外觀的預設開啟；會改變按鍵、按一下或拖曳作用的預設關閉，因此在你開啟其中一項之前，LYNX SHARE 的操作與 FL Studio 相同。每個開關與其所在行指明位置的設定是同一個設定。"
+"FL-exact (turn all LYNX extras off)" = "與 FL 相同（關閉所有 LYNX 附加功能）"
+"Recommended" = "建議"
+"Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)" = "關閉所有 LYNX 附加功能：LYNX SHARE 與 FL Studio 相同（Esc 關閉取得焦點的視窗和起始頁保留，與 FL Studio 一樣）"
+"Every LYNX extra at its default: the ones that only change the look on, the rest off" = "每個 LYNX 附加功能恢復預設：只改變外觀的開啟，其餘關閉"
+"A pattern clip made longer than its pattern plays the pattern again until the clip ends; FL Studio plays it once and is silent after it. On by default. Also on the General page." = "比其樣式更長的樣式片段會重複播放樣式直到片段結束；FL Studio 只播放一次，之後無聲。預設開啟。「一般」頁面中也有。"

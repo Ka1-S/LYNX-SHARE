@@ -200,14 +200,17 @@
             engine.sendChangeMessage();
             engine.dispatchPendingMessages();
             roll.scrollToNotes (true);
+            const auto highlightWas = chordlane::pianoRollHighlight(); // (round 190qk: on by default now)
             workflowextras::setExtra ("pianoRoll.chordHighlight", true);
             roll.setChordHighlightForShot (chordlane::highlightAt (engine.getSong(), 4 * bar));
             check ("roll_highlight_c", roll.chordHighlightForShot().root == 0);
             savePng (shot::snapshot (roll), out ("pianoroll-chord-c"));
+            savePng (roll.createComponentSnapshot (roll.getLocalBounds(), true, 1.5f), out ("pianoroll-chord-c@150")); // (round 190qk)
             roll.setChordHighlightForShot (chordlane::highlightAt (engine.getSong(), 6 * bar));
             check ("roll_highlight_f", roll.chordHighlightForShot().root == 5);
             savePng (shot::snapshot (roll), out ("pianoroll-chord-f"));
-            workflowextras::setExtra ("pianoRoll.chordHighlight", false);
+            savePng (roll.createComponentSnapshot (roll.getLocalBounds(), true, 1.5f), out ("pianoroll-chord-f@150")); // (round 190qk)
+            workflowextras::setExtra ("pianoRoll.chordHighlight", highlightWas);
         }
 
         // --- the paint cost: 64 chords against the lane off ----------------------------------------------------------------

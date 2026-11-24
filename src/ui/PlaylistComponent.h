@@ -142,7 +142,7 @@ public:
     // round 190oo (design review O-1, a LYNX extra, off by default): Playlist › View › "Shade faded audio (LYNX)" — the
     // Pattern layout also shades what a fade takes away, as the Clip-launch layout and issue #230's reference (Live) do;
     // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
-    static inline bool shadeFadedAudio = false;
+    static inline bool shadeFadedAudio = false; // (round 190qk: stays off — +1.3 % Playlist paint on Thief, over the 1 % gate)
     // PR #267 (round 190qj, a LYNX extra: FL 2026 marks a selected track with a strip at its lane's start only): with tracks selected, the
     // other tracks' rows step back under a light dark veil in the Pattern layout. On by default (owner, 2026-11-23: a
     // visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras
@@ -374,7 +374,7 @@ public:
     std::vector<char> activityShown; // round 190ig (FM-28): [track] its activity strip lit (FL's Pattern layout, while playing)
     // Issue #154 (round 190ht; core/TrackInserts.h), a LYNX extra, off by default (FL keeps an insert's effects in the
     // Mixer): the linked headers get a column listing their mixer track's insert effects, and are this much wider.
-    static inline bool showTrackInserts = false; // ui-options.txt trackInserts, action playlist.trackInserts
+    static inline bool showTrackInserts = true; // ui-options.txt trackInserts, action playlist.trackInserts (on by default since round 190qk)
     static constexpr int insertsColumnWidth = 104;
     juce::Rectangle<int> insertsListForSnapshot (int track) const { return trackInserts (track); }
     // round 190im (R5, DC-7): the lit strip's brightness step 1..4 follows the level of what the track plays (its clips'

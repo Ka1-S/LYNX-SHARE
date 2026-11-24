@@ -4149,17 +4149,22 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             }
             return p;
         };
+        // (round 190qk: both fades' shades are one path, filled once before the lines — one fill per clip instead of two; a
+        // fade under 3 px has no area to see under its line. With Shade faded audio on, Thief's Playlist cost +2.2 % a frame
+        // with a fill per fade, +1.3 % this way)
+        const auto shaded = ! fl || shadeFadedAudio;
+        juce::Path shadeArea;
+        const auto addShade = [&] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
+            if (! shaded || std::abs (x1 - x0) < 3.0f)
+                return;
+            auto area = curve (x0, x1, rising, cross, equalPower, linear, tension);
+            area.lineTo (x1, body.getY());
+            area.lineTo (x0, body.getY());
+            area.closeSubPath();
+            shadeArea.addPath (area);
+        };
         auto paintFade = [&] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
             auto edge = curve (x0, x1, rising, cross, equalPower, linear, tension);
-            if (! fl || shadeFadedAudio) // (round 190oo O-1: the Pattern layout shades too with View › Shade faded audio)
-            {
-                auto area = edge;
-                area.lineTo (x1, body.getY());
-                area.lineTo (x0, body.getY());
-                area.closeSubPath();
-                g.setColour (shade);
-                g.fillPath (area);
-            }
             g.setColour (line);
             g.strokePath (edge, juce::PathStrokeType (fl ? 1.6f : 1.2f));
             if (cross || equalPower) // the neighbour's side of the crossfade, which this clip covers
@@ -4169,6 +4174,15 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             }
         };
 
+        if (fadeIn > 0)
+            addShade (r.getX(), inX, true, c.crossfadeIn > 0, (c.fadeCurve & 1) != 0, (c.linearFades & 1) != 0, c.fadeInTension);
+        if (fadeOut > 0)
+            addShade (outX, r.getRight(), false, c.crossfadeOut > 0, (c.fadeCurve & 2) != 0, (c.linearFades & 2) != 0, c.fadeOutTension);
+        if (! shadeArea.isEmpty())
+        {
+            g.setColour (shade);
+            g.fillPath (shadeArea);
+        }
         if (fadeIn > 0)
             paintFade (r.getX(), inX, true, c.crossfadeIn > 0, (c.fadeCurve & 1) != 0, (c.linearFades & 1) != 0, c.fadeInTension);
         if (fadeOut > 0)
