@@ -28,6 +28,8 @@ A hotfix for 0.1.31.
 - Fixed: right-clicking the hint bar crashed LYNX (#269).
 - Fixed: markers couldn't be deleted (#281).
 - Fixed: two LYNX entries in the Linux app menu (#278).
+- Fixed: a Patcher used as an instrument came back in FL as an empty synth.
+- Changed: plugins FL saved as a trial keep FL's trial mark on export (#282).
 - Fixed: 0.1.31 used ~7 MB more memory and more CPU right after start-up.
 
 ## 0.1.31 alpha
