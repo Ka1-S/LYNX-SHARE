@@ -101,6 +101,10 @@ void addJumpToNextBar (Song& song, std::int64_t tick);
 // "Change to marker loop": the time selection becomes a marker loop (a Marker loop at its start, a marker at its end)
 // and the selection is cleared
 void changeToMarkerLoop (Song& song);
+// Time markers › "Delete" (issue #281; FL 2026's manual: "Delete the marker/s in the time-line selection. If no selection
+// is made then all markers are deleted."): the markers in the song's time selection [loopStart, loopEnd) go, or every
+// marker when there is no selection. The number of markers removed.
+int deleteInSelection (Song& song);
 
 // The Playlist's Time markers keys (round 167k, FL 2026's EEMarkerMainMenu):
 // Ctrl+T "Add auto" (FUN_0122a070 → FUN_00e546a0): a plain marker at `tick` named "Auto", "Auto #2", "Auto #3"... (the
