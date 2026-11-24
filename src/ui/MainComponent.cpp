@@ -1963,9 +1963,9 @@ void MainComponent::resized()
                 break;
             case Group::snap: // global snap over the pattern selector, each with its name
             {
-                // round 190qg (cleanup, Grouped look): the two boxes start at the same x, after their icons alone (FL's
-                // boxes have no caption); the default keeps its captions (owner option in the 190qg HANDOFF)
-                const auto labelWidth = grouped ? h + 4 : captionWidth;
+                // round 190qg (cleanup): the two boxes start at the same x, after their icons alone (FL's boxes have no
+                // caption); owner decision O1 (rollup 0.1.32 step 2): the default drops the SNAP / PATTERN captions too
+                const auto labelWidth = h + 4;
                 auto first = juce::Rectangle<int> (panel.getX(), row1, panel.getWidth(), h);
                 snapLabelArea = first.removeFromLeft (labelWidth);
                 put (snapToggleButton, snapLabelArea.withWidth (h));
