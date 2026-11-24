@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Jede Mixer-Spur geht an den Master. Routing schickt sie zusätzlich woandershin.
+
+00:00:09.000 --> 00:00:14.400
+Wähle die Spur aus, die du senden willst, hier die Chords.
+
+00:00:14.800 --> 00:00:20.600
+Klicke auf den Pfeil unter einer anderen Spur: Die Chords gehen jetzt auch dorthin.
+
+00:00:21.000 --> 00:00:26.400
+Der Regler darunter ist der Send-Pegel: wie viel dorthin geht.
+
+00:00:26.800 --> 00:00:32.200
+Lege einen Hall auf diese Spur: ein Hall-Bus, den alle Spuren teilen können.
+
+00:00:32.600 --> 00:00:38.200
+Rechtsklick auf einen Pfeil für mehr: Nur zu diesem Track routen oder Sidechain zu diesem Track.
+
+00:00:38.600 --> 00:00:45.000
+Spiele ab: Die Akkorde bekommen ihren Raum, und jede Spur behält ihren eigenen Fader.

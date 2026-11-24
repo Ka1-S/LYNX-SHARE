@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Sem som, ou com estalos? Abra Opções, Configurações de áudio.
+
+00:00:09.000 --> 00:00:14.400
+O driver: ASIO no Windows, Core Audio no Mac, PipeWire ou ALSA no Linux.
+
+00:00:14.800 --> 00:00:20.200
+A saída é onde você ouve o LYNX. Padrão do sistema segue o computador.
+
+00:00:20.600 --> 00:00:26.200
+Tamanho do buffer: menor responde mais rápido ao tocar, maior dá mais folga à CPU.
+
+00:00:26.600 --> 00:00:32.000
+Toque um som de teste para conferir que você ouve.
+
+00:00:32.400 --> 00:00:37.800
+De qualquer lugar, Ajuda, Testar saída de áudio faz o mesmo.
+
+00:00:38.200 --> 00:00:44.200
+Estalos? Aumente o buffer. Notas atrasadas? Diminua.

@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Każda ścieżka Mixera idzie na Master. Routing wysyła ją jeszcze gdzie indziej.
+
+00:00:09.000 --> 00:00:14.400
+Zaznacz ścieżkę do wysłania, tu Chords.
+
+00:00:14.800 --> 00:00:20.600
+Kliknij strzałkę pod inną ścieżką: Chords idą teraz także tam.
+
+00:00:21.000 --> 00:00:26.400
+Gałka pod nią to poziom sendu: ile tam trafia.
+
+00:00:26.800 --> 00:00:32.200
+Dodaj pogłos na tej ścieżce: bus pogłosu, który może dzielić każda ścieżka.
+
+00:00:32.600 --> 00:00:38.200
+Prawy klik na strzałce daje więcej: Kieruj tylko do tej ścieżki albo Sidechain do tej ścieżki.
+
+00:00:38.600 --> 00:00:45.000
+Odtwórz: akordy dostają swoją przestrzeń, a każda ścieżka zachowuje własny suwak.

@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.800
+In the Clip-launch layout, the Device view shows a track's devices in a row.
+
+00:00:09.200 --> 00:00:14.600
+Click a track, here the Chords: its instrument first, then its effects.
+
+00:00:15.000 --> 00:00:20.400
+Drag an effect from the Browser's Audio Effects onto the chain.
+
+00:00:20.800 --> 00:00:26.400
+The signal flows left to right. Each device shows its main knobs.
+
+00:00:26.800 --> 00:00:32.400
+Its window button opens the full editor. Ctrl+C and Ctrl+V copy a device.
+
+00:00:32.800 --> 00:00:38.200
+Press Play: the chords now go through Echoform.
+
+00:00:38.600 --> 00:00:44.400
+Ctrl+Alt+4 shows the Device view; Shift+Tab switches to the clip.

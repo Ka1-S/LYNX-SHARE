@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Every Mixer track goes to the Master. Routing sends it somewhere else too.
+
+00:00:09.000 --> 00:00:14.400
+Select the track to send, here the Chords.
+
+00:00:14.800 --> 00:00:20.600
+Click the arrow under another track: the Chords now go there as well.
+
+00:00:21.000 --> 00:00:26.400
+The knob under it is the send level: how much goes there.
+
+00:00:26.800 --> 00:00:32.200
+Put a reverb on that track: a reverb bus that every track can share.
+
+00:00:32.600 --> 00:00:38.200
+Right-click an arrow for more: Route to this track only, or Sidechain to this track.
+
+00:00:38.600 --> 00:00:45.000
+Play: the chords get their space, and every track keeps its own fader.

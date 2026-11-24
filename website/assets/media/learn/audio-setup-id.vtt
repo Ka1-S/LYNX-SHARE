@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Tidak ada suara, atau berderak? Buka Options, Audio settings.
+
+00:00:09.000 --> 00:00:14.400
+Drivernya: ASIO di Windows, Core Audio di Mac, PipeWire atau ALSA di Linux.
+
+00:00:14.800 --> 00:00:20.200
+Perangkat output adalah tempat kamu mendengar LYNX. System default mengikuti komputermu.
+
+00:00:20.600 --> 00:00:26.200
+Ukuran buffer: lebih kecil lebih responsif saat bermain, lebih besar memberi CPU ruang.
+
+00:00:26.600 --> 00:00:32.000
+Putar suara tes untuk memastikan kamu mendengarnya.
+
+00:00:32.400 --> 00:00:37.800
+Dari mana saja, Help, Test audio output melakukan hal yang sama.
+
+00:00:38.200 --> 00:00:44.200
+Berderak? Naikkan buffer. Nada terlambat? Turunkan.

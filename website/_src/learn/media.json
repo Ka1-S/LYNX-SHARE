@@ -1,4 +1,20 @@
 {
+ "assets/media/learn/audio-setup-en-1080.mp4": {
+  "size": 3115020,
+  "sha256": "6eff81c22bdb8b66b2bf492b5b5582624ef09133c3fe044731f5497c7a69fc4d"
+ },
+ "assets/media/learn/audio-setup-en-720.mp4": {
+  "size": 1952623,
+  "sha256": "9300b0bd02d36d5aacec1d8f5e973d4668078df011c7a5de52ccd9771740d552"
+ },
+ "assets/media/learn/audio-setup-pt-BR-1080.mp4": {
+  "size": 3270823,
+  "sha256": "396233a639100e810e13fb59f15192b030aa045147dd34efb8ced7b4d719b2bd"
+ },
+ "assets/media/learn/audio-setup-pt-BR-720.mp4": {
+  "size": 2017785,
+  "sha256": "cdcd1ff8c364d0eddcd8f8d221603af2c5128f52ba7330d18387fbe5ea0ed285"
+ },
  "assets/media/learn/automation-basics-en-1080.mp4": {
   "size": 4255177,
   "sha256": "4d88794b8b3f302105f0e1083d88d453bbceeaaa9755fafb9caa6f93a37e3b34"
@@ -14,6 +30,22 @@
  "assets/media/learn/automation-basics-pt-BR-720.mp4": {
   "size": 2655493,
   "sha256": "e4dea9fe6705530dd432ce791a49fac816080ef7f6c8b5f199e18d480149dbbb"
+ },
+ "assets/media/learn/automation-lanes-en-1080.mp4": {
+  "size": 3138808,
+  "sha256": "540f02fd5c01dd686dca5c1c432e61b8895fccefc0bb56c86cfa1db59232d271"
+ },
+ "assets/media/learn/automation-lanes-en-720.mp4": {
+  "size": 1970471,
+  "sha256": "c980a0052d104aa9da90cf06a06241c52ae8ec9ec2638532ff187fcd98ca1ad6"
+ },
+ "assets/media/learn/automation-lanes-pt-BR-1080.mp4": {
+  "size": 3216027,
+  "sha256": "8fb8880c584a67763315c692e2a18a381e497d303fa1a742d4d978f67d9fa257"
+ },
+ "assets/media/learn/automation-lanes-pt-BR-720.mp4": {
+  "size": 2027500,
+  "sha256": "345f93c8f2c2951844acd47fc04d5501fd864240be5fe39966a861f1b068cc03"
  },
  "assets/media/learn/clip-launch-tour-en-1080.mp4": {
   "size": 3248596,
@@ -46,6 +78,22 @@
  "assets/media/learn/command-palette-pt-BR-720.mp4": {
   "size": 2224501,
   "sha256": "ab784ff607491eaa2a11e88f8a9430346a61c97e21385c83d3a143a1bf2e69c4"
+ },
+ "assets/media/learn/device-view-en-1080.mp4": {
+  "size": 3760384,
+  "sha256": "c4ac5425915c9218308789d50a991fa24d55de9d6b743c8c2fb49f2bd2063a15"
+ },
+ "assets/media/learn/device-view-en-720.mp4": {
+  "size": 2329122,
+  "sha256": "5e18731793296cf7b682f93d182df5357478a40e1def89fc4a8ea26eed8ef17b"
+ },
+ "assets/media/learn/device-view-pt-BR-1080.mp4": {
+  "size": 3928405,
+  "sha256": "c5fc725a90a1416efa32e49fd04da16260e64ca688a0a79e0d432bd6907febcf"
+ },
+ "assets/media/learn/device-view-pt-BR-720.mp4": {
+  "size": 2408154,
+  "sha256": "d65d7ef08778b02875bc8990c671dded1c0936359f32fabf8475e8d85f0177d1"
  },
  "assets/media/learn/eq-basics-en-1080.mp4": {
   "size": 5490617,
@@ -95,6 +143,38 @@
   "size": 2392342,
   "sha256": "11d75e2d3bea32e54416cd5cd9b6c0e844c0476a7f47e6fec804300228a3fee1"
  },
+ "assets/media/learn/help-and-tips-en-1080.mp4": {
+  "size": 6204321,
+  "sha256": "b09e89e269a2f0900605fa7dd1508c9d9e1638187fa0b005188dcec0974e5caa"
+ },
+ "assets/media/learn/help-and-tips-en-720.mp4": {
+  "size": 3620439,
+  "sha256": "53e8f93d5ba8fb4c62adf631fa48029ad8d0f517f3bfea1ab2c7c376c66165c1"
+ },
+ "assets/media/learn/help-and-tips-pt-BR-1080.mp4": {
+  "size": 6324489,
+  "sha256": "2afcacb7444cf3a5575e246223b63640d5bab499de7a7343c8e008f938b77f05"
+ },
+ "assets/media/learn/help-and-tips-pt-BR-720.mp4": {
+  "size": 3758052,
+  "sha256": "9af16da8b7db5390ddae0731aaf2d3143893a9d5c8e8f3d27ad2cb401f1dafb4"
+ },
+ "assets/media/learn/lynx-extras-en-1080.mp4": {
+  "size": 5409815,
+  "sha256": "2b04ad2f09a22822327c0cafa8a00cb1729f6f246da8213b81af38745c1fb9e4"
+ },
+ "assets/media/learn/lynx-extras-en-720.mp4": {
+  "size": 3100907,
+  "sha256": "60ebb8297f286d04db0cbb733080aa2ca35fc77749bc6ee9e4a751dd5e12da65"
+ },
+ "assets/media/learn/lynx-extras-pt-BR-1080.mp4": {
+  "size": 5482826,
+  "sha256": "cd7889effb01e1611ff5fac775834a7e71eb4cab59294ae7f4de729ce35d3dc0"
+ },
+ "assets/media/learn/lynx-extras-pt-BR-720.mp4": {
+  "size": 3199560,
+  "sha256": "8764812129b5d8cc7f4108dc656bbd74916064501e3a78c5ec4ddfa95d8a451d"
+ },
  "assets/media/learn/lynx-instruments-en-1080.mp4": {
   "size": 3562805,
   "sha256": "90b506225546c5de24bb37d71a762a526ac3d3e80144cca62886c6d0a2caf94b"
@@ -111,6 +191,22 @@
   "size": 2181977,
   "sha256": "ab822596175c719d04bb6ec363ac8e669dd3f83204ddafbf9fc2fb80a6a365ef"
  },
+ "assets/media/learn/make-it-yours-en-1080.mp4": {
+  "size": 3084669,
+  "sha256": "b08473a86b6ec1fc948916bce8823f8970199d39f91f4d7e3efb99fa475cba32"
+ },
+ "assets/media/learn/make-it-yours-en-720.mp4": {
+  "size": 1870864,
+  "sha256": "a31d46059c726ca3f2d3c9282b660ed14a2f173cfcb980def0ab9e7b8ee2cdce"
+ },
+ "assets/media/learn/make-it-yours-pt-BR-1080.mp4": {
+  "size": 3175859,
+  "sha256": "ddd278f93eca0e170c8c9c841d5483cf5af1982e67c8903ec9e869dbcab81a21"
+ },
+ "assets/media/learn/make-it-yours-pt-BR-720.mp4": {
+  "size": 1931462,
+  "sha256": "21f423297feafa4fe32c76427f16acf3ad07a2e4032e45d8cd7b298f55289348"
+ },
  "assets/media/learn/midi-keyboard-en-1080.mp4": {
   "size": 3097005,
   "sha256": "4031843c5a26ae2cf3b431e54a63e483e981718d06b9da113b0c5cca5e64bfe5"
@@ -126,6 +222,22 @@
  "assets/media/learn/midi-keyboard-pt-BR-720.mp4": {
   "size": 2103167,
   "sha256": "73df0a511fe1a7f75c9e68afc6e591c30c971d10aaae4eb09db79cf84ae8471a"
+ },
+ "assets/media/learn/mixer-routing-en-1080.mp4": {
+  "size": 3424543,
+  "sha256": "6c2fa42fcd6c1beec9dc2c7c111df76a24d22e6ae467cb70b9d6dd19cdde62dc"
+ },
+ "assets/media/learn/mixer-routing-en-720.mp4": {
+  "size": 2116228,
+  "sha256": "0c21f1b5fcf1590eba1b07ea0b7a6c274803a3e39f07408fc7e273b4e2668596"
+ },
+ "assets/media/learn/mixer-routing-pt-BR-1080.mp4": {
+  "size": 3494529,
+  "sha256": "55f05c69813e4c8afd1e652dda51e5f863e0ec70bf77bd88091290c1a565eb95"
+ },
+ "assets/media/learn/mixer-routing-pt-BR-720.mp4": {
+  "size": 2201960,
+  "sha256": "fc7c89e5fa00adf4a3bc4597cb7d7ed293e9900904047de1034fc4f0af90060c"
  },
  "assets/media/learn/mixing-basics-en-1080.mp4": {
   "size": 3530214,
@@ -287,6 +399,38 @@
   "size": 2538702,
   "sha256": "a2ebd5cf619ec5024b75f66b5117db229383392c64b142a03cdbfd4a20d9b9dc"
  },
+ "assets/media/learn/settings-tour-en-1080.mp4": {
+  "size": 3371869,
+  "sha256": "c1806c2ccda57d33d90ffe54253953887e4e891667b2c1adb3180d1ac4a74c57"
+ },
+ "assets/media/learn/settings-tour-en-720.mp4": {
+  "size": 2155502,
+  "sha256": "b3abe218db9fbe615ef9275b621669900257e793c804d76cfd637427d54a0fd7"
+ },
+ "assets/media/learn/settings-tour-pt-BR-1080.mp4": {
+  "size": 3546188,
+  "sha256": "989306af78b50302877f1f1f6b6ba8a95f8dc676abe478accbdb093b318526d0"
+ },
+ "assets/media/learn/settings-tour-pt-BR-720.mp4": {
+  "size": 2230652,
+  "sha256": "97c0225fdb7e95d565bd6de85e3b29d5753aca4b74048f1da21fdfec2cc375a7"
+ },
+ "assets/media/learn/shortcuts-keys-en-1080.mp4": {
+  "size": 3613587,
+  "sha256": "9f0de366968a6e05d76b0e97f92ed88780d2ec7bf650359c0848859602bdbb7e"
+ },
+ "assets/media/learn/shortcuts-keys-en-720.mp4": {
+  "size": 2245514,
+  "sha256": "110f231bfb38e7ab550c4bccc868cacb304857ad62ccb63484ed32f45cd6ea09"
+ },
+ "assets/media/learn/shortcuts-keys-pt-BR-1080.mp4": {
+  "size": 3740379,
+  "sha256": "622913f7f84602d0e0ae1f093d3c535cb1e7b19857527f9f1c7910525073e622"
+ },
+ "assets/media/learn/shortcuts-keys-pt-BR-720.mp4": {
+  "size": 2355324,
+  "sha256": "85fcb434e0d15a61f6c94bd849140d14da64b174f46c0110319f2b1e9a49bda8"
+ },
  "assets/media/learn/sidechain-en-1080.mp4": {
   "size": 4728864,
   "sha256": "3b90016cc10bc6585633816f55d5378c92deb9823a2bf2a9c8cca0bd26fc9d32"
@@ -366,6 +510,22 @@
  "assets/media/learn/switch-layouts-pt-BR-720.mp4": {
   "size": 2418266,
   "sha256": "78a0c873e419d42d852dcecbcddb5d26c4c8985fec6384810d47e39d88d6d5e0"
+ },
+ "assets/media/learn/track-only-en-1080.mp4": {
+  "size": 3316975,
+  "sha256": "1d05018310a3139d8464333edfb5aeadeab4779351826937864d4397d3977e7e"
+ },
+ "assets/media/learn/track-only-en-720.mp4": {
+  "size": 2079235,
+  "sha256": "29e72574c63c083c69ea803a2966db8c3c7f9ac270a834bc4cbe885df20f6154"
+ },
+ "assets/media/learn/track-only-pt-BR-1080.mp4": {
+  "size": 3405499,
+  "sha256": "dcaccfd5ce67200de0e4b9d29f1bc6b535b79961d955a17b05f97a0f4a54bda2"
+ },
+ "assets/media/learn/track-only-pt-BR-720.mp4": {
+  "size": 2194756,
+  "sha256": "43c526007ab63e97063fb6453f32eb8dbdacb7306dcd7888a1ab31faecd30bdc"
  },
  "assets/media/learn/tracker-en-1080.mp4": {
   "size": 2197018,

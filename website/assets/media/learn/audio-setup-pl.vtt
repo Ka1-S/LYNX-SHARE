@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Brak dźwięku albo trzaski? Otwórz Opcje, Ustawienia audio.
+
+00:00:09.000 --> 00:00:14.400
+Sterownik: ASIO w Windows, Core Audio na Macu, PipeWire lub ALSA w Linuksie.
+
+00:00:14.800 --> 00:00:20.200
+Urządzenie wyjściowe to miejsce, gdzie słyszysz LYNX. Domyślne systemowe podąża za komputerem.
+
+00:00:20.600 --> 00:00:26.200
+Rozmiar bufora: mniejszy reaguje szybciej przy graniu, większy daje procesorowi zapas.
+
+00:00:26.600 --> 00:00:32.000
+Odtwórz dźwięk testowy, żeby sprawdzić, czy go słyszysz.
+
+00:00:32.400 --> 00:00:37.800
+Z każdego miejsca Pomoc, Testuj wyjście audio robi to samo.
+
+00:00:38.200 --> 00:00:44.200
+Trzaski? Zwiększ bufor. Nuty się spóźniają? Zmniejsz go.

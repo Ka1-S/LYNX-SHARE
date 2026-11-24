@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Cada faixa do Mixer vai para o Master. O roteamento manda ela para outro lugar também.
+
+00:00:09.000 --> 00:00:14.400
+Selecione a faixa que vai enviar, aqui os Chords.
+
+00:00:14.800 --> 00:00:20.600
+Clique na seta embaixo de outra faixa: os Chords agora vão para lá também.
+
+00:00:21.000 --> 00:00:26.400
+O botão embaixo dela é o nível do envio: quanto vai para lá.
+
+00:00:26.800 --> 00:00:32.200
+Coloque um reverb nessa faixa: um bus de reverb que todas as faixas podem usar.
+
+00:00:32.600 --> 00:00:38.200
+Clique com o direito numa seta para mais: Rotear só para esta faixa, ou Sidechain para esta faixa.
+
+00:00:38.600 --> 00:00:45.000
+Aperte Play: os acordes ganham espaço, e cada faixa mantém o seu fader.
