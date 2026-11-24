@@ -135,16 +135,23 @@ TEST (hotfix190qp_imported_fl_volume_send_and_filter_automation_play)
             auto song = busSong (length, c.toMaster);
             twoClips (song, c.target, c.name, 0.8f, 0.2f, k == 0 ? 0.1f : 0.8f, half);
             const auto imported = throughFl (song);
+            // the target the import gave the clips (an FL plugin's parameter may come back at LYNX's own index)
+            AutomationTarget target;
             int driving = 0;
             for (const auto& a : imported.automations)
-                driving += a.target == c.target ? 1 : 0;
-            CHECK (driving == 2);
-            if (driving != 2)
+                if (a.name.rfind (c.name, 0) == 0)
+                {
+                    if (driving == 0)
+                        target = a.target;
+                    driving += a.target == target ? 1 : 0;
+                }
+            CHECK (driving == 2 && target.kind == c.target.kind && target.index == c.target.index);
+            if (driving != 2 || target.kind != c.target.kind)
                 for (const auto& a : imported.automations)
-                    std::printf ("    %s: imported automation \"%s\" kind %d index %d slot %d param %d, links %d\n", c.name, a.name.c_str(), (int) a.target.kind,
-                                 a.target.index, a.target.slot, a.target.param, (int) a.links.size());
+                    std::fprintf (stderr, "    %s: imported automation \"%s\" kind %d index %d slot %d param %d, links %d\n", c.name, a.name.c_str(),
+                                  (int) a.target.kind, a.target.index, a.target.slot, a.target.param, (int) a.links.size());
             level[k] = rmsOver (imported, (double) half + ppq, (double) length);
-            const auto shown = shownAt (imported, c.target, (double) half + 2.0 * ppq);
+            const auto shown = shownAt (imported, target, (double) half + 2.0 * ppq);
             CHECK (shown.has_value() && std::abs (*shown - (k == 0 ? 0.1f : 0.8f)) < 0.02f);
         }
         CHECK (level[1] > 0.001 && level[0] < 0.7 * level[1]); // (low: quieter, a shut filter or a closed send)
