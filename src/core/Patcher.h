@@ -115,6 +115,8 @@ public:
     // a voice property of a note that came in on MIDI port `port` (a Channel Rack VFX's output, round 165c): the
     // instruments on that pin take it (VFX nodes as a property event of that voice)
     void voicePropertyPort (int port, int key, int prop, float value, int midiChannel) noexcept;
+    void voiceProperty (int key, int prop, float value) noexcept; // issue #271: on the channel's own notes (pin 0)
+    std::atomic<bool> voiceProps { true }; // (the channel's ChannelDef::engineRev >= 5)
     // what the VFX nodes sent to "To LYNX SHARE" MIDI ports since the last call (round 165c); the rest wait
     int takeHostEvents (Instrument::PortEvent* out, int max) noexcept;
     // a controller's mod wheel, other CCs, channel pressure and pitch wheel played into the Patcher's channel (round

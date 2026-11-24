@@ -3659,6 +3659,13 @@ public:
             quit();
             return;
         }
+        // --issuesshot190qo <prefix> (round 190qo, issues #239, #215, #251, #270): src/IssuesShot190qo.inc
+        if (args.contains ("--issuesshot190qo"))
+        {
+            setApplicationReturnValue (runIssuesShot190qo (args[args.indexOf ("--issuesshot190qo") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190qb <prefix> (round 190qb, follow-ups of issues #206 and #215): src/IssuesShot190qb.inc
         if (args.contains ("--issuesshot190qb"))
         {
@@ -8971,6 +8978,44 @@ private:
                 slides190piResult = "ERROR the copy read back " + why;
         }
 
+        // round 190qo (issues #270, #271): LYNX's typing chord layouts follow FL's own four chord files; "Save a copy for 0.1.31"
+        // of a SoundFont channel with slide notes (engine revision 5: slide velocity and pan) gets one sound line and
+        // revision 3, a project without slide notes none
+        juce::String issues190qoResult = "OK";
+        {
+            const auto rule = lynx::keys::typingpiano::chordRuleCheck();
+            auto song = lynx::Song::makeDefault();
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            lynx::ChannelDef sf;
+            sf.instrument = lynx::InstrumentKind::soundfont;
+            sf.name = "SF 190qo";
+            song.channels.push_back (sf);
+            const auto ch = (int) song.channels.size() - 1;
+            lynx::Note a, slide;
+            a.start = 0, a.length = 4 * lynx::ppq, a.key = 60, a.channel = ch;
+            slide = a, slide.start = lynx::ppq, slide.length = lynx::ppq, slide.slide = true, slide.velocity = 0.1f;
+            song.patterns[0].notes = { a };
+            const auto lines = [] (const lynx::olderlynx::Copy& copy) {
+                return (int) std::count_if (copy.lost.begin(), copy.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                    return juce::String (l.text).startsWith ("Slide notes move only the pitch on these channels") && l.sound;
+                });
+            };
+            const auto plain = lynx::olderlynx::forRelease (song, "0.1.31");
+            song.patterns[0].notes.push_back (slide);
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.31");
+            juce::String why;
+            const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+            if (rule != "OK")
+                issues190qoResult = "ERROR typing chord rule " + juce::String (rule);
+            else if (! plain.ok || lines (plain) != 0)
+                issues190qoResult = "ERROR a line for a project without SoundFont slides";
+            else if (! copy.ok || lines (copy) != 1)
+                issues190qoResult = "ERROR the copy's line " + copy.error;
+            else if (! back || back->channels.back().engineRev > 3)
+                issues190qoResult = "ERROR the copy read back " + why;
+        }
+
         // round 190pr: "Save a copy for 0.1.30" of the export's marker actions (Song::exportMarkers: one sound line when an
         // arrangement has a skip or Start marker, none otherwise; the key goes), of Harmor's automation and of Sytrus'
         // note Mod X / Y (engine revision 3: written at 2, one line each naming the clip / channel); the .lynx keys read back
@@ -9531,8 +9576,8 @@ private:
             const auto rels = lynx::olderlynx::releases();
             if (oscParam < 0)
                 rollup032Result = "ERROR set-up: no 3x Osc FL target";
-            else if (song.channels[(std::size_t) first].engineRev != 4)
-                rollup032Result = "ERROR set-up: a new channel is not at revision 4";
+            else if (song.channels[(std::size_t) first].engineRev != 5) // (round 190qo: 5, issue #271's slide velocity)
+                rollup032Result = "ERROR set-up: a new channel is not at revision 5";
             else if (rels.size() != 4 || rels[0] != "0.1.31" || rels[1] != "0.1.30" || rels[2] != "0.1.28" || rels[3] != "0.1.27")
                 rollup032Result = "ERROR the release list: " + rels.joinIntoString (" ");
             for (const auto* release : { "0.1.31", "0.1.30", "0.1.28" })
@@ -11150,6 +11195,7 @@ private:
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
+                        && issues190qoResult == "OK" // (round 190qo)
                         && flparity190prResult == "OK"
                         && hotfix190qpWfResult == "OK" // (round 190qp)
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
@@ -11275,6 +11321,7 @@ private:
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
                << "slides190pi=" << slides190piResult << "\n"
+               << "issues190qo=" << issues190qoResult << "\n"
                << "flparity190pr=" << flparity190prResult << "\n"
                << "chordlane190pf=" << chordlane190pfResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
@@ -21204,6 +21251,7 @@ private:
 #include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
 #include "Picker190qiShot.inc" // round 190qi (TOP-NEXT R6): picker and Browser quality of life
 #include "PickerPaintBench190qi.inc" // round 190qi: the plugin lists' and the Browser's paint gate
+#include "IssuesShot190qo.inc" // round 190qo (issues #239, #215, #251, #270)
 #include "RackAuto190owShot.inc" // round 190ow (PAT-7 rest, DE-123: the automation clip rows at work)
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)

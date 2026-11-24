@@ -3,6 +3,7 @@
 
 #include "core/SoundFont.h"
 #include "core/HostSlide.h"
+#include "core/Vfx.h"
 
 #include <algorithm>
 #include <chrono>
@@ -823,6 +824,9 @@ struct Voice
     float restAtStart = 0; // the channel's fine tune + main pitch in baseCents (they move it live: setChannelPitchNow)
     float filterBaseCents = 13500, filterQ = 0.7071f;
     bool oneShot = false;
+    // issue #271 (round 190qo): what a slide note's velocity / pan moves — the level and cut-off without the velocity,
+    // and the region's own pan
+    float levelBase = 1, cutoffBase = 13500, regionPan = 0;
 };
 
 // Freeverb-style stereo reverb (mono in), buffers sized in prepare()
@@ -1028,6 +1032,21 @@ public:
         s.p = readParams (channel.modelParams);
         settings.write (s);
         polyLimit.store (channel.maxPolyphony > 0 ? channel.maxPolyphony : 0, std::memory_order_relaxed);
+        voiceProps.store (channel.engineRev >= 5, std::memory_order_relaxed);
+    }
+
+    // Issue #271 (round 190qo): FL's SoundFont Player follows a slide note's velocity and pan on the sounding note (FL
+    // 2026's /R renders, docs/analise/REA_rodada190qo.md: velocity 100 sliding to 10 ends at the velocity-10 level, 10 to
+    // 100 rises to the velocity-100 level, tick by tick); LYNX's took the pitch only. From engine revision 5 on (new
+    // channels, .flp imports; a project saved before plays as it did). Queued behind the notes, like slideTo.
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! voiceProps.load (std::memory_order_relaxed) || ! std::isfinite (value))
+            return;
+        if (prop == (int) vfx::Prop::velocity)
+            pending.push ({ key, value, NoteMsg::propVelocity, 0, 0, 0 });
+        else if (prop == (int) vfx::Prop::pan)
+            pending.push ({ key, 0.0f, NoteMsg::propPan, value, 0, 0 });
     }
 
     void setParameter (int index, float value) noexcept override
@@ -1174,6 +1193,8 @@ public:
             const auto& e = pending.events[(std::size_t) i];
             if (e.kind == NoteMsg::slide)
                 applySlide (e.key, e.cents, e.velocity, (int) e.id, e.pan); // (velocity = the slide's length in samples)
+            else if (e.kind == NoteMsg::propVelocity || e.kind == NoteMsg::propPan)
+                applyVoiceProperty (e.key, e.kind == NoteMsg::propVelocity, e.kind == NoteMsg::propVelocity ? e.velocity : e.pan);
             else if (e.kind == NoteMsg::on)
             {
                 startingId = e.id;
@@ -1207,7 +1228,7 @@ public:
 private:
     struct NoteMsg
     {
-        enum Kind : std::uint8_t { off, on, slide };
+        enum Kind : std::uint8_t { off, on, slide, propVelocity, propPan };
         int key; float velocity; Kind kind; float pan, cents; std::uint32_t id;
     };
     struct Pending
@@ -1280,9 +1301,20 @@ private:
         return font.findPreset (bank, program);
     }
 
-    float velocityGain (int vel) const noexcept
+    float velocityGain (int vel) const noexcept { return velocityGain01 ((float) vel / 127.0f); }
+    // Issue #271 (round 190qo): FL's SoundFont Player's velocity law, measured on two fonts (FL 2026 /R renders of FL
+    // velocities 1 … 128, REA_rodada190qo §1b): the level moves 15 dB a decade of velocity, (v / 128)^0.75, within
+    // 0.05 dB; LYNX's SF2 default curve moved 40 dB a decade (velocity 10 was 25 dB too quiet). Scaled so velocity 100
+    // keeps the level it had (it matched FL's there). From engine revision 5 on, with the SF2 default curve chosen.
+    bool flVelocityLaw() const noexcept { return voiceProps.load (std::memory_order_relaxed) && (int) param (pVelocityCurve) == 0; }
+    static float flVelocityGain (float velocity01) noexcept
     {
-        const auto v = std::clamp ((float) vel / 127.0f, 0.0f, 1.0f);
+        constexpr float at100 = (99.0f / 127.0f) * (99.0f / 127.0f); // (the SF2 curve's level at FL's velocity 100 = MIDI 99)
+        return at100 * std::pow (std::clamp (velocity01, 0.0f, 1.0f) / 0.78125f, 0.75f);
+    }
+    float velocityGain01 (float v01) const noexcept
+    {
+        const auto v = std::clamp (v01, 0.0f, 1.0f);
         switch ((int) param (pVelocityCurve))
         {
             case 1: return v;                        // linear amplitude
@@ -1333,6 +1365,7 @@ private:
         const auto& preset = font.presets[(std::size_t) presetIndex];
         const auto transposed = std::clamp (key + (int) param (pTranspose), 0, 127);
         const auto vel = std::clamp ((int) std::lround (velocity01 * 127.0f), 1, 127);
+        startingVelocity01 = velocity01;
         const auto mode = (int) param (pProgramMode);
         const auto drums = mode == 2 || (mode == 0 && preset.bank == 128);
         noteVelocity[(std::size_t) std::clamp (key, 0, 127)] = (std::uint8_t) vel;
@@ -1424,6 +1457,7 @@ private:
         const auto& preset = font.presets[(std::size_t) presetIndex];
         const auto transposed = std::clamp (key + (int) param (pTranspose), 0, 127);
         const auto vel = std::max (1, (int) noteVelocity[(std::size_t) std::clamp (key, 0, 127)]);
+        startingVelocity01 = (float) vel / 127.0f;
         const auto random = nextRandom();
         for (std::size_t ri = 0; ri < preset.regions.size(); ++ri)
         {
@@ -1487,7 +1521,10 @@ private:
         // level: attenuation (EMU's 0.4 scaling of centibels, as SoundFont players do), velocity, the region's pan
         const auto sfzVelocity = r.sfz && (int) param (pVelocityCurve) == 0; // SFZ's amp_veltrack curve, unless overridden
         const auto v01 = (float) vel / 127.0f;
-        v.gainBase = dbToGain (-0.04f * r.attenuation) * (sfzVelocity ? 1.0f - r.ampVelTrack + r.ampVelTrack * v01 * v01 : velocityGain (vel));
+        v.levelBase = dbToGain (-0.04f * r.attenuation);
+        v.gainBase = v.levelBase * (sfzVelocity ? 1.0f - r.ampVelTrack + r.ampVelTrack * v01 * v01
+                                    : flVelocityLaw() ? flVelocityGain (startingVelocity01) : velocityGain (vel));
+        v.regionPan = r.pan * 2.0f;
         const auto pan = std::clamp (r.pan * 2.0f + notePan, -1.0f, 1.0f);
         const auto angle = (pan + 1.0f) * 0.25f * 3.14159265f;
         v.panL = std::cos (angle) * 1.41421356f, v.panR = std::sin (angle) * 1.41421356f;
@@ -1497,6 +1534,7 @@ private:
         v.filterBaseCents = (float) r.filterFc;
         if (param (pCutoff) > 0.0f)
             v.filterBaseCents = (float) knobCutoffCents (param (pCutoff));
+        v.cutoffBase = v.filterBaseCents;
         if (param (pVelocityToCutoff) >= 0.5f)
             v.filterBaseCents -= 2400.0f * (1.0f - (float) vel / 127.0f);
         const auto qDb = param (pResonance) > 0.0f ? param (pResonance) * 24.0f : (float) r.filterQ / 10.0f;
@@ -1504,7 +1542,35 @@ private:
         v.filter.on = v.filterBaseCents < 13450.0f || qDb > 0.0f || r.modEnvToFilterFc != 0 || r.modLfoToFilterFc != 0 || param (pCutoffMod) > 0.0f;
     }
 
+    // issue #271: a slide note's velocity (0..1, FL's velocity / 128 as the notes') or pan (−1..1) on the key's sounding
+    // voices: the level and the velocity → cut-off as a note started at that velocity has them, the pan as its note pan
+    void applyVoiceProperty (int key, bool velocity, float value) noexcept
+    {
+        for (auto& v : voices)
+            if (v.active && ! v.released && v.key == key && v.region != nullptr)
+            {
+                const auto& r = *v.region;
+                if (velocity)
+                {
+                    const auto v01 = std::clamp (value, 1.0f / 127.0f, 1.0f); // (startNote's round(v · 127) / 127, unrounded)
+                    const auto sfzVelocity = r.sfz && (int) param (pVelocityCurve) == 0;
+                    v.gainBase = v.levelBase * (sfzVelocity ? 1.0f - r.ampVelTrack + r.ampVelTrack * v01 * v01
+                                                : flVelocityLaw() ? flVelocityGain (value) : velocityGain01 (v01));
+                    v.filterBaseCents = v.cutoffBase - (param (pVelocityToCutoff) >= 0.5f ? 2400.0f * (1.0f - v01) : 0.0f);
+                }
+                else
+                {
+                    const auto pan = std::clamp (v.regionPan + value, -1.0f, 1.0f);
+                    const auto angle = (pan + 1.0f) * 0.25f * 3.14159265f;
+                    v.panL = std::cos (angle) * 1.41421356f, v.panR = std::sin (angle) * 1.41421356f;
+                }
+            }
+    }
+
+    std::atomic<bool> voiceProps { true }; // (ChannelDef::engineRev >= 5)
+
     std::uint32_t startingId = 0; // (the note id startNote gives its voices)
+    float startingVelocity01 = 0.78125f; // (issue #271: the note's velocity, unrounded, for FL's velocity law)
 
     // `id` ≠ 0: only that note's voices (round 190ej)
     void stopNote (int key, std::uint32_t id = 0) noexcept

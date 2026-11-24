@@ -22,6 +22,8 @@
 #include "core/HardwareInsert.h"
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
+#include "ui/WorkflowExtras.h"
+#include "core/SaveExtras.h"
 #include "ui/WindowOwner.h"
 
 #include "engine/AacEncoder.h"
@@ -1199,7 +1201,12 @@ private:
     // folder and the file, so Export... writes there at once (a file already there: asked once, as Same as last time).
     // A plain name keeps FL's order: the file dialog, opening in the export folder. (Not for track renders straight to
     // their "Record to" files, nor the demo takes: chooseFile handles those first.)
-    bool writesWithoutDialog() const { return naming && exportnaming::hasFolders (options.nameTemplate); }
+    // Round 190qo's LYNX extra "Export to the File name's folder without asking" (issue #215, off by default) does the same
+    // for every name (rollup 0.1.32 step 2: one path for both).
+    bool writesWithoutDialog() const
+    {
+        return naming && (exportnaming::hasFolders (options.nameTemplate) || (saveextras::exportNoDialog() && exportFolder().isDirectory()));
+    }
     juce::File directTarget() const { return exportFolder().getChildFile (resolvedName() + juce::String (exportopts::extension (options.format))); }
 
     void chooseExportFolder()
@@ -1261,6 +1268,13 @@ private:
             const auto token = juce::String (std::string (w.token));
             menu.addItem (id++, token + "   " + tr (juce::String (std::string (w.meaning))));
         }
+        // issue #215 (round 190qo, LYNX extra): Export... without the file dialog
+        menu.addSeparator();
+        menu.addItem (tr ("Export to the File name's folder without asking"), true, saveextras::exportNoDialog(), [safe = juce::Component::SafePointer<ExportPanel> (this)] {
+            workflowextras::setExtra ("export.noDialog", ! saveextras::exportNoDialog());
+            if (safe != nullptr)
+                safe->refreshName();
+        });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wildcardButton), [safe = juce::Component::SafePointer<ExportPanel> (this)] (int chosen) {
             if (safe != nullptr && chosen > 0 && chosen <= (int) std::size (exportnaming::wildcards))
                 safe->insertWildcard (juce::String (std::string (exportnaming::wildcards[(std::size_t) chosen - 1].token)));
@@ -2765,6 +2779,18 @@ juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& f
         panel.setNameTemplateForSnapshot ("$project_$bpm", when);
         expect ("a plain name opens the file dialog", ! panel.writesWithoutDialogForCheck());
         expect ("its preview is the name alone", ! panel.namePreviewForSnapshot().contains (folder.getFullPathName()), panel.namePreviewForSnapshot());
+        // rollup 0.1.32 step 2: round 190qo's extra (issue #215) takes every name the same way
+        {
+            const auto kept = saveextras::exportNoDialog();
+            saveextras::setExportNoDialog (true);
+            panel.setNameTemplateForSnapshot ("$project_$bpm", when);
+            expect ("with the extra on a plain name writes without the dialog", panel.writesWithoutDialogForCheck());
+            const auto before2 = started.size();
+            panel.clickExportForCheck();
+            expect ("Export... started it in the export folder", started.size() == before2 + 1 && started.back().getParentDirectory() == folder,
+                    started.size() > before2 ? started.back().getFullPathName() : juce::String ("nothing"));
+            saveextras::setExportNoDialog (kept);
+        }
         panel.setExportFolder (before);
     }
     folder.getChildFile ("BOUNCE").deleteRecursively();

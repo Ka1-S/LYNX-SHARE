@@ -434,6 +434,10 @@ std::vector<Action> makeActions()
         { "playlist.mergeSimilarClips", TR_NOOP ("Merge similar pattern clips"), Context::playlist, { chord ('G', ctrl | shift) } },
         { "playlist.mergeAutomationClips", TR_NOOP ("Merge automation clips"), Context::playlist, { chord ('G', ctrl | alt) } },
         { "playlist.cloneTracks", TR_NOOP ("Clone selected playlist track(s)"), Context::playlist, { chord ('B', ctrl | shift) } },
+        // issue #249 (round 190qo): no key in FL (a track is muted with its LED, soloed with a right-click or Ctrl+click on it);
+        // free for the user to bind in the Shortcut manager
+        { "playlist.muteTracks", TR_NOOP ("Mute / unmute the selected playlist track(s)"), Context::playlist, {} },
+        { "playlist.soloTrack", TR_NOOP ("Solo / unsolo the selected playlist track"), Context::playlist, {} },
         { "playlist.makeUnique", TR_NOOP ("Make the selected clips unique"), Context::playlist, { chord ('V', ctrl | shift) } },
         // FL's Alt+M / Shift+Alt+M (EEMuteAction / EEUnmuteAction, issue #53): the selected clips, or all of them
         { "playlist.muteClips", TR_NOOP ("Mute the selected clips (all when none is selected)"), Context::playlist, { chord ('M', alt) } },
@@ -758,6 +762,9 @@ struct TypingLayout
     const char* keys; // one token per layoutKeys character: notes at octave 4, root C ("60,64,67" a chord), "-" LOCK, "~" FREE
 };
 
+constexpr int firstTypingScanCode = 0x02, lastTypingScanCode = 0x35;
+constexpr int firstScanCode = firstTypingScanCode, lastScanCode = lastTypingScanCode;
+
 // The printable keys of FL's .scr files, in their line order (FL reads a file's lines as the scan codes 2..0x35 of a US
 // keyboard: number row, Q row, A row with ` , \ then the Z row; the Backspace, Tab, Enter, Ctrl / Caps and Shift lines
 // are FREE in every file, so they are left out). LYNX matches the keys by character.
@@ -800,68 +807,371 @@ const TypingLayout typingLayouts[] = {
         { "Other Whole Tone", "84 86 88 90 92 94 96 98 100 102 104 106 72 74 76 78 80 82 84 86 88 90 92 94 60 62 64 66 68 70 72 74 76 78 80 ~ ~ 48 50 52 54 56 58 60 62 64 66" },
 };
 
-// The token of `key` in `layout` (pointing into its string), nullptr when the key is not one of layoutKeys.
-const char* layoutToken (int key, int layout) noexcept
+// ---- the layout list (round 190qo, issue #270) ------------------------------------------------------------------------
+// FL's own layouts (above), then LYNX's chord layouts for FL's other seven-note scales (made by the rule FL's four chord
+// files follow, checked against them in the tests), then the .scr files found in FL's "Typing to piano" folder and in
+// LYNX's own (setUserLayouts). One entry per layout, its keys parsed once.
+struct ParsedLayout
+{
+    std::string name, folder;
+    typingpiano::Source source = typingpiano::Source::fl;
+    std::array<TypingKey, sizeof (layoutKeys) - 1> keys {};
+};
+
+int keyIndex (int key) noexcept
 {
     const auto c = key >= 'a' && key <= 'z' ? key - 'a' + 'A' : key;
     const auto* found = c > 0 && c < 0x7f ? std::strchr (layoutKeys, c) : nullptr;
-    if (found == nullptr || layout < 0 || layout >= (int) std::size (typingLayouts))
-        return nullptr;
+    return found != nullptr ? (int) (found - layoutKeys) : -1;
+}
 
-    const auto* token = typingLayouts[layout].keys;
-    for (auto i = found - layoutKeys; i > 0 && token != nullptr; --i) // skip one space-separated token per key before it
-        if ((token = std::strchr (token, ' ')) != nullptr)
-            ++token;
-    return token;
+// one of the tables' tokens: "60,64,67" notes, "-" LOCK (taken, no note), "~" FREE (not taken)
+TypingKey parseToken (const std::string& token)
+{
+    TypingKey k;
+    if (token.empty() || token == "~")
+        return k;
+    k.taken = true;
+    const char* t = token.c_str();
+    for (char* end = nullptr; *t >= '0' && *t <= '9'; t = *end == ',' ? end + 1 : end)
+        k.notes.push_back ((int) std::strtol (t, &end, 10));
+    return k;
+}
+
+ParsedLayout parseTable (const TypingLayout& table)
+{
+    ParsedLayout l;
+    l.name = table.name;
+    std::size_t i = 0;
+    const std::string keys = table.keys;
+    for (std::size_t at = 0; at <= keys.size() && i < l.keys.size(); ++i)
+    {
+        const auto end = std::min (keys.find (' ', at), keys.size());
+        l.keys[i] = parseToken (keys.substr (at, end - at));
+        at = end + 1;
+    }
+    return l;
+}
+
+// The seven steps of a layout whose Z row plays its scale from MIDI 48 (FL's scale files), or {} for another layout.
+std::vector<int> sevenStepsOf (const ParsedLayout& l)
+{
+    std::vector<int> steps;
+    const auto z = keyIndex ('Z');
+    for (int i = 0; i < 8; ++i)
+    {
+        const auto& k = l.keys[(std::size_t) (z + i)];
+        if (k.notes.size() != 1)
+            return {};
+        steps.push_back (k.notes.front() - 48);
+    }
+    if (steps.front() != 0 || steps[7] != 12) // (exactly seven notes to the octave)
+        return {};
+    steps.pop_back();
+    return steps;
+}
+
+int stepNote (const std::vector<int>& steps, int index, int root) noexcept
+{
+    const auto octave = index >= 0 ? index / 7 : -((-index + 6) / 7);
+    return root + 12 * octave + steps[(std::size_t) (index - 7 * octave)];
+}
+
+// the triad on scale degree `d` (thirds of the scale), its notes placed in the 12 semitones from `low` up
+std::vector<int> triadIn (const std::vector<int>& steps, int d, int low)
+{
+    std::vector<int> notes;
+    for (int third = 0; third < 3; ++third)
+    {
+        const auto n = stepNote (steps, d + 2 * third, 60);
+        notes.push_back (low + ((n - low) % 12 + 12) % 12);
+    }
+    std::sort (notes.begin(), notes.end());
+    return notes;
+}
+
+ParsedLayout chordsLayout (const ParsedLayout& scale, const std::string& name)
+{
+    // FL's "Major + Chords" / "Minor Natural + Chords": the scale's own layout, its number row the scale's triads in root
+    // position, one degree per key from the root at MIDI 60 (key 1 = I, key 2 = ii... key = = the 12th degree up)
+    auto l = scale;
+    l.name = name;
+    l.source = typingpiano::Source::lynx;
+    const auto steps = sevenStepsOf (scale);
+    for (int k = 0; k < 12; ++k)
+    {
+        auto& key = l.keys[(std::size_t) keyIndex ("1234567890-="[k])];
+        key.taken = true;
+        key.notes = { stepNote (steps, k, 60), stepNote (steps, k + 2, 60), stepNote (steps, k + 4, 60) };
+    }
+    return l;
+}
+
+ParsedLayout chordmapLayout (const ParsedLayout& scale, const std::string& name)
+{
+    // FL's "Major Chordmap" / "Minor Natural Chordmap": the Q row plays the triads of degrees 1..7 (then 1..5 again),
+    // each in the 12 semitones from the scale's note below the root at MIDI 60; the number row the same chords with their
+    // lowest note an octave up, the A row with their highest an octave down; the Z row the scale from MIDI 36
+    ParsedLayout l;
+    l.name = name;
+    l.source = typingpiano::Source::lynx;
+    const auto steps = sevenStepsOf (scale);
+    const auto low = stepNote (steps, -1, 60);
+    const auto set = [&l] (char c, std::vector<int> notes) {
+        auto& key = l.keys[(std::size_t) keyIndex (c)];
+        key.taken = true;
+        key.notes = std::move (notes);
+    };
+    for (int k = 0; k < 12; ++k)
+    {
+        const auto chord = triadIn (steps, k % 7, low);
+        set ("QWERTYUIOP[]"[k], chord);
+        auto up = chord;
+        up.front() += 12;
+        std::sort (up.begin(), up.end());
+        set ("1234567890-="[k], up);
+        if (k < 11)
+        {
+            auto down = chord;
+            down.back() -= 12;
+            std::sort (down.begin(), down.end());
+            set ("ASDFGHJKL;'"[k], down);
+        }
+    }
+    for (int k = 0; k < 10; ++k)
+        set ("ZXCVBNM,./"[k], { stepNote (steps, k, 36) });
+    return l;
+}
+
+struct Registry
+{
+    std::vector<ParsedLayout> list;
+    std::size_t builtIn = 0; // FL's and LYNX's; the user's files follow
+};
+
+Registry& registry()
+{
+    static Registry r = [] {
+        Registry made;
+        for (const auto& table : typingLayouts)
+            made.list.push_back (parseTable (table));
+        // LYNX's "+ Chords" and "Chordmap" for every FL seven-note scale FL ships without them, in FL's menu order
+        std::vector<ParsedLayout> extra;
+        for (const auto& l : made.list)
+        {
+            // (FL's scales only: not the "Layout ..." key layouts, whose Z row is the white keys too)
+            if (l.name.rfind ("Layout ", 0) == 0 || sevenStepsOf (l).empty() || l.name.find ("Chord") != std::string::npos)
+                continue;
+            auto base = l.name;
+            if (const auto paren = base.find (" ("); paren != std::string::npos) // ("Minor Natural (Aeolian)" -> "Minor Natural")
+                base = base.substr (0, paren);
+            const auto exists = [&made] (const std::string& n) {
+                return std::any_of (made.list.begin(), made.list.end(), [&n] (const ParsedLayout& x) { return x.name == n; });
+            };
+            if (! exists (base + " + Chords"))
+                extra.push_back (chordsLayout (l, base + " + Chords"));
+            if (! exists (base + " Chordmap"))
+                extra.push_back (chordmapLayout (l, base + " Chordmap"));
+        }
+        made.list.insert (made.list.end(), extra.begin(), extra.end());
+        made.builtIn = made.list.size();
+        return made;
+    }();
+    return r;
+}
+
+const TypingKey* layoutKey (int key, int layout) noexcept
+{
+    const auto& list = registry().list;
+    const auto i = keyIndex (key);
+    if (i < 0 || layout < 0 || layout >= (int) list.size())
+        return nullptr;
+    return &list[(std::size_t) layout].keys[(std::size_t) i];
 }
 } // namespace
 
 int typingpiano::layoutCount() noexcept
 {
-    return (int) std::size (typingLayouts);
+    return (int) registry().list.size();
 }
 
 const char* typingpiano::layoutName (int layout) noexcept
 {
-    return layout >= 0 && layout < layoutCount() ? typingLayouts[layout].name : "";
+    return layout >= 0 && layout < layoutCount() ? registry().list[(std::size_t) layout].name.c_str() : "";
+}
+
+typingpiano::Source typingpiano::layoutSource (int layout) noexcept
+{
+    return layout >= 0 && layout < layoutCount() ? registry().list[(std::size_t) layout].source : Source::fl;
+}
+
+std::string typingpiano::layoutFolder (int layout)
+{
+    return layout >= 0 && layout < layoutCount() ? registry().list[(std::size_t) layout].folder : std::string();
 }
 
 int typingpiano::layoutIndex (const std::string& name) noexcept
 {
-    for (int i = 0; i < layoutCount(); ++i)
-        if (name == typingLayouts[i].name)
-            return i;
+    const auto& list = registry().list;
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (name == list[i].name)
+            return (int) i;
     return pianoLayout();
 }
 
 int typingpiano::pianoLayout() noexcept
 {
-    for (int i = 0; i < layoutCount(); ++i)
-        if (std::strcmp (typingLayouts[i].name, "Layout Piano") == 0)
-            return i;
+    const auto& list = registry().list;
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (list[i].name == "Layout Piano")
+            return (int) i;
     return 0;
 }
 
 int typingpiano::performanceLayout() noexcept
 {
-    for (int i = 0; i < layoutCount(); ++i)
-        if (std::strcmp (typingLayouts[i].name, "Layout Performance mode") == 0)
-            return i;
+    const auto& list = registry().list;
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (list[i].name == "Layout Performance mode" && list[i].source == Source::fl)
+            return (int) i;
     return -1;
+}
+
+// FL's .scr format ("01 Typing Keyboard Layouts Explained.txt" in FL's folder; FL's parser FUN_00661f70): line N is the
+// key at PC scan code N + 2 (the number row, Backspace, Tab, the Q row, Enter, Ctrl, the A row, `, left Shift, \, the
+// Z row); FREE = no note, still a shortcut; LOCK = no note and no shortcut; a note as a MIDI number ("60") or a name
+// with FL's octaves ("C5" = 60, "C#5", "Db5"); a chord as notes separated by commas. Missing lines are FREE.
+bool typingpiano::parseScr (const std::string& text, std::array<TypingKey, 47>& keys)
+{
+    static_assert (sizeof (layoutKeys) - 1 == 47);
+    keys = {};
+    bool any = false;
+    std::size_t at = 0;
+    for (int line = 0; at <= text.size() && line + firstScanCode <= lastScanCode; ++line)
+    {
+        auto end = text.find ('\n', at);
+        if (end == std::string::npos)
+            end = text.size();
+        std::string raw = text.substr (at, end - at);
+        at = end + 1;
+        std::string t;
+        for (const auto c : raw)
+            if (! std::isspace ((unsigned char) c))
+                t += (char) std::toupper ((unsigned char) c);
+        const auto us = usKeyOfScanCode (line + firstScanCode);
+        const auto i = us != 0 ? keyIndex (us) : -1;
+        if (i < 0 || t.empty() || t == "FREE")
+            continue;
+        auto& key = keys[(std::size_t) i];
+        if (t == "LOCK")
+        {
+            key.taken = true;
+            any = true;
+            continue;
+        }
+        std::vector<int> notes;
+        bool ok = true;
+        std::size_t p = 0;
+        while (ok && p < t.size())
+        {
+            auto q = t.find (',', p);
+            if (q == std::string::npos)
+                q = t.size();
+            const auto part = t.substr (p, q - p);
+            p = q + 1;
+            int n = -1;
+            if (! part.empty() && std::isdigit ((unsigned char) part[0]))
+                n = std::atoi (part.c_str());
+            else if (! part.empty() && part[0] >= 'A' && part[0] <= 'G')
+            {
+                static const int pcs[] = { 9, 11, 0, 2, 4, 5, 7 }; // A B C D E F G
+                auto pc = pcs[part[0] - 'A'];
+                std::size_t j = 1;
+                if (j < part.size() && part[j] == '#')
+                    ++pc, ++j;
+                else if (j < part.size() && part[j] == 'B')
+                    --pc, ++j;
+                if (j < part.size() && (std::isdigit ((unsigned char) part[j]) || part[j] == '-'))
+                    n = 12 * std::atoi (part.c_str() + j) + pc;
+            }
+            if (n < 0 || n > 127)
+                ok = false;
+            else
+                notes.push_back (n);
+        }
+        if (! ok || notes.empty())
+            continue; // (a line FL can't read either: the key stays free)
+        key.taken = true;
+        key.notes = std::move (notes);
+        any = true;
+    }
+    return any;
+}
+
+void typingpiano::setUserLayouts (const std::vector<UserLayout>& files)
+{
+    auto& r = registry();
+    r.list.resize (r.builtIn);
+    for (const auto& f : files)
+    {
+        ParsedLayout l;
+        l.name = f.name;
+        l.folder = f.folder;
+        l.source = Source::user;
+        std::array<TypingKey, 47> keys;
+        if (! parseScr (f.text, keys))
+            continue;
+        std::copy (keys.begin(), keys.end(), l.keys.begin());
+        const auto same = std::any_of (r.list.begin(), r.list.end(), [&l] (const ParsedLayout& x) { return x.name == l.name && x.folder == l.folder; });
+        if (! same) // (FL's own files, also in FL's folder, are listed once: the built-in ones)
+            r.list.push_back (std::move (l));
+    }
+}
+
+std::string typingpiano::chordRuleCheck()
+{
+    // LYNX's chord layouts are made by the rule FL's own four chord files follow: made again from FL's scales, they must
+    // give those files key for key
+    const auto& list = registry().list;
+    const auto find = [&list] (const std::string& n) -> const ParsedLayout* {
+        for (const auto& l : list)
+            if (l.name == n && l.source == Source::fl)
+                return &l;
+        return nullptr;
+    };
+    std::string why;
+    for (const auto* scale : { "Major", "Minor Natural (Aeolian)" })
+    {
+        const auto base = std::string (scale) == "Major" ? std::string ("Major") : std::string ("Minor Natural");
+        const auto* s = find (scale);
+        const auto* plus = find (base + " + Chords");
+        const auto* map = find (base + " Chordmap");
+        if (s == nullptr || plus == nullptr || map == nullptr)
+            return "missing FL layout for " + base;
+        const auto a = chordsLayout (*s, "x"), b = chordmapLayout (*s, "y");
+        for (std::size_t i = 0; i < a.keys.size(); ++i)
+        {
+            if (a.keys[i].notes != plus->keys[i].notes || a.keys[i].taken != plus->keys[i].taken)
+                why += base + " + Chords key " + layoutKeys[i] + "; ";
+            if (b.keys[i].notes != map->keys[i].notes || b.keys[i].taken != map->keys[i].taken)
+                why += base + " Chordmap key " + layoutKeys[i] + "; ";
+        }
+    }
+    return why.empty() ? "OK" : why;
 }
 
 TypingKey typingPianoKey (int key, int octave, int root, int layout)
 {
     TypingKey out;
-    const auto* token = layoutToken (key, layout);
-    if (token == nullptr || *token == '~') // FREE (or not in the layout): the key stays a shortcut
+    const auto* k = layoutKey (key, layout);
+    if (k == nullptr || ! k->taken) // FREE (or not in the layout): the key stays a shortcut
         return out;
 
     out.taken = true; // (FL's key handler FUN_011828c0 reports any token but FREE as handled, even with no note)
     // FL's note: the table's + root + 12 x the octave offset (KbC2..KbC6 = -2..2), for every layout (FUN_011828c0)
     const auto shift = 12 * (typingpiano::clampOctave (octave) - typingpiano::defaultOctave) + typingpiano::clampRoot (root);
-    for (char* end = nullptr; *token >= '0' && *token <= '9'; token = *end == ',' ? end + 1 : end)
-        if (const auto n = (int) std::strtol (token, &end, 10) + shift; n >= 0 && n <= 127)
+    for (const auto n0 : k->notes)
+        if (const auto n = n0 + shift; n >= 0 && n <= 127)
             out.notes.push_back (n);
     return out;
 }
@@ -875,7 +1185,6 @@ namespace
 {
 // layoutKeys by PC scan code (set 1): 0x02..0x0D the number row, 0x10..0x1B the Q row, 0x1E..0x28 the A row, 0x29 `,
 // 0x2B \, 0x2C..0x35 the Z row (the gaps are Backspace / Tab, Enter / Ctrl and the left Shift)
-constexpr int firstTypingScanCode = 0x02, lastTypingScanCode = 0x35;
 constexpr char usKeyByScanCode[] = "1234567890-=\0\0QWERTYUIOP[]\0\0ASDFGHJKL;'`\0\\ZXCVBNM,./";
 static_assert (sizeof (usKeyByScanCode) - 1 == lastTypingScanCode - firstTypingScanCode + 1);
 } // namespace

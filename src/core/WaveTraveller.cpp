@@ -1,4 +1,5 @@
 #include "core/WaveTraveller.h"
+#include "core/Vfx.h"
 
 #include <algorithm>
 #include <atomic>
@@ -884,6 +885,7 @@ public:
 
     void configure (const ChannelDef& channel, double bpm) noexcept override
     {
+        voiceProps.store (channel.engineRev >= 5); // (issue #271)
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         const auto tempo = (float) (bpm > 0.0 ? bpm : 140.0);
@@ -928,6 +930,26 @@ public:
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
+
+    // Issue #271 (round 190qo): a slide note's velocity and pan move the sounding voices' Final.Vol / Final.Pan, as FL's
+    // host does for its Wave Traveller (FL 2026 /R renders, REA_rodada190qo). From engine revision 5 on.
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! voiceProps.load (std::memory_order_relaxed) || ! std::isfinite (value) || (prop != (int) vfx::Prop::velocity && prop != (int) vfx::Prop::pan))
+            return;
+        for (int slot = 0; slot < wavetrav::Engine::maxVoices; ++slot)
+        {
+            if (! engine.voiceActive (slot) || noteKey[(std::size_t) slot] != key)
+                continue;
+            if (prop == (int) vfx::Prop::velocity)
+                volFactor[(std::size_t) slot] = (float) ((std::pow (11.0, 1.28 * std::clamp ((double) value, 0.0, 1.0)) - 1.0) / 10.0);
+            else
+                notePan[(std::size_t) slot] = std::clamp (value, -1.0f, 1.0f);
+            engine.setVoiceLevels (slot, (float) (channelVol * (double) volFactor[(std::size_t) slot]),
+                                   (float) std::clamp ((double) notePan[(std::size_t) slot] + channelPan, -1.0, 1.0));
+        }
+    }
+    std::atomic<bool> voiceProps { true }; // (ChannelDef::engineRev >= 5)
 
     void noteOff (int key) noexcept override
     {

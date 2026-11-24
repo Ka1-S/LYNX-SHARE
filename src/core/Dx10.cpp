@@ -1,5 +1,6 @@
 #include "core/Dx10.h"
 #include "core/HostSlide.h"
+#include "core/Vfx.h"
 #include "core/FlVoiceProcessor.h"
 
 #include <algorithm>
@@ -564,6 +565,7 @@ public:
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
+        voiceProps.store (channel.engineRev >= 5);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
         if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo)
@@ -656,6 +658,33 @@ public:
                 engine.release (slot);
         }
     }
+
+    // Issue #271 (round 190qo): a slide note's velocity and pan move the sounding voices' Final.Vol / Final.Pan, as FL's
+    // host does for its DX10 (FL 2026 /R renders, REA_rodada190qo: velocity 100 sliding to 10 ends at the velocity-10
+    // level). From engine revision 5 on (a project saved before plays as it did).
+    void voiceProperty (int key, int prop, float value) noexcept override
+    {
+        if (! voiceProps.load (std::memory_order_relaxed) || ! std::isfinite (value))
+            return;
+        for (int i = 0; i < engine.count; ++i)
+        {
+            const auto slot = engine.order[(std::size_t) i];
+            auto& v = engine.voices[(std::size_t) slot];
+            if (v.key != std::clamp (key, 0, 127) || v.released)
+                continue;
+            if (prop == (int) vfx::Prop::velocity)
+            {
+                volFactor[(std::size_t) slot] = (float) ((std::pow (11.0, 1.28 * std::clamp ((double) value, 0.0, 1.0)) - 1.0) / 10.0);
+                v.fvol = (float) (channelVol * (double) volFactor[(std::size_t) slot]);
+            }
+            else if (prop == (int) vfx::Prop::pan)
+            {
+                notePan[(std::size_t) slot] = std::clamp (value, -1.0f, 1.0f);
+                v.fpan = (float) std::clamp ((double) notePan[(std::size_t) slot] + channelPan, -1.0, 1.0);
+            }
+        }
+    }
+    std::atomic<bool> voiceProps { true }; // (ChannelDef::engineRev >= 5)
 
     bool idle() const noexcept override { return engine.count == 0; }
 

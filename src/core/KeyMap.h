@@ -9,6 +9,7 @@
 // Modified chords (Ctrl/Alt), F-keys and the non-printable keys (Space, Enter, arrows, Delete...)
 // always work.
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -107,6 +108,27 @@ struct TypingKey
     std::vector<int> notes;
     bool taken = false;
 };
+
+// Issue #270 (round 190qo): more layouts after FL's. LYNX adds "+ Chords" (the number row plays the scale's triads, the
+// letters single notes) and "Chordmap" layouts for FL's seven-note scales that FL ships without them (Minor Melodic,
+// Minor Harmonic, Dorian...), made by the rule FL's own Major / Minor Natural chord files follow; and, as FL does, the
+// user's own .scr files (FL's "Typing to piano" folders and LYNX's), listed after them.
+namespace typingpiano
+{
+    enum class Source { fl, lynx, user };
+    Source layoutSource (int layout) noexcept;
+    std::string layoutFolder (int layout); // a user file's sub folder ("" at the top of its folder)
+    struct UserLayout
+    {
+        std::string name, folder, text; // the file's name without .scr, its sub folder, its contents
+    };
+    // Puts these files after the built-in layouts (replacing the ones set before). A file named as a built-in layout
+    // in the same place is left out; one that has no readable key too. Message thread.
+    void setUserLayouts (const std::vector<UserLayout>& files);
+    // FL's .scr text -> the keys, by layoutKeys' order (47 keys). False when no line sets a note or a LOCK.
+    bool parseScr (const std::string& text, std::array<TypingKey, 47>& keys);
+    std::string chordRuleCheck(); // "OK" when LYNX's rule gives FL's own chord layouts back (tests, --selftest)
+}
 TypingKey typingPianoKey (int key, int octave, int root, int layout);
 std::vector<int> typingPianoNotes (int key, int octave, int root, int layout); // typingPianoKey().notes
 

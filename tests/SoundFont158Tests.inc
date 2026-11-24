@@ -241,10 +241,11 @@ TEST (soundfont158_velocity_layers_and_presets)
     CHECK (std::abs (loud / soft - 0.8f / 0.5f) < 0.03f); // layer amplitudes 0.5 and 0.8
     // the second preset plays its own samples (half the level)
     CHECK (std::abs (level (1, 0.9f) / loud - 0.5f) < 0.02f);
-    // the SoundFont velocity curve: 40·log10(v) dB
+    // the SoundFont velocity curve: FL's SoundFont Player's 15·log10(v) dB (round 190qo, issue #271: engine revision 5;
+    // before, the SF2 curve's 40·log10(v) dB)
     rig.set (lynx::sf::pVelocityCurve, 0);
     const auto part = level (0, 0.6f), full = level (0, 1.0f); // (both in the loud layer)
-    const auto half = part, expect = std::pow ((float) std::lround (0.6f * 127.0f) / 127.0f, 2.0f);
+    const auto half = part, expect = std::pow (0.6f, 0.75f);
     CHECK (std::abs (half / full - expect) < 0.02f);
     // a program change (MIDI) picks the preset too
     const std::uint8_t pc[2] { 0xC0, 1 };

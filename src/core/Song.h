@@ -1059,7 +1059,9 @@ struct ChannelDef
     // Harmor 3 (round 190pr): automation of its filter frequencies and Mod X / Y / Z moves them as in FL (before: ignored).
     // 3x Osc 4 (round 190py): FL's automation of its parameters and the channel's voice-processor values (filter cut /
     // res, envelopes; threeosc::isFlTarget) moves them as in FL (before: ignored).
-    int engineRev = 4;
+    // SoundFont 5 (round 190qo, issue #271): a slide note moves the sounding notes' velocity and pan, as FL's SoundFont
+    // Player does (before: the pitch only).
+    int engineRev = 5;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
     float swingMix = 1.0f;   // how much of the global swing applies to this channel (0..1), as in FL

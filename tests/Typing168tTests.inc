@@ -50,9 +50,12 @@ TEST (typing_fl_layouts_from_scr_files)
 {
     using namespace lynx::keys;
     namespace tp = typingpiano;
-    CHECK (tp::layoutCount() == 31); // FL's 31 files (round 169f: Performance mode too)
+    int fl = 0;
+    for (int i = 0; i < tp::layoutCount(); ++i)
+        fl += tp::layoutSource (i) == tp::Source::fl ? 1 : 0;
+    CHECK (fl == 31); // FL's 31 files (round 169f: Performance mode too; round 190qo: LYNX's chord layouts follow them)
     CHECK (std::string (tp::layoutName (0)) == "Layout FPC (C4)" && std::string (tp::layoutName (tp::pianoLayout())) == "Layout Piano");
-    CHECK (tp::layoutIndex ("Major") >= 0 && tp::layoutIndex ("nope") == tp::pianoLayout() && std::string (tp::layoutName (99)).empty());
+    CHECK (tp::layoutIndex ("Major") >= 0 && tp::layoutIndex ("nope") == tp::pianoLayout() && std::string (tp::layoutName (999)).empty());
 
     // Piano: FL's Layout Piano.scr (round 169f; K is LOCK there)
     const auto piano = tp::pianoLayout();
@@ -87,7 +90,7 @@ TEST (typing169f_fl_layout_piano_free_lock_and_performance)
     // FL's menu order: by name, so "Major" before "Major + Chords"; Performance mode between Janko and Piano
     CHECK (std::string (tp::layoutName (2)) == "Layout Performance mode" && tp::performanceLayout() == 2 && tp::pianoLayout() == 3);
     CHECK (tp::layoutIndex ("Major") + 1 == tp::layoutIndex ("Major + Chords"));
-    for (int l = 1; l < tp::layoutCount(); ++l)
+    for (int l = 1; l < tp::layoutCount() && tp::layoutSource (l) == tp::Source::fl; ++l) // (FL's; LYNX's own follow, round 190qo)
         CHECK (std::string (tp::layoutName (l - 1)) < tp::layoutName (l));
 
     // FL's Layout Piano: LYNX's two rows plus L ; , . / [ ] = ; 1 4 8 - F K ' are LOCK; A ` \ are FREE
