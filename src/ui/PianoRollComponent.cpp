@@ -6212,6 +6212,7 @@ void PianoRollComponent::touchLongPress (const juce::MouseEvent& rightClick)
 
 void PianoRollComponent::touchPan (float dx, float dy)
 {
+    settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     scrollTicks = juce::jmax (0.0, scrollTicks - (double) dx / pixelsPerTick);
     scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()), scrollY - juce::roundToInt (dy));
@@ -6221,6 +6222,7 @@ void PianoRollComponent::touchPan (float dx, float dy)
 
 void PianoRollComponent::touchPinch (float scale, juce::Point<float> centre)
 {
+    settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) keyboardWidth);
     const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * (double) scale);

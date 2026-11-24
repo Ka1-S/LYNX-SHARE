@@ -15518,6 +15518,7 @@ void PlaylistComponent::touchLongPress (const juce::MouseEvent& rightClick)
 
 void PlaylistComponent::touchPan (float dx, float dy)
 {
+    settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     scrollTicks = juce::jmax (0.0, scrollTicks - (double) dx / pixelsPerTick);
     scrollY = juce::jmax (0, scrollY - juce::roundToInt (dy));
@@ -15527,6 +15528,7 @@ void PlaylistComponent::touchPan (float dx, float dy)
 
 void PlaylistComponent::touchPinch (float scale, juce::Point<float> centre)
 {
+    settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) headerWidth);
     const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * (double) scale);
