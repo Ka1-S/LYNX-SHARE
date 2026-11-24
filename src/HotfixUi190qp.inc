@@ -152,6 +152,19 @@
     };
     std::unique_ptr<HotfixUi190qpDriver> hotfixUi190qp;
 
+    // the shown window whose name contains `token` (on the desktop, or docked inside the main window). A function of its
+    // own: the timer's steps call it after runHotfixUi190qp has returned (a recursive std::function captured by
+    // reference there dangled: the route crashed on Windows)
+    static juce::Component* hotfixUiFindIn (juce::Component& c, const juce::String& token)
+    {
+        if (c.getName().contains (token) && c.isShowing() && c.getWidth() > 20 && c.getHeight() > 20)
+            return &c;
+        for (auto* child : c.getChildren())
+            if (auto* found = hotfixUiFindIn (*child, token))
+                return found;
+        return nullptr;
+    }
+
     void runHotfixUi190qp (const juce::String& prefix, const juce::StringArray& pluginFiles)
     {
         using namespace lynx;
@@ -182,19 +195,11 @@
         st->ok = runHotfixUiAPart (st->checks) && st->ok;
 
         // the shown window whose name contains `token` (on the desktop, or docked inside the main window)
-        std::function<juce::Component* (juce::Component&, const juce::String&)> findIn = [&findIn] (juce::Component& c, const juce::String& token) -> juce::Component* {
-            if (c.getName().contains (token) && c.isShowing() && c.getWidth() > 20 && c.getHeight() > 20)
-                return &c;
-            for (auto* child : c.getChildren())
-                if (auto* found = findIn (*child, token))
-                    return found;
-            return nullptr;
-        };
-        auto shownWindow = [findIn] (const juce::String& token) -> juce::Component* {
+        auto shownWindow = [] (const juce::String& token) -> juce::Component* {
             auto& d = juce::Desktop::getInstance();
             for (int i = d.getNumComponents(); --i >= 0;)
                 if (auto* c = d.getComponent (i); c != nullptr && c->isShowing())
-                    if (auto* found = findIn (*c, token))
+                    if (auto* found = hotfixUiFindIn (*c, token))
                         return found;
             return nullptr;
         };
