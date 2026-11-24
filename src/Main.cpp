@@ -9778,7 +9778,7 @@ private:
                 juce::MemoryBlock bytes;
                 std::int32_t channels = 0;
                 std::int64_t frames = 0;
-                for (int tries = 0; tries < 200 && str == juce::File() && stretched != nullptr; ++tries)
+                for (int tries = 0; tries < 600 && str == juce::File() && stretched != nullptr; ++tries) // (rollup 0.1.32 step 2: up to 30 s — the writer thread queues behind the self-test's other cache writes; 10 s ran out once under load)
                 {
                     juce::Thread::sleep (50);
                     for (const auto& f : cache.findChildFiles (juce::File::findFiles, false, "*.str"))
@@ -9799,7 +9799,8 @@ private:
                 const auto acceptedBy0131 = frames > 0 && (channels == 1 || channels == 2)
                                             && (juce::int64) bytes.getSize() == 32 + frames * channels * (juce::int64) sizeof (float);
                 if (stretched == nullptr || ! stretched->isStereo() || str == juce::File())
-                    rollup032Result = "ERROR stretch cache: nothing written";
+                    rollup032Result = juce::String ("ERROR stretch cache: nothing written (")
+                                      + (stretched == nullptr ? "no copy" : ! stretched->isStereo() ? "the copy is mono" : "no new .str in 30 s") + ")";
                 else if (channels != -2 || frames != (std::int64_t) stretched->frames() || (juce::int64) bytes.getSize() != 32 + frames * (juce::int64) sizeof (float)
                          || std::memcmp (static_cast<const char*> (bytes.getData()) + 32, stretched->leftData(), (std::size_t) frames * sizeof (float)) != 0
                          || std::memcmp (stretched->leftData(), stretched->rightData(), (std::size_t) frames * sizeof (float)) != 0)
