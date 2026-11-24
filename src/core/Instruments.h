@@ -187,6 +187,10 @@ public:
     virtual void settleNew() {}
     // Control output ("controller" instruments), 0..1. Audio thread.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
+    // Round 190qz: whether that output has sent a value yet. FL's controllers send a value to their links only when it
+    // changes, so before the first one the target keeps its own value (an Envelope Controller before its first note:
+    // REA_rodada162e, "sent only when it changes"). The rack then leaves the target alone (an automation value of NaN).
+    virtual bool controlSent (int /*output*/) const noexcept { return true; }
     // the program the instrument plays when a note can select it (Transistor Bass's sequencer: the note's key), −1
     // otherwise; the editor follows it as FL's does (round 169g2)
     virtual int selectedProgram() const noexcept { return -1; }

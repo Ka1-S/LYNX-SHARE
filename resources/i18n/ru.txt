@@ -12730,3 +12730,4 @@ countries: ru by kz
 "Number of effect slots on new mixer tracks" = "Число слотов эффектов у новых дорожек микшера"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "В этой версии 10 слотов эффектов на инсерт: эффекты в слотах после 10-го не сохраняются: {0}"
 "This insert has no free slot ({0} effects)" = "В этом инсерте нет свободного слота ({0} эффектов)"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "В этой версии связи Peak Controller и Envelope Controller задают свои цели с самого начала, ещё до того, как контроллер отправит значение: {0}"

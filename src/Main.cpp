@@ -8838,7 +8838,7 @@ private:
                 else if (back->remoteMappings.size() != 1 || back->remoteMappings[0].action != lynx::RemoteAction::play
                          || countOf (copy, "{0} key / MIDI mapping(s) of Overdub") != 1 || detailOf (copy, "{0} key / MIDI mapping(s) of Overdub") != "1")
                     rollup031s5Result = juce::String ("ERROR gap190og's transport mappings in the copy for ") + release;
-                else if (copy.json.contains ("smartDisable") || back->channels[(std::size_t) synthIndex].smartDisable || song.mixer[2].effects.back().engineRev != 2
+                else if (copy.json.contains ("smartDisable") || back->channels[(std::size_t) synthIndex].smartDisable || song.mixer[2].effects.back().engineRev < 2 // (round 190qz: 3 is current)
                          || backEmberRev != (is130 ? 1 : 0))
                     rollup031s5Result = juce::String ("ERROR 190ok's smart disable / engine revision in the copy for ") + release + " (rev " + juce::String (backEmberRev) + ")";
                 else if (back->automations != song.automations)
@@ -9451,8 +9451,8 @@ private:
             const auto rels = lynx::olderlynx::releases();
             if (oscParam < 0)
                 rollup032Result = "ERROR set-up: no 3x Osc FL target";
-            else if (song.channels[(std::size_t) first].engineRev != 4)
-                rollup032Result = "ERROR set-up: a new channel is not at revision 4";
+            else if (song.channels[(std::size_t) first].engineRev < 4) // (round 190qz: 6 is current)
+                rollup032Result = "ERROR set-up: a new channel is not at revision 4 or later";
             else if (rels.size() != 4 || rels[0] != "0.1.31" || rels[1] != "0.1.30" || rels[2] != "0.1.28" || rels[3] != "0.1.27")
                 rollup032Result = "ERROR the release list: " + rels.joinIntoString (" ");
             for (const auto* release : { "0.1.31", "0.1.30", "0.1.28" })

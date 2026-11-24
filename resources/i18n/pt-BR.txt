@@ -12864,3 +12864,4 @@ countries: br
 "Number of effect slots on new mixer tracks" = "Número de slots de efeito nas novas trilhas do mixer"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Esta versão tem 10 slots de efeito por insert: os efeitos nos slots depois do 10 ficam de fora: {0}"
 "This insert has no free slot ({0} effects)" = "Este insert não tem slot livre ({0} efeitos)"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "Nesta versão, os links do Peak Controller e do Envelope Controller ajustam seus alvos desde o início, antes de o controlador enviar um valor: {0}"

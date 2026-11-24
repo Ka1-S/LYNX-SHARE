@@ -12730,3 +12730,4 @@ countries: jp
 "Number of effect slots on new mixer tracks" = "新しいミキサートラックのエフェクトスロット数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "このバージョンのエフェクトスロットはインサートあたり 10 個です。スロット 10 より後のエフェクトは含まれません: {0}"
 "This insert has no free slot ({0} effects)" = "このインサートには空きスロットがありません（エフェクト {0} 個）"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "このリリースでは、Peak Controller と Envelope Controller のリンクはコントローラーが値を送る前から、最初からターゲットを設定します: {0}"

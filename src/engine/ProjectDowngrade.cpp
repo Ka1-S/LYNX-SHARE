@@ -2382,6 +2382,8 @@ void toRelease0130 (juce::var& root, Losses& lost)
 //   3 (revision 4 changes only that 3x Osc automation, so every channel plays the same in 0.1.31);
 // - round 190py-khs: Effector's hidden Kilohearts laws 50 Flanger, 51 Dual Delay, 52 Ensemble (0.1.31 reads codes 41 … 49
 //   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them.
+// - round 190qz: Peak / Envelope Controller links before the controller's first value (a line), EffectSlot::engineRev 3
+//   written at 2 (revision 3 changes only the Peak Controller's first value).
 // Not in projects, so nothing to change here: round 190px's caches (a stretched copy with identical channels has header
 // channels −2, which 0.1.31 refuses and stretches again; the stream cache's .R.same marker leaves no .R.pcm, which 0.1.31
 // takes for a missing cache and decodes again), 190qh's views (ui-options), Touch mode (ui-options), the new-track slot
@@ -2450,6 +2452,41 @@ void toRelease0131 (juce::var& root, Losses& lost)
         if (! flangerDelay.isEmpty())
             lost.push_back ({ TR_NOOP ("Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}"),
                               listOf (flangerDelay), true });
+    }
+
+    // round 190qz: a Peak Controller (EffectSlot::engineRev 3) or an Envelope Controller (ChannelDef::engineRev 6) leaves its
+    // links' targets at their own values until it sends its first value, as FL's do; 0.1.31 sends 0 / the output's base from
+    // the start. A line naming the controllers that have links; the slots are written at revision 2 (the channels at 3
+    // below), so the copy plays the same in newer LYNX.
+    {
+        juce::StringArray controllers;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+            {
+                const auto& src = a["source"];
+                if (! src.isArray() || src.size() < 4)
+                    continue;
+                const int track = src[0], slot = src[1], channel = src[3];
+                if (channel >= 0)
+                {
+                    const auto& c = root["channels"][channel];
+                    if (c.isObject() && c["instrument"].toString() == "controller" && (int) c["engineRev"] >= 6)
+                        addOnce (controllers, channelName (c, channel));
+                }
+                else if (track >= 0 && slot >= 0)
+                {
+                    const auto& e = root["mixer"][track]["effects"][slot];
+                    if (e.isObject() && e["kind"].toString() == "peakController" && (int) e["engineRev"] >= 3)
+                        addOnce (controllers, insertName (root["mixer"], track));
+                }
+            }
+        if (! controllers.isEmpty())
+            lost.push_back ({ TR_NOOP ("Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}"),
+                              listOf (controllers), true });
+        forEachEffect (root, [] (juce::DynamicObject& e, const juce::String&) {
+            if ((int) e.getProperty ("engineRev") > 2)
+                e.setProperty ("engineRev", 2);
+        });
     }
 
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {

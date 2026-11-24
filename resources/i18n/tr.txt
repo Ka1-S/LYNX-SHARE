@@ -12730,3 +12730,4 @@ countries: tr
 "Number of effect slots on new mixer tracks" = "Yeni mikser kanallarındaki efekt slotu sayısı"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Bu sürümde insert başına 10 efekt slotu var: 10. slottan sonraki efektler dışarıda kalır: {0}"
 "This insert has no free slot ({0} effects)" = "Bu insertte boş slot yok ({0} efekt)"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "Bu sürümde Peak Controller ve Envelope Controller bağlantıları, denetleyici bir değer göndermeden önce hedeflerini en baştan ayarlar: {0}"

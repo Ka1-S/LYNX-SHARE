@@ -173,6 +173,9 @@ public:
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Control output ("controller" effects such as the Peak Controller), 0..1. Read every block.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
+    // Round 190qz: whether that output has sent a value yet (Instrument::controlSent: a Peak Controller that has not
+    // processed a block — its slot bypassed from the start — sends nothing, so the target keeps its own value)
+    virtual bool controlSent (int /*output*/) const noexcept { return true; }
     // Whether an editor shows this slot's live meters now (round 190gp; the renderer tells a slot with live meters before
     // each block, ProcessTimes::metersWanted). A meter that costs CPU and is only shown (Apex Limiter's loudness and
     // true-peak meter) may stop while none does. Never called: shown.

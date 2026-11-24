@@ -12730,3 +12730,4 @@ countries: kr
 "Number of effect slots on new mixer tracks" = "새 믹서 트랙의 이펙트 슬롯 수"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "이 버전은 인서트당 이펙트 슬롯이 10개입니다. 10번 이후 슬롯의 이펙트는 빠집니다: {0}"
 "This insert has no free slot ({0} effects)" = "이 인서트에는 빈 슬롯이 없습니다 (이펙트 {0}개)"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "이 릴리스에서는 Peak Controller와 Envelope Controller 링크가 컨트롤러가 값을 보내기 전부터 처음부터 대상을 설정합니다: {0}"

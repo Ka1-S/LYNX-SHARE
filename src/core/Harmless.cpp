@@ -1065,6 +1065,9 @@ public:
     }
 
     // velocity 0…1 (FL velocity / 128); volFactor: Final.Vol / channel volume; pan: note pan; pitchOffset: cents
+    // the next note's Final.FCut / FRes (−1…1; round 190qz: the note's Mod X / Y), taken by its records
+    double nextFcut = 0.0, nextFres = 0.0;
+
     int noteOn (int key, double velocity, double volFactor, double channelVol, double notePan, double channelPan,
                 double pitchOffset) noexcept
     {
@@ -1616,7 +1619,9 @@ private:
         v.pluckDecay.fill (1.0f), v.pluckInit = 0, v.pluckDirty = true;
         v.trem = P.tremM;
         v.lrInit = false;
-        v.finalFcut = 0.0, v.finalFres = 0.0; // LYNX notes carry no Mod X / Mod Y
+        // the note's Mod X / Y as FL's Final.FCut / FRes (round 190qz, ChannelDef::engineRev 6 on: nextFcut / nextFres;
+        // 0 before, as LYNX's notes had none)
+        v.finalFcut = nextFcut, v.finalFres = nextFres;
         v.nacc = 0.0;
         v.seed = seed, v.nseed = seed, v.rnd = rnd;
         v.lf0 = v.f0 = v.pos = v.ph70 = v.phPh = 0.0;
@@ -2352,7 +2357,7 @@ Settings defaultSettings() noexcept
 // vol = 0.75·(3^x36 − 1)/2·(Final.Vol + offset)·unison gain. LYNX's channel gains are gl = √2·V·cos((1 + p)π/4),
 // gr = √2·V·sin(…), so V = √((gl² + gr²)/2) and p are recovered exactly and FL's law is applied once (the channel
 // volume and pan are not applied a second time). Velocity = LYNX velocity (FL velocity / 128). Mod X/Y
-// (Final.FCut/FRes) are 0: LYNX notes have none. Host events 4/5 (release velocity, release-time factor) are
+// (Final.FCut/FRes): the note's own from engine revision 6 (round 190qz), 0 before. Host events 4/5 (release velocity, release-time factor) are
 // answered with 0 and 1, as in the reference.
 //
 // Quality: the editor's "quality" combo (state integer, 0 or 1) is used for both playback and export — LYNX's engine
@@ -2390,6 +2395,7 @@ public:
                 s.raw[i] = std::isfinite (channel.modelParams[i]) ? channel.modelParams[i] : 0.0f;
         s.bpm = bpm > 0.0 ? bpm : 120.0;
         s.pitchCents = channel.sampler.pitch * 100.0f;
+        noteModulation.store (channel.engineRev >= 6);
         const auto& mp = channel.modelParams;
         if (mp.size() > (std::size_t) harmlessCompIndex)
         {
@@ -2417,6 +2423,15 @@ public:
     {
         nextPan = pan;
         nextCents = cents;
+    }
+
+    // round 190qz (ChannelDef::engineRev 6 on): the note's Mod X / Y (0…1, 0.5 = centre) reach its voice as FL's
+    // Final.FCut / FRes, (b − 128) / 128 of FL's byte (REA_rodada76 §1), which the engine adds to the filter's cutoff and
+    // resonance (§1.15). Before revision 6: 0, as before
+    void setNextNoteModulation (float modX, float modY) noexcept override
+    {
+        nextModX = modX;
+        nextModY = modY;
     }
 
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
@@ -2457,10 +2472,17 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         // VEL → volume (p37): Final.Vol = chan.Vol·Init.Vol when on, chan.Vol when off
         const auto volFactor = engine.P.p[37] > 0 ? (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0 : 1.0;
+        if (noteModulation.load (std::memory_order_relaxed))
+        {
+            engine.nextFcut = (double) std::clamp (nextModX, 0.0f, 1.0f) * 2.0 - 1.0;
+            engine.nextFres = (double) std::clamp (nextModY, 0.0f, 1.0f) * 2.0 - 1.0;
+        }
+        nextModX = nextModY = 0.5f;
         const auto index = engine.noteOn (key, vel, volFactor, channelVol, (double) nextPan, channelPan,
                                           (double) settings.pitchCents + (double) nextCents);
         engine.anchorNote (index, live.ref (settings.pitchCents));
         engine.setLynxNote (index, startingNoteId());
+        engine.nextFcut = engine.nextFres = 0.0;
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -2591,6 +2613,8 @@ private:
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, songTicks = -1.0;
     long long sinceTicks = 0;
     float nextPan = 0.0f, nextCents = 0.0f;
+    float nextModX = 0.5f, nextModY = 0.5f;
+    std::atomic<bool> noteModulation { false };
     LiveChannelPitch live; // (audio thread)
 };
 } // namespace

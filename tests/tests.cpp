@@ -18097,6 +18097,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlParity190prTests.inc" // round 190pr: Harmor automation, FL song-start values of Harmor / Sytrus / FL effects
 #include "PatcherXyz190ptTests.inc" // round 190pt: Patcher Control Surface / X-Y-Z links, Vocodex controls under automation
 #include "Parity190pyTests.inc" // round 190py: channel PITCH automation, Gross Beat automation, Love Philter / Harmless scales, 3x Osc automation
+#include "Parity190qzTests.inc" // round 190qz: Peak / Envelope Controller links before the controller's first value
 #include "Perf190osTests.inc" // round 190os: the safe-overload guard lets go at the stop and within 1 s of the overload's end
 #include "Perf190pxTests.inc" // round 190px: AVX half-band, kept minimum-phase poles, Ogg samples without spare room, render-ahead paced
 #include "NativePerf190pzTests.inc" // round 190pz: recording path (no yield while takes record, durable sync every 5 s, two-piece copies)

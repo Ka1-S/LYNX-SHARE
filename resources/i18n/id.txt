@@ -12730,3 +12730,4 @@ countries: id
 "Number of effect slots on new mixer tracks" = "Jumlah slot efek pada trek mixer baru"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Versi ini punya 10 slot efek per insert: efek di slot setelah slot 10 tidak disertakan: {0}"
 "This insert has no free slot ({0} effects)" = "Insert ini tidak punya slot kosong ({0} efek)"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "Di rilis ini, tautan Peak Controller dan Envelope Controller mengatur targetnya sejak awal, sebelum controller mengirim nilai: {0}"

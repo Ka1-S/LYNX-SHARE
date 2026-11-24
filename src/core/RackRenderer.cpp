@@ -3429,14 +3429,25 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
             continue; // (render-ahead: that unit's renderer works it out; what it drives is that renderer's too)
         // (round 190lv: a batched block's piece >= 1 holds a placeholder here, the source writes the value into the piece's
         // slot right after it rendered the piece before: runGraphRound / processBatched)
+        // (round 190qz: a source that has sent nothing yet leaves the target its own value — NaN — as FL's controllers do)
         if (src.channel >= 0)
         {
             if (src.channel < (int) state.instruments.size() && state.instruments[(std::size_t) src.channel] != nullptr)
-                automationValues[(std::size_t) a] = deferLive ? 0.0f : automation.mapLive (state.instruments[(std::size_t) src.channel]->controlOutput (src.output));
+            {
+                const auto& source = *state.instruments[(std::size_t) src.channel];
+                automationValues[(std::size_t) a] = deferLive ? 0.0f
+                                                    : source.controlSent (src.output) ? automation.mapLive (source.controlOutput (src.output))
+                                                                                      : std::numeric_limits<float>::quiet_NaN();
+            }
         }
         else if (src.track < (int) state.effects.size() && src.slot >= 0 && src.slot < (int) state.effects[(std::size_t) src.track].size()
             && state.effects[(std::size_t) src.track][(std::size_t) src.slot] != nullptr)
-            automationValues[(std::size_t) a] = deferLive ? 0.0f : automation.mapLive (state.effects[(std::size_t) src.track][(std::size_t) src.slot]->controlOutput (src.output));
+        {
+            const auto& source = *state.effects[(std::size_t) src.track][(std::size_t) src.slot];
+            automationValues[(std::size_t) a] = deferLive ? 0.0f
+                                                : source.controlSent (src.output) ? automation.mapLive (source.controlOutput (src.output))
+                                                                                  : std::numeric_limits<float>::quiet_NaN();
+        }
     }
     if (deferLive)
         pieces[(std::size_t) pieceSlot()].liveDeferred = true;
@@ -7477,8 +7488,17 @@ void RackRenderer::writeLiveValue (const RackState& state, int automation, int s
         return;
     const auto& a = state.song.automations[(std::size_t) automation];
     const auto& src = a.source;
-    value = src.channel >= 0 ? a.mapLive (state.instruments[(std::size_t) src.channel]->controlOutput (src.output))
-                             : a.mapLive (state.effects[(std::size_t) src.track][(std::size_t) src.slot]->controlOutput (src.output));
+    // (round 190qz: nothing sent yet = NaN, the target's own value)
+    if (src.channel >= 0)
+    {
+        const auto& source = *state.instruments[(std::size_t) src.channel];
+        value = source.controlSent (src.output) ? a.mapLive (source.controlOutput (src.output)) : std::numeric_limits<float>::quiet_NaN();
+    }
+    else
+    {
+        const auto& source = *state.effects[(std::size_t) src.track][(std::size_t) src.slot];
+        value = source.controlSent (src.output) ? a.mapLive (source.controlOutput (src.output)) : std::numeric_limits<float>::quiet_NaN();
+    }
 }
 
 bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept

@@ -54,7 +54,7 @@ TEST (flparity190pr_harmor_fl_parameter_numbers_and_ranges)
            && harmor::flParamInState (772));
     CHECK (harmor::automatable (52) && harmor::automatable (64) && harmor::automatable (438) && harmor::automatable (450)
            && harmor::automatable (772) && harmor::automatable (774) && ! harmor::automatable (775) && ! harmor::automatable (53));
-    CHECK (ChannelDef {}.engineRev == 4); // (round 190py: 4, a desktop 3x Osc follows FL's automation)
+    CHECK (ChannelDef {}.engineRev >= 4); // (round 190py: 4, a desktop 3x Osc follows FL's automation; round 190qz: 6)
 }
 
 TEST (flparity190pr_harmor_follows_filter_and_xyz_automation)

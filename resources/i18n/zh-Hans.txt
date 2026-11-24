@@ -12730,3 +12730,4 @@ countries: cn sg
 "Number of effect slots on new mixer tracks" = "新混音器轨道的效果槽位数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每个插入通道有 10 个效果槽位：第 10 个之后槽位中的效果将被省略：{0}"
 "This insert has no free slot ({0} effects)" = "此插入通道没有空槽（{0} 个效果）"
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "在此版本中，Peak Controller 与 Envelope Controller 的链接从一开始就设置其目标，而不等控制器发送数值：{0}"
