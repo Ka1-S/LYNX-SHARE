@@ -2007,6 +2007,17 @@ public:
             return;
         }
 
+        if (args.contains ("--feel190qetest"))
+        {
+            // LYNX --feel190qetest report.txt [shot prefix [project]] (round 190qe, TOP-NEXT R1): edge scroll, view stack, zoom
+            // glide and anchor, Restore selection, Keep labels on screen, off screen (src/Feel190qeTest.inc)
+            const auto i = args.indexOf ("--feel190qetest");
+            const auto arg = [&args] (int k) { return k < args.size() && ! args[k].startsWith ("--") ? args[k].unquoted() : juce::String(); };
+            setApplicationReturnValue (runFeel190qeTest (arg (i + 1), arg (i + 2), arg (i + 3)) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--hwheel254test"))
         {
             // LYNX --hwheel254test report.txt (round 190ou, issue #254): the horizontal wheel in the Playlist (three layouts),
@@ -9818,6 +9829,10 @@ private:
             lynx::MixerStrips::showPeakValues = keptPeaks;
             lynx::MixerStrips::showCorrelation = keptCorrelation;
         }
+        // round 190qe (TOP-NEXT R1): the edge scroll at FL's speed, the view stack, the zoom glide and anchor, Restore
+        // selection, Keep labels on screen, through the real Playlist / Piano roll off screen (src/Feel190qeTest.inc)
+        juce::String feel190qeResult;
+        runFeel190qeTest ({}, {}, {}, &feel190qeResult);
 
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
@@ -11096,7 +11111,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11212,6 +11227,7 @@ private:
                << "slots260=" << slots260Result << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
+               << "feel190qe=" << feel190qeResult << "\n"
                << "issue258=" << issue258Result << "\n"
                << "autolive190qp=" << autolive190qpResult << "\n"
                << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
@@ -16531,6 +16547,11 @@ private:
             return;
         }
 
+        // LYNX_UIPERF_STANDIN=1 (round 190qe): no audio device here (Xvfb under WSL): the self-tests' stand-in device plays the
+        // song, so the "playing" steps move (the playhead of UX-A10's check above all)
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_STANDIN", {}) == "1" && engine->getDeviceManager().getCurrentAudioDevice() == nullptr)
+            if (const auto e = engine->openStandInDevice (48000.0, 512); e.isNotEmpty())
+                std::fprintf (stderr, "uiperf: stand-in device: %s\n", e.toRawUTF8());
         // LYNX_UIPERF_MUTE=1: the Master fader down (the meters of the inserts still move): a run on a desktop someone uses
         if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_MUTE", {}) == "1")
             engine->editSong ([] (lynx::Song& s) { if (! s.mixer.empty()) s.mixer[0].volume = 0.0f; }, false);
@@ -16975,6 +16996,101 @@ private:
                                          wheelAt (ui->getPlaylistForSnapshot(), 0.0f, (f / 9) % 2 == 0 ? 0.15f : -0.15f, juce::ModifierKeys (juce::ModifierKeys::ctrlModifier));
                                  }, 120 });
         run->steps.push_back ({ "playlist after the zoom (settles)", {}, {}, 500 });
+        // round 190qe (TOP-NEXT R1): "edgescroll" — a clip held 20 px past the Playlist's right edge for 2 s: the view runs on
+        // the view's frames at FL's speed (Pattern layout: ≈ 223 px/s), so the window's frames a second are the display's rate
+        // (compare "playlist maximised, playing"); the move is undone after. "UX-A10" — the overview strip's window dragged
+        // sideways for 5 s while the song plays: the playhead drawn must move every frame (no stall, then jump, as FL's)
+        {
+            struct FeelPerf
+            {
+                double startScroll = 0.0, startMs = 0.0, ppt = 1.0;
+                juce::Point<int> press, held;
+                std::vector<double> playheads;
+                int stalls = 0, longestStall = 0, run = 0;
+            };
+            auto feel = std::make_shared<FeelPerf>();
+            auto inject = [this] (juce::Component& target, juce::Point<int> p, bool down) {
+                auto* peer = mainWindow->getPeer();
+                if (peer == nullptr)
+                    return;
+                const auto mods = down ? juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier) : juce::ModifierKeys();
+                juce::ModifierKeys::currentModifiers = mods;
+                const auto local = peer->globalToLocal (target.localPointToGlobal (p).toFloat());
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, mods, juce::MouseInputSource::defaultPressure,
+                                        juce::MouseInputSource::defaultOrientation, juce::Time::currentTimeMillis());
+            };
+            run->steps.push_back ({ "playlist edgescroll: a clip held 20 px past the right edge (2 s)", [this, ui, feel, inject] {
+                                       engine->stop();
+                                       ui->selectTabForSnapshot (2);
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       const auto grid = pl.gridAreaForSnapshot();
+                                       // the first clip at least 24 px wide fully in view
+                                       const auto& list = engine->getSong().playlist;
+                                       for (int i = 0; i < (int) list.size(); ++i)
+                                           if (const auto b = pl.clipBoundsForSnapshot (i); b.getWidth() >= 24 && grid.contains (b) && b.getHeight() >= 12)
+                                           {
+                                               feel->press = { b.getX() + 12, b.getBottom() - 4 };
+                                               break;
+                                           }
+                                       feel->held = { grid.getRight() - 1 + 20, feel->press.y };
+                                       feel->startScroll = pl.viewNowForTests().scroll;
+                                       feel->ppt = pl.viewNowForTests().pixelsPerUnit;
+                                       inject (pl, feel->press, false);
+                                       inject (pl, feel->press, true);
+                                       inject (pl, { (feel->press.x + feel->held.x) / 2, feel->press.y }, true);
+                                       inject (pl, feel->held, true);
+                                       feel->startMs = juce::Time::getMillisecondCounterHiRes();
+                                   }, {}, 2000, [this, ui, feel, inject] {
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       const auto ms = juce::Time::getMillisecondCounterHiRes() - feel->startMs;
+                                       const auto moved = (pl.viewNowForTests().scroll - feel->startScroll) * feel->ppt;
+                                       inject (pl, feel->held, false);
+                                       juce::ModifierKeys::currentModifiers = {};
+                                       engine->undo();
+                                       return "    edge scroll: " + juce::String (moved, 0) + " px in " + juce::String (ms / 1000.0, 2) + " s = "
+                                              + juce::String (ms > 0.0 ? 1000.0 * moved / ms : 0.0, 0) + " px/s (FL's law 20 px out: 223 px/s; press at "
+                                              + feel->press.toString() + ")\n";
+                                   } });
+            run->steps.push_back ({ "playlist overview drag while playing (UX-A10, 5 s)", [this, ui, feel, inject] {
+                                       ui->selectTabForSnapshot (2);
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       pl.setViewForSnapshot (64.0, 0, 0);
+                                       engine->getTransport().songMode = true;
+                                       engine->rewind();
+                                       engine->play();
+                                       auto& strip = pl.overviewForSnapshot();
+                                       const auto w = strip.windowAreaForSnapshot();
+                                       feel->press = pl.getLocalPoint (&strip, juce::Point<int> ((int) w.getCentreX(), (int) w.getCentreY()));
+                                       feel->playheads.clear();
+                                       feel->stalls = feel->longestStall = feel->run = 0;
+                                       inject (pl, feel->press, false);
+                                       inject (pl, feel->press, true);
+                                   },
+                                   [ui, feel, inject] (int f) {
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       // 2 px a frame to the right for 2.5 s, then back
+                                       const auto dx = f < 150 ? 2 * f : 2 * (300 - f);
+                                       inject (pl, feel->press.translated (dx, 0), true);
+                                       const auto now = pl.playheadTickForSnapshot();
+                                       if (! feel->playheads.empty() && now == feel->playheads.back())
+                                       {
+                                           feel->longestStall = juce::jmax (feel->longestStall, ++feel->run);
+                                           ++feel->stalls;
+                                       }
+                                       else
+                                           feel->run = 0;
+                                       feel->playheads.push_back (now);
+                                   }, 300, [this, ui, feel, inject] {
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       inject (pl, feel->press, false);
+                                       juce::ModifierKeys::currentModifiers = {};
+                                       engine->stop();
+                                       const auto ok = feel->longestStall < 2;
+                                       return "    UX-A10: " + juce::String ((int) feel->playheads.size()) + " frames, the playhead stood still on "
+                                              + juce::String (feel->stalls) + " (longest run " + juce::String (feel->longestStall) + " frames) "
+                                              + (ok ? "OK" : "STALLS") + "\n";
+                                   } });
+        }
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
@@ -21061,6 +21177,7 @@ private:
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
+#include "Feel190qeTest.inc" // round 190qe (TOP-NEXT R1): edge scroll, view stack, glide, keep labels
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
 #include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
@@ -29401,11 +29518,29 @@ private:
             }
             text << name << ", columns over the whole frame: pixels " << pixelHash() << "\n";
         };
+        // LYNX_KEEP_LABELS=0|1 (round 190qe): Playlist ▸ View ▸ "Keep labels on screen" for the whole run (A/B of the labels' cost)
+        if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_KEEP_LABELS", {}); keep.isNotEmpty())
+        {
+            lynx::keeplabels::on = keep != "0";
+            text << "keep labels on screen " << (lynx::keeplabels::on ? "on" : "off") << " (LYNX_KEEP_LABELS)\n";
+        }
         const char* views[] { "channel rack", "piano roll", "playlist", "mixer" };
         for (int v = 0; v < 4; ++v)
         {
             ui.selectTabForSnapshot (v);
             measureAll (views[v]);
+        }
+        // LYNX_PAINTBENCH_BAR=<n> (round 190qe): the Playlist once more from bar n (the same zoom), so the clips whose start is
+        // scrolled off draw their labels at the left edge ("Keep labels on screen")
+        if (const auto fromBar = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_BAR", {}).getIntValue(); fromBar > 0)
+        {
+            ui.selectTabForSnapshot (2);
+            auto& pl = ui.getPlaylistForSnapshot();
+            const auto before = pl.viewForSnapshot();
+            pl.setViewForSnapshot (before.pixelsPerTick * (double) offline.getSong().barTicks(), fromBar, 0);
+            pl.setScrollYForSnapshot (before.scrollY);
+            measureAll ("playlist from bar " + juce::String (fromBar));
+            pl.restoreViewForSnapshot (before);
         }
         ui.showDesktopForSnapshot (false);
         measureAll ("desktop");

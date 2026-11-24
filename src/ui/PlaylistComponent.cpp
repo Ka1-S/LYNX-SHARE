@@ -14,6 +14,7 @@
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
+#include "platform/Paths.h" // (round 190qe: testMode)
 #include "ui/ShotShowing.h"
 #include "core/FlSettings.h"
 #include "core/RulerGestures.h"
@@ -411,6 +412,20 @@ juce::Rectangle<float> paintFlClipFrame (juce::Graphics& g, juce::Rectangle<floa
     return band ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (title.getHeight());
 }
 
+// Round 190qe (D2-PL2, FL's Playlist ▸ View ▸ "Keep labels on screen", on by default): while the Playlist paints its
+// clips, the arrangement's left edge when the option is on (else far left): a clip that starts left of it and reaches
+// past it leaves its title to the held pass (PlaylistComponent::paintStickyTitles), which draws it at that edge
+static float heldTitleLeft = -1.0e9f;
+// LYNX_KEEP_LABELS_ALL=0 (diagnostics, A/B with one build): only what round 190ig held (the Pattern layout's audio and
+// automation clips), for the paint gate's measure of what this round adds
+static bool heldEveryClip()
+{
+    static const bool all = [] { const auto* v = std::getenv ("LYNX_KEEP_LABELS_ALL"); return v == nullptr || juce::String (v) != "0"; }();
+    return all;
+}
+void paintClipFrameTitle (juce::Graphics& g, juce::Rectangle<float> title, float width, juce::Colour header, const juce::String& name, ClipGlyph glyph,
+                          bool muted, const theme::ClipLook* look);
+
 // The FL header's glyph and name, drawn after the content: the glyph from 16 px wide, the name from 34 px with FL's middle
 // ellipsis (FM-27, FM-14: FL keeps both on narrow clips). A muted clip leaves the glyph's place to its X (paintMutedVeil).
 void paintFlClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name, ClipGlyph glyph,
@@ -494,21 +509,32 @@ juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float>
         g.setColour (theme::colour::bg0.withAlpha (0.35f)); // the header's lower edge
         g.fillRect (title.getX(), title.getBottom() - 1.0f, title.getWidth(), 1.0f);
 
-        if (r.getWidth() > 18.0f && title.getHeight() >= 9.0f)
-        {
-            auto text = title.withTrimmedLeft (3.0f).withTrimmedRight (2.0f);
-            if (muted)
-                text.removeFromLeft (13.0f);
-            else if (r.getWidth() >= 40.0f) // room for the glyph (where the clip menu opens)
-                paintClipGlyph (g, text.removeFromLeft (13.0f), glyph, (look != nullptr ? look->ink : clipTitleText (header)).withMultipliedAlpha (0.8f));
-            const uitrace::Part tallyTitle (uitrace::part::title);
-            g.setColour (look != nullptr ? look->ink : clipTitleText (header));
-            g.setFont (font (type::caption, true));
-            textcache::drawText (g, name, text.withTrimmedLeft (2.0f).toNearestInt(), juce::Justification::centredLeft, true);
-        }
+        // (round 190qe, "Keep labels on screen": a clip whose start is scrolled off gets its title in the held pass,
+        // PlaylistComponent::paintStickyTitles, at the view's left edge)
+        if (! (r.getX() < heldTitleLeft && r.getRight() > heldTitleLeft) || muted || ! heldEveryClip())
+            paintClipFrameTitle (g, title, r.getWidth(), header, name, glyph, muted, look);
     }
 
     return r.withTrimmedTop (title.getHeight());
+}
+
+// paintClipFrame's glyph and name in the header band `title` of a clip `width` px wide (round 190qe: also a held title)
+void paintClipFrameTitle (juce::Graphics& g, juce::Rectangle<float> title, float width, juce::Colour header, const juce::String& name, ClipGlyph glyph,
+                          bool muted, const theme::ClipLook* look)
+{
+    using namespace theme;
+    if (width > 18.0f && title.getHeight() >= 9.0f)
+    {
+        auto text = title.withTrimmedLeft (3.0f).withTrimmedRight (2.0f);
+        if (muted)
+            text.removeFromLeft (13.0f);
+        else if (width >= 40.0f) // room for the glyph (where the clip menu opens)
+            paintClipGlyph (g, text.removeFromLeft (13.0f), glyph, (look != nullptr ? look->ink : clipTitleText (header)).withMultipliedAlpha (0.8f));
+        const uitrace::Part tallyTitle (uitrace::part::title);
+        g.setColour (look != nullptr ? look->ink : clipTitleText (header));
+        g.setFont (font (type::caption, true));
+        textcache::drawText (g, name, text.withTrimmedLeft (2.0f).toNearestInt(), juce::Justification::centredLeft, true);
+    }
 }
 
 // A muted clip, as in FL Studio: the whole clip dims, its waveform or notes still readable, and an X takes the glyph's place.
@@ -907,15 +933,18 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
     {
         shift.area = { headerWidth, rulerTop, grid.getRight() - headerWidth, grid.getBottom() - rulerTop };
         shift.alsoChanged = { headerWidth, grid.getBottom(), grid.getWidth(), getHeight() - grid.getBottom() }; // (the pattern blocks)
-        if (flClipLook()) // round 190ig: FL's titles held at the left edge; only their header bands are painted again
+        // round 190ig: FL's titles held at the left edge; only their header bands are painted again (round 190qe: FL's
+        // "Keep labels on screen", every layout and clip kind, while the option is on)
+        if (keeplabels::on)
         {
             const auto& song = engine.getSong();
             const auto left = (float) grid.getX();
+            const auto fl = flClipLook();
             const auto titleFont = theme::font (theme::type::caption, true);
             juce::Rectangle<int> titles;
             for (const auto& c : song.playlist)
             {
-                if (c.kind == ClipKind::pattern || c.muted || c.track < 0)
+                if (c.muted || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
                     continue;
                 const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
                 if (((x0 < left) == (x0 - (float) dx < left)) || x1 - x0 < 16.0f) // (only a start that crosses the edge now)
@@ -924,7 +953,8 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                 if (y > grid.getBottom() || y + h < grid.getY() || juce::jmax (x1, x1 - (float) dx) <= left || noteedit::isFoldedAway (song, c.track))
                     continue;
                 const auto* name = c.kind == ClipKind::audio ? (c.channel >= 0 && c.channel < (int) song.channels.size() ? &song.channels[(std::size_t) c.channel].name : nullptr)
-                                                             : (c.automation >= 0 && c.automation < (int) song.automations.size() ? &song.automations[(std::size_t) c.automation].name : nullptr);
+                                   : c.kind == ClipKind::automation ? (c.automation >= 0 && c.automation < (int) song.automations.size() ? &song.automations[(std::size_t) c.automation].name : nullptr)
+                                                                    : (c.pattern >= 0 && c.pattern < (int) song.patterns.size() ? &song.patterns[(std::size_t) c.pattern].name : nullptr);
                 if (name == nullptr)
                     continue;
                 // (the picture holds a clip's title only while its start is in view; a start that crosses the edge in this step
@@ -934,7 +964,9 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                     continue;
                 const auto reach = 22.0f + (float) std::abs (dx) + juce::GlyphArrangement::getStringWidth (titleFont, juce::String::fromUTF8 (name->c_str()));
                 const auto r = clipRectAt (x0, x1, (float) y, h);
-                const auto bandHeight = r.getHeight() + 1.0f < (float) flBandBelow ? juce::jmin (r.getHeight(), 15.0f) : flHeaderHeight (r);
+                const auto bandHeight = ! fl                                   ? (liveArrangeLook() ? juce::jmin (r.getHeight(), (float) liveStripHeight) : clipHeaderHeight (r))
+                                        : r.getHeight() + 1.0f < (float) flBandBelow ? juce::jmin (r.getHeight(), 15.0f)
+                                                                                      : flHeaderHeight (r);
                 const auto bandArea = juce::Rectangle<float> (left, r.getY(), reach, bandHeight).getSmallestIntegerContainer().getIntersection (grid);
                 // round 190im (perf, the scroll frames where a start crosses the edge: 9.4 → 11.0 ms in round 190ig): the band
                 // is the clip's own opaque header, so painting that one clip there gives the exact pixels, without a whole
@@ -943,7 +975,7 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                 const auto band = bandArea.getIntersection (r.withRight (juce::jmin (r.getRight(), x1)).getSmallestIntegerContainer());
                 const auto& index = song.playlist;
                 const auto i = (int) (&c - index.data());
-                auto alone = ! band.isEmpty() && r.getWidth() >= SmallClips::maxWidth && drag == Drag::none && hover.clip != i && rubberBand.isEmpty()
+                auto alone = fl && c.kind != ClipKind::pattern && ! band.isEmpty() && r.getWidth() >= SmallClips::maxWidth && drag == Drag::none && hover.clip != i && rubberBand.isEmpty()
                              && song.performanceZoneEnd() <= 0 && ! engine.isLiveRecording();
                 for (int k = 0; alone && k < (int) index.size(); ++k)
                     if (const auto& o = index[(std::size_t) k]; k != i && o.track == c.track
@@ -2007,6 +2039,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
     if (insertMarkTrack >= 0 || insertMarkLine.isVisible()) // round 190mk (DL-70)
         updateInsertMarkLine();
 
+    heldTitleLeft = keeplabels::on ? (float) gridArea().getX() : -1.0e9f; // (round 190qe: "Keep labels on screen")
     const auto& song = engine.getSong();
     const auto grid = gridArea();
     const auto bar = song.barTicks();
@@ -3310,14 +3343,19 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 // its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
 void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 {
-    if (! flClipLook())
+    // round 190qe (D2-PL2): FL's Playlist ▸ View ▸ "Keep labels on screen" (on by default) — every layout's arrangement and
+    // every clip kind (FL holds the pattern clips' labels too, verify_190qc shot 06); off: the titles go with the clips
+    if (! keeplabels::on)
         return;
+    heldTitleLeft = (float) gridArea().getX();
     const auto grid = gridArea();
     const auto left = (float) grid.getX();
     const juce::Graphics::ScopedSaveState state (g);
     if (! g.reduceClipRegion (grid) || ! g.getClipBounds().intersects (juce::Rectangle<int> (grid.getX(), grid.getY(), (int) flStickyTitleMax, grid.getHeight())))
         return;
     const auto& song = engine.getSong();
+    const auto fl = flClipLook();
+    const auto live = liveArrangeLook();
     // the clips that cross the left edge, found again only when the view or the song changed (a frame of a scroll or of
     // the playhead draws the same few)
     const HeldTitlesKey key { scrollTicks, pixelsPerTick, scrollY, engine.getPublishCount(), song.playlist.size(), grid };
@@ -3328,11 +3366,15 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
         for (int i = 0; i < (int) song.playlist.size(); ++i)
         {
             const auto& c = song.playlist[(std::size_t) i];
-            if (c.kind == ClipKind::pattern || c.muted || c.track < 0)
+            if (c.muted || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
                 continue;
             if (const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end()); x0 >= (double) left || x1 <= (double) left || x1 - (double) left < 16.0)
                 continue;
             if (const auto y = trackToY (c.track); y > grid.getBottom() || y + heightOf (c.track) < grid.getY() || noteedit::isFoldedAway (song, c.track))
+                continue;
+            if (c.kind == ClipKind::automation && live && projection.isChild (c.track) && c.gridSlot < 0) // (a Live lane: no block)
+                continue;
+            if (const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end()); x1 - x0 < SmallClips::maxWidth) // (drawn without a title)
                 continue;
             heldTitles.push_back (i);
         }
@@ -3346,21 +3388,59 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
         const auto y = trackToY (c.track), h = heightOf (c.track);
         if (y > grid.getBottom() || y + h < grid.getY())
             continue;
-        auto r = clipRectAt (x0, x1, (float) y, h);
-        r = r.withRight (juce::jmin (r.getRight(), left + flStickyTitleMax)); // (a held title is at most this wide)
+        const auto whole = clipRectAt (x0, x1, (float) y, h);
+        auto r = whole.withRight (juce::jmin (whole.getRight(), left + flStickyTitleMax)); // (a held title is at most this wide)
         const auto band = r.getHeight() + 1.0f < (float) flBandBelow;
-        if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+        // FL's look (Pattern layout): the audio and automation clips' FL header
+        if (fl && c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
         {
             const auto& channel = song.channels[(std::size_t) c.channel];
             const auto look = theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint);
             paintFlClipTitle (g, r, look, juce::String::fromUTF8 (channel.name.c_str()), ClipGlyph::audio, false, band, left, true);
+            continue;
         }
-        else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+        if (fl && c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
         {
             const auto& automation = song.automations[(std::size_t) c.automation];
             const auto look = theme::clipBody (juce::Colour (automation.colour), trackColourIn (song, c.track), ClipKind::automation, theme::ClipStyle::flTint);
             paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, false, band, left, true);
+            continue;
         }
+        // the name each layout's painter shows (paintClipFrame, paintLiveClipFrame)
+        juce::String name;
+        ClipGlyph glyph = ClipGlyph::pattern;
+        juce::Colour base;
+        if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+        {
+            name = juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].name.c_str());
+            glyph = ClipGlyph::audio;
+            base = audioClipColour (song.channels[(std::size_t) c.channel]);
+        }
+        else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+        {
+            const auto& automation = song.automations[(std::size_t) c.automation];
+            name = juce::String::fromUTF8 (automation.name.c_str());
+            glyph = ClipGlyph::automation;
+            base = automation.target.kind == AutomationTargetKind::none ? theme::colour::textDisabled
+                                                                         : theme::colour::automation.withMultipliedSaturation (0.75f).withMultipliedBrightness (0.8f);
+        }
+        else if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
+        {
+            name = juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str());
+            base = theme::tame (patternColour (song, c.pattern));
+        }
+        else
+            continue;
+        const auto held = r.withLeft (left);
+        if (live)
+        {
+            paintLiveClipTitle (g, held, liveClipLook (c), name);
+            continue;
+        }
+        const auto simpleLook = c.kind != ClipKind::automation ? simpleClipLook (c) : std::nullopt;
+        const auto title = held.withHeight (clipHeaderHeight (whole));
+        const auto header = simpleLook ? simpleLook->headerTop : clipHeaderColour (base);
+        paintClipFrameTitle (g, title, held.getWidth(), header, name, glyph, false, simpleLook ? &*simpleLook : nullptr);
     }
 }
 
@@ -3368,6 +3448,7 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 // selection outline), for the cache's repair of a held title's band (cacheShift: only where the clip alone is drawn)
 void PlaylistComponent::paintHeldClip (juce::Graphics& g, int index)
 {
+    heldTitleLeft = keeplabels::on ? (float) gridArea().getX() : -1.0e9f; // (round 190qe)
     const auto& song = engine.getSong();
     if (index < 0 || index >= (int) song.playlist.size())
         return;
@@ -3848,7 +3929,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     }
 
     if (fl)
-        paintFlClipTitle (g, r, look, name, ClipGlyph::audio, c.muted, band, (float) headerWidth, false);
+        paintFlClipTitle (g, r, look, name, ClipGlyph::audio, c.muted, band, heldTitleLeft, false);
     else if (! liveLook)
         paintClipOutline (g, r, colour, false, false);
 
@@ -4054,7 +4135,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
         }
         g.setColour (look.content);
         g.strokePath (curve, juce::PathStrokeType (1.5f));
-        paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted, band, (float) headerWidth, false);
+        paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted, band, heldTitleLeft, false);
     }
     else
     {
@@ -6095,6 +6176,14 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     hover = {};
     gliding = false;
     pointerPress = placedByDoubleClick = false; // (round 190jq)
+    // round 190qe: a zoom glide lands; the press is kept in the song (a selection box's corner while the view runs);
+    // the selection before the press is what "Restore selection" brings back if this click replaces it
+    settleViewGlide();
+    edgeScroller.stop();
+    edgeDragEvent.reset();
+    dragDownTick = xToTick (e.x);
+    dragDownContentY = e.y + scrollY;
+    selectionAtPress = clipKeys (selection);
 
     // FL's middle + right click (round 190mp, DE-62; FL manual Playlist §8, captured in the Piano roll 190mp A3.2): the
     // second button opens the main menu at the mouse with the tools' "Mode" column on its left
@@ -7212,6 +7301,27 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         return;
     if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
         return;
+    // round 190qe (D2-PL1): past the arrangement's edge the view runs (feelFrame); the moved or resized clip and the brush
+    // stay at the edge meanwhile, as FL keeps them (round 190qc)
+    if (! edgeLayout && (edgeScrollsX() || edgeScrollsY()))
+    {
+        if (drag == Drag::move && dragOutToClipGrid (e)) // round 190ef: out over the Clip-launch grid (before the edge holds it)
+            return;
+        edgeDragEvent.emplace (e); // (the real pointer: the speed comes from how far past the edge it is)
+        frames.wake();
+        if (drag != Drag::select)
+        {
+            const auto grid = gridArea();
+            const auto x = edgeScrollsX() ? (float) edgescroll::clampInto (e.position.x, grid.getX(), grid.getRight()) : e.position.x;
+            const auto y = edgeScrollsY() ? (float) edgescroll::clampInto (e.position.y, grid.getY(), grid.getBottom()) : e.position.y;
+            if (x != e.position.x || y != e.position.y)
+            {
+                const juce::ScopedValueSetter<bool> layout (edgeLayout, true);
+                mouseDrag (e.withNewPosition (juce::Point<float> (x, y)));
+                return;
+            }
+        }
+    }
     if (drag == Drag::range || drag == Drag::rangeMove) // round 190pa (P14)
     {
         rangeMouseDrag (e);
@@ -7679,11 +7789,15 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 return;
             }
 
-            rubberBand = juce::Rectangle<int> (e.getMouseDownPosition(), e.getPosition()).getIntersection (area);
+            // (round 190qe: the box's corner stays where it was pressed in the song while the view runs at an edge; the
+            // clips between it and the pointer are selected, also the ones scrolled out of view)
+            const juce::Point<int> corner ((int) juce::jlimit (-1.0e6, 1.0e6, std::round (tickToX (dragDownTick))), dragDownContentY - scrollY);
+            const auto box = juce::Rectangle<int> (corner, e.getPosition());
+            rubberBand = box.getIntersection (area);
 
-            const auto t0 = xToTick (rubberBand.getX()), t1 = xToTick (rubberBand.getRight());
+            const auto t0 = juce::jmin (dragDownTick, xToTick (e.x)), t1 = juce::jmax (dragDownTick, xToTick (e.x));
             // (round 190jq: by drawn rows; the same as the tracks' order unless automation clips are drawn as lanes)
-            const auto tr0 = projection.row (yToTrack (rubberBand.getY())), tr1 = projection.row (yToTrack (rubberBand.getBottom()));
+            const auto tr0 = projection.row (yToTrack (box.getY())), tr1 = projection.row (yToTrack (box.getBottom()));
             const auto& playlist = engine.getSong().playlist;
             auto s = selectionBefore;
 
@@ -8124,6 +8238,19 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     if (touchInput.mouseUp (e)) // round 190pm (P23)
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    // round 190qe: the release ends the edge scroll; a click that replaced or cleared the selection leaves the old one
+    // for "Restore selection" (D2-PL9), once the release is done
+    edgeScroller.stop();
+    edgeDragEvent.reset();
+    struct RememberSelection
+    {
+        PlaylistComponent& p;
+        ~RememberSelection()
+        {
+            if (p.engine.getPublishCount() == p.followEditStamp) // (a click that only selected: an edit keeps its selection)
+                p.selectionHistory.changed (p.selectionAtPress, p.clipKeys (p.selection));
+        }
+    } const rememberSelection { *this };
     // round 190im (R15): a gesture that changed the song is an edit by hand: Follow pauses (when that option is on)
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, followEditStamp, engine.getPublishCount());
     if (insertsMouseUp (e)) // issue #154: a click or a drag in a linked header's effects list
@@ -8487,10 +8614,12 @@ void PlaylistComponent::zoomToTicks (double from, double to)
     if (to - from < 1.0)
         return;
 
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), gridArea().getWidth() / (to - from));
-    scrollTicks = juce::jmax (0.0, from);
-    updateScrollBars();
-    repaint();
+    // (round 190qe, UX-A3: glides with Animations on)
+    settleViewGlide();
+    auto target = currentView();
+    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), gridArea().getWidth() / (to - from));
+    target.scroll = juce::jmax (0.0, from);
+    showView (clampedView (target));
 }
 
 void PlaylistComponent::zoomIn (int anchorX)
@@ -8814,15 +8943,23 @@ juce::Rectangle<float> PlaylistComponent::paintLiveClipFrame (juce::Graphics& g,
         }
     }
 
+    if (! (r.getX() < heldTitleLeft && r.getRight() > heldTitleLeft) || ! heldEveryClip()) // (round 190qe: else the held pass draws it)
+        paintLiveClipTitle (g, r, look, name);
+    return body;
+}
+
+// paintLiveClipFrame's name in the strip (round 190qe: also a title held at the view's left edge)
+void PlaylistComponent::paintLiveClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name) const
+{
     if (r.getWidth() > 12.0f && name.isNotEmpty())
     {
+        const auto strip = (float) liveStripHeight;
         const uitrace::Part tallyTitle (uitrace::part::title);
         g.setColour (look.ink);
         g.setFont (theme::font (theme::type::small));
         const auto text = juce::Rectangle<float> (r.getX() + 4.0f, r.getY() + 1.0f, r.getWidth() - 6.0f, juce::jmin (strip, r.getHeight()) - 2.0f);
         textcache::drawText (g, name, text.toNearestInt(), juce::Justification::centredLeft, false);
     }
-    return body;
 }
 
 bool PlaylistComponent::automationFollows() const noexcept
@@ -9238,6 +9375,9 @@ juce::PopupMenu PlaylistComponent::selectMenu()
     select.addItem (tr ("Select next time") + key ("playlist.timeNext"), song.hasLoop(), false, [this] { runAction ("playlist.timeNext"); });
     select.addSeparator();
     select.addItem (tr ("Magic lasso") + key ("playlist.magicLasso"), true, EditorGlobals::get().magicLasso, [this] { runAction ("playlist.magicLasso"); });
+    // round 190qe (D2-PL9, LYNX's own): the selection a click replaced or cleared
+    select.addItem (tr ("Restore selection") + " (LYNX)" + key ("playlist.restoreSelection"), selectionHistory.size() > 0, false,
+                    [this] { runAction ("playlist.restoreSelection"); });
     return select;
 }
 
@@ -11305,6 +11445,7 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
         zoom.addItem (tr ("Zoom: sixteen bars") + "\tShift+3", [this] { runAction ("playlist.zoom3"); });
         zoom.addItem (tr ("Zoom to show everything") + "\tShift+4", [this] { runAction ("playlist.zoomAll"); });
         zoom.addItem (tr ("Zoom to the selection") + "\tShift+5", [this] { runAction ("playlist.zoomSelection"); });
+        zoom.addItem (tr ("Previous view"), viewStack.depth() > 0, false, [this] { runAction ("playlist.previousView"); }); // round 190qe
         zoom.addItem (tr ("Centre the view on the playhead") + "\tShift+0", [this] { runAction ("playlist.centrePlayhead"); });
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
@@ -13045,12 +13186,14 @@ void PlaylistComponent::rippleDeleteSelection()
 
 void PlaylistComponent::zoomAroundCentre (double factor)
 {
-    const auto grid = gridArea();
-    const auto centre = xToTick (grid.getCentreX());
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
-    scrollTicks = juce::jmax (0.0, centre - (grid.getCentreX() - headerWidth) / pixelsPerTick);
-    updateScrollBars();
-    repaintZoomed();
+    // round 190qe (UX-A2): the keys zoom around the playhead while it plays on screen, else the selection's centre on
+    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3)
+    settleViewGlide();
+    const auto anchor = keyZoomAnchorPx();
+    auto target = currentView();
+    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+    target.scroll = zoomanchor::scrollFor (scrollTicks, pixelsPerTick, target.pixelsPerUnit, anchor);
+    showView (clampedView (target));
 }
 
 void PlaylistComponent::zoomToBars (int bars)
@@ -13068,27 +13211,65 @@ void PlaylistComponent::zoomAll()
 void PlaylistComponent::zoomToSelection()
 {
     const auto& song = engine.getSong();
+    // round 190qe (D2-PL8): the view it leaves goes on the view stack; the same key again (the view still the one it
+    // zoomed to) goes back to it
+    settleViewGlide();
+    const auto before = currentView();
+    auto target = before;
+    auto range = [this, &target] (double from, double to) {
+        if (to - from >= 1.0)
+        {
+            target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), gridArea().getWidth() / (to - from));
+            target.scroll = juce::jmax (0.0, from);
+        }
+    };
 
     if (song.hasLoop() && selection.empty())
-        return zoomToTicks ((double) song.loopStart, (double) song.loopEnd);
+        range ((double) song.loopStart, (double) song.loopEnd);
+    else if (selection.empty())
+        range (0.0, (double) song.songLength());
+    else
+    {
+        std::int64_t from = INT64_MAX, to = 0;
+        int top = 1 << 20;
+        for (auto i : selection)
+            if (i >= 0 && i < (int) song.playlist.size())
+            {
+                from = juce::jmin (from, song.playlist[(std::size_t) i].start);
+                to = juce::jmax (to, song.playlist[(std::size_t) i].end());
+                top = juce::jmin (top, song.playlist[(std::size_t) i].track);
+            }
+        range ((double) from, (double) to);
+        if (top < (1 << 20))
+            target.scrollY = juce::jmax (0, trackToY (top) - tracksTop() + scrollY);
+    }
 
-    if (selection.empty())
-        return zoomAll();
+    showView (viewStack.toggle (before, clampedView (target)));
+}
 
-    std::int64_t from = INT64_MAX, to = 0;
-    int top = 1 << 20;
-    for (auto i : selection)
-        if (i >= 0 && i < (int) song.playlist.size())
-        {
-            from = juce::jmin (from, song.playlist[(std::size_t) i].start);
-            to = juce::jmax (to, song.playlist[(std::size_t) i].end());
-            top = juce::jmin (top, song.playlist[(std::size_t) i].track);
-        }
-
-    zoomToTicks ((double) from, (double) to);
-    scrollY = juce::jmax (0, trackToY (top) - tracksTop() + scrollY);
+// The view as the scroll bars would leave it (the song's range, the tracks' height): the stack compares views exactly
+viewstack::View PlaylistComponent::clampedView (const viewstack::View& v)
+{
+    const auto saved = currentView();
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), v.pixelsPerUnit);
+    scrollTicks = juce::jmax (0.0, v.scroll);
+    scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
-    repaint();
+    const auto clamped = currentView();
+    pixelsPerTick = saved.pixelsPerUnit;
+    scrollTicks = saved.scroll;
+    scrollY = (int) saved.scrollY;
+    updateScrollBars();
+    return clamped;
+}
+
+// A glide still running lands at once (another zoom, a click, the wheel start from where it was going)
+void PlaylistComponent::settleViewGlide()
+{
+    if (! viewGlide.running)
+        return;
+    viewGlide.running = false;
+    applyView (viewGlide.to);
 }
 
 void PlaylistComponent::centreOnPlayhead()
@@ -13097,6 +13278,175 @@ void PlaylistComponent::centreOnPlayhead()
     scrollTicks = juce::jmax (0.0, tick - gridArea().getWidth() / pixelsPerTick / 2.0);
     updateScrollBars();
     repaint();
+}
+
+// --- round 190qe (TOP-NEXT R1): edge scroll, view stack, zoom glide, selection history ---------------------------------
+
+// The drags that scroll the view at the arrangement's edges: a clip moved or resized, a selection box, a brush stroke (FL
+// scrolls for each; round 190qc). Not a drag out of the Playlist (the Clip-launch grid takes it then).
+bool PlaylistComponent::edgeScrollsX() const
+{
+    return drag == Drag::move || drag == Drag::resize || drag == Drag::trimLeft || drag == Drag::select || drag == Drag::paint;
+}
+
+bool PlaylistComponent::edgeScrollsY() const
+{
+    return drag == Drag::move || drag == Drag::select || drag == Drag::paint;
+}
+
+// One frame of the edge scroll: the pointer (still, or where the last drag event left it) past an edge scrolls the view
+// by FL's speed (Pattern) or the Live-like one, in whole physical px; the dragged item is laid out again for the
+// pointer, whose place in the song moved with the view. Esc holds it until the pointer comes back in; the release ends it.
+bool PlaylistComponent::edgeScrollFrame (double nowMs)
+{
+    const auto* dnd = juce::DragAndDropContainer::findParentDragContainerFor (this);
+    if (! edgeDragEvent.has_value() || ! (edgeScrollsX() || edgeScrollsY()) || ! (isMouseButtonDown() || edgescroll::buttonHeldForTests) || (dnd != nullptr && dnd->isDragAndDropActive()))
+    {
+        edgeScroller.stop();
+        return false;
+    }
+    if (juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::escapeKey))
+        edgeScroller.hold();
+    const auto grid = gridArea();
+    const auto law = layoutstyle::current() == layoutstyle::Style::pattern ? edgescroll::Law::fl : edgescroll::Law::smooth;
+    const auto quantum = (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this));
+    const auto at = edgeDragEvent->position;
+    const auto step = edgeScroller.update (nowMs, at.x, at.y, grid.getX(), grid.getY(), grid.getRight(), grid.getBottom(), edgeScrollsX(),
+                                           edgeScrollsY(), law, quantum);
+    if (step.dx == 0.0 && step.dy == 0.0)
+        return step.running;
+    const auto oldTicks = scrollTicks;
+    const auto oldY = scrollY;
+    if (step.dx != 0.0)
+        scrollTicks = juce::jmax (0.0, scrollTicks + step.dx / pixelsPerTick); // (it stops at the song's start, as FL's)
+    if (step.dy != 0.0)
+        scrollY = juce::jmax (0, scrollY + (int) step.dy);
+    updateScrollBars();
+    if (scrollTicks != oldTicks || scrollY != oldY)
+    {
+        repaintScrolled();
+        const auto event = *edgeDragEvent;
+        mouseDrag (event); // (the dragged clip / box / stroke follows the song under the still pointer)
+    }
+    return step.running;
+}
+
+bool PlaylistComponent::feelFrame (double nowMs)
+{
+    auto active = edgeScrollFrame (nowMs);
+    if (viewGlide.running)
+    {
+        if (viewGlide.done (nowMs))
+        {
+            viewGlide.running = false;
+            applyView (viewGlide.to);
+        }
+        else
+            applyView (viewGlide.at (nowMs));
+        active = true;
+    }
+    return active;
+}
+
+viewstack::View PlaylistComponent::currentView() const
+{
+    return { scrollTicks, pixelsPerTick, (double) scrollY };
+}
+
+void PlaylistComponent::applyView (const viewstack::View& v)
+{
+    const auto zoomed = v.pixelsPerUnit != pixelsPerTick;
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), v.pixelsPerUnit);
+    scrollTicks = juce::jmax (0.0, v.scroll);
+    scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
+    updateScrollBars();
+    if (zoomed)
+        repaintZoomed();
+    else
+        repaintScrolled();
+}
+
+// UX-A3: the zoom keys, fit and zoom-to-selection glide over 150 ms (ease-out) while Animations are on; off: at once
+void PlaylistComponent::showView (const viewstack::View& target)
+{
+    if (ui::motion::enabled() && (! platform::testMode() || glide::inTests) && ui::showingOrShot (*this))
+    {
+        viewGlide.start (currentView(), target, juce::Time::getMillisecondCounterHiRes(), (double) gridArea().getWidth());
+        if (viewGlide.running)
+        {
+            frames.wake();
+            return;
+        }
+    }
+    viewGlide.running = false;
+    applyView (target);
+}
+
+// UX-A2: the zoom keys' anchor (px from the grid's left): the playhead while playing and on screen, else the centre of the
+// selected clips when on screen, else the view's centre
+double PlaylistComponent::keyZoomAnchorPx() const
+{
+    const auto grid = gridArea();
+    const auto& song = engine.getSong();
+    const auto playing = engine.getTransport().playing.load() && song.mode == PlayMode::song;
+    std::optional<double> playhead, selected;
+    if (playing)
+        playhead = tickToX (engine.songPlayheadTicks()) - grid.getX();
+    if (! selection.empty())
+    {
+        std::int64_t from = INT64_MAX, to = 0;
+        for (auto i : selection)
+            if (i >= 0 && i < (int) song.playlist.size())
+            {
+                from = juce::jmin (from, song.playlist[(std::size_t) i].start);
+                to = juce::jmax (to, song.playlist[(std::size_t) i].end());
+            }
+        if (to > from)
+            selected = tickToX (0.5 * (double) (from + to)) - grid.getX();
+    }
+    return zoomanchor::anchorPx (zoomanchor::Source::keys, 0.0, grid.getWidth(), playing, playhead, selected);
+}
+
+std::vector<PlaylistComponent::ClipKey> PlaylistComponent::clipKeys (const std::vector<int>& indices) const
+{
+    const auto& playlist = engine.getSong().playlist;
+    std::vector<ClipKey> keys;
+    for (auto i : indices)
+        if (i >= 0 && i < (int) playlist.size())
+        {
+            const auto& c = playlist[(std::size_t) i];
+            keys.push_back ({ c.track, (int) c.kind, c.kind == ClipKind::audio ? c.channel : c.kind == ClipKind::automation ? c.automation : c.pattern,
+                              c.start, c.length });
+        }
+    std::sort (keys.begin(), keys.end());
+    return keys;
+}
+
+// D2-PL9: Edit › "Restore selection" — the selection a click replaced or cleared (the last 8, newest first); the clips
+// are found again by their track, place and source, so edits in between don't pick other clips
+void PlaylistComponent::restoreSelection()
+{
+    const auto restored = selectionHistory.restore (clipKeys (selection));
+    if (! restored.has_value())
+    {
+        ui::postHint ({ tr ("No earlier selection to restore"), {}, false, false }, 2000);
+        return;
+    }
+    const auto& playlist = engine.getSong().playlist;
+    std::vector<int> indices;
+    for (int i = 0; i < (int) playlist.size(); ++i)
+        if (const auto key = clipKeys ({ i }); ! key.empty() && std::binary_search (restored->begin(), restored->end(), key.front()))
+            indices.push_back (i);
+    const juce::ScopedValueSetter<bool> restoring (selectionHistory.restoring, true);
+    setSelection (indices);
+    repaint();
+}
+
+// D2-PL8: "Previous view" — back to the view the last "Zoom to the selection" left
+void PlaylistComponent::previousView()
+{
+    if (const auto before = viewStack.back())
+        showView (*before);
 }
 
 bool PlaylistComponent::runAction (const std::string& id)
@@ -13140,6 +13490,8 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.zoom3")) zoomToBars (16);
     else if (is ("playlist.zoomAll")) zoomAll();
     else if (is ("playlist.zoomSelection")) zoomToSelection();
+    else if (is ("playlist.previousView")) previousView();         // round 190qe (D2-PL8)
+    else if (is ("playlist.restoreSelection")) restoreSelection(); // round 190qe (D2-PL9)
     else if (is ("playlist.centrePlayhead")) centreOnPlayhead();
     else if (is ("playlist.rippleDelete")) rippleDeleteSelection();
     else if (is ("playlist.ripple")) setRipple (! ripple);
@@ -15188,6 +15540,7 @@ void PlaylistComponent::touchPinch (float scale, juce::Point<float> centre)
 void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
     gliding = false;
+    settleViewGlide(); // (round 190qe: a zoom glide lands first)
     const auto factor = gesture::pinchZoomFactor (scale);
     if (e.mods.isAltDown()) // the track heights, around the pointer
     {
@@ -15207,6 +15560,7 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
 {
     const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
+    settleViewGlide(); // (round 190qe: a zoom glide lands first; the wheel goes on from there)
 
     // FL's right-hold + wheel (round 190mp, DE-61; FL manual, captured in the Piano roll 190mp A3.3): over the clips each
     // notch down picks the next tool to the right, up the one to the left (no wrap); the held press does nothing more
@@ -15465,6 +15819,7 @@ bool PlaylistComponent::playheadTrailOn() const
 
 bool PlaylistComponent::liveFrame (double nowMs)
 {
+    const auto feel = feelFrame (nowMs); // round 190qe: the edge scroll of a drag, the zoom glide
     auto& transport = engine.getTransport();
     const auto& song = engine.getSong();
     const auto playing = transport.playing.load();
@@ -15678,7 +16033,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
         repaint (liveArea);
         liveArea = {};
     }
-    return playing || moved || live;
+    return playing || moved || live || feel;
 }
 
 // Round 190w: FL 2026's track header levels (Playlist menu › View › Track headers [DFM] EEShowAudioTrackMetersAction

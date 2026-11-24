@@ -18119,3 +18119,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)
+#include "Feel190qeTests.inc" // round 190qe (0.1.32): edge scroll (FL law), view stack, zoom glide and anchor, selection history, keep labels

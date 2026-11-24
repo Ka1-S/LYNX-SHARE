@@ -3607,6 +3607,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showHiddenTracks = on;
         else if (key == "fadePreviews") // #230 (round 190nq): Playlist › View › Show fade previews
             PlaylistComponent::showFadePreviews = on;
+        else if (key == "keepLabels") // round 190qe (D2-PL2): Playlist › View › Keep labels on screen (FL: on)
+            keeplabels::on = on;
         else if (key == "shadeFadedAudio") // round 190oo (O-1): Playlist › View › Shade faded audio (LYNX)
             PlaylistComponent::shadeFadedAudio = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
@@ -4040,6 +4042,7 @@ void MainComponent::saveUiSettings()
                                       + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
                                       + "\nshowHiddenTracks=" + juce::String (PlaylistComponent::showHiddenTracks ? 1 : 0)
                                       + "\nfadePreviews=" + juce::String (PlaylistComponent::showFadePreviews ? 1 : 0)
+                                      + "\nkeepLabels=" + juce::String (keeplabels::on ? 1 : 0)
                                       + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
@@ -5437,6 +5440,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             { "zoomIn", TR_NOOP ("Zoom in") }, { "zoomOut", TR_NOOP ("Zoom out") }, { "zoom1", TR_NOOP ("Zoom: one bar") },
             { "zoom2", TR_NOOP ("Zoom: four bars") }, { "zoom3", TR_NOOP ("Zoom: sixteen bars") },
             { "zoomAll", TR_NOOP ("Zoom to show everything") }, { "zoomSelection", TR_NOOP ("Zoom to the selection") },
+            { "previousView", TR_NOOP ("Previous view") }, // round 190qe (D2-PL8)
             { "centrePlayhead", TR_NOOP ("Centre the view on the playhead") }
         };
         for (const auto& [id, text] : items)
@@ -5580,18 +5584,17 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             {
                 // FL 2026's Playlist menu › View › Track headers (round 190w; [DFM] EEViewMenu, FL's defaults)
                 juce::PopupMenu view;
-                view.addSectionHeader (tr ("Track headers"));
                 auto option = [this, &view] (const juce::String& text, bool& setting) {
                     view.addItem (text, true, setting, [this, &setting] {
                         setting = ! setting;
                         playlist.headerOptionsChanged();
                     });
                 };
-                option (tr ("Show controls on audio tracks"), PlaylistComponent::showAudioTrackControls);
-                option (tr ("Show levels on audio tracks"), PlaylistComponent::showAudioTrackLevels);
-                option (tr ("Show levels on instrument tracks"), PlaylistComponent::showInstrumentTrackLevels);
+                // round 190qe (D2-PL2): FL's View › Content section, its first item "Keep labels on screen" (on by default,
+                // FL's PLForm\KeepLabelsOnScreen = 1; REA_rodada190qc), then FL's other Content items LYNX has, in FL's order
+                view.addSectionHeader (tr ("Content"));
+                option (tr ("Keep labels on screen"), keeplabels::on);
                 // FL's View › "Hide collapsed grouped tracks" (round 190jf, B17; EEHideCollapsedAction)
-                view.addSeparator();
                 view.addItem (tr ("Hide collapsed grouped tracks"), true, PlaylistComponent::hideCollapsedGroups, [this] {
                     auto apply = [safe = juce::Component::SafePointer<MainComponent> (this)] {
                         if (safe == nullptr)
@@ -5624,6 +5627,10 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                     playlist.headerOptionsChanged();
                     saveUiSettings();
                 });
+                view.addSectionHeader (tr ("Track headers"));
+                option (tr ("Show controls on audio tracks"), PlaylistComponent::showAudioTrackControls);
+                option (tr ("Show levels on audio tracks"), PlaylistComponent::showAudioTrackLevels);
+                option (tr ("Show levels on instrument tracks"), PlaylistComponent::showInstrumentTrackLevels);
                 // round 190ol (research190oe P1, owner decision O-1): LYNX's Sections lane, off by default in this layout (the
                 // Simple layout has its title bar button, the Clip-launch layout none)
                 view.addSeparator();

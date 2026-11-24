@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/ChordLane.h"
+#include "core/EditorFeel.h" // round 190qe (R1)
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "ui/TouchInput.h"
@@ -723,6 +724,50 @@ private:
     void zoomToSelection();
     void zoomAll();
     void centreOnPlayhead();
+
+    // Round 190qe (TOP-NEXT R1, core/EditorFeel.h): the view runs while notes, a selection box, a brush stroke or a lane
+    // stroke (velocity, the event lanes) are dragged past the editor's edge (FL's measured law in the Pattern layout, the
+    // Live-like one elsewhere; up and down too for the notes); the view stack of "Zoom to the selection"; the zoom glide;
+    // the selection history
+    edgescroll::Scroller edgeScroller;
+    std::optional<juce::MouseEvent> edgeDragEvent;
+    bool edgeLayout = false;
+    double dragDownTick = 0.0;
+    int dragDownContentY = 0;
+    bool edgeOnLane() const;
+    bool edgeScrollsX() const;
+    bool edgeScrollsY() const;
+    bool edgeScrollFrame (double nowMs);
+    bool feelFrame (double nowMs);
+    viewstack::Stack viewStack;
+    glide::Glide viewGlide;
+    viewstack::View currentView() const;
+    void applyView (const viewstack::View& v);
+    void showView (const viewstack::View& v);
+    viewstack::View clampedView (const viewstack::View& v);
+    void settleViewGlide();
+    double keyZoomAnchorPx() const;
+    struct NoteKey
+    {
+        int channel = 0, key = 0;
+        std::int64_t start = 0, length = 0;
+        bool operator== (const NoteKey&) const = default;
+        auto operator<=> (const NoteKey&) const = default;
+    };
+    std::vector<NoteKey> noteKeys (const std::vector<int>& indices) const;
+    selhistory::History<NoteKey> selectionHistory;
+    std::vector<NoteKey> selectionAtPress;
+
+public:
+    void restoreSelection();
+    void previousView();
+    bool edgeScrollRunning() const noexcept { return edgeScroller.isRunning(); }
+    std::size_t viewStackDepth() const noexcept { return viewStack.depth(); }
+    bool feelFrameForTests (double nowMs) { return feelFrame (nowMs); }
+    juce::Rectangle<int> laneAreaForSnapshot() const { return velocityArea(); }
+    viewstack::View viewNowForTests() const { return currentView(); }
+
+private:
     juce::PopupMenu toolsMenu();
 
     // --- scripts (Tools › Scripts: FL's Piano roll scripts, round 190as; ui/PianoRollScripts.cpp) ---------------------

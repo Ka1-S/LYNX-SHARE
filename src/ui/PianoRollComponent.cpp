@@ -2962,6 +2962,14 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
+    // round 190qe: a zoom glide lands; the press is kept in the song (a selection box's corner while the view runs); the
+    // selection before the press is what "Restore selection" brings back if this click replaces it
+    settleViewGlide();
+    edgeScroller.stop();
+    edgeDragEvent.reset();
+    dragDownTick = xToTick (e.x);
+    dragDownContentY = e.y + scrollY;
+    selectionAtPress = noteKeys (selection);
     if (engine.getSong().channels.empty())
         return;
 
@@ -3594,6 +3602,26 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         repaint (eventPaneArea().withX (0).withWidth (getWidth()));
         return;
     }
+    // round 190qe (D2-PL1): past the editor's edge the view runs (feelFrame); the dragged notes, the brush and the lane
+    // stroke stay at the edge meanwhile, as FL keeps them (round 190qc)
+    if (! edgeLayout && (edgeScrollsX() || edgeScrollsY()))
+    {
+        edgeDragEvent.emplace (e); // (the real pointer: the speed comes from how far past the edge it is)
+        frames.wake();
+        if (drag != Drag::select)
+        {
+            const auto grid = gridArea();
+            const auto lane = edgeOnLane() ? velocityArea() : grid;
+            const auto x = edgeScrollsX() ? (float) edgescroll::clampInto (e.position.x, grid.getX(), grid.getRight()) : e.position.x;
+            const auto y = edgeScrollsY() ? (float) edgescroll::clampInto (e.position.y, lane.getY(), lane.getBottom()) : e.position.y;
+            if (x != e.position.x || y != e.position.y)
+            {
+                const juce::ScopedValueSetter<bool> layout (edgeLayout, true);
+                mouseDrag (e.withNewPosition (juce::Point<float> (x, y)));
+                return;
+            }
+        }
+    }
     const auto snapOn = ! e.mods.isAltDown();
     // after the step below, the hint bar says what the gesture is doing
     const struct PostAfter
@@ -3750,8 +3778,13 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
                 return;
             }
 
-            const auto t0 = xToTick (rubberBand.getX()), t1 = xToTick (rubberBand.getRight());
-            const auto kTop = yToKey (rubberBand.getY()), kBottom = yToKey (rubberBand.getBottom());
+            // (round 190qe: the box's corner stays where it was pressed in the song while the view runs at an edge; the
+            // notes between it and the pointer are selected, also the ones scrolled out of view)
+            const juce::Point<int> corner ((int) juce::jlimit (-1.0e6, 1.0e6, std::round (tickToX (dragDownTick))), dragDownContentY - scrollY);
+            const auto box = juce::Rectangle<int> (corner, e.getPosition());
+            rubberBand = box.getIntersection (area);
+            const auto t0 = juce::jmin (dragDownTick, xToTick (e.x)), t1 = juce::jmax (dragDownTick, xToTick (e.x));
+            const auto kTop = yToKey (box.getY()), kBottom = yToKey (box.getBottom());
             const auto& notes = currentPattern (engine.getSong()).notes;
             auto s = selectionBefore;
 
@@ -4111,6 +4144,19 @@ void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
     if (touchInput.mouseUp (e)) // round 190pm (P23)
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    // round 190qe: the release ends the edge scroll; a click that replaced or cleared the selection leaves the old one
+    // for "Restore selection" (D2-PL9)
+    edgeScroller.stop();
+    edgeDragEvent.reset();
+    struct RememberSelection
+    {
+        PianoRollComponent& p;
+        ~RememberSelection()
+        {
+            if (p.engine.getPublishCount() == p.followEditStamp) // (a click that only selected: an edit keeps its selection)
+                p.selectionHistory.changed (p.selectionAtPress, p.noteKeys (p.selection));
+        }
+    } const rememberSelection { *this };
     if (boundaryDrag >= 0) // round 190on (P10): the heights are kept
     {
         boundaryDrag = -1;
@@ -4605,10 +4651,12 @@ void PianoRollComponent::zoomToTicks (double from, double to)
     if (to - from < 1.0)
         return;
 
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, gridArea().getWidth() / (to - from));
-    scrollTicks = juce::jmax (0.0, from);
-    updateScrollBars();
-    repaint();
+    // (round 190qe, UX-A3: glides with Animations on)
+    settleViewGlide();
+    auto target = currentView();
+    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, gridArea().getWidth() / (to - from));
+    target.scroll = juce::jmax (0.0, from);
+    showView (clampedView (target));
 }
 
 void PianoRollComponent::zoomIn (int anchorX)
@@ -4914,6 +4962,7 @@ juce::PopupMenu PianoRollComponent::moreMenu()
         zoom.addItem (tr ("Zoom: sixteen bars") + "\tShift+3", [this] { runAction ("pianoRoll.zoom3"); });
         zoom.addItem (tr ("Zoom to show everything") + "\tShift+4", [this] { runAction ("pianoRoll.zoomAll"); });
         zoom.addItem (tr ("Zoom to the selection") + "\tShift+5", [this] { runAction ("pianoRoll.zoomSelection"); });
+        zoom.addItem (tr ("Previous view"), viewStack.depth() > 0, false, [this] { runAction ("pianoRoll.previousView"); }); // round 190qe
         zoom.addItem (tr ("Centre the view on the playhead") + "\tShift+0", [this] { runAction ("pianoRoll.centrePlayhead"); });
         zoom.addSeparator();
         zoom.addItem (tr ("Taller keys") + "\tCtrl+Alt+Wheel", [this] { rowHeight = juce::jmin (gesture::maxKeyHeight, rowHeight + 2); updateScrollBars(); repaint(); });
@@ -5234,12 +5283,14 @@ void PianoRollComponent::openNoteTool (NoteTool tool)
 
 void PianoRollComponent::zoomAroundCentre (double factor)
 {
-    const auto grid = gridArea();
-    const auto centre = xToTick (grid.getCentreX());
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
-    scrollTicks = juce::jmax (0.0, centre - (grid.getCentreX() - keyboardWidth) / pixelsPerTick);
-    updateScrollBars();
-    repaint();
+    // round 190qe (UX-A2): the keys zoom around the playhead while it plays on screen, else the selection's centre on
+    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3)
+    settleViewGlide();
+    const auto anchor = keyZoomAnchorPx();
+    auto target = currentView();
+    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
+    target.scroll = zoomanchor::scrollFor (scrollTicks, pixelsPerTick, target.pixelsPerUnit, anchor);
+    showView (clampedView (target));
 }
 
 void PianoRollComponent::zoomToBars (int bars)
@@ -5275,11 +5326,214 @@ void PianoRollComponent::zoomToSelection()
         high = juce::jmax (high, n.key);
     }
 
+    // round 190qe (D2-PL8): the view it leaves goes on the view stack; the same key again (the view still the one it
+    // zoomed to) goes back to it
+    settleViewGlide();
     const auto margin = (double) ticksPerStep;
-    zoomToTicks (juce::jmax (0.0, (double) from - margin), (double) to + margin);
-    scrollY = juce::jmax (0, rowFor ((low + high) / 2) * rowHeight - gridArea().getHeight() / 2);
+    const auto before = currentView();
+    auto view = before;
+    const auto t0 = juce::jmax (0.0, (double) from - margin), t1 = (double) to + margin;
+    if (t1 - t0 >= 1.0)
+    {
+        view.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, gridArea().getWidth() / (t1 - t0));
+        view.scroll = t0;
+    }
+    view.scrollY = juce::jmax (0, rowFor ((low + high) / 2) * rowHeight - gridArea().getHeight() / 2);
+    showView (viewStack.toggle (before, clampedView (view)));
+}
+
+// --- round 190qe (TOP-NEXT R1): edge scroll, view stack, zoom glide, selection history ---------------------------------
+
+// A lane stroke (velocity, Release velocity..., the event lanes): the view runs sideways only, with the lane's x range
+bool PianoRollComponent::edgeOnLane() const
+{
+    return drag == Drag::velocity || drag == Drag::velocitySet || drag == Drag::eventDraw || drag == Drag::eventErase;
+}
+
+// FL scrolls for notes moved and resized, the selection box, the brushes, and the lane strokes (round 190qc)
+bool PianoRollComponent::edgeScrollsX() const
+{
+    return drag == Drag::move || drag == Drag::resize || drag == Drag::resizeLeft || drag == Drag::select || drag == Drag::paint
+           || drag == Drag::drumPaint || edgeOnLane();
+}
+
+bool PianoRollComponent::edgeScrollsY() const
+{
+    return drag == Drag::move || drag == Drag::select || drag == Drag::paint || drag == Drag::drumPaint;
+}
+
+bool PianoRollComponent::edgeScrollFrame (double nowMs)
+{
+    if (! edgeDragEvent.has_value() || ! (edgeScrollsX() || edgeScrollsY()) || ! (isMouseButtonDown() || edgescroll::buttonHeldForTests))
+    {
+        edgeScroller.stop();
+        return false;
+    }
+    if (juce::KeyPress::isKeyCurrentlyDown (juce::KeyPress::escapeKey))
+        edgeScroller.hold();
+    const auto grid = gridArea();
+    const auto lane = edgeOnLane() ? velocityArea() : grid;
+    const auto law = layoutstyle::current() == layoutstyle::Style::pattern ? edgescroll::Law::fl : edgescroll::Law::smooth;
+    const auto quantum = (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this));
+    const auto at = edgeDragEvent->position;
+    const auto step = edgeScroller.update (nowMs, at.x, at.y, grid.getX(), lane.getY(), grid.getRight(), lane.getBottom(), edgeScrollsX(),
+                                           edgeScrollsY(), law, quantum);
+    if (step.dx == 0.0 && step.dy == 0.0)
+        return step.running;
+    const auto oldTicks = scrollTicks;
+    const auto oldY = scrollY;
+    if (step.dx != 0.0)
+        scrollTicks = juce::jmax (0.0, scrollTicks + step.dx / pixelsPerTick);
+    if (step.dy != 0.0)
+        scrollY = juce::jmax (0, scrollY + (int) step.dy);
+    updateScrollBars();
+    if (scrollTicks != oldTicks || scrollY != oldY)
+    {
+        // (a lane stroke goes on from where it was in the song: its last point moved with the view)
+        lastVelocityX -= (int) std::lround ((scrollTicks - oldTicks) * pixelsPerTick);
+        repaint();
+        const auto event = *edgeDragEvent;
+        mouseDrag (event);
+    }
+    return step.running;
+}
+
+bool PianoRollComponent::feelFrame (double nowMs)
+{
+    auto active = edgeScrollFrame (nowMs);
+    if (viewGlide.running)
+    {
+        if (viewGlide.done (nowMs))
+        {
+            viewGlide.running = false;
+            applyView (viewGlide.to);
+        }
+        else
+            applyView (viewGlide.at (nowMs));
+        active = true;
+    }
+    return active;
+}
+
+viewstack::View PianoRollComponent::currentView() const
+{
+    return { scrollTicks, pixelsPerTick, (double) scrollY };
+}
+
+void PianoRollComponent::applyView (const viewstack::View& v)
+{
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, v.pixelsPerUnit);
+    scrollTicks = juce::jmax (0.0, v.scroll);
+    scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
     repaint();
+}
+
+viewstack::View PianoRollComponent::clampedView (const viewstack::View& v)
+{
+    const auto saved = currentView();
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, v.pixelsPerUnit);
+    scrollTicks = juce::jmax (0.0, v.scroll);
+    scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
+    updateScrollBars();
+    const auto clamped = currentView();
+    pixelsPerTick = saved.pixelsPerUnit;
+    scrollTicks = saved.scroll;
+    scrollY = (int) saved.scrollY;
+    updateScrollBars();
+    return clamped;
+}
+
+// UX-A3: the zoom keys, fit and zoom-to-selection glide over 150 ms (ease-out) while Animations are on; off: at once
+void PianoRollComponent::showView (const viewstack::View& target)
+{
+    if (ui::motion::enabled() && (! platform::testMode() || glide::inTests) && ui::showingOrShot (*this))
+    {
+        viewGlide.start (currentView(), target, juce::Time::getMillisecondCounterHiRes(), (double) gridArea().getWidth());
+        if (viewGlide.running)
+        {
+            frames.wake();
+            return;
+        }
+    }
+    viewGlide.running = false;
+    applyView (target);
+}
+
+void PianoRollComponent::settleViewGlide()
+{
+    if (! viewGlide.running)
+        return;
+    viewGlide.running = false;
+    applyView (viewGlide.to);
+}
+
+// UX-A2: the zoom keys' anchor (px from the grid's left): the playhead while the pattern plays and it is on screen, else
+// the centre of the selected notes when on screen, else the view's centre
+double PianoRollComponent::keyZoomAnchorPx() const
+{
+    const auto grid = gridArea();
+    const auto& song = engine.getSong();
+    const auto playing = engine.getTransport().playing.load();
+    std::optional<double> playhead, selected;
+    if (playing)
+        if (const auto tick = transportedit::patternPlayhead (song, song.currentPattern, engine.getTransport().positionTicks.load()); tick >= 0.0)
+            playhead = tickToX (tick) - grid.getX();
+    if (! selection.empty())
+    {
+        const auto& notes = currentPattern (song).notes;
+        std::int64_t from = INT64_MAX, to = 0;
+        for (auto i : selection)
+            if (i >= 0 && i < (int) notes.size())
+            {
+                from = juce::jmin (from, notes[(std::size_t) i].start);
+                to = juce::jmax (to, notes[(std::size_t) i].start + notes[(std::size_t) i].length);
+            }
+        if (to > from)
+            selected = tickToX (0.5 * (double) (from + to)) - grid.getX();
+    }
+    return zoomanchor::anchorPx (zoomanchor::Source::keys, 0.0, grid.getWidth(), playing, playhead, selected);
+}
+
+std::vector<PianoRollComponent::NoteKey> PianoRollComponent::noteKeys (const std::vector<int>& indices) const
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    std::vector<NoteKey> keys;
+    for (auto i : indices)
+        if (i >= 0 && i < (int) notes.size())
+        {
+            const auto& n = notes[(std::size_t) i];
+            keys.push_back ({ n.channel, n.key, n.start, n.length });
+        }
+    std::sort (keys.begin(), keys.end());
+    return keys;
+}
+
+// D2-PL9: "Restore selection" — the notes a click deselected (the last 8 selections, newest first), found again by their
+// channel, key, start and length
+void PianoRollComponent::restoreSelection()
+{
+    const auto restored = selectionHistory.restore (noteKeys (selection));
+    if (! restored.has_value())
+    {
+        ui::postHint ({ tr ("No earlier selection to restore"), {}, false, false }, 2000);
+        return;
+    }
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    std::vector<int> indices;
+    for (int i = 0; i < (int) notes.size(); ++i)
+        if (const auto key = noteKeys ({ i }); ! key.empty() && std::binary_search (restored->begin(), restored->end(), key.front()))
+            indices.push_back (i);
+    const juce::ScopedValueSetter<bool> restoring (selectionHistory.restoring, true);
+    setSelection (indices);
+    repaint();
+}
+
+// D2-PL8: "Previous view" — back to the view the last "Zoom to the selection" left
+void PianoRollComponent::previousView()
+{
+    if (const auto before = viewStack.back())
+        showView (*before);
 }
 
 void PianoRollComponent::centreOnPlayhead()
@@ -5406,6 +5660,9 @@ juce::PopupMenu PianoRollComponent::selectMenu()
         if (g.onOptionsChanged != nullptr)
             g.onOptionsChanged();
     });
+    // round 190qe (D2-PL9, LYNX's own): the selection a click replaced or cleared
+    menu.addItem (tr ("Restore selection") + " (LYNX)" + keyText ("pianoRoll.restoreSelection"), selectionHistory.size() > 0, false,
+                  [this] { runAction ("pianoRoll.restoreSelection"); });
     return menu;
 }
 
@@ -5685,6 +5942,8 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.zoom3")) zoomToBars (16);
     else if (is ("pianoRoll.zoomAll")) zoomAll();
     else if (is ("pianoRoll.zoomSelection")) zoomToSelection();
+    else if (is ("pianoRoll.previousView")) previousView();         // round 190qe (D2-PL8)
+    else if (is ("pianoRoll.restoreSelection")) restoreSelection(); // round 190qe (D2-PL9)
     else if (is ("pianoRoll.centrePlayhead")) centreOnPlayhead();
     else if (is ("pianoRoll.follow")) EditorGlobals::get().setFollowing (true, ! EditorGlobals::get().isFollowing (true));
     else if (is ("pianoRoll.eventPaneAlternate")) toggleEventPaneAlternate(); // FL's Shift+Enter (round 190fz)
@@ -5973,6 +6232,7 @@ void PianoRollComponent::touchPinch (float scale, juce::Point<float> centre)
 
 void PianoRollComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
 {
+    settleViewGlide(); // (round 190qe: a zoom glide lands first)
     gliding = false;
     const auto factor = gesture::pinchZoomFactor (scale);
     if (e.mods.isAltDown()) // taller / shorter keys, keeping the key under the pointer in place
@@ -6023,6 +6283,7 @@ void PianoRollComponent::showToolModeMenu()
 
 void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
 {
+    settleViewGlide(); // (round 190qe: a zoom glide lands first)
     const LaneScope laneScope (*this, stackedLaneAt (e.getPosition())); // (round 190on)
     const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     // FL's right-hold + wheel (round 190mp, DE-61; capture 190mp A3.3): each notch down picks the next tool to the right,
@@ -6809,8 +7070,9 @@ juce::Rectangle<int> PianoRollComponent::playheadColumn (double tick) const
     return tick >= 0.0 ? juce::Rectangle<int> ((int) tickToX (tick) - 7, 0, 14, getHeight()) : juce::Rectangle<int>();
 }
 
-bool PianoRollComponent::playheadFrame (double)
+bool PianoRollComponent::playheadFrame (double nowMs)
 {
+    const auto feel = feelFrame (nowMs); // round 190qe: the edge scroll of a drag, the zoom glide
     auto& transport = engine.getTransport();
     auto tick = -1.0;
     const auto playing = transport.playing.load();
@@ -6914,7 +7176,7 @@ bool PianoRollComponent::playheadFrame (double)
         repaint (liveHeldArea);
         liveHeldArea = {};
     }
-    return playing || moved;
+    return playing || moved || feel;
 }
 // --- round 168g: FL's Piano roll File / Edit / View items ----------------------------------------------------------------
 

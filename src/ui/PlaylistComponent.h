@@ -25,6 +25,7 @@
 #include "core/StripSilence.h"
 #include "core/TrackClips.h" // round 190ne
 #include "core/SimpleHeaderTarget.h" // round 190oo (CS-24)
+#include "core/EditorFeel.h" // round 190qe (R1)
 #include "engine/AudioEngine.h"
 #include "ui/DeleteFade.h"
 #include "ui/EditorTools.h"
@@ -889,6 +890,7 @@ private:
     juce::Image liveLaneImage;
     std::uint64_t liveLaneKey = 0;
     juce::Rectangle<float> paintLiveClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name) const;
+    void paintLiveClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name) const;
     // Live's grid lines from x0 to x1: level 0 = a bar group's first bar, 1 = a bar, 2 = a beat; `group` = the group's parity
     template <typename Line>
     void forEachLiveGridLine (double x0, double x1, Line&& line) const;
@@ -1336,6 +1338,52 @@ private:
     void zoomToSelection();
     void zoomAll();
     void centreOnPlayhead();
+
+    // Round 190qe (TOP-NEXT R1, core/EditorFeel.h): the view runs while a clip, a selection box or a brush stroke is dragged
+    // past the arrangement's edge (FL's measured law in the Pattern layout, the Live-like one elsewhere); the view stack of
+    // "Zoom to the selection"; the zoom glide (Animations on); the selection history ("Restore selection")
+    edgescroll::Scroller edgeScroller;
+    std::optional<juce::MouseEvent> edgeDragEvent; // the drag's last event, laid out again while the view runs
+    bool edgeLayout = false;                       // (mouseDrag with the pointer held at the edge)
+    double dragDownTick = 0.0;                     // the press, in the song (a selection box keeps its corner there)
+    int dragDownContentY = 0;
+    bool edgeScrollsX() const; // the drag in progress scrolls the view sideways / up and down at the edges
+    bool edgeScrollsY() const;
+    bool edgeScrollFrame (double nowMs);
+    bool feelFrame (double nowMs);
+    viewstack::Stack viewStack;
+    glide::Glide viewGlide;
+    viewstack::View currentView() const;
+    void applyView (const viewstack::View& v);
+    void showView (const viewstack::View& v); // glides over 150 ms with Animations on, else at once
+    viewstack::View clampedView (const viewstack::View& v);
+    void settleViewGlide();
+    double keyZoomAnchorPx() const;           // UX-A2: the zoom keys' anchor, px from the grid's left
+    struct ClipKey
+    {
+        int track = 0, kind = 0, source = 0;
+        std::int64_t start = 0, length = 0;
+        bool operator== (const ClipKey&) const = default;
+        auto operator<=> (const ClipKey&) const = default;
+    };
+    std::vector<ClipKey> clipKeys (const std::vector<int>& indices) const;
+    selhistory::History<ClipKey> selectionHistory;
+    std::vector<ClipKey> selectionAtPress;
+
+public:
+    void restoreSelection();
+    void previousView();
+    // --selftest / --uiperf edgescroll (round 190qe)
+    bool edgeScrollRunning() const noexcept { return edgeScroller.isRunning(); }
+    bool viewGlideRunning() const noexcept { return viewGlide.running; }
+    std::size_t viewStackDepth() const noexcept { return viewStack.depth(); }
+    bool feelFrameForTests (double nowMs) { return feelFrame (nowMs); }
+    juce::Rectangle<int> gridAreaForSnapshot() const { return gridArea(); }
+    OverviewBar& overviewForSnapshot() noexcept { return overview; }
+    std::vector<int> clipSelectionForSnapshot() const { return selection; }
+    viewstack::View viewNowForTests() const { return currentView(); }
+
+private:
 
     // Pattern Blocks (round 170f)
     friend class PatternBlocksView;

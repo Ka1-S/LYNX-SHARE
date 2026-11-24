@@ -351,6 +351,7 @@ public:
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
+    juce::Rectangle<float> windowAreaForSnapshot() const { return windowArea(); } // (round 190qe: --uiperf's UX-A10 drag)
 
 private:
     juce::Rectangle<float> windowArea() const;

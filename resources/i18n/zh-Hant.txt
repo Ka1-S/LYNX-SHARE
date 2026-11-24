@@ -12736,3 +12736,9 @@ countries: tw hk mo
 "MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI 片段：[LMB] 按一下或拖曳在此音軌上繪製一個  [2xLMB] 在片段上：在下方編輯其音符"
 "Move this rule up (the first matching rule wins)" = "上移此規則（第一個符合的規則生效）"
 "Move this rule down" = "下移此規則"
+# round 190qe (TOP-NEXT R1): Keep labels on screen, the view stack, Restore selection
+"Keep labels on screen" = "標籤保持在畫面內"
+"Previous view" = "上一個檢視"
+"Previous view (before the zoom to the selection)" = "上一個檢視（縮放到所選內容之前）"
+"Restore selection" = "還原選取"
+"No earlier selection to restore" = "沒有可還原的先前選取"
