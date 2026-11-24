@@ -2203,9 +2203,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     g.fillRect (grid.getX(), y, grid.getWidth(), h);
                     return;
                 }
+                const auto shade = groupShade (c); // (rollup 0.1.32 step 2: once per lane, not per span)
                 for (const auto& sp : spans)
                 {
-                    g.setColour (sp.dark ? groupShade (c) : c);
+                    g.setColour (sp.dark ? shade : c);
                     g.fillRect (sp.x0, y, sp.x1 - sp.x0, h);
                 }
             };
