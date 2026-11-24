@@ -12652,3 +12652,7 @@ countries: tr
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "Dışa aktarılan dosyanın adı. $project, $date veya $bpm gibi joker karakterler dışa aktarırken doldurulur. Bir / dosyayı dışa aktarma klasörünün içinde bu adlı bir klasöre koyar (gerekirse oluşturulur)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Boş slot: efekt eklemek için tıklayın, aramak için çift tıklayın veya orta tuşla tıklayın"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Parça efektleri: [LMB] mikser kanalına efekt ekle  [MMB] veya çift tıklama: efekt ara  (Tarayıcı'dan bir efekt buraya da bırakılabilir)"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "Dışa aktarmanın gideceği klasör: {0}. Dosya adında bir klasör varsa (bir /), Dışa aktar... dosyayı sormadan oraya yazar"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI klibi: [LMB] bu izde bir tane çizmek için tıklayın veya sürükleyin  [2xLMB] bir klipte: notalarını aşağıda düzenleyin"

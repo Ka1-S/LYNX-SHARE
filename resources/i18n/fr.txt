@@ -12652,3 +12652,7 @@ countries: fr be ch ca lu
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "Le nom du fichier exporté. Les jokers comme $project, $date ou $bpm sont remplis à l'export. Un / place le fichier dans un dossier de ce nom à l'intérieur du dossier d'export (créé si besoin)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Slot vide : cliquez pour ajouter un effet, double-cliquez ou cliquez avec la molette pour en chercher un"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Effets de la piste : [LMB] ajouter un effet à sa piste de mixage  [MMB] ou double-clic : en chercher un  (on peut aussi y déposer un effet du Navigateur)"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "Le dossier où va l'export : {0}. Avec un dossier dans le nom du fichier (un /), Exporter... écrit là sans demander le fichier"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "Clip MIDI : [LMB] cliquez ou faites glisser pour en dessiner un sur cette piste  [2xLMB] sur un clip : modifiez ses notes en bas"

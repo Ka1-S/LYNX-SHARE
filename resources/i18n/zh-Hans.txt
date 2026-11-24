@@ -12652,3 +12652,7 @@ countries: cn sg
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "导出文件的名称。导出时会填入 $project、$date 或 $bpm 等通配符。/ 会把文件放进导出文件夹内同名的文件夹（需要时自动创建）"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "空插槽：单击添加效果器，双击或中键单击可搜索"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "音轨效果：[LMB] 为其混音器轨道添加效果  [MMB] 或双击：搜索效果（也可从浏览器拖放到这里）"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "导出所去的文件夹：{0}。文件名中含有文件夹（/）时，“导出...”会直接写到那里，不再询问文件"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI 片段：[LMB] 单击或拖动在此轨道上绘制一个  [2xLMB] 在片段上：在下方编辑其音符"

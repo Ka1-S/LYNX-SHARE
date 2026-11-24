@@ -595,12 +595,16 @@ public:
         wildcardButton.setButtonText (tr ("Wildcards"));
         wildcardButton.setTooltip (tr ("Insert a wildcard at the cursor"));
         wildcardButton.onClick = [this] { showWildcards(); };
+        // round 190qp (#215 follow-up): the folder the export goes to, chosen here; with a folder in the file name
+        // (a typed /) Export... writes there without the file dialog (REAPER's render directory + file name)
+        folderButton.setButtonText (tr ("Folder..."));
+        folderButton.onClick = [this] { chooseExportFolder(); };
         namePreview.setFont (theme::font (theme::type::small));
         namePreview.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         namePreview.setMinimumHorizontalScale (0.7f);
-        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &folderButton, &namePreview })
             addChildComponent (c);
-        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &namePreview })
+        for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &folderButton, &namePreview })
             c->setVisible (naming);
 
         exportButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
@@ -774,6 +778,8 @@ public:
             auto row = block.removeFromTop (26);
             nameLabel.setBounds (row.removeFromLeft (theme::labelColumnWidth ({ &nameLabel }, 92, 150)));
             wildcardButton.setBounds (row.removeFromRight (juce::jlimit (96, 160, wildcardButton.getBestWidthForHeight (26))));
+            row.removeFromRight (6);
+            folderButton.setBounds (row.removeFromRight (juce::jlimit (80, 140, folderButton.getBestWidthForHeight (26))));
             row.removeFromRight (8);
             nameEditor.setBounds (row);
             block.removeFromTop (2);
@@ -1189,20 +1195,60 @@ private:
         return juce::String::fromUTF8 (exportnaming::resolve (options.nameTemplate, namingContext(), stems).c_str());
     }
 
+    // Round 190qp (#215 follow-up: "/BOUNCE/..." still opened the file manager): a file name with a folder part names the
+    // folder and the file, so Export... writes there at once (a file already there: asked once, as Same as last time).
+    // A plain name keeps FL's order: the file dialog, opening in the export folder. (Not for track renders straight to
+    // their "Record to" files, nor the demo takes: chooseFile handles those first.)
+    bool writesWithoutDialog() const { return naming && exportnaming::hasFolders (options.nameTemplate); }
+    juce::File directTarget() const { return exportFolder().getChildFile (resolvedName() + juce::String (exportopts::extension (options.format))); }
+
+    void chooseExportFolder()
+    {
+        folderChooser = lynx::ui::makeFileChooser (tr ("Select the folder where output should be rendered..."), exportFolder(), {});
+        lynx::ui::launchChooser (folderChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                                 [safe = juce::Component::SafePointer<ExportPanel> (this)] (const juce::FileChooser& fc) {
+                                     if (safe == nullptr)
+                                         return;
+                                     if (const auto dir = fc.getResult(); dir.isDirectory())
+                                         safe->setExportFolder (dir);
+                                 });
+    }
+
+public:
+    void setExportFolder (const juce::File& dir)
+    {
+        lastFolder = dir;
+        refreshName();
+    }
+    bool writesWithoutDialogForCheck() { readControls(); return writesWithoutDialog(); }
+    void clickExportForCheck() { chooseFile(); }
+    juce::File directTargetForCheck() const { return directTarget(); }
+    juce::File exportFolderForCheck() const { return exportFolder(); }
+    // the Export button's path without the system dialog: true when it wrote / would write without asking (the file is
+    // `*started`); false when it would open the file dialog
+    std::function<void (const juce::File&)> startExportForCheck;
+    static juce::File baseFolderAfterForCheck() { return lastFolder; }
+
+private:
     void refreshName()
     {
         if (! naming)
             return;
         const auto ext = juce::String (exportopts::extension (options.format));
-        auto text = tr ("File:") + " " + resolvedName() + ext;
+        // round 190qp: with folders in the name Export... writes straight there, so the line shows the whole path
+        auto text = tr ("File:") + " " + (writesWithoutDialog() ? directTarget().getFullPathName() : resolvedName() + ext);
         if (options.stems != exportopts::Stems::none)
         {
             const auto base = resolvedName().toStdString();
             const auto example = juce::String::fromUTF8 (exportopts::stemFileName (base, 1, "Kick", exportopts::extension (options.format)).c_str());
             text = tr ("Stems:") + " " + example + ", ...";
+            if (writesWithoutDialog())
+                text = tr ("Stems:") + " " + exportFolder().getChildFile (example).getFullPathName() + ", ...";
         }
         namePreview.setText (text, juce::dontSendNotification);
         namePreview.setTooltip (text);
+        folderButton.setTooltip (tr ("The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file",
+                                     { exportFolder().getFullPathName() }));
     }
 
     void showWildcards()
@@ -1502,6 +1548,30 @@ private:
             }
 
         auto folder = exportFolder();
+        // round 190qp (#215 follow-up): a folder in the file name: written there, no file dialog
+        if (writesWithoutDialog())
+        {
+            const auto target = directTarget();
+            const auto write = [folder, target] (ExportPanel& panel) {
+                makeFoldersFor (target, folder);
+                panel.startExport (target, folder);
+            };
+            if (target.existsAsFile())
+            {
+                auto* w = new juce::AlertWindow (tr ("Export audio"), tr ("{0} already exists. Replace it?", { target.getFullPathName() }),
+                                                 juce::MessageBoxIconType::QuestionIcon);
+                w->addButton (tr ("Replace"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+                w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+                w->enterModalState (true, juce::ModalCallbackFunction::create ([write, safe = juce::Component::SafePointer<ExportPanel> (this)] (int result) {
+                                        if (result == 1 && safe != nullptr)
+                                            write (*safe);
+                                    }),
+                                    true);
+                return;
+            }
+            write (*this);
+            return;
+        }
         // issue #215 (round 190ng): the name the template gives ("$project" = the project's name, as before)
         const auto name = naming ? resolvedName() : suggestedName;
         // issue #215 follow-up (round 190qb): a template with folders ("BOUNCE/$project") makes them inside the export
@@ -1510,7 +1580,7 @@ private:
         const auto made = makeFoldersFor (target, folder);
         chooser = lynx::ui::makeFileChooser (tr ("Export audio"), target, "*" + extension);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [this, extension, made] (const juce::FileChooser& fc) {
+                              [this, extension, made, folder, offered = target.getParentDirectory()] (const juce::FileChooser& fc) {
                                   auto file = fc.getResult();
 
                                   if (file == juce::File())
@@ -1523,7 +1593,9 @@ private:
 
                                   if (! file.hasFileExtension (extension))
                                       file = file.withFileExtension (extension);
-                                  startExport (file);
+                                  // round 190qp: the file kept in the folder the template made: the export folder stays
+                                  // the one above it (it became ".../BOUNCE", so the next export went to BOUNCE/BOUNCE)
+                                  startExport (file, file.getParentDirectory() == offered ? folder : juce::File());
                               });
     }
 
@@ -1543,14 +1615,21 @@ private:
     }
 
     // Renders to `file` with the window's choices (the file dialog's result, or "Same as last time"). Closes the window.
-    void startExport (juce::File file)
+    // `base`: the export folder for next time when the name's own folders put the file below it (none: the file's folder)
+    void startExport (juce::File file, juce::File base = {})
     {
+        if (startExportForCheck)
+        {
+            lastFolder = base != juce::File() ? base : file.getParentDirectory();
+            startExportForCheck (file);
+            return;
+        }
         const auto o = options;
         auto& engineRef = engine;
         const auto tracks = onlyTracks;
         const auto after = afterRender;
         const auto inRealTime = realtime;
-        lastFolder = file.getParentDirectory();
+        lastFolder = base != juce::File() ? base : file.getParentDirectory();
         // round 190ap: what "Same as last time" repeats (the plain Export window only)
         if (persistent && additions)
             exportLastFile().replaceWithText (juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));
@@ -1641,6 +1720,8 @@ private:
     juce::Label nameLabel, namePreview;
     juce::TextEditor nameEditor;
     juce::TextButton wildcardButton;
+    juce::TextButton folderButton; // round 190qp
+    std::unique_ptr<juce::FileChooser> folderChooser;
     juce::Time nowForNaming; // (--issues190ngshot: a fixed time; else now)
 
     static inline juce::File lastFolder;
@@ -2632,6 +2713,62 @@ std::unique_ptr<juce::Component> makeExportPanelWithAdditions (AudioEngine& engi
 std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, const std::vector<int>& tracks)
 {
     return std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false, 0, tracks);
+}
+
+juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& folder, const juce::String& shotPrefix)
+{
+    juce::StringArray failed;
+    const auto expect = [&failed] (const char* what, bool ok, const juce::String& detail = {}) {
+        if (! ok)
+            failed.add (juce::String (what) + (detail.isEmpty() ? juce::String() : " (" + detail + ")"));
+    };
+    folder.createDirectory();
+    const auto before = ExportPanel::baseFolderAfterForCheck();
+    {
+        ExportPanel panel (engine, folder, "Song", false, 0);
+        panel.setSize (620, panel.getHeight());
+        panel.setExportFolder (folder);
+        std::vector<juce::File> started;
+        panel.startExportForCheck = [&started] (const juce::File& f) { started.push_back (f); };
+        const auto when = juce::Time (2026, 10, 23, 22, 21, 0, 0, true);
+        panel.setNameTemplateForSnapshot ("/BOUNCE/$project_D$day-M$month-Y$year", when);
+        const auto wanted = folder.getChildFile ("BOUNCE").getChildFile ("Song_D23-M11-Y2026.wav");
+        expect ("folder template writes without the dialog", panel.writesWithoutDialogForCheck());
+        expect ("its target", panel.directTargetForCheck() == wanted, panel.directTargetForCheck().getFullPathName());
+        expect ("the preview shows the whole path", panel.namePreviewForSnapshot().contains (wanted.getFullPathName()), panel.namePreviewForSnapshot());
+        if (shotPrefix.isNotEmpty())
+            for (const auto scale : { 1.0f, 1.5f })
+            {
+                const juce::File png (shotPrefix + (scale > 1.0f ? "-export-folder-name@150.png" : "-export-folder-name.png"));
+                png.deleteFile();
+                juce::FileOutputStream out (png);
+                juce::PNGImageFormat().writeImageToStream (panel.createComponentSnapshot (panel.getLocalBounds(), true, scale), out);
+            }
+        // Export...: no file dialog, the file in BOUNCE (made), the export folder stays the one above it
+        panel.clickExportForCheck();
+        expect ("Export... started the export at once", started.size() == 1 && started.front() == wanted,
+                started.empty() ? juce::String ("nothing") : started.front().getFullPathName());
+        expect ("the BOUNCE folder was made", folder.getChildFile ("BOUNCE").isDirectory());
+        expect ("the export folder stays (no BOUNCE/BOUNCE next time)", ExportPanel::baseFolderAfterForCheck() == folder,
+                ExportPanel::baseFolderAfterForCheck().getFullPathName());
+        panel.clickExportForCheck();
+        expect ("a second export goes to the same file", started.size() == 2 && started.back() == wanted);
+        // the file is there: asked first (Replace / Cancel), nothing started until then
+        wanted.replaceWithText ("x");
+        panel.clickExportForCheck();
+        auto* modal = juce::Component::getCurrentlyModalComponent();
+        expect ("an existing file asks first", started.size() == 2 && dynamic_cast<juce::AlertWindow*> (modal) != nullptr);
+        if (auto* alert = dynamic_cast<juce::AlertWindow*> (modal))
+            delete alert;
+        wanted.deleteFile();
+        // a plain name keeps FL's order: the file dialog
+        panel.setNameTemplateForSnapshot ("$project_$bpm", when);
+        expect ("a plain name opens the file dialog", ! panel.writesWithoutDialogForCheck());
+        expect ("its preview is the name alone", ! panel.namePreviewForSnapshot().contains (folder.getFullPathName()), panel.namePreviewForSnapshot());
+        panel.setExportFolder (before);
+    }
+    folder.getChildFile ("BOUNCE").deleteRecursively();
+    return failed.isEmpty() ? juce::String ("OK") : "ERROR " + failed.joinIntoString ("; ");
 }
 
 std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine)

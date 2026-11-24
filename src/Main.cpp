@@ -3573,6 +3573,17 @@ public:
             quit();
             return;
         }
+        // --hotfix190qpwfshot <prefix> (round 190qp, 0.1.31.1 hotfix): src/Hotfix190qpWf.inc, its checks and pictures
+        if (args.contains ("--hotfix190qpwfshot"))
+        {
+            const auto prefix = args[args.indexOf ("--hotfix190qpwfshot") + 1].unquoted();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            const auto r = hotfix190qpWfCheck (prefix);
+            juce::File (prefix + "-checks.txt").replaceWithText ("hotfix190qp_wf=" + r + "\n");
+            setApplicationReturnValue (r == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
         // --issuesshot190qb <prefix> (round 190qb, follow-ups of issues #206 and #215): src/IssuesShot190qb.inc
         if (args.contains ("--issuesshot190qb"))
         {
@@ -10663,6 +10674,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
+        const auto hotfix190qpWfResult = hotfix190qpWfCheck(); // round 190qp (0.1.31.1): track clips' notes, Export... with folders
         const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
         const auto determinismResult = lynx::determinism190po::check(); // round 190po: one render on any threads (Windows' x87)
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
@@ -10678,6 +10690,7 @@ private:
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
+                        && hotfix190qpWfResult == "OK" // (round 190qp)
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -10796,6 +10809,7 @@ private:
                << "chordlane190pf=" << chordlane190pfResult << "\n"
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "determinism190po=" << determinismResult << "\n"
+               << "hotfix190qp_wf=" << hotfix190qpWfResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -20627,6 +20641,7 @@ private:
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
 #include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
+#include "Hotfix190qpWf.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes; Export... with folders in the name)
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

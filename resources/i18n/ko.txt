@@ -12652,3 +12652,7 @@ countries: kr
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "내보낸 파일의 이름입니다. $project, $date, $bpm 같은 와일드카드는 내보낼 때 채워집니다. / 를 넣으면 내보내기 폴더 안의 그 이름의 폴더에 파일을 넣습니다 (필요하면 만듦)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "빈 슬롯: 클릭하여 이펙트 추가, 더블 클릭 또는 가운데 클릭으로 검색"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "트랙 이펙트: [LMB] 믹서 트랙에 이펙트 추가  [MMB] 또는 더블 클릭: 검색  (브라우저에서 여기로 드롭해도 됨)"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "내보내기가 저장되는 폴더: {0}. 파일 이름에 폴더(/)가 있으면 내보내기...가 파일을 묻지 않고 그곳에 씁니다"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI 클립: [LMB] 클릭하거나 드래그해서 이 트랙에 그리기  [2xLMB] 클립에서: 아래에서 노트 편집"

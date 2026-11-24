@@ -12652,3 +12652,7 @@ countries: nl be
 "The exported file's name. Wildcards such as $project, $date or $bpm are filled in when you export. A / puts the file in a folder of that name inside the export folder (made when needed)" = "De naam van het geëxporteerde bestand. Jokertekens zoals $project, $date of $bpm worden ingevuld bij het exporteren. Een / zet het bestand in een map met die naam in de exportmap (wordt zo nodig gemaakt)"
 "Empty slot: click to add an effect, double-click or middle-click to search for one" = "Leeg slot: klik om een effect toe te voegen, dubbelklik of middelklik om er een te zoeken"
 "Track effects: [LMB] add an effect to its mixer track  [MMB] or double-click: search for one  (drop one from the Browser here too)" = "Spooreffecten: [LMB] een effect aan het mixerspoor toevoegen  [MMB] of dubbelklik: er een zoeken  (een effect uit de Browser kan hier ook neergezet worden)"
+
+# round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
+"The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "De map waar de export heen gaat: {0}. Met een map in de bestandsnaam (een /) schrijft Exporteren... daarheen zonder naar het bestand te vragen"
+"MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI-clip: [LMB] klik of sleep om er een op dit spoor te tekenen  [2xLMB] op een clip: bewerk de noten hieronder"

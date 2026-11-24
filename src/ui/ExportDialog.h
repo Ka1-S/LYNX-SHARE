@@ -106,6 +106,11 @@ std::unique_ptr<juce::Component> makeExportPanelWithAdditions (AudioEngine& engi
 std::unique_ptr<juce::Component> makeExportPanelWithName (AudioEngine& engine, const juce::String& projectName, const juce::String& templ, juce::Time now,
                                                           juce::String& preview, juce::String& resolved, int stems = 0);
 std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, const std::vector<int>& tracks);
+// Round 190qp (#215 follow-up): the Export button with a folder in the file name writes into the export folder without the
+// file dialog. Runs the real panel on `folder` (a scratch folder the check may write into; nothing is rendered: the
+// export is caught where it would start) and returns "OK" or what failed; `shotPrefix` not empty: the window at 100 %
+// and 150 % (<prefix>-export-folder-name.png / @150).
+juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& folder, const juce::String& shotPrefix = {});
 // The render window of "Render as audio clip" (a pattern render: WAV, no file dialog; round 190gk's shot of FL's
 // Start button). Nothing renders.
 std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine);
