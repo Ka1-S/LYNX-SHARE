@@ -1956,11 +1956,19 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             if (n.slide) // slide mark: FL's manual (Piano roll): "slide notes have a small triangle on the right" (round 190kn, DE-80)
             {
-                juce::Path arrow;
-                const auto w = juce::jmin (7.0f, juce::jmax (3.0f, r.getWidth() - 4.0f));
-                arrow.addTriangle (r.getRight() - 2.0f - w, r.getBottom() - 2.0f, r.getRight() - 2.0f - w, r.getY() + 2.0f, r.getRight() - 2.0f, r.getCentreY());
-                g.setColour (bg0.withAlpha (0.65f));
-                g.fillPath (arrow);
+                // issue #272 (round 190qo, FL 2026 capture shots/fl/272-fl-slide-mark-x8.png): FL's mark is a small right
+                // triangle, its right angle at the bottom right (◢), 7 x 7 px on a 15 px note, centred in the note's
+                // height, its right side 2 px in from the note's right edge. LYNX drew a ▶ wedge over the note's whole
+                // height, which looked like a differently shaped note.
+                const auto size = juce::jmin (7.0f, r.getHeight() - 4.0f, juce::jmax (3.0f, r.getWidth() - 4.0f));
+                if (size >= 2.0f)
+                {
+                    const auto right = r.getRight() - 2.0f, bottom = r.getCentreY() + size * 0.5f;
+                    juce::Path mark;
+                    mark.addTriangle (right - size, bottom, right, bottom, right, bottom - size);
+                    g.setColour (bg0.withAlpha (0.65f));
+                    g.fillPath (mark);
+                }
             }
 
             if (gesture::noteLabelFits (r.getWidth(), rowHeight)) // the note's name, readable on its colour
