@@ -12656,3 +12656,5 @@ countries: tw hk mo
 # round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
 "The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "匯出所去的資料夾：{0}。檔名中含有資料夾（/）時，「匯出...」會直接寫到那裡，不再詢問檔案"
 "MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "MIDI 片段：[LMB] 按一下或拖曳在此音軌上繪製一個  [2xLMB] 在片段上：在下方編輯其音符"
+"Move this rule up (the first matching rule wins)" = "上移此規則（第一個符合的規則生效）"
+"Move this rule down" = "下移此規則"

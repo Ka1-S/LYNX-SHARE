@@ -12656,3 +12656,5 @@ countries: fr be ch ca lu
 # round 190qp (0.1.31.1 hotfix): Export... with a folder in the name, the Simple layout's MIDI clip hint
 "The folder the export goes to: {0}. With a folder in the file name (a /), Export... writes there without asking for the file" = "Le dossier où va l'export : {0}. Avec un dossier dans le nom du fichier (un /), Exporter... écrit là sans demander le fichier"
 "MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "Clip MIDI : [LMB] cliquez ou faites glisser pour en dessiner un sur cette piste  [2xLMB] sur un clip : modifiez ses notes en bas"
+"Move this rule up (the first matching rule wins)" = "Monter cette règle (la première règle qui correspond l'emporte)"
+"Move this rule down" = "Descendre cette règle"
