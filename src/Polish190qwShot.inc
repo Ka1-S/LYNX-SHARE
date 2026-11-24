@@ -1,5 +1,5 @@
     // --polish190qwshot <prefix> [project] (round 190qw, design polish pass + the Soft look, queue item 67): the Soft look's
-    // checks (off by default, saved in the theme and read back, the Channel rack's 26 px rows, the plugin header's 36 px),
+    // checks (off by default, saved in the theme and read back, the palette stamp renewed),
     // then every main view of the three layouts (the --design190ojshot set, 100 % and @150) in the default look
     // (<prefix>-default-*) and in the Soft look (<prefix>-soft-*), and the Settings pages in the Soft look
     // (<prefix>-soft-settings-*). <prefix>-checks.txt ends with result=OK / FAIL. Included in the app class of Main.cpp.
@@ -30,20 +30,13 @@
                std::count_if (std::begin (extras::items), std::end (extras::items), [] (const extras::Item& i) { return i.id == "theme.softLook"; }) == 1);
 
         {
-            AudioEngine offline (false);
-            ChannelRackComponent rack (offline);
-            const auto before = ChannelRackComponent::rowHeight;
+            // (the Channel rack keeps FL's 30 px row pitch in both looks: the Soft plates are drawn slimmer inside it)
+            static_assert (ChannelRackComponent::rowHeight == 30);
             auto soft = start;
             soft.soft = true;
             themeui::apply (soft, false);
-            rack.sendLookAndFeelChange();
-            const auto softRows = ChannelRackComponent::rowHeight;
             const auto softTile = theme::paletteStampNow();
             themeui::apply (start, false);
-            rack.sendLookAndFeelChange();
-            check ("Channel rack rows: " + juce::String (before) + " px, Soft " + juce::String (softRows) + " px, back to "
-                       + juce::String (ChannelRackComponent::rowHeight) + " px",
-                   before == 30 && softRows == 26 && ChannelRackComponent::rowHeight == 30);
             check ("switching the look renews the palette stamp (the cached steps and plates are drawn again)", theme::paletteStampNow() != softTile);
             check ("Soft: user colours muted, the default look leaves them", theme::softened (juce::Colour (0xffe03020)) == juce::Colour (0xffe03020));
             soft.soft = true;

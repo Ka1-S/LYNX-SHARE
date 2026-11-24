@@ -199,7 +199,6 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     engine.addChangeListener (this);
     engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });
-    rowHeight = rowHeightForLook(); // (round 190qw: the Soft look's rows)
     updateSize();
     showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30); // (stopped while hidden; round 174f)
 }
@@ -424,22 +423,6 @@ void ChannelRackComponent::groupSelected()
                                  setFilterGroup (group);
                              }),
                              true);
-}
-
-int ChannelRackComponent::rowHeightForLook() noexcept
-{
-    return theme::soft() ? 26 : 30; // (round 190qw: the Soft look's slimmer rows, as sidthenugget asked on Discord, 11-23)
-}
-
-void ChannelRackComponent::lookAndFeelChanged()
-{
-    // round 190qw: a theme change (ThemeSettings sends every window a look-and-feel change) may switch the Soft look
-    if (const auto h = rowHeightForLook(); h != rowHeight)
-    {
-        rowHeight = h;
-        updateSize();
-    }
-    repaint();
 }
 
 void ChannelRackComponent::updateSize()
@@ -1300,7 +1283,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
             const auto& channel = song.channels[(std::size_t) row];
             const auto selected = ! autoOnly && std::binary_search (selection.begin(), selection.end(), row); // (round 190ow)
-            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
+            // (round 190qw: the Soft look's slimmer plate, 20 px in FL's 30 px row)
+            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + (theme::soft() ? 5.0f : 3.0f), (float) nameWidth,
+                                                          (float) rowHeight - (theme::soft() ? 10.0f : 6.0f));
 
             if (selected) // selected rows are subtly lifted
             {
@@ -1837,7 +1822,9 @@ void ChannelRackComponent::paintAutomationButton (juce::Graphics& g, int a, int 
         g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (high), 1.0f);
         g.drawLine (juce::Line<float> (low + along, high - along), 1.0f);
     }
-    const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
+    // (round 190qw: the Soft look's slimmer plate, 20 px in FL's 30 px row)
+    const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + (theme::soft() ? 5.0f : 3.0f), (float) nameWidth,
+                                                  (float) rowHeight - (theme::soft() ? 10.0f : 6.0f));
     if (rest && theme::soft()) // (round 190qw: the Soft look's plate, as the channels' above it)
     {
         const auto own = automation.colour != 0 ? theme::tame (juce::Colour (automation.colour)) : bg6.brighter (0.2f);
