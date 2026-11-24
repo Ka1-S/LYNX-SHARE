@@ -1,4 +1,5 @@
 #include "ui/WindowAudio.h"
+#include "ui/Notices.h" // round 190qx
 
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
@@ -252,7 +253,8 @@ void Link::reopen()
     gave = false;
     if (error.isNotEmpty() || openDevice (devices).empty())
     {
-        ui::postHint ({ tr ("Could not open the audio device {0}", { shown (deviceOf (wanted.get())) }) }, 5000);
+        ui::notify ({ ui::Notice::Kind::problem, tr ("Could not open the audio device {0}", { shown (deviceOf (wanted.get())) }),
+                      tr ("Settings › Audio chooses another one."), {}, {}, 0, "audio.deviceOpen" }); // (round 190qx: a notice)
         devices.restartLastAudioDevice();
     }
     else if (savingOff)

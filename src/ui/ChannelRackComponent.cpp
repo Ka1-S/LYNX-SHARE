@@ -16,6 +16,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/Notices.h" // round 190qx
 #include "core/NoteRepeat.h"
 #include "ui/PaintAB.h"
 #include "ui/ImageCaches.h"
@@ -4557,8 +4558,9 @@ void ChannelRackComponent::openPluginWindow (int channel)
         return;
     }
 
-    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Plugin"),
-                                            tr ("This plugin could not be loaded (it is not installed or has not been scanned)."));
+    // round 190qx: a notice, not a box to click away (the plugin's name in it)
+    const auto& channels = engine.getSong().channels;
+    ui::pluginNotLoaded (juce::isPositiveAndBelow (channel, (int) channels.size()) ? juce::String::fromUTF8 (channels[(std::size_t) channel].plugin.name.c_str()) : juce::String());
 }
 
 void ChannelRackComponent::rename (int channel)

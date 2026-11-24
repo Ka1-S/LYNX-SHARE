@@ -329,24 +329,88 @@ inline const char* emptyText (EmptyHint h) noexcept
 }
 
 // --- contextual tips ----------------------------------------------------------------------------------------------------
-enum class Tip : int { songModeEmpty = 0, recordNoInput };
-constexpr int tipCount = 2;
+enum class Tip : int
+{
+    songModeEmpty = 0,
+    recordNoInput,
+    // round 190qx (the owner's "make the options easy"): one gentle tip the first time a complex window opens
+    mixerRouting,
+    pianoRoll,
+    tracker,
+    deviceView,
+    automationLanes
+};
+constexpr int tipCount = 7;
 
-inline const char* tipId (Tip t) noexcept { return t == Tip::songModeEmpty ? "songModeEmpty" : "recordNoInput"; }
+// the window tips (shown once each, the first time their window opens; not the one-per-session confusion tips)
+constexpr bool isWindowTip (Tip t) noexcept { return (int) t >= (int) Tip::mixerRouting; }
+
+inline const char* tipId (Tip t) noexcept
+{
+    switch (t)
+    {
+        case Tip::songModeEmpty: return "songModeEmpty";
+        case Tip::recordNoInput: return "recordNoInput";
+        case Tip::mixerRouting: return "mixerRouting";
+        case Tip::pianoRoll: return "pianoRoll";
+        case Tip::tracker: return "tracker";
+        case Tip::deviceView: return "deviceView";
+        case Tip::automationLanes: return "automationLanes";
+    }
+    return "";
+}
 
 inline const char* tipTitle (Tip t) noexcept
 {
-    return t == Tip::songModeEmpty ? TR_NOOP ("Nothing to play in Song mode yet") : TR_NOOP ("No input to record from yet");
+    switch (t)
+    {
+        case Tip::songModeEmpty: return TR_NOOP ("Nothing to play in Song mode yet");
+        case Tip::recordNoInput: return TR_NOOP ("No input to record from yet");
+        case Tip::mixerRouting: return TR_NOOP ("Tip: sending one insert into another");
+        case Tip::pianoRoll: return TR_NOOP ("Tip: drawing notes");
+        case Tip::tracker: return TR_NOOP ("Tip: typing notes in the Tracker");
+        case Tip::deviceView: return TR_NOOP ("Tip: a track's devices");
+        case Tip::automationLanes: return TR_NOOP ("Tip: automation lanes");
+    }
+    return "";
 }
 
 inline const char* tipText (Tip t) noexcept
 {
-    return t == Tip::songModeEmpty
-               ? TR_NOOP ("Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist.")
-               : TR_NOOP ("To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one.");
+    switch (t)
+    {
+        case Tip::songModeEmpty:
+            return TR_NOOP ("Song mode plays the Playlist, and it's empty. Switch to Pattern to hear the pattern you're editing, or place it in the Playlist.");
+        case Tip::recordNoInput:
+            return TR_NOOP ("To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one.");
+        case Tip::mixerRouting:
+            return TR_NOOP ("Select an insert, then click the arrow at the bottom of another one to send its sound there. Right-click the arrow for a sidechain.");
+        case Tip::pianoRoll:
+            return TR_NOOP ("Click to draw a note and right-click to delete it. The lane at the bottom sets each note's velocity.");
+        case Tip::tracker:
+            return TR_NOOP ("Turn Edit on and type notes with the typing keyboard's two rows. 1 ends a note; the hint bar names the field under the cursor.");
+        case Tip::deviceView:
+            return TR_NOOP ("The selected track's instrument and effects, in the order the sound goes through them. Drop an effect from the Browser onto the row to add it.");
+        case Tip::automationLanes:
+            return TR_NOOP ("Each lane under a track draws one control's automation. Click to add a point, drag to move it, right-click for its menu.");
+    }
+    return "";
 }
 
-inline const char* tipAction (Tip t) noexcept { return t == Tip::songModeEmpty ? TR_NOOP ("Switch to Pattern") : TR_NOOP ("Audio settings..."); }
+inline const char* tipAction (Tip t) noexcept
+{
+    switch (t)
+    {
+        case Tip::songModeEmpty: return TR_NOOP ("Switch to Pattern");
+        case Tip::recordNoInput: return TR_NOOP ("Audio settings...");
+        case Tip::mixerRouting:
+        case Tip::pianoRoll:
+        case Tip::tracker:
+        case Tip::deviceView:
+        case Tip::automationLanes: return TR_NOOP ("How to use this...");
+    }
+    return "";
+}
 
 // The confusion signals
 // Play pressed in Song mode, in the Pattern layout, with nothing in the Playlist
@@ -458,6 +522,12 @@ public:
         return ! shownThisSession && ! s.tipsOff && ! s.hintsOff && (s.tipsSeen & (1u << (std::uint32_t) t)) == 0;
     }
     void shown() noexcept { shownThisSession = true; }
+    // round 190qx: a window tip shows the first time its window opens (once ever: it is retired as it shows), with no
+    // other tip on screen; "No more tips" (or Settings › General's "Show tips" off) and the hints off stop them too
+    static bool canShowWindowTip (Tip t, const State& s, bool otherTipShown) noexcept
+    {
+        return isWindowTip (t) && ! otherTipShown && ! s.tipsOff && ! s.hintsOff && (s.tipsSeen & (1u << (std::uint32_t) t)) == 0;
+    }
     bool shownForCheck() const noexcept { return shownThisSession; }
     static void gotIt (State& s, Tip t) noexcept { s.tipsSeen |= 1u << (std::uint32_t) t; }
     static void noMoreTips (State& s) noexcept { s.tipsOff = true; }

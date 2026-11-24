@@ -149,6 +149,9 @@
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/ActionSearch.h" // round 190nq (#228)
+#include "ui/HowTo.h" // round 190qx
+#include "ui/Notices.h" // round 190qx
+#include "ui/TrackerComponent.h"
 #include "core/ExtrasDefaults.h" // round 190qk: which extras are on by default, the user-set list
 #include "core/LynxExtras.h" // round 190on (P2: the command palette lists the extras)
 #include "ui/SettingsPages.h"
@@ -350,6 +353,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         autolookui::load(); // issue #239 (round 190od): the user's automatic colour / icon rules
         loadOnboarding(); // round 190np: the welcome card's answer, the Next-3 ticks, the tips seen
         onboardingOn = true;
+        // round 190qx: once per version (not on a first start), a notice names what is new for finding your way
+        juce::Timer::callAfterDelay (5000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->showWhatsNewNotice();
+        });
         if (std::exchange (showExtendedHintAfterLoad, false)) // round 190mr (DF-49)
             showExtendedHint (true);
         // the start-up song follows Options › Mixer too (round 163) and the automatic crossfades of new projects (166e)
@@ -808,6 +816,25 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         saveUiSettings();
     };
     workspace.onPanelMenu = [this] (Panel panel, juce::PopupMenu& menu) { addPanelMenuItems (panel, menu); };
+    // round 190qx: each panel's "How to use this..." (the Playlist's panel holds the clip grid / the Simple timeline there)
+    workspace.howToFor = [this] (Panel panel) {
+        if (panel == Panel::playlist && layoutStyle == layoutstyle::Style::clipLaunch)
+            return howto::Window::clipGrid;
+        if (panel == Panel::playlist && layoutStyle == layoutstyle::Style::simple)
+            return howto::Window::simple;
+        const howto::Window guides[] = { howto::Window::playlist, howto::Window::channelRack, howto::Window::pianoRoll, howto::Window::mixer, howto::Window::browser };
+        return guides[juce::jlimit (0, workspace::panelCount - 1, (int) panel)];
+    };
+    // round 190qx: the notices' window, and the one-time tip of an automation lane
+    ui::addNoticeHost (this);
+    ui::openPluginManager = [safe = juce::Component::SafePointer<MainComponent> (this)] {
+        if (safe != nullptr)
+            safe->showPluginManager();
+    };
+    howto::onWindowShown = [safe = juce::Component::SafePointer<MainComponent> (this)] (howto::Window w, juce::Component*) {
+        if (safe != nullptr && w == howto::Window::automation)
+            safe->maybeShowWindowTip (onboarding::Tip::automationLanes, &safe->playlist);
+    };
     workspace.onFocusChanged = [this] (Panel panel) {
         refreshPanelButtons();
         // another panel took over (a click, F5..F9): the Browser's search box gives the keys back (issue #9)
@@ -1208,6 +1235,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    ui::removeNoticeHost (this); // (round 190qx)
+    howto::onWindowShown = nullptr;
     juce::Desktop::getInstance().removeGlobalMouseListener (&touchWatcher); // (round 190pm)
     windows::stop(); // (issue #232: "bye" to the other windows)
     windowAudio.reset();
@@ -2676,6 +2705,19 @@ std::vector<PaletteItem> MainComponent::commandPaletteItems()
         }
     }
     menuBar.getProperties().set ("lynxOneColumnMenu", false); // (getMenuForIndex set it for the View menu)
+    // round 190qx (OPTIONS.md: 128 options lived only in a window's own menu): the panels' menus too, under the window's name
+    {
+        const juce::ScopedValueSetter<bool> indexing (indexingMenusForPalette, true);
+        const std::pair<Panel, const char*> panels[] = { { Panel::playlist, TR_NOOP ("Playlist") }, { Panel::channelRack, TR_NOOP ("Channel Rack") },
+                                                         { Panel::pianoRoll, TR_NOOP ("Piano Roll") }, { Panel::mixer, TR_NOOP ("Mixer") },
+                                                         { Panel::browser, TR_NOOP ("Browser") } };
+        for (const auto& [panel, name] : panels)
+        {
+            juce::PopupMenu own;
+            addPanelMenuItems (panel, own);
+            addMenuItems (items, own, tr (name));
+        }
+    }
     // 3. the LYNX extras' switches, as Settings › LYNX extras switches them
     for (const auto& x : extras::items)
     {
@@ -2714,6 +2756,25 @@ std::vector<PaletteItem> MainComponent::commandPaletteItems()
             if (safe != nullptr)
                 safe->openSettings (page);
             return safe != nullptr;
+        };
+        items.push_back (std::move (p));
+    }
+    // 4b. round 190qx: every option of every Settings page — it opens the page with the option outlined
+    for (const auto& option : settingsOptions (engine, settingsHooks()))
+    {
+        PaletteItem p;
+        p.entry.kind = actionsearch::Kind::setting;
+        p.entry.id = ("setting:" + juce::String ((int) option.page) + ":" + option.text).toStdString();
+        p.entry.text = option.text.toStdString();
+        p.entry.english = option.english.toStdString();
+        p.entry.where = (tr ("Settings") + " > " + settingsPageName (option.page) + (option.section.isNotEmpty() ? " > " + option.section : juce::String()))
+                            .toStdString(); // (the palette's menu paths use ">" too)
+        p.run = [safe, page = (int) option.page, text = option.text] {
+            if (safe == nullptr)
+                return false;
+            safe->openSettings (page);
+            revealInSettings ((SettingsPage) page, text);
+            return true;
         };
         items.push_back (std::move (p));
     }
@@ -3615,8 +3676,7 @@ void MainComponent::connectBrowser (BrowserComponent& b)
         if (PatcherWindows::takeEffectFromBrowser (slot))
             return;
         if (! mixer.addEffectToSelected (std::move (slot)))
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin database"),
-                                                    tr ("The selected insert has no free effect slot."));
+            ui::notify ({ ui::Notice::Kind::problem, tr ("The selected insert has no free effect slot"), tr ("Remove an effect from it, or select another insert in the Mixer."), {}, {}, 0, "mixer.noFreeSlot" }); // (round 190qx: a notice)
         else
             showPanel (Panel::mixer);
     };
@@ -5949,7 +6009,7 @@ void MainComponent::togglePluginPicker()
         if (safe == nullptr)
             return;
         if (! safe->mixer.addEffectToSelected (std::move (slot)))
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Plugin picker"), tr ("The selected insert has no free effect slot."));
+            ui::notify ({ ui::Notice::Kind::problem, tr ("The selected insert has no free effect slot"), tr ("Remove an effect from it, or select another insert in the Mixer."), {}, {}, 0, "mixer.noFreeSlot" }); // (round 190qx: a notice)
         else
         {
             safe->showPanel (Panel::mixer);
@@ -6049,8 +6109,7 @@ void MainComponent::showQuickAdd()
     };
     targets.addEffect = [this] (EffectSlot slot) {
         if (! mixer.addEffectToSelected (std::move (slot)))
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Quick-add palette"),
-                                                    tr ("The selected insert has no free effect slot."));
+            ui::notify ({ ui::Notice::Kind::problem, tr ("The selected insert has no free effect slot"), tr ("Remove an effect from it, or select another insert in the Mixer."), {}, {}, 0, "mixer.noFreeSlot" }); // (round 190qx: a notice)
         else
             showPanel (Panel::mixer);
     };
@@ -8567,6 +8626,8 @@ void MainComponent::timerCallback()
     const auto showRemote = (remoteui::enabled() || remoteui::active() || remoteHistoryError.isNotEmpty()) && ! demo::active(); // (round 190np: --demo hides it)
     if (next3Card != nullptr && ++onboardingTicks % 15 == 0) // (round 190np: what the Next-3 items read from the view)
         onboardingTick();
+    if (onboardingOn && ++windowTipTicks % 15 == 0 && (tipInsideAnchor || windowTipsPending())) // (round 190qx: the window tips)
+        windowTipTick();
     remoteControlBar.setText (remoteHistoryError.isNotEmpty() ? remoteHistoryError : tr (remoteui::status()), juce::dontSendNotification);
     if (remoteControlBar.isVisible() != showRemote)
     {
@@ -9119,7 +9180,16 @@ void MainComponent::autosave()
             if (safe == nullptr)
                 return;
             if (! ok)
-                ui::postHint ({ tr ("Autosave failed: {0}", { error }), {}, false, false }, 6000);
+            {
+                // round 190qx (OPTIONS.md: a failed backup was easy to miss in the hint bar): a notice that stays until closed
+                ui::Notice n;
+                n.kind = ui::Notice::Kind::problem;
+                n.id = "autosave.failed";
+                n.text = tr ("The backup copy could not be written");
+                n.detail = tr ("{0}. Your changes are not saved yet: save the project (Ctrl+S).", { error.trimCharactersAtEnd (".") });
+                n.holdMs = 10 * 60 * 1000;
+                ui::notify (std::move (n));
+            }
             else
             {
                 safe->rotateBackups (stem);
@@ -9203,7 +9273,7 @@ void MainComponent::saveNewVersion()
     projectName = file.getFileNameWithoutExtension();
     importedSuffix = {};
     updateTitle();
-    ui::postHint ({ tr ("Saved as a new version: {0}", { file.getFileName() }), {}, false, false }, 5000);
+    ui::savedFile (tr ("Saved as a new version"), file); // (round 190qx: a notice with Show in folder)
 }
 
 void MainComponent::showVersions()
@@ -9643,7 +9713,7 @@ void MainComponent::saveToNewProjectFolder()
         self.projectName = name;
         self.importedSuffix = {};
         self.updateTitle();
-        ui::postHint ({ tr ("Saved in its own folder: {0}", { folder.getFullPathName() }), {}, false, false }, 5000);
+        ui::savedFile (tr ("Saved in its own folder"), folder); // (round 190qx)
     });
 }
 
@@ -10011,7 +10081,7 @@ void MainComponent::saveCopyForOlder()
                                                                                   copy.ok ? file.getFullPathName() : copy.error);
                                           return;
                                       }
-                                      ui::postHint ({ tr ("Saved a copy for LYNX SHARE {0}", { release }), file.getFileName() }, 6000);
+                                      ui::savedFile (tr ("Saved a copy for LYNX SHARE {0}", { release }), file); // (round 190qx)
                                   });
     }), true);
 }
@@ -10342,6 +10412,48 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
     }
 }
 
+// round 190qx: what's new for finding your way, once per version, as a notice (and in the hint bar)
+void MainComponent::showWhatsNewNotice()
+{
+    if (! onboardingOn || demo::active() || ! onboardui::profileExistedAtStart() || onboard.hintsOff || setupOverlay != nullptr)
+        return;
+    const auto file = PluginHost::settingsFolder().getChildFile ("whats-new-shown.txt");
+    const juce::String version (JUCE_APPLICATION_VERSION_STRING);
+    if (file.loadFileAsString().trim() == version)
+        return;
+    file.replaceWithText (version);
+    ui::Notice n;
+    n.kind = ui::Notice::Kind::info;
+    n.id = "whatsNew";
+    n.text = tr ("New: every window's menu has How to use this..., and Settings has Reset this page");
+    n.detail = tr ("The ? palette finds any setting too: type a few words, Enter shows it in Settings.");
+    n.actionText = tr ("How to use Settings");
+    n.action = [] { howto::show (howto::Window::settings, nullptr); };
+    n.holdMs = 12000;
+    ui::notify (std::move (n));
+}
+
+// round 190qx: where a "How to use..." card points (the window it is about, when it shows)
+juce::Component* MainComponent::guideAnchor (howto::Window w)
+{
+    juce::Component* c = nullptr;
+    switch (w)
+    {
+        case howto::Window::playlist:
+        case howto::Window::automation: c = &playlist; break;
+        case howto::Window::channelRack: c = &rack; break;
+        case howto::Window::pianoRoll: c = &pianoRoll; break;
+        case howto::Window::mixer: c = &mixer; break;
+        case howto::Window::browser: c = &browser; break;
+        case howto::Window::clipGrid: c = clipGridView.get(); break;
+        case howto::Window::deviceView: c = detailView.get(); break;
+        case howto::Window::simple: c = &playlist; break; // (the Simple timeline is the Playlist)
+        case howto::Window::tracker: c = findToolWindow ("tracker"); break;
+        case howto::Window::settings: c = findToolWindow ("settings"); break;
+    }
+    return c != nullptr && c->isShowing() ? c : nullptr;
+}
+
 void MainComponent::openSettings (int page)
 {
     lastSettingsPage = page; // (issue #181: Ctrl+, opens this page next time)
@@ -10356,6 +10468,19 @@ SettingsHooks MainComponent::settingsHooks()
     hooks.browserFoldersChanged = [safe] {
         if (safe != nullptr)
             safe->browser.reloadUserFolders();
+    };
+    // round 190qx: Settings › General › Hints and warnings "Show tips and hints" (Help's item; on again also undoes "No more tips")
+    hooks.tipsShown = [safe] { return safe != nullptr && ! safe->onboard.hintsOff && ! safe->onboard.tipsOff; };
+    hooks.showTips = [safe] (bool on) {
+        if (safe == nullptr)
+            return;
+        safe->onboard.hintsOff = ! on;
+        if (on)
+            safe->onboard.tipsOff = false;
+        safe->saveOnboarding();
+        if (! on)
+            safe->closeTip();
+        safe->updateEmptyHint();
     };
     hooks.getGeneral = [safe] {
         GeneralOptions o;
@@ -10765,7 +10890,7 @@ void MainComponent::saveClipboardToBrowser (bool midi)
         return;
     }
     browser.refreshRoots();
-    ui::postHint ({ tr ("Saved to Clipboard files: {0}", { file.getFileName() }), {}, false, false }, 5000);
+    ui::savedFile (tr ("Saved to Clipboard files"), file); // (round 190qx)
 }
 
 void MainComponent::confirmPrepareForMidiExport()
@@ -12039,6 +12164,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                           : tr ("First-song tour"),
                       [this] { startFirstSongTourAnywhere(); });
         menu.addItem (tr ("Getting started"), [this] { showGettingStarted(); });
+        // round 190qx (the owner's "make the options easy"): every window's short guide, each also at the end of its menu
+        {
+            juce::PopupMenu guides;
+            for (int w = 0; w < howto::windowCount; ++w)
+                guides.addItem (tr (howto::title ((howto::Window) w)), [this, w] { howto::show ((howto::Window) w, guideAnchor ((howto::Window) w)); });
+            menu.addSubMenu (tr ("How to use..."), guides);
+        }
         if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
             menu.addItem (tr ("Welcome screen..."), [this] {
                 if (simpleWorkflow != nullptr)
