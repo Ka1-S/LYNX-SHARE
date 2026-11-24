@@ -12730,3 +12730,4 @@ countries: nl be
 "Number of effect slots on new mixer tracks" = "Aantal effectslots op nieuwe mixertracks"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Deze versie heeft 10 effectslots per insert: de effecten in de slots na slot 10 vallen weg: {0}"
 "This insert has no free slot ({0} effects)" = "Deze insert heeft geen vrij slot ({0} effecten)"
+"Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "De nieuwere Kilohearts-wetten van Effector (het overbemonsterde pad van kHs Ring Mod; de vervangers van kHs Formant Filter, kHs Delay en kHs Clipper) spelen de eerdere Ring Mod-wet en de eigen Vowel, Delay en Distort van Effector: {0}"

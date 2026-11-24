@@ -12,7 +12,9 @@
 //   [12] law: code / 64 — 8 Ring Mod, 16 Reverser, 24 Resonator, 32 Phase Distortion, 40 Shaper (round 190nb's k / 8,
 //        the same floats), round 190nh: 41 Comb Filter, 42 Chorus, 43 Trance Gate, 44 Distortion, 45 Bitcrush,
 //        46 Frequency Shifter, 47 Phaser, 48 Ensemble, 49 Nonlinear Filter; round 190py: 50 Flanger, 51 Dual Delay,
-//        52 Ensemble with the plug-in's own voice motions (48 stays for slots saved with it); 0 = none
+//        52 Ensemble with the plug-in's own voice motions (48 stays for slots saved with it); round 190qz: 53 Ring Mod
+//        with the plug-in's own 2× path (8 stays for slots saved with it), 54 Formant Filter, 55 Delay, 56 Clipper
+//        (slots saved with their earlier stand-ins, Facet EQ / Echoform / Fruity Soft Clipper, keep them); 0 = none
 //   [13 …] the law's values (encodings below); the mix is Effector's own Wet knob [2]
 //   Shaper: [17] point count / 16, [18 + 2 k] x, [19 + 2 k] y as (v + 1) / 2, k < 12
 //   Trance Gate: [24 + k] step k as (on + 2 tie) / 3, k < 64
@@ -27,7 +29,9 @@ namespace lynx::khsdsp
 {
 enum class Law { none = 0, ringMod, reverser, resonator, phaseDistortion, shaper,
                  comb, chorus, tranceGate, distortion, bitcrush, freqShift, phaser, ensemble, nonlinearFilter,
-                 flanger, dualDelay, ensemble2 }; // round 190py: codes 50, 51, 52 (ensemble2: the plug-in's own voice motions)
+                 flanger, dualDelay, ensemble2, // round 190py: codes 50, 51, 52 (ensemble2: the plug-in's own voice motions)
+                 ringMod2, formant, delay, clipper }; // round 190qz: codes 53 (Ring Mod with the plug-in's own 2× path),
+                                                      // 54 (Formant Filter), 55 (Delay), 56 (Clipper)
 constexpr int lawParam = 12;
 constexpr int valueParam = 13; // + k
 constexpr int shaperCountParam = 17, shaperPointParam = 18, maxShaperPoints = 12;
@@ -45,12 +49,13 @@ inline Law lawOf (float v) noexcept
     const int c = (int) std::lround (v * 64.0f);
     if (c >= 8 && c <= 40 && c % 8 == 0)
         return (Law) (c / 8);
-    return c >= 41 && c <= 52 ? (Law) (6 + c - 41) : Law::none;
+    return c >= 41 && c <= 56 ? (Law) (6 + c - 41) : Law::none;
 }
 inline float lawValue (Law l) noexcept { return (float) lawCode (l) / 64.0f; }
 // the latency a law reports (the comb filter's 16-tap sinc read is centred 7 samples late, dry and wet alike; round
 // 190py: the Flanger's dry and wet come 16 samples late, the centre of its 2× up-sampler's 32 taps)
-inline int lawLatency (Law l) noexcept { return l == Law::comb ? 7 : l == Law::flanger ? 16 : 0; }
+// round 190qz: the Ring Mod's 2× path (its two 15-tap half-bands) makes dry and wet 7 samples late
+inline int lawLatency (Law l) noexcept { return l == Law::comb || l == Law::ringMod2 ? 7 : l == Law::flanger ? 16 : 0; }
 
 constexpr double pi = 3.141592653589793, twoPi = 6.283185307179586;
 
@@ -222,11 +227,17 @@ public:
         flReset();
         ddReset();
         ens2Reset();
+        rm2Reset();
+        fmReset();
+        dlReset();
+        clReset();
     }
     void setSongBeats (double b) noexcept { songBeats = b; songKnown = true; }
     // round 190oc: LYNX's own half-band (the Nonlinear Filter's 2× resampler): its all-pass coefficients, A0's at the even
     // places, A1's at the odd ones (tests, docs)
     static std::vector<double> nonlinearHalfBand() { const auto& a = nlfHalfBand().a; return { a.begin(), a.end() }; }
+    // round 190qz: the Ring Mod law's half-band, its four odd taps on one side (tests, docs)
+    static std::vector<float> ringMod2Taps() { const auto& t = rm2Taps(); return { t.begin(), t.end() }; }
     // round 190py: one of the Ensemble law's voice curves (motion 0 random / 1 symmetric / 2 sine, voice 0 … 15, curve 0
     // delay / 1 cutoff), its 1024 points (tests, docs)
     static std::vector<float> ensembleCurve (int motion, int voice, int curve)
@@ -257,6 +268,10 @@ public:
             case Law::flanger: flanger (l, r, n, p, mix); break;
             case Law::dualDelay: dualDelay (l, r, n, p, mix, bpm); break;
             case Law::ensemble2: ensemble2 (l, r, n, p, mix); break;
+            case Law::ringMod2: ringMod2 (l, r, n, p, mix); break;
+            case Law::formant: formant (l, r, n, p, mix); break;
+            case Law::delay: delay (l, r, n, p, mix, bpm); break;
+            case Law::clipper: clipper (l, r, n, p, mix); break;
             default: break;
         }
     }
@@ -2366,6 +2381,446 @@ private:
         for (auto& ch : nlfCh)
             ch = {};
         nlfMode = -1;
+    }
+
+    // ---- round 190qz: Ring Mod with the plug-in's own signal path (law 53) ---------------------------------------
+    // [STATIC] RingModDsp (REA_rodada190qz-khs §2): the whole effect runs at 2 fs. Up 2×: the even 2× sample is the
+    // input 4 samples back, the odd one a half-band interpolation of the 8 samples around it; the sine modulator
+    // (phase in turns, double, += f / 2 fs a 2× sample, wrapped once a block; the left channel at φ + s, the right at
+    // φ − s, s = spread / 4, evaluated in float) goes through the rectifier with first-order antiderivative
+    // anti-aliasing (F (m) = ½ (g+ max (m, 0)² + g− min (m, 0)²), y = (F (m) − F (m₋₁)) / (m − m₋₁), or f at the mean
+    // when |m − m₋₁| < 5·10⁻⁶), then m' = 1 + mix · (bias − 1 + y) multiplies the 2× input; down 2× through the same
+    // half-band, then a 15 Hz cookbook high pass (Q 1/√2, direct form II in double). Dry and wet come 7 samples late
+    // (the law reports 7). The plug-in's half-band coefficients are a fixed table: LYNX uses its own design (a
+    // Kaiser-windowed sinc, 15 taps, unity at DC; β = 4.55 chosen black-box on the references, REA §2). Asleep as round
+    // 190nb's law: from a reset until the first block with sound, and from the second all-zero block on.
+    // Encodings: [13] frequency / 32 768 Hz (a power of two: the plug-in's float comes back exactly), [14] spread,
+    // [15] bias, [16] rectify (r + 1) / 2; the mix is Wet.
+    static constexpr double rm2Beta = 4.55;
+    // the half-band's odd taps t[k] (k = 0 nearest the centre … 3) on one side, Σ t = ¼ (with the centre tap ½ and the
+    // other side: unity at DC); the interpolated sample is 2 Σ t[k] (x[c − k] + x[c + 1 + k])
+    static const std::array<float, 4>& rm2Taps() noexcept
+    {
+        static const std::array<float, 4> taps = [] {
+            auto i0 = [] (double x) { double s = 1.0, t = 1.0; for (int k = 1; k < 40; ++k) { t *= (x / (2.0 * k)) * (x / (2.0 * k)); s += t; } return s; };
+            std::array<double, 4> h {};
+            double sum = 0.0;
+            for (int k = 0; k < 4; ++k)
+            {
+                const double u = 2.0 * k + 1.0, r = u / 8.0; // the 2× tap's distance from the centre (15 taps: ±7)
+                h[(std::size_t) k] = std::sin (0.5 * pi * u) / (pi * u) * i0 (rm2Beta * std::sqrt (std::max (0.0, 1.0 - r * r))) / i0 (rm2Beta);
+                sum += h[(std::size_t) k];
+            }
+            std::array<float, 4> f {};
+            for (int k = 0; k < 4; ++k)
+                f[(std::size_t) k] = (float) (0.25 * h[(std::size_t) k] / sum);
+            return f;
+        }();
+        return taps;
+    }
+    struct Rm2Channel
+    {
+        std::array<float, 8> x {};   // the input, x[0] newest
+        std::array<float, 15> u {};  // the 2× stream, u[0] newest
+        float mPrev = 0.0f;          // the previous 2× modulator value (anti-aliasing)
+        double w1 = 0.0, w2 = 0.0;   // the high pass (direct form II)
+    };
+    std::array<Rm2Channel, 2> rm2 {};
+    RampD rm2Inc;
+    Ramp rm2Spread, rm2Bias, rm2Rect, rm2Mix;
+    double rm2Phase = 0.0, rm2HpFor = -1.0;
+    double rm2Hp[5] {}; // b0, b1, b2, a1, a2
+    void rm2Reset() noexcept
+    {
+        rm2 = {};
+        rm2Inc = {};
+        rm2Spread = {}, rm2Bias = {}, rm2Rect = {}, rm2Mix = {};
+        rm2Phase = 0.0;
+    }
+    void ringMod2 (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        bool silent = true;
+        for (int i = 0; i < n && silent; ++i)
+            silent = l[i] == 0.0f && r[i] == 0.0f;
+        if (silent)
+        {
+            if (ringAsleep || ++ringSilent > 1)
+            {
+                ringAsleep = true;
+                return;
+            }
+        }
+        else
+        {
+            ringAsleep = false;
+            ringSilent = 0;
+        }
+        if (rm2HpFor != fs)
+        {
+            rm2HpFor = fs;
+            const double w0 = twoPi * 15.0 / fs, cs = std::cos (w0), al = std::sin (w0) / (2.0 * 0.7071067811865476), a0 = 1.0 + al;
+            rm2Hp[0] = (1.0 + cs) / 2.0 / a0, rm2Hp[1] = -(1.0 + cs) / a0, rm2Hp[2] = rm2Hp[0];
+            rm2Hp[3] = -2.0 * cs / a0, rm2Hp[4] = (1.0 - al) / a0;
+        }
+        const int n2 = 2 * n;
+        const double hz = std::clamp ((double) p[valueParam], 0.0, 1.0) * 32768.0;
+        rm2Inc.set (hz / (2.0 * fs), n2);
+        rm2Spread.set (0.25f * std::clamp (p[valueParam + 1], 0.0f, 1.0f), n2);
+        rm2Bias.set (std::clamp (p[valueParam + 2], 0.0f, 1.0f), n2);
+        rm2Rect.set (2.0f * (2.0f * std::clamp (p[valueParam + 3], 0.0f, 1.0f) - 1.0f), n2); // 2 · rectify (−2 … 2)
+        rm2Mix.set (std::clamp (mix, 0.0f, 1.0f), n2);
+        const auto& t = rm2Taps();
+        float* io[2] { l, r };
+        for (int i = 0; i < n; ++i)
+        {
+            // two 2× samples: the modulator for both channels at each
+            float m[2][2]; // [2× sample][channel]
+            float g[2];    // the mix at each
+            float b[2], rp[2], rn[2];
+            for (int k = 0; k < 2; ++k)
+            {
+                // (the odd 2× sample's phase is φ + the even one's increment; φ moves by both)
+                const double inc = rm2Inc.step();
+                const double ph = k == 0 ? rm2Phase : rm2Phase + rm2PrevInc;
+                if (k == 1)
+                    rm2Phase += rm2PrevInc + inc;
+                else
+                    rm2PrevInc = inc;
+                const float s = rm2Spread.step();
+                const float pf = (float) ph;
+                m[k][0] = std::sin ((pf + s) * 6.2831855f);
+                m[k][1] = std::sin ((pf - s) * 6.2831855f);
+                b[k] = rm2Bias.step();
+                const float rr = rm2Rect.step();
+                rp[k] = std::min (1.0f, 1.0f + rr);
+                rn[k] = std::min (1.0f, 1.0f - rr);
+                g[k] = rm2Mix.step();
+            }
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& ch = rm2[(std::size_t) c];
+                for (int j = 7; j > 0; --j)
+                    ch.x[(std::size_t) j] = ch.x[(std::size_t) (j - 1)];
+                ch.x[0] = io[c][i];
+                // the even 2× sample (x 4 back) and the odd one between x[4] and x[3]
+                const float odd = 2.0f * (t[0] * (ch.x[4] + ch.x[3]) + t[1] * (ch.x[5] + ch.x[2]) + t[2] * (ch.x[6] + ch.x[1]) + t[3] * (ch.x[7] + ch.x[0]));
+                const float up[2] { ch.x[4], odd };
+                for (int k = 0; k < 2; ++k)
+                {
+                    const float mv = m[k][c], mp = ch.mPrev;
+                    ch.mPrev = mv;
+                    float y;
+                    const float d = mv - mp;
+                    if (std::abs (d) < 4.9999999e-06f)
+                    {
+                        const float a = (mv + mp) * 0.5f;
+                        y = (a < 0.0f ? rn[k] : rp[k]) * a;
+                    }
+                    else
+                    {
+                        const float ap = std::max (mv, 0.0f), an = std::min (mv, 0.0f), bp = std::max (mp, 0.0f), bn = std::min (mp, 0.0f);
+                        y = ((ap * ap - bp * bp) * rp[k] + (an * an - bn * bn) * rn[k]) * 0.5f / d;
+                    }
+                    const float mod = g[k] * (b[k] - 1.0f + y) + 1.0f;
+                    for (int j = 14; j > 0; --j)
+                        ch.u[(std::size_t) j] = ch.u[(std::size_t) (j - 1)];
+                    ch.u[0] = up[k] * mod;
+                }
+                // down 2× (centred 7 2× samples back), then the high pass
+                const float dn = 0.5f * ch.u[7] + t[0] * (ch.u[8] + ch.u[6]) + t[1] * (ch.u[10] + ch.u[4]) + t[2] * (ch.u[12] + ch.u[2]) + t[3] * (ch.u[14] + ch.u[0]);
+                const double w = (double) dn - (rm2Hp[4] * ch.w2 + rm2Hp[3] * ch.w1);
+                const double o = rm2Hp[2] * ch.w2 + rm2Hp[1] * ch.w1 + rm2Hp[0] * w;
+                ch.w2 = ch.w1, ch.w1 = w;
+                io[c][i] = (float) o;
+            }
+        }
+        rm2Phase -= std::floor (rm2Phase);
+    }
+    double rm2PrevInc = 0.0;
+
+    // ---- round 190qz: Formant Filter (law 54) ---------------------------------------------------------------------
+    // [STATIC] VocalFilterDsp (REA_rodada190qz-khs §3): two cookbook biquads in a row, both at the plug-in's Q: at the
+    // lower of the two cutoffs a peak of 20 · log10 (Q) dB (Lows on) or a high pass (Lows off), at the higher one a peak
+    // of the same gain (Highs on) or a low pass (Highs off); the cutoffs held at most 0.49 fs. Direct form I in double,
+    // the first section's output rounded to float before the second. The designer is the textbook cookbook (peak:
+    // A = 10^(dB / 40), α = sin w0 / 2Q; the gain in dB taken in float). Encodings: [13] cutoff 1 / 32 768 Hz,
+    // [14] cutoff 2 / 32 768 Hz, [15] Q / 64 (powers of two: the plug-in's floats come back exactly), [16] Lows (1),
+    // [17] Highs (1); the mix is Wet (the plug-in has none: 1).
+    struct FmSection
+    {
+        double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
+        double x1[2] {}, x2[2] {}, y1[2] {}, y2[2] {};
+        double run (int c, double x) noexcept
+        {
+            const double y = b2 * x2[c] + b1 * x1[c] + b0 * x - (a2 * y2[c] + a1 * y1[c]);
+            x2[c] = x1[c], x1[c] = x, y2[c] = y1[c], y1[c] = y;
+            return y;
+        }
+        void clear() noexcept { for (int c = 0; c < 2; ++c) x1[c] = x2[c] = y1[c] = y2[c] = 0.0; }
+    };
+    std::array<FmSection, 2> fm {};
+    float fmFor[6] { -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f };
+    void fmReset() noexcept
+    {
+        for (auto& s : fm)
+            s.clear();
+    }
+    // the cookbook designer for the three shapes the plug-in uses (0 low pass, 2 high pass, 5 peak)
+    static void fmDesign (FmSection& s, int shape, double rate, double hz, double q, double db) noexcept
+    {
+        const double f = std::min (hz, 0.49 * rate);
+        const double w0 = f * twoPi / rate, cs = std::cos (w0), sn = std::sin (w0), al = sn / (q + q);
+        double b0, b1, b2, a0, a1, a2;
+        if (shape == 5)
+        {
+            const double A = std::exp2 (db * 0.08304820237218406);
+            b0 = 1.0 + al * A, b1 = -2.0 * cs, b2 = 1.0 - al * A;
+            a0 = 1.0 + al / A, a1 = -2.0 * cs, a2 = 1.0 - al / A;
+        }
+        else if (shape == 2)
+        {
+            b0 = (1.0 + cs) * 0.5, b1 = -(1.0 + cs), b2 = (1.0 + cs) * 0.5;
+            a0 = 1.0 + al, a1 = -2.0 * cs, a2 = 1.0 - al;
+        }
+        else
+        {
+            b0 = (1.0 - cs) * 0.5, b1 = 1.0 - cs, b2 = (1.0 - cs) * 0.5;
+            a0 = 1.0 + al, a1 = -2.0 * cs, a2 = 1.0 - al;
+        }
+        const double g = 1.0 / a0;
+        s.b0 = b0 * g, s.b1 = b1 * g, s.b2 = b2 * g, s.a1 = a1 * g, s.a2 = a2 * g;
+    }
+    void formant (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        const float c1 = std::clamp (p[valueParam], 0.0f, 1.0f) * 32768.0f, c2 = std::clamp (p[valueParam + 1], 0.0f, 1.0f) * 32768.0f;
+        const float q = std::max (std::clamp (p[valueParam + 2], 0.0f, 1.0f) * 64.0f, 1.0e-3f);
+        const float lows = p[valueParam + 3] >= 0.5f ? 1.0f : 0.0f, highs = p[valueParam + 4] >= 0.5f ? 1.0f : 0.0f;
+        const float key[6] { c1, c2, q, lows, highs, (float) fs };
+        if (! std::equal (key, key + 6, fmFor))
+        {
+            std::copy (key, key + 6, fmFor);
+            const float db = std::log10 (q) * 20.0f;
+            fmDesign (fm[0], lows > 0.0f ? 5 : 2, fs, (double) std::min (c1, c2), (double) q, (double) db);
+            fmDesign (fm[1], highs > 0.0f ? 5 : 0, fs, (double) std::max (c1, c2), (double) q, (double) db);
+        }
+        float* io[2] { l, r };
+        for (int c = 0; c < 2; ++c)
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = io[c][i];
+                const auto v = (float) fm[0].run (c, (double) x);
+                const auto y = (float) fm[1].run (c, (double) v);
+                io[c][i] = mix >= 1.0f ? y : x + mix * (y - x);
+            }
+    }
+    // ---- round 190qz: Delay (law 55) ------------------------------------------------------------------------------
+    // [STATIC] DelayDsp (REA_rodada190qz-khs §4): one stereo line at T seconds (synced: steps × the note at the tempo,
+    // as the Dual Delay), at most 5 s. A change of T glides: the time moves linearly from where it was to the new one
+    // over 50 ms (then per sample across the block; while it moves the line is read between samples), else the read is
+    // round (T fs − 7) + 7 samples back from the newest before the write (each echo one sample after that), clamped to what
+    // has been written (from 15). Into the line: the input through the pan gains (√2 cos, √2 sin of (pan + 1) π/4,
+    // crossfaded across a block on a change) plus feedback × the read, Bounce (ping-pong) crossing the channels, each
+    // through the Dual Delay's tone shelf (48 dB a second of echo, the current time). Ducking as the Dual Delay's (an RMS
+    // follower from 0.005, k = ½ (1 − 2^(−1 / (50 ms · fs))), depth 10 duck²), but here it scales the mix:
+    // out = x + clamp (1 − e · depth, 0, 1) · mix · (wet − x). Asleep after T + 64 samples of silence (a block whose
+    // echoes reach 2^-20 counts as sound); the follower relaxes while asleep: e = (1 − k)^n (e − 2^-20) + 2^-20.
+    // Encodings: [13] time / 16 s, [14] steps / 64, [15] the denominator's index / 6, [16] sync (1), [17] feedback,
+    // [18] pan (v + 1) / 2, [19] bounce (1), [20] duck, [21] tone (v + 1) / 2; the mix is Wet.
+    std::array<Line, 2> dlLines {};
+    float dlTime = 0.0f, dlFrom = 0.0f, dlTarget = -1.0f, dlGlide = 1.0f;
+    bool dlGlideFresh = true;
+    Ramp dlT, dlFb, dlDuck, dlMix;
+    std::array<float, 2> dlPanOld {}, dlPanNew {};
+    float dlPanT = 0.0f, dlPanInc = 0.0f;
+    bool dlPanFresh = true;
+    float dlEnv = 0.005f;
+    bool dlAsleep = true;
+    double dlS1[2] {}, dlS2[2] {};
+    void dlReset() noexcept
+    {
+        dlLines[0].ring = &rev[0], dlLines[1].ring = &rev[1];
+        for (auto& ln : dlLines)
+            ln.clear(), ln.fill = 15;
+        dlTime = dlFrom = 0.0f, dlTarget = -1.0f, dlGlide = 1.0f;
+        dlGlideFresh = true;
+        for (auto* r : { &dlT, &dlFb, &dlDuck, &dlMix })
+            *r = {};
+        dlPanOld = dlPanNew = {};
+        dlPanT = dlPanInc = 0.0f;
+        dlPanFresh = true;
+        dlEnv = 0.005f;
+        dlAsleep = true;
+        dlS1[0] = dlS1[1] = dlS2[0] = dlS2[1] = 0.0;
+    }
+    void delay (float* l, float* r, int n, const float* p, float mix, double bpm) noexcept
+    {
+        if (! rev[0].ready())
+            return;
+        const float sr = (float) fs;
+        float t;
+        if (p[valueParam + 3] < 0.5f)
+            t = std::clamp (p[valueParam], 0.0f, 1.0f) * enc::ddSeconds;
+        else
+        {
+            const int steps = std::max (1, (int) std::lround (64.0 * std::clamp ((double) p[valueParam + 1], 0.0, 1.0)));
+            const int den = (int) std::lround (6.0 * std::clamp ((double) p[valueParam + 2], 0.0, 1.0));
+            t = (float) ((double) steps * enc::reverserBeats (den) / (double) (float) (std::max (bpm, 1.0) / 60.0));
+        }
+        t = std::min (std::max (t, 0.0f), 5.0f);
+        // the glide (50 ms) towards a new time
+        if (std::abs (t - dlTarget) >= 1.1920928955078125e-07f)
+            dlFrom = dlTime, dlGlide = 0.0f;
+        dlTarget = t;
+        if (dlGlideFresh)
+            dlTime = t, dlGlide = 1.0f, dlGlideFresh = false;
+        else
+        {
+            if (dlGlide < 1.0f)
+            {
+                dlGlide = (float) n / (0.05f * sr) + dlGlide;
+                if (dlGlide < 1.0f)
+                    t = (t - dlFrom) * dlGlide + dlFrom;
+            }
+            dlTime = t;
+        }
+        const bool moving = ! dlT.fresh && std::abs (t - dlT.target) >= 1e-15f;
+        dlT.set (t, n);
+        const float fbk = std::clamp (p[valueParam + 4], 0.0f, 1.0f);
+        dlFb.set (fbk, n);
+        const float pan = std::clamp (p[valueParam + 5], 0.0f, 1.0f);
+        const float ang = pan * 1.5707963705062866f;
+        const std::array<float, 2> pg { (float) ((double) std::cos (ang) * 1.4142135623730951), (float) ((double) std::sin (ang) * 1.4142135623730951) };
+        if (dlPanFresh)
+            dlPanOld = dlPanNew = pg, dlPanInc = 0.0f, dlPanFresh = false;
+        else
+            dlPanOld = dlPanNew, dlPanNew = pg, dlPanInc = 1.0f / (float) n;
+        dlPanT = 0.0f;
+        const bool bounce = p[valueParam + 6] >= 0.5f;
+        const float duck = std::clamp (p[valueParam + 7], 0.0f, 1.0f);
+        dlDuck.set (duck * duck * 10.0f, n);
+        dlMix.set (std::clamp (mix, 0.0f, 1.0f), n);
+        const float tone = 2.0f * std::clamp (p[valueParam + 8], 0.0f, 1.0f) - 1.0f;
+        // the tone shelf at the current time
+        const float x = t * 48.0f * tone;
+        double gH = 1.0, gL = 1.0, gB;
+        if (x >= 0.0f)
+        {
+            const float g = std::exp2 (x * -0.16609640419483185f);
+            gL = (double) g, gB = (double) (g * 0.5857864618301392f + 1.4142135381698608f);
+        }
+        else
+        {
+            const float g = std::exp2 (x * 0.16609640419483185f);
+            gH = (double) g, gB = (double) (g * 0.5857864618301392f + 1.4142135381698608f);
+        }
+        const double gc = std::tan (std::min (0.4999 * (double) sr, 800.0) * pi / (double) sr);
+        const double A = 2.0 + gc, D = 1.0 / (A * gc + 1.0), E = D * gc, G = gc + gc;
+        const float k = ddFollow();
+        const bool wasAsleep = dlAsleep;
+        dlAsleep = sleeping (l, r, n, (double) (t * sr) + 3.0);
+        // a block that wakes: its leading silence still sleeps (HeartCore wakes on the first sound; the references show no
+        // follower steps before it, whatever the host's block grid), so the result does not depend on the block size
+        int from = 0;
+        if (wasAsleep && ! dlAsleep)
+            while (from < n && l[from] == 0.0f && r[from] == 0.0f)
+                ++from;
+        if (dlAsleep || from > 0)
+        {
+            dlEnv = (float) std::pow (1.0 - (double) k, (double) (dlAsleep ? n : from)) * (dlEnv - 9.5367431640625e-07f) + 9.5367431640625e-07f;
+            if (dlAsleep)
+                return;
+        }
+        const auto maxRead = (std::uint32_t) dlLines[0].ring->mask;
+        float peak = 0.0f;
+        for (int i = from; i < n; ++i)
+        {
+            const float tv = dlT.step();
+            dlPanT += 1.0f;
+            const float pf = dlPanT * dlPanInc, pa = 1.0f - pf;
+            const float pl = pf * dlPanNew[0] + pa * dlPanOld[0], pr = pf * dlPanNew[1] + pa * dlPanOld[1];
+            const float fb = dlFb.step(), dk = dlDuck.step(), mx = dlMix.step();
+            const float x0[2] { l[i], r[i] };
+            float a[2];
+            if (moving)
+            {
+                const float d = std::max (tv * sr - 1.0f, 0.0f);
+                for (int c = 0; c < 2; ++c)
+                    a[c] = dlLines[(std::size_t) c].catmull (std::min (d, (float) maxRead - 4.0f));
+            }
+            else
+            {
+                const auto d = (std::uint32_t) std::min ((int) std::round (tv * sr - 7.0f) + 7, (int) maxRead);
+                for (int c = 0; c < 2; ++c)
+                    a[c] = dlLines[(std::size_t) c].at (d);
+            }
+            const double u[2] { (double) (fb * a[0] + (bounce ? pr : pl) * x0[0]), (double) (fb * a[1] + (bounce ? pl : pr) * x0[1]) };
+            float w[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                double& s1 = dlS1[c];
+                double& s2 = dlS2[c];
+                const double v = gc * u[c] + s1;
+                const double hp = u[c] - (v * A + s2) * D;
+                const double bp = hp * gc + s1;
+                const double lp = (v - s2 * gc) * E + s2;
+                s1 = ((u[c] - lp) - (bp + bp)) * G + s1;
+                s2 = bp * G + s2;
+                w[c] = (float) (hp * gH + lp * gL + bp * gB);
+            }
+            if (bounce)
+                std::swap (w[0], w[1]);
+            dlLines[0].push (w[0]), dlLines[1].push (w[1]);
+            peak = std::max (peak, std::max (std::abs (a[0]), std::abs (a[1])));
+            const float pw = std::max ((x0[0] * x0[0] + x0[1] * x0[1]) * 0.5f, 9.5367431640625e-07f);
+            dlEnv = (pw / dlEnv - dlEnv) * k + dlEnv;
+            const float gain = std::min (1.0f, std::max (0.0f, 1.0f - dlEnv * dk)) * mx;
+            l[i] = gain * (a[0] - x0[0]) + x0[0];
+            r[i] = gain * (a[1] - x0[1]) + x0[1];
+        }
+        if (peak > 9.5367431640625e-07f)
+            quietRun = 0;
+    }
+    // ---- round 190qz: Clipper (law 56) -----------------------------------------------------------------------------
+    // [STATIC] ClipperDsp (REA_rodada190qz-khs §5): memoryless, at the base rate. u = x · pre gain, a = |u|; with the
+    // threshold T and knee K: a ≤ (1 − K) T passes, a > (1 + K) T gives T, between them a quadratic knee
+    // T (1 − (a / T − 1 − K)² / 4K); the sign restored, × post gain. The four values ramp across a block on a change.
+    // Encodings: [13] threshold / 2, [14] knee, [15] pre gain / 16, [16] post gain / 16 (linear gains: the plug-in's
+    // floats come back exactly); the mix is Wet (the plug-in has none: 1).
+    Ramp clT, clK, clPre, clPost;
+    void clReset() noexcept
+    {
+        for (auto* r : { &clT, &clK, &clPre, &clPost })
+            *r = {};
+    }
+    void clipper (float* l, float* r, int n, const float* p, float mix) noexcept
+    {
+        clT.set (std::clamp (p[valueParam], 0.0f, 1.0f) * 2.0f, n);
+        clK.set (std::clamp (p[valueParam + 1], 0.0f, 1.0f), n);
+        clPre.set (std::clamp (p[valueParam + 2], 0.0f, 1.0f) * 16.0f, n);
+        clPost.set (std::clamp (p[valueParam + 3], 0.0f, 1.0f) * 16.0f, n);
+        auto shape = [] (float u, float T, float K) noexcept {
+            const float sg = u < 0.0f ? -1.0f : 1.0f, a = sg * u;
+            float y = T;
+            if (a <= (K + 1.0f) * T)
+            {
+                if (a <= (1.0f - K) * T)
+                    y = a;
+                else
+                {
+                    const float z = (-1.0f - K) + a / T;
+                    y = ((z * z) / (K * -4.0f) + 1.0f) * T;
+                }
+            }
+            return y * sg;
+        };
+        for (int i = 0; i < n; ++i)
+        {
+            const float T = clT.step(), K = clK.step(), pre = clPre.step(), post = clPost.step();
+            const float xl = l[i], xr = r[i];
+            const float yl = shape (xl * pre, T, K) * post, yr = shape (pre * xr, T, K) * post;
+            l[i] = mix >= 1.0f ? yl : xl + mix * (yl - xl);
+            r[i] = mix >= 1.0f ? yr : xr + mix * (yr - xr);
+        }
     }
 };
 } // namespace lynx::khsdsp

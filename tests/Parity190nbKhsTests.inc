@@ -33,8 +33,9 @@ TEST (parity190nbkhs_five_snapins_open_on_effector_laws_and_effector_stays_fl)
     int n = 0;
     auto ring = load ("kHs Ring Mod", state ("\"mix\": \"1\", \"frequency\": \"440\", \"spread\": \"0.5\", \"bias\": \"0.25\", \"rectify\": \"-0.5\", \"$type\": \"ring_mod\""), n);
     CHECK (ring.kind == EffectKind::effector && n > 5);
-    CHECK (k::lawOf (ring.params[(std::size_t) k::lawParam]) == k::Law::ringMod);
-    CHECK (std::abs (k::enc::ringHz (ring.params[(std::size_t) k::valueParam]) - 440.0) < 0.01);
+    // (round 190qz: law 53, the plug-in's own 2× path, its frequency / 32 768 exactly; law 8 stays for saved slots)
+    CHECK (k::lawOf (ring.params[(std::size_t) k::lawParam]) == k::Law::ringMod2);
+    CHECK (ring.params[(std::size_t) k::valueParam] * 32768.0f == 440.0f);
     CHECK (std::abs (ring.params[(std::size_t) k::valueParam + 3] - 0.25f) < 1e-6f); // rectify −0.5 → (r + 1) / 2
     CHECK (text (ring, 0) == "Ring");
     auto rev = load ("kHs Reverser", state ("\"delay_numerator\": \"4\", \"delay_time\": \"0.2\", \"delay_denominator\": \"denominator_8t\", "
@@ -97,6 +98,9 @@ TEST (parity190nbkhs_ring_mod_reverser_shaper_and_phase_distortion_laws)
     int n = 0;
     // Ring Mod at 100 Hz, rectify +100 %: a constant input becomes 0.5 · |sin|, never negative, peak 0.5
     auto ring = load ("kHs Ring Mod", state ("\"mix\": \"1\", \"frequency\": \"100\", \"spread\": \"0\", \"bias\": \"0\", \"rectify\": \"1\", \"$type\": \"ring_mod\""), n);
+    // (round 190qz: new imports open on law 53; this checks round 190nb's law 8, which slots saved with it keep)
+    ring.params[(std::size_t) khsdsp::lawParam] = khsdsp::lawValue (khsdsp::Law::ringMod);
+    ring.params[(std::size_t) khsdsp::valueParam] = khsdsp::enc::ringHzValue (100.0);
     const auto y = parity190nbkhs::run (ring, std::vector<float> (24000, 0.5f));
     float lo = 1.0f, hi = -1.0f;
     for (float v : y) lo = std::min (lo, v), hi = std::max (hi, v);
@@ -133,16 +137,16 @@ TEST (parity190nbkhs_measured_maps_of_the_earlier_stand_ins)
     using namespace lynx;
     using namespace parity190lnkhs;
     int n = 0;
-    // kHs Delay: a linear mix (dry 1 − m, wet m) on Echoform's equal-power Mix + Output (the echoes only); one sample late
+    // kHs Delay: the linear mix (round 190qz: on Effector's Delay law, which plays it itself — tests/Parity190qzKhsTests.inc;
+    // the Echoform map stays for slots saved with it)
     auto d = load ("kHs Delay", state ("\"delay_time\": \"0.2\", \"sync_mode\": \"ms\", \"feedback\": \"0.5\", \"mix\": \"0.5\", \"$type\": \"delay\""), n);
-    CHECK (std::abs (d.params[(std::size_t) named (d, "Mix")] - 2.0f / 3.0f) < 1e-5f);              // cos (60°) = 0.5 dry
-    CHECK (text (d, named (d, "Output")) == "-4.7 dB" || text (d, named (d, "Output")) == "-4.8 dB"); // 0.5 / sin 60° = −4.77 dB
-    CHECK (std::abs (echosuite::echoform::timeMs (d.params[(std::size_t) named (d, "Time L")]) - (200.0 + 1000.0 / 48000.0)) < 1e-3);
-    // kHs Formant Filter: two cookbook peaks of 20·log10 (Q) dB at Q (Q 4: +12 dB), no output trim
+    CHECK (d.kind == EffectKind::effector && khsdsp::lawOf (d.params[(std::size_t) khsdsp::lawParam]) == khsdsp::Law::delay);
+    CHECK (d.params[(std::size_t) effector::wetMix] == 0.5f);
+    // kHs Formant Filter: two cookbook biquads at Q (round 190qz: on Effector's Formant Filter law; the Facet EQ map stays
+    // for slots saved with it)
     auto f = load ("kHs Formant Filter", state ("\"q\": \"4\", \"cutoff_1\": \"1500\", \"cutoff_2\": \"550\", \"lows\": \"true\", \"highs\": \"false\", \"$type\": \"vocal_filter\""), n);
-    CHECK (std::abs (facet::hz (f.params[(std::size_t) facet::param (0, 1)]) - 550.0) < 1.0);
-    CHECK (facet::shape (f.params[(std::size_t) facet::param (1, 0)]) == facet::Shape::highCut);
-    CHECK (std::abs (facet::gainDb (f.params[(std::size_t) facet::param (0, 2)]) - 12.04) < 0.05);
+    CHECK (f.kind == EffectKind::effector && khsdsp::lawOf (f.params[(std::size_t) khsdsp::lawParam]) == khsdsp::Law::formant);
+    CHECK (f.params[(std::size_t) khsdsp::valueParam + 1] * 32768.0f == 550.0f && f.params[(std::size_t) khsdsp::valueParam + 4] == 0.0f);
     // kHs Flanger: dry cos / wet sin of mix × 45° (round 190py: on Effector's Flanger law, which plays that mix itself —
     // tests/Parity190pyKhsTests.inc; the Fruity Flanger map stays for slots saved with it)
     auto fl = load ("kHs Flanger", state ("\"delay\": \"0.001\", \"mix\": \"1\", \"mod_depth\": \"0.001\", \"mod_rate\": \"0.3\", \"feedback\": \"0\", \"$type\": \"flanger\""), n);

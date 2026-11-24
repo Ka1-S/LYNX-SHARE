@@ -2381,7 +2381,10 @@ void toRelease0130 (juce::var& root, Losses& lost)
 // - round 190py: the channel PITCH target and a desktop 3x Osc's live automation (lines), ChannelDef::engineRev 4 written at
 //   3 (revision 4 changes only that 3x Osc automation, so every channel plays the same in 0.1.31);
 // - round 190py-khs: Effector's hidden Kilohearts laws 50 Flanger, 51 Dual Delay, 52 Ensemble (0.1.31 reads codes 41 … 49
-//   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them.
+//   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them;
+// - round 190qz-khs: Effector's hidden Kilohearts laws 53 Ring Mod (the plug-in's 2× path), 54 Formant Filter, 55 Delay,
+//   56 Clipper: a Ring Mod slot goes back to round 190nb's law 8 (its frequency re-encoded; the oversampling and the
+//   15 Hz high pass go), the other three are cut (Effector plays its visible Type: Vowel, Delay, Distort), one line.
 // Not in projects, so nothing to change here: round 190px's caches (a stretched copy with identical channels has header
 // channels −2, which 0.1.31 refuses and stretches again; the stream cache's .R.same marker leaves no .R.pcm, which 0.1.31
 // takes for a missing cache and decodes again), 190qh's views (ui-options), Touch mode (ui-options), the new-track slot
@@ -2450,6 +2453,31 @@ void toRelease0131 (juce::var& root, Losses& lost)
         if (! flangerDelay.isEmpty())
             lost.push_back ({ TR_NOOP ("Effector's Kilohearts Flanger and Dual Delay laws (the kHs Flanger and kHs Dual Delay stand-ins) play Effector's own Flanger and Delay: {0}"),
                               listOf (flangerDelay), true });
+    }
+
+    // round 190qz-khs: laws 53 … 56 (0.1.31 reads codes up to 52)
+    {
+        juce::StringArray khs;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
+                return;
+            const auto law = khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]);
+            if (law != khsdsp::Law::ringMod2 && law != khsdsp::Law::formant && law != khsdsp::Law::delay && law != khsdsp::Law::clipper)
+                return;
+            addOnce (khs, where);
+            if (law == khsdsp::Law::ringMod2 && params->size() > khsdsp::valueParam)
+            {
+                const double hz = std::clamp ((double) (*params)[khsdsp::valueParam], 0.0, 1.0) * 32768.0;
+                params->set (khsdsp::lawParam, (double) khsdsp::lawValue (khsdsp::Law::ringMod));
+                params->set (khsdsp::valueParam, (double) khsdsp::enc::ringHzValue (hz));
+                return;
+            }
+            params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
+        });
+        if (! khs.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}"),
+                              listOf (khs), true });
     }
 
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {

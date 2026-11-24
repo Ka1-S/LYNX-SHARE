@@ -12730,3 +12730,4 @@ countries: id
 "Number of effect slots on new mixer tracks" = "Jumlah slot efek pada trek mixer baru"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "Versi ini punya 10 slot efek per insert: efek di slot setelah slot 10 tidak disertakan: {0}"
 "This insert has no free slot ({0} effects)" = "Insert ini tidak punya slot kosong ({0} efek)"
+"Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Hukum Kilohearts yang lebih baru pada Effector (jalur oversampling kHs Ring Mod; pengganti kHs Formant Filter, kHs Delay dan kHs Clipper) memainkan hukum Ring Mod sebelumnya serta Vowel, Delay dan Distort milik Effector: {0}"

@@ -12730,3 +12730,4 @@ countries: jp
 "Number of effect slots on new mixer tracks" = "新しいミキサートラックのエフェクトスロット数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "このバージョンのエフェクトスロットはインサートあたり 10 個です。スロット 10 より後のエフェクトは含まれません: {0}"
 "This insert has no free slot ({0} effects)" = "このインサートには空きスロットがありません（エフェクト {0} 個）"
+"Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Effector の新しい Kilohearts 法則(kHs Ring Mod のオーバーサンプリング経路、kHs Formant Filter・kHs Delay・kHs Clipper の代替)は、以前の Ring Mod 法則と Effector 自身の Vowel・Delay・Distort を鳴らします: {0}"
