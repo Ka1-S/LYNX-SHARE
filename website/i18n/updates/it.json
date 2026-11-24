@@ -1,4 +1,13 @@
 {
+"u.0.1.31.1.t": "Correzioni per la 0.1.31",
+"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 corregge ciò che avete segnalato sulla 0.1.31: l'automazione dei progetti FL sui controlli, finestre dei plugin che non si aprivano più, la vista Device, l'esportazione con una cartella nel nome del file, i clip sulle tracce strumento, un crash nella barra dei suggerimenti e la memoria all'avvio.",
+"u.0.1.31.1.f0": "I clip di automazione di FL che muovono più controlli, o uno tramite una formula, muovono ogni controllo nel mixer, nelle finestre dei plugin e nella vista Device; un controllo mosso a mano mostra il valore che si sente (#253).",
+"u.0.1.31.1.f1": "Le finestre agganciate di plugin e canali si riaprono dove erano, invece di uscire dalla finestra principale dopo qualche clic.",
+"u.0.1.31.1.f2": "Layout Clip-launch: scegliere una traccia nell'Arrangement mostra i suoi dispositivi, e le manopole della vista Device seguono l'automazione.",
+"u.0.1.31.1.f3": "L'esportazione audio con una cartella nel nome del file scrive lì senza chiedere di nuovo (#215); Colori e icone automatici accettano più di una regola (#239); il clic destro sulla barra dei suggerimenti non fa più chiudere LYNX (#269).",
+"u.0.1.31.1.f4": "Modalità solo tracce e layout Simple: un doppio clic su un clip vuoto di una traccia strumento apre le sue note.",
+"u.0.1.31.1.f5": "La 0.1.31 usava ~7 MB di memoria e più CPU in più subito dopo l'avvio.",
+"u.0.1.31.1.k0": "I problemi di LYNX ASIO segnalati sulla 0.1.31 non sono ancora stati riprodotti; i dettagli aiutano (Aiuto › Segnala un problema...).",
 "u.0.1.31.t": "Un Tracker integrato, LYNX Model, JSFX, Linux arm64, due progetti affiancati e molto altro",
 "u.0.1.31.s": "LYNX SHARE 0.1.31 aggiunge un Tracker integrato con importazione dei moduli tracker, LYNX Model (modelli fisici di strumenti a percussione intonata), script JSFX, build Linux arm64, una scheda di benvenuto e una pagina iniziale, Search actions per ogni comando, due progetti affiancati con copia e incolla tra loro, una corsia delle sezioni, una traccia accordi con Smart Tempo, versioni della traccia, modalità di scrittura dell'automazione, Capture automation e modulatori per qualsiasi manopola, esportazione .flm per FL Studio Mobile, i dispositivi rack di Live in linea con una Macro Map e Solo / Cue, ARA su un insert del mixer, un pacchetto di 39 plugin (anche LV2 su Linux, e un .7z da 20 MB su Windows) e correzioni per circa 30 issue di GitHub.",
 "u.0.1.31.n0": "<strong>Tracker</strong>: Vista › Tracker (Shift+F7) mostra le note di un pattern come righe e canali e le modifica alla maniera dei tracker, e i moduli tracker (.mod, .xm, .s3m, .it) si aprono con i loro sample, pattern e tempo.",
