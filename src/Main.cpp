@@ -336,6 +336,8 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "core/ZoomAnchor.h"   // round 190qr (#276)
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
+#include "ui/ChannelRackComponent.h" // (round 190qw: --polish190qwshot)
+#include "core/LynxExtras.h"          // (round 190qw: --polish190qwshot)
 #include "ui/AutoLookEditor.h" // (round 190od, issue #239)
 #include "core/StartPage.h" // (round 190oq, issue #252)
 #include "core/MuteKeys.h"
@@ -871,6 +873,13 @@ public:
         // --shot-scale <v> / --shot-suffix <text> (round 190bi, ui/ShotScale.h): the pixel scale and file-name suffix of every
         // picture route, taken out here so the routes' own arguments keep their places
         const auto args = lynx::shot::takeArguments (juce::StringArray::fromTokens (commandLine, true));
+        // round 190qw: --soft-look (picture routes, tests): this run draws in Options › Theme › Appearance › Soft (not saved)
+        if (args.contains ("--soft-look"))
+        {
+            auto soft = lynx::themeui::current();
+            soft.soft = true;
+            lynx::themeui::apply (soft, false);
+        }
 
         // round 190np: whether this profile already had LYNX's UI settings before this start (an upgrade keeps what it had:
         // no welcome card), and --demo (ui/DemoMode.h: the tutorial-video pipeline's automation mode)
@@ -3629,6 +3638,15 @@ public:
         if (args.contains ("--extras190qkshot"))
         {
             setApplicationReturnValue (runExtras190qkShot (args[args.indexOf ("--extras190qkshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --polish190qwshot <prefix> [project] (round 190qw, design polish + the Soft look): src/Polish190qwShot.inc
+        if (args.contains ("--polish190qwshot"))
+        {
+            const auto i = args.indexOf ("--polish190qwshot");
+            setApplicationReturnValue (runPolish190qwShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -21472,6 +21490,7 @@ private:
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "Extras190qkShot.inc" // round 190qk (the LYNX extras on by default)
+#include "Polish190qwShot.inc" // round 190qw (design polish pass, the Soft look)
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
 #include "Picker190qiShot.inc" // round 190qi (TOP-NEXT R6): picker and Browser quality of life
