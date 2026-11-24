@@ -11,6 +11,17 @@
 
 namespace issue269
 {
+// The repository's src/ folder: next to this file (an absolute __FILE__), or found from the working folder (the cached
+// builds compile with relative paths, and the suite runs from the repository root or from the build folder)
+inline std::filesystem::path sourceRoot()
+{
+    const auto here = std::filesystem::path (__FILE__).parent_path().parent_path() / "src";
+    for (const auto& c : { here, std::filesystem::current_path() / "src", std::filesystem::current_path().parent_path() / "src" })
+        if (std::filesystem::is_regular_file (c / "ui" / "HintBar.cpp"))
+            return c;
+    return {};
+}
+
 inline std::string readSource (const std::filesystem::path& file)
 {
     std::ifstream in (file);
@@ -74,8 +85,8 @@ TEST (issue269_no_menu_item_iterator_walks_a_temporary_menu)
     CHECK (issue269::iteratorsOverTemporaries ("MenuItemIterator (const PopupMenu& menu, bool searchRecursively = false);").empty());
 
     // every source file of the app: none left
-    const auto root = std::filesystem::path (__FILE__).parent_path().parent_path() / "src";
-    if (! std::filesystem::is_directory (root))
+    const auto root = issue269::sourceRoot();
+    if (root.empty())
         return;
     int files = 0;
     for (const auto& entry : std::filesystem::recursive_directory_iterator (root))
@@ -97,8 +108,10 @@ TEST (issue269_no_menu_item_iterator_walks_a_temporary_menu)
 
 TEST (issue269_hint_bar_right_click_builds_its_menu_from_named_menus)
 {
-    const auto file = std::filesystem::path (__FILE__).parent_path().parent_path() / "src" / "ui" / "HintBar.cpp";
-    const auto s = issue269::readSource (file);
+    const auto root = issue269::sourceRoot();
+    if (root.empty())
+        return;
+    const auto s = issue269::readSource (root / "ui" / "HintBar.cpp");
     if (s.empty())
         return;
     // the right-click shows rightClickMenu(), which walks a named copy of copyMenu()
