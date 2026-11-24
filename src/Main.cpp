@@ -9545,7 +9545,9 @@ private:
                 const auto since = juce::Time::getCurrentTime() - juce::RelativeTime::seconds (2.0);
                 lynx::SampleLibrary library;
                 const auto shortWav = writeSame ("same 190qn.wav", 44100);
-                const auto stretched = library.loadStretched (shortWav.getFullPathName(), 1.25);
+                // (a ratio within resampleTolerance: the copy is resampled channel by channel, so identical channels stay identical,
+                // as Thief's near-tempo stems; the spectral stretchers' stereo output need not be bit-identical across channels)
+                const auto stretched = library.loadStretched (shortWav.getFullPathName(), 1.0005);
                 // (the copy is written by the cache's writer thread: the new .str file whose frames are this copy's)
                 juce::File str;
                 juce::MemoryBlock bytes;
