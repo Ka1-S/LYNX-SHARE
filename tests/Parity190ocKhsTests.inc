@@ -47,7 +47,7 @@ TEST (parity190ockhs_law_code_and_translation)
     namespace k = khsdsp;
     // code 49 (kept for it by round 190nh); round 190nb's and 190nh's codes unchanged
     CHECK (k::lawCode (k::Law::nonlinearFilter) == 49 && k::lawValue (k::Law::nonlinearFilter) == 49.0f / 64.0f);
-    CHECK (k::lawOf (49.0f / 64.0f) == k::Law::nonlinearFilter && k::lawOf (48.0f / 64.0f) == k::Law::ensemble && k::lawOf (53.0f / 64.0f) == k::Law::none); // (round 190py: 50 … 52 Flanger, Dual Delay, Ensemble)
+    CHECK (k::lawOf (49.0f / 64.0f) == k::Law::nonlinearFilter && k::lawOf (48.0f / 64.0f) == k::Law::ensemble && k::lawOf (57.0f / 64.0f) == k::Law::none); // (round 190py: 50 … 52 Flanger, Dual Delay, Ensemble)
     const auto s = filter ("notch", "fuzzy", 3620.386, 9.11803, 0.75);
     CHECK (s.kind == EffectKind::effector && k::lawOf (s.params[(std::size_t) k::lawParam]) == k::Law::nonlinearFilter);
     CHECK (std::lround (4.0f * s.params[(std::size_t) k::valueParam]) == 3 && std::lround (8.0f * s.params[(std::size_t) k::valueParam + 1]) == 6);

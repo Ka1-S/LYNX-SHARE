@@ -12731,3 +12731,4 @@ countries: tw hk mo
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每個插入通道有 10 個效果槽位：第 10 個之後槽位中的效果將被省略：{0}"
 "This insert has no free slot ({0} effects)" = "此插入通道沒有空槽（{0} 個效果）"
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "在此版本中，Peak Controller 與 Envelope Controller 的連結從一開始就設定其目標，而不等控制器傳送數值：{0}"
+"Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Effector 較新的 Kilohearts 規律（kHs Ring Mod 的過取樣路徑；kHs Formant Filter、kHs Delay 與 kHs Clipper 的替代）改為播放先前的 Ring Mod 規律以及 Effector 自身的 Vowel、Delay 與 Distort：{0}"

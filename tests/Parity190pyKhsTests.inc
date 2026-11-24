@@ -25,7 +25,7 @@ TEST (parity190pykhs_law_codes_and_translation)
     CHECK (k::lawCode (k::Law::flanger) == 50 && k::lawCode (k::Law::dualDelay) == 51);
     CHECK (k::lawOf (50.0f / 64.0f) == k::Law::flanger && k::lawOf (51.0f / 64.0f) == k::Law::dualDelay);
     CHECK (k::lawOf (49.0f / 64.0f) == k::Law::nonlinearFilter && k::lawOf (52.0f / 64.0f) == k::Law::ensemble2);
-    CHECK (k::lawOf (53.0f / 64.0f) == k::Law::none && k::lawCode (k::Law::ensemble2) == 52);
+    CHECK (k::lawOf (57.0f / 64.0f) == k::Law::none && k::lawCode (k::Law::ensemble2) == 52);
     int n = 0;
     const auto f = load ("kHs Flanger", state (parity190pykhs::flangerBody()), n);
     CHECK (f.kind == EffectKind::effector && n > 8 && k::lawOf (f.params[(std::size_t) k::lawParam]) == k::Law::flanger);

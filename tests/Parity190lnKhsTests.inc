@@ -92,19 +92,17 @@ TEST (parity190lnkhs_delay_time_and_synced_notes)
     auto d = load ("kHs Delay", state ("\"pan\": \"0\", \"delay_numerator\": \"3\", \"delay_time\": \"0.25\", \"delay_denominator\": \"denominator_16\", "
                                        "\"sync_mode\": \"ms\", \"ping_pong\": \"true\", \"duck\": \"0\", \"feedback\": \"0.4\", \"mix\": \"0.3\", "
                                        "\"tone\": \"0\", \"$type\": \"delay\""), n);
-    CHECK (d.kind == EffectKind::echoform);
-    CHECK (text (d, named (d, "Time L")) == "250.0 ms" && text (d, named (d, "Style")) == "Ping-pong");
-    CHECK (text (d, named (d, "Feedback")) == "40%" && text (d, named (d, "Mode")) == "Clean");
-    // (round 190nb: the measured linear mix — dry 1 − m through Echoform's equal-power Mix: cos (Mix × 90°) = 0.7)
-    CHECK (std::abs (std::cos (0.5 * M_PI * d.params[(std::size_t) named (d, "Mix")]) - 0.7) < 1e-5);
-    // synced 3/16 = a dotted eighth: Echoform's dotted 1/8
+    // (round 190qz: kHs Delay opens on Effector's Delay law — DelayDsp read in HeartCore; the Echoform map stays for slots
+    // saved with it): the time / 16 s exactly, bounce, feedback, the mix on Wet
+    namespace k = khsdsp;
+    CHECK (d.kind == EffectKind::effector && k::lawOf (d.params[(std::size_t) k::lawParam]) == k::Law::delay);
+    CHECK (d.params[(std::size_t) k::valueParam] * k::enc::ddSeconds == 0.25f && d.params[(std::size_t) k::valueParam + 6] == 1.0f);
+    CHECK (std::abs (d.params[(std::size_t) k::valueParam + 4] - 0.4f) < 1e-7f && std::abs (d.params[(std::size_t) named (d, "Wet")] - 0.3f) < 1e-7f);
+    // synced 3/16: steps / 64, the denominator's index / 6, sync on
     auto s = load ("kHs Delay", state ("\"delay_numerator\": \"3\", \"delay_time\": \"0.2\", \"delay_denominator\": \"denominator_16\", "
                                        "\"sync_mode\": \"sync\", \"feedback\": \"0\", \"mix\": \"0.5\", \"$type\": \"delay\""), n);
-    CHECK (text (s, named (s, "Sync L")) == "dotted" && text (s, named (s, "Note L")) == "1/8");
-    // 5/16 has no Echoform note: its time at 120 BPM (625 ms)
-    auto u = load ("kHs Delay", state ("\"delay_numerator\": \"5\", \"delay_time\": \"0.2\", \"delay_denominator\": \"denominator_16\", "
-                                       "\"sync_mode\": \"sync\", \"feedback\": \"0\", \"mix\": \"0.5\", \"$type\": \"delay\""), n);
-    CHECK (text (u, named (u, "Sync L")) == "ms" && text (u, named (u, "Time L")) == "625.0 ms");
+    CHECK (std::lround (64.0f * s.params[(std::size_t) k::valueParam + 1]) == 3 && std::lround (6.0f * s.params[(std::size_t) k::valueParam + 2]) == 4);
+    CHECK (s.params[(std::size_t) k::valueParam + 3] == 1.0f);
 }
 
 TEST (parity190lnkhs_trance_gate_pattern_on_volume_gate) // (round 190nh: on Effector's Trance Gate law)
