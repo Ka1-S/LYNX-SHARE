@@ -2798,6 +2798,67 @@ public:
                 x += w[i] + 4.0f;
             }
         }
+        else if (id == "mixer.peakValues" || id == "mixer.correlation")
+        {
+            // three strips: meters, then the peak read-out under each (or the correlation bar)
+            for (int i = 0; i < 3; ++i)
+            {
+                const auto x = r.getX() + 6.0f + (float) i * 22.0f;
+                g.setColour (dim);
+                g.fillRoundedRectangle (x, r.getY(), 14.0f, r.getHeight() - 10.0f, 1.5f);
+                g.setColour (theme::colour::meterLow.withAlpha (0.8f));
+                g.fillRect (x + 4.0f, r.getY() + 8.0f + (float) i * 4.0f, 6.0f, r.getHeight() - 20.0f - (float) i * 4.0f);
+                g.setColour (lit);
+                if (id == "mixer.peakValues")
+                    g.fillRoundedRectangle (x, r.getBottom() - 7.0f, 14.0f, 6.0f, 1.5f);
+                else
+                {
+                    g.fillRect (x, r.getBottom() - 4.0f, 14.0f, 1.5f);
+                    g.fillRect (x + 7.0f + (float) (i - 1) * 3.0f, r.getBottom() - 7.0f, 2.0f, 6.0f);
+                }
+            }
+        }
+        else if (id == "playlist.dimUnselectedTracks" || id == "playlist.darkenMutedTracks")
+        {
+            // four tracks of clips: one selected (dim others) or one switched off (darkened)
+            const auto rowH = r.getHeight() / 4.0f;
+            for (int i = 0; i < 4; ++i)
+            {
+                const auto marked = i == 1;
+                const auto veiled = id == "playlist.dimUnselectedTracks" ? ! marked : marked;
+                auto row = juce::Rectangle<float> (r.getX(), r.getY() + (float) i * rowH, r.getWidth(), rowH - 1.5f);
+                g.setColour (bg2);
+                g.fillRect (row);
+                g.setColour (textSecondary.withAlpha (0.8f));
+                g.fillRoundedRectangle (row.getX() + 4.0f + (float) i * 6.0f, row.getY() + 1.5f, 26.0f, row.getHeight() - 3.0f, 1.5f);
+                if (veiled)
+                {
+                    g.setColour (bg0.withAlpha (on ? 0.6f : 0.25f));
+                    g.fillRect (row);
+                }
+                if (marked && id == "playlist.dimUnselectedTracks")
+                {
+                    g.setColour (lit);
+                    g.drawRect (row, 1.0f);
+                }
+            }
+        }
+        else if (id == "toolbar.grouped")
+        {
+            const float w[] = { 18.0f, 24.0f, 16.0f };
+            auto x = r.getX();
+            for (int i = 0; i < 3; ++i)
+            {
+                const auto box = juce::Rectangle<float> (x, r.getCentreY() - 9.0f, w[i], 18.0f);
+                g.setColour (on ? bg3 : bg1);
+                g.fillRoundedRectangle (box, 3.0f);
+                g.setColour (lit);
+                g.drawRoundedRectangle (box, 3.0f, 1.0f);
+                g.setColour (textSecondary);
+                g.fillRect (box.reduced (4.0f, 7.0f));
+                x += w[i] + 4.0f;
+            }
+        }
         else if (id == "general.hoverValues")
         {
             const auto c = juce::Point<float> (r.getX() + 14.0f, r.getCentreY());

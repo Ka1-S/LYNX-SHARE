@@ -239,8 +239,9 @@ inline constexpr Item items[] = {
 
 // Round 190qx (the owner's "make the options easy"): the page shows the extras grouped by area, in this order (the list
 // above is in the order the extras landed, so one area's items are spread over it). A section missing here goes last.
-inline constexpr std::string_view sectionOrder[] = { TR_NOOP ("Windows"), TR_NOOP ("Editing"), TR_NOOP ("Transport"), TR_NOOP ("Playlist"),
-                                                     TR_NOOP ("Piano Roll"), TR_NOOP ("Mixer"), TR_NOOP ("Recording"), TR_NOOP ("Device view"),
+inline constexpr std::string_view sectionOrder[] = { TR_NOOP ("Windows"),     TR_NOOP ("Toolbar"),     TR_NOOP ("Editing"),     TR_NOOP ("Transport"),
+                                                     TR_NOOP ("Playlist"),    TR_NOOP ("Piano Roll"),  TR_NOOP ("Mixer"),       TR_NOOP ("Audio editor"),
+                                                     TR_NOOP ("Recording"),   TR_NOOP ("Export"),      TR_NOOP ("Files"),       TR_NOOP ("Device view"),
                                                      TR_NOOP ("Clip-launch workflow"), TR_NOOP ("Simple workflow"), TR_NOOP ("Controllers") };
 
 constexpr int sectionRank (std::string_view section) noexcept
@@ -254,7 +255,8 @@ constexpr int sectionRank (std::string_view section) noexcept
 // Round 190qx: the extras that only change what you see (the page draws a small picture of each beside its switch)
 inline constexpr std::string_view visualIds[] = { "mixer.loudness",        "mixer.stripInserts",     "playlist.trackInserts", "playlist.sectionsLane",
                                                   "playlist.chordLane",    "playlist.shadeFadedAudio", "pianoRoll.chordHighlight", "simple.projectName",
-                                                  "controlBar.liveScale",  "general.hoverValues",    "pianoRoll.songBarsRuler" };
+                                                  "controlBar.liveScale",  "general.hoverValues",    "pianoRoll.songBarsRuler", "mixer.peakValues",
+                                                  "mixer.correlation",     "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks", "toolbar.grouped" };
 
 constexpr bool isVisual (std::string_view id) noexcept
 {
