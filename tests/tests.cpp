@@ -17751,6 +17751,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LayoutStyle184aTests.inc"
 #include "Rack116Tests.inc"
 #include "Issue116DetachedTests.inc"
+#include "Issue282TrialMarkTests.inc" // round 190qs: issue #282, FL's trial mark and the FL generators' round trip
 #include "Trial187bTests.inc"
 #include "ProjectKey184aTests.inc"
 #include "KeyGuess184aTests.inc"

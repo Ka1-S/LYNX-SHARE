@@ -984,12 +984,15 @@ struct LayerSettings
 // The FL plugin an imported channel generator or mixer effect came from (round 171e, Export to FL Studio): its internal
 // name (.flp 0xC9) and saved state (0xD5; empty = the same as the channel's pluginState), and a fingerprint of what the
 // import made of it (flpexport::fingerprint). While the LYNX side is unchanged (the same fingerprint), Export to FL
-// Studio writes the original plugin back byte for byte. Saved with the project.
+// Studio writes the original plugin back byte for byte. Saved with the project. `trialSaved`: FL saved the plugin while
+// it was a trial there (its record's flag 0x80, issue #282); the export keeps that mark with the plugin, so an FL that
+// still has it as a trial keeps it locked, as it does with FL's own trial saves.
 struct FlOrigin
 {
     std::string plugin;
     std::vector<std::uint8_t> state;
     std::uint64_t fingerprint = 0;
+    bool trialSaved = false;
 
     bool empty() const noexcept { return plugin.empty(); }
     bool operator== (const FlOrigin&) const = default;

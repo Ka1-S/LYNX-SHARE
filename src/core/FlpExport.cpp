@@ -14,6 +14,7 @@
 #include "core/SamplerPage.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -119,6 +120,34 @@ const FlGenerator* generatorFor (InstrumentKind kind) noexcept
 }
 
 bool originMatches (const ChannelDef& c) { return ! c.flOrigin.empty() && c.flOrigin.fingerprint == fingerprint (c); }
+
+bool sameName (const std::string& a, const std::string& b) noexcept
+{
+    return a.size() == b.size() && std::equal (a.begin(), a.end(), b.begin(), [] (char x, char y) {
+               return std::tolower ((unsigned char) x) == std::tolower ((unsigned char) y);
+           });
+}
+
+// FL's trial mark (plugin record flag 0x80, issue #282, REA_rodada190qs): FL sets it on a plugin it saved while that
+// plugin was a trial, and an FL where it still is one does not load its settings (it locks the plugin until it is
+// bought). The mark stays with the plugin it was saved with, whatever LYNX did to its settings, as FL's own resave keeps
+// it; a channel that now holds another generator (or none: FL writes the mark on plugin records only) loses it.
+bool keepsTrialMark (const ChannelDef& def, const std::string& generator)
+{
+    if (generator.empty())
+        return false;
+    if (! def.flOrigin.empty())
+        return sameName (def.flOrigin.plugin, generator);
+    // (no origin: the FPC kit and hosted plugins, which travel as themselves)
+    return generator == "FPC" ? def.instrument == InstrumentKind::fpc : generator == "Fruity Wrapper";
+}
+
+std::string trialNote (const std::string& label, const std::string& plugin)
+{
+    return label + ": " + plugin + " was saved by a trial of FL Studio. Where " + plugin
+           + " is still a trial, FL Studio keeps it locked and does not load its settings (as with FL's own trial saves);"
+             " an FL Studio that owns it loads them";
+}
 bool originMatches (const EffectSlot& s) { return ! s.flOrigin.empty() && s.flOrigin.fingerprint == fingerprint (s); }
 
 bool samplerLike (InstrumentKind k) noexcept { return k == InstrumentKind::sampler || k == InstrumentKind::audioClip; }
@@ -1106,6 +1135,13 @@ struct Converter
             c.type = flp::ChannelType::sampler;
             report.dropped.push_back (channelLabel (def, index) + ": " + instrumentName (def.instrument) + " (no FL equivalent)");
         }
+        if (flTrialSaved (c.wrapperFlags))
+        {
+            if (keepsTrialMark (def, c.pluginName))
+                report.notes.push_back (trialNote (channelLabel (def, index), c.pluginName == "Fruity Wrapper" ? def.plugin.name : c.pluginName));
+            else
+                c.wrapperFlags &= ~flTrialSavedFlag;
+        }
         return c;
     }
 
@@ -1936,6 +1972,12 @@ struct Converter
                 if (! what.empty())
                 {
                     report.exact.push_back (label + what);
+                }
+                // FL's trial mark stays with the effect it was saved with (issue #282; keepsTrialMark)
+                if (fx.flOrigin.trialSaved && sameName (fx.flOrigin.plugin, slot.plugin))
+                {
+                    slot.wrapperFlags |= flTrialSavedFlag;
+                    report.notes.push_back (trialNote (label.substr (0, label.size() - 2), slot.plugin));
                 }
                 slotMap[{ t, s }] = row;
                 slotPlugin[{ t, s }] = slot.plugin;
