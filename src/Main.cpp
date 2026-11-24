@@ -326,6 +326,10 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include "core/Vfx.h"
 #include "core/TransistorBass.h"
 #include "ui/Splash.h"
+#include "core/ExportDone.h"   // round 190qr (#280)
+#include "core/StartupSound.h" // round 190qr (#280)
+#include "core/ClipHandle.h"   // round 190qr (#274)
+#include "core/ZoomAnchor.h"   // round 190qr (#276)
 #include "ui/Theme.h"
 #include "ui/ThemeSettings.h"
 #include "ui/AutoLookEditor.h" // (round 190od, issue #239)
@@ -1894,6 +1898,14 @@ public:
             return;
         }
 
+        if (args.contains ("--issuesshot190qr"))
+        {
+            // --issuesshot190qr <prefix> (round 190qr, issues #274-#281): src/IssuesShot190qr.inc
+            setApplicationReturnValue (runIssuesShot190qr (args[args.indexOf ("--issuesshot190qr") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--issuesshot190ll"))
         {
             // --issuesshot190ll <prefix> (round 190ll, issues #200 / #203): src/IssuesShot190ll.inc
@@ -1978,6 +1990,18 @@ public:
             // sound, through the app's engine with render-ahead off and on (src/Issue258Test.inc; Transistor Bass needs
             // FL Studio, LYNX_FL_INSTALL on Linux)
             runIssue258Test (args[args.indexOf ("--issue258test") + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--issues190qrtest"))
+        {
+            // LYNX --issues190qrtest report.txt (round 190qr, issues #274-#281; also in --selftest): src/Issues190qrCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto result = issues190qrCheck (log);
+            juce::File (args[args.indexOf ("--issues190qrtest") + 1].unquoted()).replaceWithText (log + "issues190qr=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
             return;
         }
 
@@ -4854,6 +4878,22 @@ public:
             playStartupSound();
     }
 
+    // issue #280 (round 190qr): the LYNX extra "Play a sound when an export finishes" (core/ExportDone.h)
+    void bindExportDoneSound()
+    {
+        lynx::exportdone::playSound = [this] {
+            if (engine != nullptr)
+            {
+                auto sound = lynx::startup::makeDoneSound (48000.0);
+                auto sample = std::make_shared<lynx::SampleData>();
+                sample->left = std::move (sound.left);
+                sample->right = std::move (sound.right);
+                sample->sampleRate = sound.sampleRate;
+                engine->previewSample (sample);
+            }
+        };
+    }
+
     void playStartupSound()
     {
         if (startupOptions.sound && ! std::exchange (startupSoundPlayed, true) && engine != nullptr)
@@ -4877,6 +4917,7 @@ public:
 
     void createMainWindow()
     {
+        bindExportDoneSound(); // (round 190qr, #280)
         mainWindow = std::make_unique<MainWindow> ("LYNX SHARE", *engine); // the brand; getApplicationName() stays "LYNX" (an id: instance lock, X11 WM_CLASS, ALSA client)
         lynx::setMainWindowForOwnership (mainWindow.get());
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
@@ -9706,6 +9747,11 @@ private:
         juce::String issue258Log;
         const auto issue258Result = issue258Check (issue258Log);
 
+        // round 190qr (issues #274-#281): markers' Delete, the rack's time signature, FL's deepest zoom and the samples drawn
+        // there, the zoom-around-the-song-position and gain-handle extras (src/Issues190qrCheck.inc)
+        juce::String issues190qrLog;
+        const auto issues190qrResult = issues190qrCheck (issues190qrLog);
+
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
         // thresholds in a .lynxtheme (D2-MX7; none written for the default look), the three unbound actions (D2-MX1, MX8)
@@ -11045,7 +11091,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11161,6 +11207,7 @@ private:
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
+               << "issues190qr=" << issues190qrResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
@@ -21006,6 +21053,7 @@ private:
 #include "HWheel254Test.inc" // round 190ou: issue #254, the horizontal wheel
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
+#include "Issues190qrCheck.inc" // round 190qr: issues #274-#281 (markers, rack meter, zoom, extras)
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my
@@ -40266,6 +40314,7 @@ private:
 #include "PrShot190jv.inc" // round 190jv
 #include "HostPlay190ll.inc" // round 190ll (issue #199)
 #include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)
+#include "IssuesShot190qr.inc" // round 190qr (issues #274-#281: the FL | LYNX pictures)
 #include "SimpleGbShot190ke.inc" // round 190ke
 #include "LoopShot190kf.inc"   // round gaps190kf
 #include "QaRest190lcShot.inc"  // rollup 0.1.30 step 7 (round 190lc)

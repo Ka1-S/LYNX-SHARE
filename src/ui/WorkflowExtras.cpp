@@ -24,6 +24,9 @@
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
 #include "core/RangeEdit.h" // round 190pa (P14)
+#include "core/ZoomAnchor.h" // round 190qr (#276)
+#include "core/ExportDone.h" // round 190qr (#280)
+#include "core/ClipHandle.h" // round 190qr (#274)
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -112,6 +115,14 @@ bool readUiOption (const juce::String& key, bool on)
         trackclips::setShownInSelector (on);
     else if (key == "rulerSeeksAnyTool") // issue #227 (round 190nq, LYNX extra)
         ruler::seekWithAnyTool() = on;
+    else if (key == "zoomAtSongPosition") // issue #276 (round 190qr, LYNX extra)
+        zoomanchor::atSongPosition() = on;
+    else if (key == "exportDoneSound") // issue #280 (round 190qr, LYNX extra)
+        exportdone::sound() = on;
+    else if (key == "exportDoneWindow")
+        exportdone::window() = on;
+    else if (key == "gainHandleFollowsView") // issue #274 (round 190qr, LYNX extra)
+        cliphandle::gainFollowsView() = on;
     else if (key == "sectionsLane") // round 190ol (P1): the Pattern layout's Sections lane
         sections::patternLaneOn() = on;
     else if (key == "chordLane") // round 190pf (P13): the Chord lane, every layout
@@ -158,6 +169,9 @@ juce::String uiOptionsText()
            + "\nescClosesWindows=" + juce::String (escclose::enabled() ? 1 : 0) // (round 190ng, issue #217)
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
+           + "\nzoomAtSongPosition=" + juce::String (zoomanchor::atSongPosition() ? 1 : 0) // (round 190qr, issue #276)
+           + "\nexportDoneSound=" + juce::String (exportdone::sound() ? 1 : 0) + "\nexportDoneWindow=" + juce::String (exportdone::window() ? 1 : 0) // (#280)
+           + "\ngainHandleFollowsView=" + juce::String (cliphandle::gainFollowsView() ? 1 : 0) // (round 190qr, issue #274)
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
            + "\nchordLane=" + juce::String (chordlane::laneOn() ? 1 : 0) // (round 190pf, P13)
            + "\nprChordHighlight=" + juce::String (chordlane::pianoRollHighlight() ? 1 : 0) // (round 190pf, P13)
@@ -194,6 +208,14 @@ std::optional<bool> extraOn (std::string_view id)
         return escclose::enabled();
     if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         return ruler::seekWithAnyTool();
+    if (id == "editing.zoomAtSongPosition") // round 190qr (issue #276)
+        return zoomanchor::atSongPosition();
+    if (id == "export.doneSound") // round 190qr (issue #280)
+        return exportdone::sound();
+    if (id == "export.doneWindow")
+        return exportdone::window();
+    if (id == "playlist.gainHandleFollowsView") // round 190qr (issue #274)
+        return cliphandle::gainFollowsView();
     if (id == "playlist.sectionsLane") // round 190ol (P1)
         return sections::patternLaneOn();
     if (id == "playlist.chordLane") // round 190pf (P13)
@@ -245,6 +267,14 @@ bool setExtra (std::string_view id, bool on)
         escclose::enabled() = on;
     else if (id == "playlist.rulerSeeksAnyTool") // round 190nq (issue #227)
         ruler::seekWithAnyTool() = on;
+    else if (id == "editing.zoomAtSongPosition") // round 190qr (issue #276)
+        zoomanchor::atSongPosition() = on;
+    else if (id == "export.doneSound") // round 190qr (issue #280)
+        exportdone::sound() = on;
+    else if (id == "export.doneWindow")
+        exportdone::window() = on;
+    else if (id == "playlist.gainHandleFollowsView") // round 190qr (issue #274)
+        cliphandle::gainFollowsView() = on;
     else if (id == "playlist.sectionsLane") // round 190ol (P1)
         sections::patternLaneOn() = on;
     else if (id == "playlist.chordLane") // round 190pf (P13)

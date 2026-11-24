@@ -87,7 +87,12 @@ struct WaveStyle
     // #230 (round 190nq): FL's "Show fade previews" — a gain (0..1) for the column at x (in body coordinates), multiplied
     // into the shape; empty = none (every view but the Playlist's faded audio clips)
     std::function<float (float x)> envelope;
+    // issue #277 (round 190qr): the audio the summary was made of (the same frames). Zoomed in under sampleDetailFrames
+    // frames a pixel the clean style draws the samples themselves — the signal's line through each frame, the highest and
+    // lowest frame of each pixel — instead of the summary's mirrored outline; empty = the summary at every zoom
+    std::shared_ptr<const SampleData> samples;
 };
+constexpr double sampleDetailFrames = 16.0;
 
 // Draws the summary into `body`: pixel column x shows frames [startFrame + x * framesPerPixel, + framesPerPixel)
 // (a negative framesPerPixel draws backwards, for reversed samples). Only the part inside g's clip is drawn.

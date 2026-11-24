@@ -47,6 +47,9 @@ class ChannelRackComponent final : public juce::Component,
                                    private juce::Timer
 {
 public:
+    // round 190qr (--selftest issues190qr, #279): the steps shown for the pattern and an off step's colour
+    int numStepsForSnapshot() const { return numSteps(); }
+    juce::Colour stepOffForSnapshot (int step) const { return stepOffAt (step); }
     // LYNX extra (on by default; Options › General "Playhead column in the Channel Rack"): a soft highlight of the
     // playing step's column under every row's steps, and the first step of each bar marked on the playing-step strip
     static inline std::atomic<bool> playheadColumn { true };
@@ -259,6 +262,9 @@ private:
     void moved() override;
     int stickyX = 0; // how far the viewport scrolled the rack sideways (the controls column stays in view)
     int numSteps() const;   // the pattern's steps
+    // issue #279 (round 190qr): the steps of a beat (16 / the song's denominator), FL's colour groups, and an off step's colour
+    int stepGroup() const;
+    juce::Colour stepOffAt (int step) const;
     int shownSteps() const; // plus FL's ghost steps: the free width after the pattern's end (issue #11)
     int ghostSteps = 0;
     // channel looping: the row's loop point in steps (0: the row doesn't loop), the advanced controls' column (FL's

@@ -12730,3 +12730,15 @@ countries: kr
 "Number of effect slots on new mixer tracks" = "새 믹서 트랙의 이펙트 슬롯 수"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "이 버전은 인서트당 이펙트 슬롯이 10개입니다. 10번 이후 슬롯의 이펙트는 빠집니다: {0}"
 "This insert has no free slot ({0} effects)" = "이 인서트에는 빈 슬롯이 없습니다 (이펙트 {0}개)"
+
+# --- round 190qr: issues #274-#281 (volume / pan automation actions, zoom around the song position, export done, gain handle)
+"Create volume automation for the selected channel (Mixer: the selected insert)" = "선택한 채널의 볼륨 오토메이션 만들기 (Mixer: 선택한 인서트)"
+"Create pan automation for the selected channel (Mixer: the selected insert)" = "선택한 채널의 팬 오토메이션 만들기 (Mixer: 선택한 인서트)"
+"Zoom around the song position" = "송 위치를 중심으로 줌"
+"The wheel and the zoom keys of the Playlist and the Piano roll keep the song position (the playhead) where it is on screen while it is in view, so an exact edit point stays under the eye. Off, as in FL Studio: the wheel zooms around the mouse pointer. Also in the Playlist ruler's right-click menu › Zoom." = "Playlist와 Piano roll의 휠과 줌 키는 송 위치(재생 헤드)가 보이는 동안 화면의 그 자리에 유지해, 정확한 편집 지점이 눈앞에 남습니다. 끔(FL Studio와 같음): 휠은 마우스 포인터를 중심으로 줌합니다. Playlist 눈금자의 오른쪽 클릭 메뉴 › 줌에도 있습니다."
+"Play a sound when an export finishes" = "내보내기가 끝나면 소리 재생"
+"A short chime plays when Export audio, stems or sections are written, so a long render can run while you do something else. FL Studio plays nothing. Also in File › Export." = "오디오 내보내기, 스템 또는 섹션이 기록되면 짧은 차임이 울려, 긴 렌더링 중에 다른 일을 할 수 있습니다. FL Studio는 아무 소리도 내지 않습니다. 파일 › 내보내기에도 있습니다."
+"Show a window when an export finishes" = "내보내기가 끝나면 창 표시"
+"A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export." = "기록된 파일을 피크 레벨과 함께 알려 주고 폴더에서 보여 주는 버튼이 있는 창입니다. 끔(FL Studio와 같음): 힌트 바가 몇 초 동안 알려 줍니다. 파일 › 내보내기에도 있습니다."
+"The clip gain handle stays in view" = "클립 게인 핸들이 계속 보임"
+"An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu." = "오디오 클립의 게인 핸들(아래 가장자리의 반원)은 클립 자체의 가운데가 스크롤되어 보이지 않으면 클립의 보이는 부분 가운데로 이동해 어떤 줌에서도 닿을 수 있습니다. 끔(FL Studio와 같음): 클립 가운데에 있습니다. 게인 핸들의 오른쪽 클릭 메뉴에도 있습니다."

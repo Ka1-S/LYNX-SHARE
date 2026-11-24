@@ -177,6 +177,21 @@ inline constexpr Item items[] = {
     { "playlist.rangeEdits", TR_NOOP ("Playlist"), TR_NOOP ("Range edits on chosen tracks (Ctrl+Alt+drag)"),
       TR_NOOP ("Ctrl+Alt+drag in the Playlist draws a time range over only the tracks (or the one automation lane) it crosses: Delete, Cut, Copy, Paste, Duplicate, Split and Render to audio then act on just that part, clips and automation lanes, and a drag inside it moves it. The other tracks stay as they are. Also always on in the Clip-launch layout's Arrangement."),
       "ui-options.txt:rangeEdits" },
+    // round 190qr (issue #276): REAPER's "Horizontal zoom center: edit cursor or play cursor"; FL zooms around the mouse
+    { "editing.zoomAtSongPosition", TR_NOOP ("Editing"), TR_NOOP ("Zoom around the song position"),
+      TR_NOOP ("The wheel and the zoom keys of the Playlist and the Piano roll keep the song position (the playhead) where it is on screen while it is in view, so an exact edit point stays under the eye. Off, as in FL Studio: the wheel zooms around the mouse pointer. Also in the Playlist ruler's right-click menu › Zoom."),
+      "ui-options.txt:zoomAtSongPosition" },
+    // round 190qr (issue #274): FL draws the clip gain handle in the clip's middle, off screen when zoomed in on a long clip
+    { "playlist.gainHandleFollowsView", TR_NOOP ("Playlist"), TR_NOOP ("The clip gain handle stays in view"),
+      TR_NOOP ("An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu."),
+      "ui-options.txt:gainHandleFollowsView" },
+    // round 190qr (issue #280): FL 2026 closes its render window and says nothing (the hint bar shows the result in LYNX)
+    { "export.doneSound", TR_NOOP ("Export"), TR_NOOP ("Play a sound when an export finishes"),
+      TR_NOOP ("A short chime plays when Export audio, stems or sections are written, so a long render can run while you do something else. FL Studio plays nothing. Also in File › Export."),
+      "ui-options.txt:exportDoneSound" },
+    { "export.doneWindow", TR_NOOP ("Export"), TR_NOOP ("Show a window when an export finishes"),
+      TR_NOOP ("A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export."),
+      "ui-options.txt:exportDoneWindow" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

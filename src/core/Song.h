@@ -28,6 +28,11 @@ namespace lynx
 constexpr int ppq = 960;              // ticks per quarter note
 constexpr int stepsPerBeat = 4;       // step sequencer in sixteenth notes
 constexpr int ticksPerStep = ppq / stepsPerBeat;
+// Issue #277 (round 190qr): the Playlist's and the Piano roll's deepest zoom, FL 2026's: 8 px per tick of the project's
+// timebase (measured at 96 and 960 PPQ, Playlist and Piano roll: 400 px = 50 ticks at 960). LYNX's 960 PPQ is FL's
+// highest, so this is FL's deepest zoom: 7680 px a quarter note. (Was 200 px a quarter in the Playlist, 480 in the
+// Piano roll.)
+constexpr double maxPixelsPerTick = 8.0;
 
 // The song's meter (round 190fg): `beats` beats of a 1/`unit` note per bar (a time signature's numerator / denominator:
 // Live's "n / d", FL's playlist time signatures). LYNX's ticks count quarter notes at the tempo (ppq a quarter, the

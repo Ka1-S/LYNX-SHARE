@@ -224,6 +224,12 @@ inline juce::Colour stepOff (int step)
 {
     return (step / 4) % 2 == 0 ? colour::stepOff : colour::stepOffAlt; // alternating groups of 4
 }
+// issue #279 (round 190qr): FL's Channel Rack alternates the colour every beat, `group` steps (16 / the time signature's
+// denominator: 4 in x/4, 2 in x/8; FL 2026 shots 279-fl-rack-*.png)
+inline juce::Colour stepOff (int step, int group)
+{
+    return (step / std::max (1, group)) % 2 == 0 ? colour::stepOff : colour::stepOffAlt;
+}
 
 inline juce::Colour muteLed (bool muted)
 {

@@ -76,6 +76,11 @@ std::vector<Action> makeActions()
         // round 190an (CROSS-DAW F13): FL's Add › Automation for last tweaked parameter as a key action. FL gives it
         // no key (DFM Add_AutoLastMenu has no ShortCut and ShortcutsModule has no action for it), so none by default
         { "automation.lastTweaked", TR_NOOP ("Create automation clip for the last tweaked control"), Context::global, {} },
+        // issue #275 (round 190qr, LYNX's own; FL has no key for these either): volume / pan automation of the selected
+        // channel (with the Mixer focused: of the selected insert), as a clip, or a lane while Automation lanes is on. No
+        // key by default (FL has none; Ctrl+Alt+P is Live's "Hide/Show Open Plug-In Windows"): bind them in the key editor
+        { "automation.volume", TR_NOOP ("Create volume automation for the selected channel (Mixer: the selected insert)"), Context::global, {} },
+        { "automation.pan", TR_NOOP ("Create pan automation for the selected channel (Mixer: the selected insert)"), Context::global, {} },
 
         // workspace panels
         { "panel.playlist", TR_NOOP ("Show, focus or hide the Playlist"), Context::global, { chord (f5) } },

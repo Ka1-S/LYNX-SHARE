@@ -12730,3 +12730,15 @@ countries: cn sg
 "Number of effect slots on new mixer tracks" = "新混音器轨道的效果槽位数"
 "This release holds 10 effect slots per insert: the effects in the slots past 10 are left out: {0}" = "此版本每个插入通道有 10 个效果槽位：第 10 个之后槽位中的效果将被省略：{0}"
 "This insert has no free slot ({0} effects)" = "此插入通道没有空槽（{0} 个效果）"
+
+# --- round 190qr: issues #274-#281 (volume / pan automation actions, zoom around the song position, export done, gain handle)
+"Create volume automation for the selected channel (Mixer: the selected insert)" = "为所选通道创建音量自动化（Mixer：所选插入）"
+"Create pan automation for the selected channel (Mixer: the selected insert)" = "为所选通道创建声像自动化（Mixer：所选插入）"
+"Zoom around the song position" = "围绕歌曲位置缩放"
+"The wheel and the zoom keys of the Playlist and the Piano roll keep the song position (the playhead) where it is on screen while it is in view, so an exact edit point stays under the eye. Off, as in FL Studio: the wheel zooms around the mouse pointer. Also in the Playlist ruler's right-click menu › Zoom." = "Playlist 和 Piano roll 的滚轮与缩放键在歌曲位置（播放头）可见时保持它在屏幕上的位置，让精确的编辑点始终在眼前。关闭（与 FL Studio 相同）：滚轮围绕鼠标指针缩放。也在 Playlist 标尺的右键菜单 › 缩放中。"
+"Play a sound when an export finishes" = "导出完成时播放提示音"
+"A short chime plays when Export audio, stems or sections are written, so a long render can run while you do something else. FL Studio plays nothing. Also in File › Export." = "导出音频、分轨或段落写入完成时会响起简短的提示音，长时间渲染时可以去做别的事。FL Studio 不播放任何声音。也在 文件 › 导出 中。"
+"Show a window when an export finishes" = "导出完成时显示窗口"
+"A window names the file(s) written, with the peak level, and a button that shows them in their folder. Off, as in FL Studio: the hint bar says it for a few seconds. Also in File › Export." = "窗口列出写入的文件及其峰值电平，并提供在文件夹中显示的按钮。关闭（与 FL Studio 相同）：提示栏显示几秒钟。也在 文件 › 导出 中。"
+"The clip gain handle stays in view" = "片段增益手柄保持可见"
+"An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu." = "当音频片段的中间滚出视图时，其增益手柄（底边上的半圆）会移到片段可见部分的中间，在任何缩放下都能拖到。关闭（与 FL Studio 相同）：它留在片段中间。也在增益手柄的右键菜单中。"
