@@ -558,6 +558,10 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
         }
         if (auto* c = onboardui::findShowing (window, target))
             return c;
+        // (round 190qx: a call-out on the main window's own top-level window, beside this component: a How-to guide card)
+        if (auto* top = window.getTopLevelComponent(); top != nullptr && top != &window)
+            if (auto* c = onboardui::findShowing (*top, target))
+                return c;
         return findInOtherWindows (window, target);
     };
     const auto find = [&args, &locate]() -> juce::Component& {
