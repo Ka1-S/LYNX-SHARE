@@ -1845,6 +1845,20 @@ public:
             return;
         }
 
+        if (args.contains ("--hotfixui190qp"))
+        {
+            // LYNX --hotfixui190qp <prefix> [--plugin file]... (hotfix 0.1.31.1, round 190qp): the Clip-launch Arrangement's
+            // track selection reaching the Device View, and channel / plugin windows opened and closed again and again
+            // (src/HotfixUi190qp.inc); <prefix>-checks.txt, result=OK
+            const auto i = args.indexOf ("--hotfixui190qp");
+            juce::StringArray plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            runHotfixUi190qp (args[i + 1].unquoted(), plugins);
+            return;
+        }
+
         if (args.contains ("--pertabshot259"))
         {
             // LYNX --pertabshot259 <prefix> [--plugin file]... [--shot-scale 1.5 --shot-suffix @150] (round 190pw, PR #259:
@@ -9447,6 +9461,9 @@ private:
             lynx::windowplaces::fromVar ({});
         }
 
+        // hotfix 0.1.31.1 (round 190qp): a docked window's place in the dock's coordinates (src/HotfixUi190qp.inc)
+        const auto hotfixPlacesResult = hotfixPlaces190qpCheck();
+
         // round 190pv (issue #258): a cloned channel's own automation clip drives its sound (src/Issue258Test.inc: the app's
         // engine, render-ahead off and on; Transistor Bass when FL Studio is here, LYNX Synth always)
         juce::String issue258Log;
@@ -10687,7 +10704,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && autolive190qpResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && hotfixPlacesResult == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && flparity190prResult == "OK"
                         && hotfix190qpWfResult == "OK" // (round 190qp)
@@ -10797,6 +10814,7 @@ private:
                << "rollup031s8_copy_for_0130=" << rollup031s8Result << "\n"
                << "headergear248=" << headerGearResult << "\n"
                << "pertab259=" << perTab259Result << "\n"
+               << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "issue258=" << issue258Result << "\n"
@@ -20616,6 +20634,7 @@ private:
 #include "Tracks190peShot.inc" // round 190pe
 #include "HeaderGearShot248.inc" // rollup 0.1.31 step 7 (PRs #248 / #256)
 #include "PerTabShot259.inc" // round 190pw (PR #259)
+#include "HotfixUi190qp.inc" // hotfix 0.1.31.1 (round 190qp)
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)

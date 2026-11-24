@@ -32,6 +32,9 @@ juce::Component* mainWindowComponent();
 // window has no native one) with its close button. `setEditorDock` names the workspace (nullptr: none, at shutdown);
 // FL's "Detach all new plugins" (`setEditorsDetached`) or LYNX_DOCKED_PLUGINS=0 keep them owned top-level windows.
 void setEditorDock (Workspace* workspace);
+// Hotfix 0.1.31.1 (round 190qp): the workspace docked editor windows live in (nullptr: none) — ui/WindowPlaces.h keeps a
+// docked window's place in its coordinates
+juce::Component* editorDockArea();
 void setEditorsDetached (bool detached);
 // Call where keepAboveMainWindow was called (after the window is visible): docks the window, or keeps it above the main
 // window when it can't be docked. True when it is docked.

@@ -15,13 +15,35 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "ui/NativeChild.h"
+
+namespace lynx
+{
+juce::Component* editorDockArea(); // (ui/WindowOwner.h)
+}
+
 namespace lynx::windowplaces
 {
+// Hotfix 0.1.31.1 (round 190qp, "plugin interfaces refuse to open after a few clicks"): a docked window (a native child
+// window of the main window, ui/NativeChild.h; every docked editor on Windows) keeps its place in the editor dock's
+// coordinates (`docked`). 0.1.31 kept its screen place and gave it back as the child window's bounds, which are relative
+// to the main window: each reopen moved the window by the dock's place on the screen, until it opened outside the main
+// window. A window of its own keeps its screen place, as before.
 struct Place
 {
     juce::Rectangle<int> bounds;
     bool open = false;
+    bool docked = false;
 };
+
+namespace detail
+{
+// the dock a docked window lives in (nullptr: a window of its own, or drawn inside the main window)
+inline juce::Component* dockOf (const juce::Component& window)
+{
+    return nativechild::isAttached (window) ? editorDockArea() : nullptr;
+}
+} // namespace detail
 
 inline std::map<juce::String, Place>& all()
 {
@@ -78,8 +100,13 @@ private:
     {
         auto& place = all()[key];
         place.open = c.isVisible() && c.isOnDesktop();
-        if (c.isOnDesktop() && ! c.getScreenBounds().isEmpty())
-            place.bounds = c.getScreenBounds();
+        if (auto* dock = dockOf (c))
+        {
+            if (const auto r = nativechild::boundsIn (c, *dock); ! r.isEmpty())
+                place.bounds = r, place.docked = true;
+        }
+        else if (c.isOnDesktop() && ! c.getScreenBounds().isEmpty())
+            place.bounds = c.getScreenBounds(), place.docked = false;
     }
     juce::String key;
 };
@@ -92,11 +119,27 @@ inline void tag (juce::Component& window, const juce::String& key)
         return;
     if (auto it = all().find (key); it != all().end() && ! it->second.bounds.isEmpty() && window.isOnDesktop())
     {
-        auto r = it->second.bounds;
-        const auto& displays = juce::Desktop::getInstance().getDisplays();
-        if (const auto* d = displays.getDisplayForRect (r); d != nullptr)
-            r = r.constrainedWithin (d->userArea);
-        window.setBounds (r);
+        if (auto* dock = detail::dockOf (window))
+        {
+            // docked: back where it was in the dock (its own size: the page it opens on decides it), kept inside the
+            // dock. A place it had as a window of its own is not a place in the dock: the dock's placement stays.
+            if (it->second.docked)
+            {
+                auto r = window.getBounds().withPosition (it->second.bounds.getPosition());
+                const auto area = dock->getLocalBounds();
+                r.setX (juce::jlimit (0, juce::jmax (0, area.getWidth() - r.getWidth()), r.getX()));
+                r.setY (juce::jlimit (0, juce::jmax (0, area.getHeight() - r.getHeight()), r.getY()));
+                nativechild::place (window, *dock, r);
+            }
+        }
+        else if (! it->second.docked)
+        {
+            auto r = it->second.bounds;
+            const auto& displays = juce::Desktop::getInstance().getDisplays();
+            if (const auto* d = displays.getDisplayForRect (r); d != nullptr)
+                r = r.constrainedWithin (d->userArea);
+            window.setBounds (r);
+        }
     }
     auto& list = detail::Follower::followers();
     if (auto it = list.find (&window); it != list.end())
@@ -105,18 +148,26 @@ inline void tag (juce::Component& window, const juce::String& key)
     window.addComponentListener (follower.get());
     auto& place = all()[key];
     place.open = window.isVisible() && window.isOnDesktop();
-    if (window.isOnDesktop())
-        place.bounds = window.getScreenBounds();
+    if (auto* dock = detail::dockOf (window))
+        place.bounds = nativechild::boundsIn (window, *dock), place.docked = true;
+    else if (window.isOnDesktop())
+        place.bounds = window.getScreenBounds(), place.docked = false;
     list[&window] = std::move (follower);
 }
 
-// the registry as stored in a project: [[key, x, y, w, h, open], ...]
+// the registry as stored in a project: [[key, x, y, w, h, open], ...]; a docked window's place (in the dock's
+// coordinates) has a 7th entry, "docked" (hotfix 0.1.31.1: 0.1.31 reads only six-entry places, so it skips them)
 inline juce::var toVar()
 {
     juce::Array<juce::var> list;
     for (const auto& [key, place] : all())
         if (! place.bounds.isEmpty())
-            list.add (juce::Array<juce::var> { key, place.bounds.getX(), place.bounds.getY(), place.bounds.getWidth(), place.bounds.getHeight(), place.open });
+        {
+            juce::Array<juce::var> e { key, place.bounds.getX(), place.bounds.getY(), place.bounds.getWidth(), place.bounds.getHeight(), place.open };
+            if (place.docked)
+                e.add ("docked");
+            list.add (e);
+        }
     for (const auto& key : hiddenHeaders())
         list.add (juce::Array<juce::var> { key, "headerHidden" });
     return list.isEmpty() ? juce::var() : juce::var (list);
@@ -128,8 +179,8 @@ inline void fromVar (const juce::var& v)
     hiddenHeaders().clear();
     if (const auto* list = v.getArray())
         for (const auto& e : *list)
-            if (e.isArray() && e.size() == 6)
-                all()[e[0].toString()] = { { (int) e[1], (int) e[2], (int) e[3], (int) e[4] }, (bool) e[5] };
+            if (e.isArray() && (e.size() == 6 || (e.size() == 7 && e[6].toString() == "docked")))
+                all()[e[0].toString()] = { { (int) e[1], (int) e[2], (int) e[3], (int) e[4] }, (bool) e[5], e.size() == 7 };
             else if (e.isArray() && e.size() == 2 && e[1].toString() == "headerHidden")
                 hiddenHeaders().insert (e[0].toString());
 }

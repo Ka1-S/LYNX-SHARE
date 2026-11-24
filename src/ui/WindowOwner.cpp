@@ -1549,6 +1549,11 @@ void setEditorDock (Workspace* workspace)
     editorDock = workspace;
 }
 
+juce::Component* editorDockArea()
+{
+    return editorDock;
+}
+
 void setEditorsDetached (bool detached)
 {
     editorsDetached = detached;
