@@ -49,6 +49,8 @@ LYNX SHARE masih dalam tahap alfa: mungkin masih ada kekurangan di sana-sini, ja
 
 ## What's new
 
+LYNX SHARE 0.1.31.1 memperbaiki yang kamu laporkan di 0.1.31: automasi proyek FL pada kontrol, jendela plugin yang berhenti terbuka, tampilan Device, ekspor dengan folder di nama file, klip di track instrumen, crash di bilah petunjuk, dan memori saat mulai.
+
 LYNX SHARE 0.1.31: Tracker bawaan yang juga membuka modul tracker (.mod, .xm, .s3m, .it); LYNX Model, model fisik
 marimba, vibraphone, xylophone, glockenspiel, tubular bells, dan kalimba; skrip efek dan instrumen JSFX; kartu
 sambutan yang menyiapkan tata letak yang tepat dan halaman awal dengan proyek terbaru-mu; pencarian yang menemukan
