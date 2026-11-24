@@ -1702,10 +1702,17 @@ void closeSettings()
         closeToolWindowOf (*panel);
 }
 
+void indexOpenSettings (SettingsPanel& panel); // (round 190qx, below)
+
 void showSettings (AudioEngine& engine, SettingsPage page, SettingsHooks hooks)
 {
     // one Settings window: opening it again shows the asked page
     openToolWindow (std::make_unique<SettingsPanel> (engine, page, true, std::move (hooks)), tr ("Settings"), "settings");
+    // round 190qx: the palette's Settings options, read from this window once per version and language (laid out first)
+    juce::MessageManager::callAsync ([] {
+        if (auto* panel = openSettingsPanel())
+            indexOpenSettings (*panel);
+    });
 }
 
 SettingsFindState settingsFindForSnapshot (juce::Component& panel, const juce::String& query, int steps)
@@ -1783,28 +1790,74 @@ void collectOptions (juce::Component& page, juce::Component& c, SettingsPage whe
 }
 } // namespace
 
-const std::vector<SettingsOption>& settingsOptions (AudioEngine& engine, const SettingsHooks& hooks)
+namespace
+{
+std::vector<SettingsOption>& indexCache()
 {
     static std::vector<SettingsOption> cached;
-    static juce::String cachedLanguage;
-    if (! cached.empty() && cachedLanguage == i18n::current())
-        return cached;
-    const auto started = juce::Time::getMillisecondCounterHiRes();
+    return cached;
+}
+juce::String& indexLanguage()
+{
+    static juce::String language;
+    return language;
+}
+
+// (the index is kept on disk per version and language: reading the pages costs ~0.2 s, the file a few ms)
+juce::File indexFile() { return PluginHost::settingsFolder().getChildFile ("settings-index.txt"); }
+juce::String indexStamp() { return juce::String (JUCE_APPLICATION_VERSION_STRING) + " " + i18n::current(); }
+
+bool loadIndex()
+{
+    juce::StringArray lines;
+    lines.addLines (indexFile().loadFileAsString());
+    if (lines.size() < 2 || lines[0] != indexStamp())
+        return false;
+    auto& cached = indexCache();
     cached.clear();
-    cachedLanguage = i18n::current();
-    SettingsPanel panel (engine, SettingsPage::general, true, hooks);
-    panel.setSize (720, 660);
+    for (int i = 1; i < lines.size(); ++i)
+    {
+        juce::StringArray f;
+        f.addTokens (lines[i], "\t", {});
+        if (f.size() < 4 || ! juce::isPositiveAndBelow (f[0].getIntValue(), (int) SettingsPage::link + 1))
+            continue;
+        cached.push_back ({ (SettingsPage) f[0].getIntValue(), f[2], f[1], f[3] });
+    }
+    indexLanguage() = i18n::current();
+    return ! cached.empty();
+}
+
+void saveIndex()
+{
+    juce::String text = indexStamp() + "\n";
+    const auto clean = [] (const juce::String& t) { return t.replaceCharacters ("\t\n\r", "   "); };
+    for (const auto& o : indexCache())
+        text << (int) o.page << "\t" << clean (o.section) << "\t" << clean (o.text) << "\t" << clean (o.english) << "\n";
+    indexFile().replaceWithText (text);
+}
+} // namespace
+
+// the options of a Settings panel that exists (made off screen for the palette, or the window's own)
+void indexSettingsPanel (SettingsPanel& panel)
+{
+    auto& cached = indexCache();
+    cached.clear();
+    indexLanguage() = i18n::current();
     auto& tabs = panel.tabsForIndex();
     const auto& order = panel.pageOrder();
     for (int i = 0; i < tabs.getNumTabs() && i < (int) order.size(); ++i)
         if (auto* content = tabs.getTabContentComponent (i))
         {
-            content->setBounds (0, 0, 720, 620);
+            // (a page not shown yet may have no size; one of the open window keeps its own; each is shown back as it was)
+            const auto wasVisible = content->isVisible();
+            if (content->getWidth() < 200)
+                content->setBounds (0, 0, 720, 620);
             content->setVisible (true);
             content->resized();
             std::vector<std::pair<int, SettingsOption>> found;
             std::vector<std::pair<int, juce::String>> titles;
             collectOptions (*content, *content, order[(std::size_t) i], found, titles);
+            content->setVisible (wasVisible);
             std::stable_sort (found.begin(), found.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
             std::sort (titles.begin(), titles.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
             for (auto& [y, option] : found)
@@ -1819,8 +1872,34 @@ const std::vector<SettingsOption>& settingsOptions (AudioEngine& engine, const S
                     cached.push_back (std::move (option));
             }
         }
+}
+
+const std::vector<SettingsOption>& settingsOptions (AudioEngine& engine, const SettingsHooks& hooks)
+{
+    auto& cached = indexCache();
+    if (! cached.empty() && indexLanguage() == i18n::current())
+        return cached;
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    if (! loadIndex())
+    {
+        SettingsPanel panel (engine, SettingsPage::general, true, hooks);
+        panel.setSize (720, 660);
+        indexSettingsPanel (panel);
+        saveIndex();
+    }
     lastIndexMs = juce::Time::getMillisecondCounterHiRes() - started;
     return cached;
+}
+
+// (the first Settings window of a version reads its own pages for the palette: nothing extra is made)
+void indexOpenSettings (SettingsPanel& panel)
+{
+    if (! indexCache().empty() && indexLanguage() == i18n::current())
+        return;
+    if (loadIndex())
+        return;
+    indexSettingsPanel (panel);
+    saveIndex();
 }
 
 double settingsOptionsBuildMs() { return lastIndexMs; }
