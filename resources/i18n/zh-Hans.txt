@@ -12790,3 +12790,5 @@ countries: cn sg
 "Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it." = "没有自身颜色的轨道、混音器轨道和通道使用强调色的柔和色调。关闭时，或使用 LYNX 自带的红色强调色时：FL 的灰色。“轨道”色点优先。"
 "Dim unselected tracks (LYNX)" = "调暗未选中的轨道（LYNX）"
 "In the Pattern layout, while Playlist tracks are selected, the other tracks' rows step back under a light dark veil, so the selection is where the eye goes. FL Studio doesn't dim them: switch this off for FL's look. Also in Playlist › View." = "在 Pattern 布局中，选中播放列表轨道时，其他轨道的行会退到一层淡淡的暗色遮罩之下，让目光落在选择上。FL Studio 不会调暗它们：关闭此项即为 FL 的外观。也在 播放列表 › 视图 中。"
+"Darken switched-off tracks (LYNX)" = "调暗已关闭的轨道 (LYNX)"
+"In the Pattern layout, a Playlist track switched off (its LED dark) also steps back as a whole row: its lane and clips go under a dark veil. FL Studio greys only the track's clips and header: switch this off for FL's look. Also in Playlist › View." = "在 Pattern 布局中，已关闭的 Playlist 轨道（其 LED 变暗）也会整行退后：其轨道行和片段处于深色遮罩下。FL Studio 只把该轨道的片段和标题变灰：关闭此项即为 FL 的外观。也在 Playlist › View 中。"

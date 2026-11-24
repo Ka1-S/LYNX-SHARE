@@ -18123,3 +18123,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Feel190qeTests.inc" // round 190qe (0.1.32): edge scroll (FL law), view stack, zoom glide and anchor, selection history, keep labels
 #include "Picker190qiTests.inc" // round 190qi (0.1.32 R6): Recent / Hidden / one row per plugin, MIDI preview, file types, Tab completion, tag tree
 #include "Issues190qjTests.inc" // round 190qj (0.1.32): issue #265 (a linked track's M and clips on other inserts), PRs #261-#266, #238
+#include "Pr268_190qmTests.inc" // round 190qm: PR #268, a switched-off Playlist track (FL's greyed clips + the LYNX row veil)

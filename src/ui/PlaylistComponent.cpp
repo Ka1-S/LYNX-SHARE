@@ -211,6 +211,12 @@ float clipHeaderHeight (juce::Rectangle<float> r) { return juce::jmin (clipTitle
 // and a 1 px silence line; on a short track the whole clip is one header-coloured band with the waveform in the clip's
 // own colour. The Clip-launch and Simple layouts keep their look (theme::clipBody's Live / BandLab styles are theirs).
 bool flClipLook() noexcept { return layoutstyle::current() == layoutstyle::Style::pattern; }
+// Round 190qm (PR #268, checked in FL 2026 on Thief: shots/fl/fl3-*): a Playlist track switched off (its LED dark) draws its
+// clips as muted clips, the veil and the X in the glyph's place, and its header grey; the lane itself is unchanged. Pattern
+// layout only (the Clip-launch and Simple layouts keep their looks). A take lane is muted only so that it stays silent
+// (Live's TakeLanes, a comp's lanes: comp::isTakeLane): it keeps its own look (paint gate, Patience: +20 % without this).
+bool switchedOff (const Song& song, int track) { return song.isTrackMuted (track) && ! comp::isTakeLane (song, track); }
+bool shownMuted (const Song& song, const Clip& c) { return c.muted || (flClipLook() && switchedOff (song, c.track)); }
 // FL's two clip forms: the band (one colour) below this track height, header + body from it. FL shows the band at its
 // default 26 px tracks and header + body at 50 px; the switch point between was not captured (an open item).
 constexpr int flBandBelow = 38;
@@ -603,6 +609,8 @@ struct PlaylistComponent::SmallClips
     static constexpr float maxWidth = 12.0f;
     std::map<juce::uint32, juce::RectangleList<float>> bodies, contents, edges;
     std::map<juce::uint32, juce::Path> waves;
+    // round 190qm (PR #268): small clips of a switched-off track, under the muted-clip veil (too narrow for its X)
+    juce::RectangleList<float> veils;
 
     void fill (juce::Graphics& g)
     {
@@ -624,6 +632,12 @@ struct PlaylistComponent::SmallClips
         {
             g.setColour (juce::Colour (argb));
             for (const auto& r : list)
+                g.fillRect (r);
+        }
+        if (! veils.isEmpty())
+        {
+            g.setColour (theme::colour::bg1.withAlpha (0.55f)); // (paintMutedVeil's veil)
+            for (const auto& r : veils)
                 g.fillRect (r);
         }
     }
@@ -800,6 +814,7 @@ public:
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
         owner.paintTrackSelectionDim (g); // (over the picture: the selection changes without the lanes being painted again)
+        owner.paintMutedTracks (g); // (over the picture: a mute changes without the lanes being painted again)
         owner.paintStickyTitles (g);
         if (! owner.gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
             owner.paintPlayhead (g);
@@ -945,7 +960,7 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
             juce::Rectangle<int> titles;
             for (const auto& c : song.playlist)
             {
-                if (c.muted || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
+                if (shownMuted (song, c) || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
                     continue;
                 const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
                 if (((x0 < left) == (x0 - (float) dx < left)) || x1 - x0 < 16.0f) // (only a start that crosses the edge now)
@@ -2325,7 +2340,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 }
 
         auto veilIfMuted = [&] (const Clip& clip, juce::Rectangle<float> area) {
-            if (! clip.muted)
+            if (! shownMuted (song, clip))
                 return;
             std::vector<juce::Rectangle<float>> lit;
             if (! compUsed.empty())
@@ -2367,7 +2382,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto barColour = c.kind == ClipKind::audio        ? colour::audioClip
                                        : c.kind == ClipKind::automation ? colour::automation
                                                                         : tame (patternColour (song, c.pattern));
-                g.setColour (barColour.withAlpha (c.muted ? 0.35f : 0.9f));
+                g.setColour (barColour.withAlpha (shownMuted (song, c) ? 0.35f : 0.9f));
                 g.fillRect (juce::Rectangle<float> (x0, y + 2.0f, juce::jmax (2.0f, x1 - x0 - 1.0f), (float) foldedHeight - 4.0f));
                 if (isSelected (i))
                 {
@@ -2380,6 +2395,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
             if (r.getWidth() < SmallClips::maxWidth && c.kind != ClipKind::automation && ! c.muted && ! isSelected (i))
             {
                 addSmallClip (smallClips, physicalScale, c, r, c.kind == ClipKind::pattern && c.pattern == song.currentPattern);
+                if (shownMuted (song, c)) // (round 190qm: its track is switched off; the X needs 14 px, as for a muted clip)
+                    smallClips.veils.addWithoutMerging (r);
                 continue;
             }
 
@@ -2425,7 +2442,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             // body + name strip
             const auto patternName = juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str());
             const auto clipBody = liveLook ? paintLiveClipFrame (g, r, *liveLook, patternName)
-                                           : paintClipFrame (g, r, base, patternName, ClipGlyph::pattern, c.muted, simpleLook ? &*simpleLook : nullptr);
+                                           : paintClipFrame (g, r, base, patternName, ClipGlyph::pattern, shownMuted (song, c), simpleLook ? &*simpleLook : nullptr);
 
             // note thumbnail: the pattern's notes as small rounded bars in a light tint of the clip colour,
             // spread over the body's height by pitch (a few keys of padding so single notes don't hug the edges)
@@ -2594,6 +2611,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         if (! cachePainting) // (the cached picture gets it from PlayheadCache::paint)
             paintTrackSelectionDim (g);
+            paintMutedTracks (g);
 
         if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
             paintStickyTitles (g);
@@ -3391,6 +3409,47 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
     }
 }
 
+void PlaylistComponent::paintMutedTracks (juce::Graphics& g)
+{
+    if (! darkenMutedTracks || ! flClipLook())
+        return;
+
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    if (grid.isEmpty() || song.playlistTracks.empty())
+        return;
+
+    std::optional<juce::Graphics::ScopedSaveState> state;
+
+    // PR #268, a LYNX extra (round 190qm: FL 2026 greys the clips and the header of a switched-off track, shownMuted and
+    // the header plate, and leaves its lane as it is): the row steps back as a whole - its lane, clips and automation
+    // lanes go dark; the tracks that are on keep their colours. (The PR's 30 % header veil is gone: paint() draws the
+    // headers after this, so it showed only over the cached picture, and the header is already grey as in FL.)
+    // (round 190qm, paint gate: this runs on every playhead frame over the picture, so nothing is set up until a
+    // switched-off track is in view)
+    bool clipped = false;
+    const auto count = juce::jmin ((int) song.playlistTracks.size(), numTracks());
+    for (int t = 0; t < count; ++t)
+    {
+        if (! song.playlistTracks[(std::size_t) t].muted || comp::isTakeLane (song, t)) // (a take lane: shownMuted)
+            continue;
+        const auto height = heightOf (t);
+        const auto y = trackToY (t);
+        const auto rowHeight = height + laneBlockHeight (t);
+        if (height <= 0 || y >= grid.getBottom() || y + rowHeight <= grid.getY())
+            continue;
+        if (! clipped)
+        {
+            state.emplace (g);
+            if (! g.reduceClipRegion (grid))
+                return;
+            clipped = true;
+            g.setColour (juce::Colours::black.withAlpha (0.45f));
+        }
+        g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
+    }
+}
+
 // The playhead over the cached image (round 174e): the line in the grid and the triangle on the ruler, as paint()
 // draws them without the cache
 // Round 190ig (FL look, Pattern layout): the titles of the audio and automation clips that start left of the view, held at
@@ -3445,7 +3504,7 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
         for (int i = 0; i < (int) song.playlist.size(); ++i)
         {
             const auto& c = song.playlist[(std::size_t) i];
-            if (c.muted || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
+            if (shownMuted (song, c) || c.track < 0 || (! heldEveryClip() && (! fl || c.kind == ClipKind::pattern)))
                 continue;
             if (const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end()); x0 >= (double) left || x1 <= (double) left || x1 - (double) left < 16.0)
                 continue;
@@ -3953,7 +4012,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     const auto liveLook = liveArrangeLook() ? std::optional<theme::ClipLook> (liveClipLook (c)) : std::nullopt;
     const auto body = fl ? paintFlClipFrame (g, r, look, band)
                     : liveLook ? paintLiveClipFrame (g, r, *liveLook, name)
-                               : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted, simpleLook ? &*simpleLook : nullptr);
+                               : paintClipFrame (g, r, colour, name, ClipGlyph::audio, shownMuted (engine.getSong(), c), simpleLook ? &*simpleLook : nullptr);
 
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
@@ -4008,7 +4067,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     }
 
     if (fl)
-        paintFlClipTitle (g, r, look, name, ClipGlyph::audio, c.muted, band, heldTitleLeft, false);
+        paintFlClipTitle (g, r, look, name, ClipGlyph::audio, shownMuted (engine.getSong(), c), band, heldTitleLeft, false);
     else if (! liveLook)
         paintClipOutline (g, r, colour, false, false);
 
@@ -4164,7 +4223,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     }
     else
     {
-        paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted);
+        paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, shownMuted (engine.getSong(), c));
         paintClipOutline (g, r, colour, false, false);
     }
 
@@ -4214,7 +4273,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
         }
         g.setColour (look.content);
         g.strokePath (curve, juce::PathStrokeType (1.5f));
-        paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted, band, heldTitleLeft, false);
+        paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, shownMuted (engine.getSong(), c), band, heldTitleLeft, false);
     }
     else
     {

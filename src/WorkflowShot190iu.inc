@@ -470,6 +470,108 @@
         }
 
 
+        // ---- 7c. PR #268 (a LYNX extra since round 190qm, on by default): a track switched off (its LED dark) goes dark as a
+        // whole; the others stay light
+        {
+            const auto bar = song().barTicks();
+            pl.setViewForSnapshot (60.0, 1, 0);
+            engine.dispatchPendingMessages();
+            int muted = -1, other = -1;
+            for (int t = 0; t < (int) song().playlistTracks.size() && t < pl.numTracksForSnapshot(); ++t)
+            {
+                const auto row = pl.trackRowForSnapshot (t);
+                if (row.getHeight() < 8 || row.getBottom() > pl.getHeight())
+                    continue;
+                const auto empty = std::none_of (song().playlist.begin(), song().playlist.end(), [t] (const Clip& c) { return c.track == t; })
+                                   && song().playlistTracks[(std::size_t) t].lanes.empty();
+                if (! empty)
+                    continue;
+                if (muted < 0)
+                    muted = t;
+                else if ((t % 2) == (muted % 2)) // (the lanes alternate by row: same shade before the veil)
+                {
+                    other = t;
+                    break;
+                }
+            }
+            check ("playlist_mute_has_two_empty_tracks", muted >= 0 && other >= 0, juce::String (muted) + " " + juce::String (other));
+            if (muted >= 0 && other >= 0)
+            {
+                const auto before = shot::snapshot (pl);
+                engine.editSong ([muted] (Song& s) { s.playlistTracks[(std::size_t) muted].muted = true; });
+                engine.dispatchPendingMessages();
+                const auto image = shot::snapshot (pl);
+                const auto x = juce::jlimit (0, image.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
+                const auto lit = before.getPixelAt (x, pl.trackRowForSnapshot (muted).getCentreY()).getBrightness();
+                const auto dark = image.getPixelAt (x, pl.trackRowForSnapshot (muted).getCentreY()).getBrightness();
+                const auto otherBefore = before.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
+                const auto otherAfter = image.getPixelAt (x, pl.trackRowForSnapshot (other).getCentreY()).getBrightness();
+                check ("playlist_muted_track_goes_dark", dark < lit * 0.75f, juce::String (lit, 4) + " -> " + juce::String (dark, 4));
+                check ("playlist_track_left_on_stays_light", std::abs (otherBefore - otherAfter) < 0.004f,
+                       juce::String (otherBefore, 4) + " -> " + juce::String (otherAfter, 4));
+                savePng (image, prefix + "-playlist-muted-track.png");
+                // round 190qm: the row veil is a LYNX extra (FL 2026 leaves a switched-off track's lane as it is: Thief,
+                // shots/fl/fl3-*); switched off, the empty lane is as before the mute (FL-exact)
+                PlaylistComponent::darkenMutedTracks = false;
+                pl.repaint();
+                {
+                    const auto fl = shot::snapshot (pl);
+                    const auto lane = fl.getPixelAt (x, pl.trackRowForSnapshot (muted).getCentreY()).getBrightness();
+                    check ("playlist_muted_track_lane_unchanged_without_the_extra_as_fl", std::abs (lane - lit) < 0.004f,
+                           juce::String (lit, 4) + " -> " + juce::String (lane, 4));
+                    savePng (fl, prefix + "-playlist-muted-track-fl.png");
+                }
+                PlaylistComponent::darkenMutedTracks = true;
+                pl.repaint();
+                engine.undo(); // (leaves the song as it was)
+                engine.dispatchPendingMessages();
+            }
+        }
+
+        // ---- 7d. round 190qm (PR #268, FL 2026 checked on Thief): a switched-off track's clips are drawn as muted clips
+        // (the veil, the X in the glyph's place), with or without the LYNX row veil
+        {
+            const auto saved = PlaylistComponent::darkenMutedTracks;
+            PlaylistComponent::darkenMutedTracks = false; // (only the FL part: the clip's own veil)
+            pl.repaint();
+            int track = -1;
+            juce::Point<int> at;
+            for (const auto& c : song().playlist)
+            {
+                if (c.muted || c.track < 0 || c.kind != ClipKind::pattern || song().isTrackMuted (c.track))
+                    continue;
+                const auto row = pl.trackRowForSnapshot (c.track);
+                const auto x = (int) pl.xOfTickForSnapshot ((double) c.start + (double) c.length * 0.5);
+                if (row.getHeight() >= 12 && row.getY() >= 0 && row.getBottom() <= pl.getHeight() && x > 0 && x < pl.getWidth() - 1
+                    && (int) (pl.xOfTickForSnapshot ((double) c.end()) - pl.xOfTickForSnapshot ((double) c.start)) >= 24)
+                {
+                    track = c.track;
+                    at = { x, row.getY() + row.getHeight() * 2 / 3 };
+                    break;
+                }
+            }
+            check ("playlist_has_a_pattern_clip_in_view", track >= 0, juce::String (track));
+            if (track >= 0)
+            {
+                const auto before = shot::snapshot (pl);
+                engine.editSong ([track] (Song& s) { s.playlistTracks[(std::size_t) track].muted = true; });
+                engine.dispatchPendingMessages();
+                pl.repaint();
+                const auto after = shot::snapshot (pl);
+                const auto b = before.getPixelAt (at.x, at.y), a = after.getPixelAt (at.x, at.y);
+                // the veil (bg1 at 55 %) takes the clip's colour away, as FL greys the clips of a track switched off
+                check ("playlist_switched_off_track_greys_its_clips_as_fl", std::abs (b.getSaturation() - a.getSaturation()) > 0.05f
+                                                                              || std::abs (b.getBrightness() - a.getBrightness()) > 0.05f,
+                       b.toDisplayString (false) + " -> " + a.toDisplayString (false));
+                savePng (after, prefix + "-playlist-muted-track-clips.png");
+                engine.undo();
+                engine.dispatchPendingMessages();
+            }
+            PlaylistComponent::darkenMutedTracks = saved;
+            pl.repaint();
+        }
+
+
         // ---- 8. Settings › LYNX extras with the new switches
         {
             auto page = makeSettingsPanel (engine, SettingsPage::extras);
