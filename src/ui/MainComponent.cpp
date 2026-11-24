@@ -3,6 +3,7 @@
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
 #include "ui/WindowPlaces.h" // (round 190oa, DF-130)
+#include "core/ExportDone.h" // round 190qr (#280)
 #include "core/Sections.h"
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/ChordLane.h"
@@ -3017,6 +3018,33 @@ bool MainComponent::runAction (const std::string& id)
             createAutomationClip (engine, *t);
         else
             ui::postHint ({ tr ("Automation for last tweaked parameter"), tr ("Last tweaked: none") }, 3000);
+    }
+    else if (is ("automation.volume") || is ("automation.pan"))
+    {
+        // issue #275 (round 190qr): the selected channel's volume / pan (the Mixer focused: the selected insert's), as a
+        // clip (FL's Create automation clip) or, while Automation lanes is on, a lane under its track
+        const auto volume = is ("automation.volume");
+        AutomationTarget t;
+        if (focusContext() == keys::Context::mixer)
+        {
+            t.kind = volume ? AutomationTargetKind::mixerVolume : AutomationTargetKind::mixerPan;
+            t.index = mixer.getSelectedTrack();
+        }
+        else
+        {
+            t.kind = volume ? AutomationTargetKind::channelVolume : AutomationTargetKind::channelPan;
+            t.index = engine.getSelectedChannel();
+        }
+        const auto& song = engine.getSong();
+        const auto exists = t.index >= 0 && (focusContext() == keys::Context::mixer ? t.index < (int) song.mixer.size() : t.index < (int) song.channels.size());
+        if (! exists)
+            ui::postHint ({ volume ? tr ("Create volume automation for the selected channel (Mixer: the selected insert)")
+                                   : tr ("Create pan automation for the selected channel (Mixer: the selected insert)"),
+                            tr ("Nothing selected") }, 3000);
+        else if (autolanes::shown())
+            createAutomationLane (engine, t);
+        else
+            createAutomationClip (engine, t);
     }
     else if (is ("view.tempoTapper")) openTempoTapper (engine);
     else if (is ("view.sampleBrowser")) toggleSampleBrowser();
@@ -11674,6 +11702,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
             exports.addItem (tr ("Project bones..."), [this] { exportProjectBones (engine, currentFile.getParentDirectory(), projectName); });
             exports.addItem (tr ("Project data files..."), [this] { exportDataFiles(); });
+            // issue #280 (round 190qr): the LYNX extras' switches
+            exports.addSeparator();
+            exports.addItem (tr ("Play a sound when an export finishes") + " (LYNX)", true, exportdone::sound(),
+                             [] { workflowextras::setExtra ("export.doneSound", ! exportdone::sound()); });
+            exports.addItem (tr ("Show a window when an export finishes") + " (LYNX)", true, exportdone::window(),
+                             [] { workflowextras::setExtra ("export.doneWindow", ! exportdone::window()); });
             menu.addSubMenu (tr ("Export"), exports);
         }
         {

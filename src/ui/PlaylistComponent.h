@@ -309,6 +309,9 @@ public:
     struct ViewForSnapshot { double pixelsPerTick, scrollTicks; int scrollY; };
     ViewForSnapshot viewForSnapshot() const noexcept { return { pixelsPerTick, scrollTicks, scrollY }; }
     void zoomAllForSnapshot() { zoomAll(); }
+    // round 190qr (--selftest issues190qr): the gain handle of a clip (#274), a y on the markers' tags (#281)
+    juce::Rectangle<float> gainHandleForSnapshot (int clip) const { return gainHandle (clip); }
+    int markerTagYForSnapshot() const noexcept { return rulerTop + timelineHeight - 6; }
     void restoreViewForSnapshot (const ViewForSnapshot& v) { pixelsPerTick = v.pixelsPerTick; scrollTicks = v.scrollTicks; scrollY = v.scrollY; updateScrollBars(); repaint(); }
     void frameStepForSnapshot() { liveFrame (juce::Time::getMillisecondCounterHiRes()); }
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick

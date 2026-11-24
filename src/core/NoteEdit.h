@@ -128,7 +128,8 @@ std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixel
 //   two beats are, and the numerator is even             -> two beats
 //   otherwise                                            -> one bar, doubled while narrower than `min` (up to 32 bars)
 // So it is never finer than a step, however far in the zoom goes. (FL's one exception, 1 tick at its maximum zoom of
-// 8 px per tick, is out of reach here: at 96 PPQ that is 3072 px per bar and LYNX's editors stop at 800.)
+// 8 px per tick, is not drawn: since round 190qr (issue #277) LYNX's Playlist and Piano roll reach that zoom too,
+// maxPixelsPerTick, but at LYNX's 960 PPQ a tick line every 8 px would be a wall of lines.)
 // numerator / denominator: the time signature (a beat is 16 / denominator steps, a bar `numerator` beats).
 std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator = 4, double minPixels = 10.0);
 

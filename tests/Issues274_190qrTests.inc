@@ -67,3 +67,45 @@ TEST (issues190qr_278_appimage_manager_entries)
     CHECK (! startsAppImage ("[Desktop Action New]\nExec=/opt/LYNX.AppImage\n", "/opt/LYNX.AppImage"));
     CHECK (! startsAppImage ("[Desktop Entry]\nType=Link\nExec=/opt/LYNX.AppImage\n", "/opt/LYNX.AppImage"));
 }
+
+#include "core/StartupSound.h"
+#include "core/ZoomAnchor.h"
+
+// #277: FL 2026's deepest zoom (8 px a tick of the project's timebase; LYNX's is FL's highest, 960 PPQ)
+TEST (issues190qr_277_deepest_zoom_is_fl_s)
+{
+    using namespace lynx;
+    CHECK (maxPixelsPerTick == 8.0);
+    CHECK (maxPixelsPerTick * ppq == 7680.0); // a quarter note at the deepest zoom
+    // at 140 BPM / 44.1 kHz that is under 16 frames a pixel: the Playlist draws the samples themselves (WaveformView)
+    const auto framesPerTick = 44100.0 * 60.0 / (140.0 * ppq);
+    CHECK (framesPerTick / maxPixelsPerTick < 16.0);
+    CHECK (framesPerTick / (800.0 / (4 * ppq)) > 16.0); // (the old limit, 800 px a 4/4 bar, never got there)
+}
+
+// #276: the zoom anchor (LYNX extra "Zoom around the song position")
+TEST (issues190qr_276_zoom_anchor)
+{
+    using namespace lynx::zoomanchor;
+    CHECK (! atSongPosition()); // off by default: FL's zoom around the mouse
+    CHECK (anchorX (false, 300.0, 120.0, 0.0, 1000.0) == 300.0);
+    CHECK (anchorX (true, 300.0, 120.0, 0.0, 1000.0) == 120.0);
+    CHECK (anchorX (true, 300.0, -5.0, 0.0, 1000.0) == 300.0);   // the song position off view (left): as usual
+    CHECK (anchorX (true, 300.0, 1000.5, 0.0, 1000.0) == 300.0); // (right)
+    CHECK (anchorX (true, 300.0, 1000.0, 0.0, 1000.0) == 1000.0); // (on the edge: in view)
+}
+
+// #280: the export's chime (LYNX extra "Play a sound when an export finishes")
+TEST (issues190qr_280_done_sound)
+{
+    using namespace lynx::startup;
+    const auto s = makeDoneSound (48000.0);
+    CHECK (s.left.size() == (std::size_t) (0.9 * 48000.0) && s.right.size() == s.left.size());
+    float peak = 0.0f;
+    for (std::size_t i = 0; i < s.left.size(); ++i)
+        peak = std::max ({ peak, std::abs (s.left[i]), std::abs (s.right[i]) });
+    CHECK (std::abs (peak - peakLevel) < 1.0e-4f);
+    CHECK (std::abs (s.left.back()) < 1.0e-6f && std::abs (s.right.back()) < 1.0e-6f); // (faded out: no click at its end)
+    const auto again = makeDoneSound (48000.0);
+    CHECK (again.left == s.left); // (the same sound every time)
+}

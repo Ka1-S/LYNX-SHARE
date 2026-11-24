@@ -18119,7 +18119,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
-#include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)
+#include "Issues274_190qrTests.inc" // round 190qr: issues #274-#281 (markers delete, AppImage manager entries, zoom, rack meter...)
 #include "Feel190qeTests.inc" // round 190qe (0.1.32): edge scroll (FL law), view stack, zoom glide and anchor, selection history, keep labels
 #include "Picker190qiTests.inc" // round 190qi (0.1.32 R6): Recent / Hidden / one row per plugin, MIDI preview, file types, Tab completion, tag tree
 #include "Issues190qjTests.inc" // round 190qj (0.1.32): issue #265 (a linked track's M and clips on other inserts), PRs #261-#266, #238

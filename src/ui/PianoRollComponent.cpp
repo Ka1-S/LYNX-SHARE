@@ -4,6 +4,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "core/ZoomAnchor.h"
 #include "core/MuteKeys.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "ui/ChordHelper.h"
@@ -307,7 +308,7 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     overview.paintContent = [this] (juce::Graphics& g, juce::Rectangle<float> area, double total) { paintOverview (g, area, total); };
     overview.onChange = [this] (double start, double length) {
         const auto width = (double) gridArea().getWidth();
-        pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, width / juce::jmax (1.0, length));
+        pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, width / juce::jmax (1.0, length));
         scrollTicks = juce::jmax (0.0, start);
         updateScrollBars();
         repaint();
@@ -1129,7 +1130,7 @@ void PianoRollComponent::updateScrollBars()
     vBar.setCurrentRange (scrollY, grid.getHeight(), juce::dontSendNotification);
     scrollTicks = hBar.getCurrentRangeStart();
     scrollY = (int) vBar.getCurrentRangeStart();
-    overview.minLength = grid.getWidth() / (120.0 / ticksPerStep);
+    overview.minLength = grid.getWidth() / (maxPixelsPerTick);
     overview.setRange (total, scrollTicks, grid.getWidth() / pixelsPerTick);
 }
 
@@ -3685,7 +3686,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         {
             const auto width = (double) juce::jmax (1, gridArea().getWidth());
             timeZoomDrag.move (e.x, e.y, flmods::ctrl (e.mods));
-            pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, width / timeZoomDrag.span);
+            pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, width / timeZoomDrag.span);
             scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
             updateScrollBars();
             repaint();
@@ -4658,7 +4659,7 @@ void PianoRollComponent::zoomToTicks (double from, double to)
     // (round 190qe, UX-A3: glides with Animations on)
     settleViewGlide();
     auto target = currentView();
-    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, gridArea().getWidth() / (to - from));
+    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, gridArea().getWidth() / (to - from));
     target.scroll = juce::jmax (0.0, from);
     showView (clampedView (target));
 }
@@ -4666,7 +4667,7 @@ void PianoRollComponent::zoomToTicks (double from, double to)
 void PianoRollComponent::zoomIn (int anchorX)
 {
     const auto anchor = xToTick (anchorX);
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * 2.0);
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick * 2.0);
     scrollTicks = juce::jmax (0.0, anchor - (anchorX - keyboardWidth) / pixelsPerTick);
     updateScrollBars();
     repaint();
@@ -4675,7 +4676,7 @@ void PianoRollComponent::zoomIn (int anchorX)
 void PianoRollComponent::zoomOut (int anchorX)
 {
     const auto anchor = xToTick (anchorX);
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick / 2.0);
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick / 2.0);
     scrollTicks = juce::jmax (0.0, anchor - (anchorX - keyboardWidth) / pixelsPerTick);
     updateScrollBars();
     repaint();
@@ -5288,11 +5289,15 @@ void PianoRollComponent::openNoteTool (NoteTool tool)
 void PianoRollComponent::zoomAroundCentre (double factor)
 {
     // round 190qe (UX-A2): the keys zoom around the playhead while it plays on screen, else the selection's centre on
-    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3)
+    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3). Issue #276 (round 190qr,
+    // the LYNX extra "Zoom around the song position"): the song position when it is in view, before all of those
     settleViewGlide();
-    const auto anchor = keyZoomAnchorPx();
+    const auto grid = gridArea();
+    const auto anchor = zoomanchor::anchorX (zoomanchor::atSongPosition() && playheadTick >= 0.0, keyZoomAnchorPx() + grid.getX(), tickToX (playheadTick),
+                                             (double) grid.getX(), (double) grid.getRight())
+                        - grid.getX();
     auto target = currentView();
-    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
+    target.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick * factor);
     target.scroll = zoomanchor::scrollFor (scrollTicks, pixelsPerTick, target.pixelsPerUnit, anchor);
     showView (clampedView (target));
 }
@@ -5339,7 +5344,7 @@ void PianoRollComponent::zoomToSelection()
     const auto t0 = juce::jmax (0.0, (double) from - margin), t1 = (double) to + margin;
     if (t1 - t0 >= 1.0)
     {
-        view.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, gridArea().getWidth() / (t1 - t0));
+        view.pixelsPerUnit = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, gridArea().getWidth() / (t1 - t0));
         view.scroll = t0;
     }
     view.scrollY = juce::jmax (0, rowFor ((low + high) / 2) * rowHeight - gridArea().getHeight() / 2);
@@ -5426,7 +5431,7 @@ viewstack::View PianoRollComponent::currentView() const
 
 void PianoRollComponent::applyView (const viewstack::View& v)
 {
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, v.pixelsPerUnit);
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, v.pixelsPerUnit);
     scrollTicks = juce::jmax (0.0, v.scroll);
     scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
@@ -5436,7 +5441,7 @@ void PianoRollComponent::applyView (const viewstack::View& v)
 viewstack::View PianoRollComponent::clampedView (const viewstack::View& v)
 {
     const auto saved = currentView();
-    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, v.pixelsPerUnit);
+    pixelsPerTick = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, v.pixelsPerUnit);
     scrollTicks = juce::jmax (0.0, v.scroll);
     scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
@@ -6229,7 +6234,7 @@ void PianoRollComponent::touchPinch (float scale, juce::Point<float> centre)
     settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) keyboardWidth);
-    const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * (double) scale);
+    const auto zoomed = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick * (double) scale);
     scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
     pixelsPerTick = zoomed;
     updateScrollBars();
@@ -6252,7 +6257,7 @@ void PianoRollComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
     else
     {
         const auto anchorPixels = (double) juce::jmax (0, e.x - keyboardWidth);
-        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * factor);
+        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick * factor);
         scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
         pixelsPerTick = zoomed;
     }
@@ -6377,9 +6382,11 @@ void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::
     }
     else if (ctrl)
     {
-        // zoom keeping the tick under the mouse in place
-        const auto anchorPixels = (double) juce::jmax (0, e.x - keyboardWidth);
-        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, 120.0 / ticksPerStep, pixelsPerTick * gesture::wheelZoomFactor (wheel.deltaY, wheel.isSmooth));
+        // zoom keeping the tick under the mouse in place (issue #276, round 190qr: with the LYNX extra "Zoom around the
+        // song position", the playhead when it is in view)
+        const auto anchorPixels = zoomanchor::anchorX (zoomanchor::atSongPosition() && playheadTick >= 0.0, (double) juce::jmax (0, e.x - keyboardWidth),
+                                                       tickToX (playheadTick) - keyboardWidth, 0.0, (double) gridArea().getWidth());
+        const auto zoomed = juce::jlimit (2.0 / ticksPerStep, maxPixelsPerTick, pixelsPerTick * gesture::wheelZoomFactor (wheel.deltaY, wheel.isSmooth));
         scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
         pixelsPerTick = zoomed;
     }

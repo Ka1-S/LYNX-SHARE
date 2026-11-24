@@ -18,6 +18,8 @@
 #include "ui/ShotShowing.h"
 #include "core/FlSettings.h"
 #include "core/RulerGestures.h"
+#include "core/ZoomAnchor.h"
+#include "core/ClipHandle.h"
 #include "ui/ColourPicker.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
@@ -1113,7 +1115,7 @@ juce::String PlaylistComponent::cacheSelfTest (const std::function<void()>& wait
     // a zoom gesture: four steps in, two out (scaled, the lanes only), then still
     const auto anchor = (double) gridArea().getWidth() * 0.4;
     auto zoomStep = [&] (double factor) {
-        const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+        const auto zoomed = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * factor);
         scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchor);
         pixelsPerTick = zoomed;
         updateScrollBars();
@@ -1271,7 +1273,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     overview.paintContent = [this] (juce::Graphics& g, juce::Rectangle<float> area, double total) { paintOverview (g, area, total); };
     overview.onChange = [this] (double start, double length) {
         const auto width = (double) gridArea().getWidth();
-        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), width / juce::jmax (1.0, length));
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, width / juce::jmax (1.0, length));
         scrollTicks = juce::jmax (0.0, start);
         updateScrollBars();
         repaintZoomed(); // (dragging the overview's window or its ends: a continuous scroll / zoom)
@@ -1939,7 +1941,7 @@ void PlaylistComponent::updateScrollBars()
     vBar.setCurrentRange (scrollY, grid.getHeight(), juce::dontSendNotification);
     scrollTicks = hBar.getCurrentRangeStart();
     scrollY = (int) vBar.getCurrentRangeStart();
-    overview.minLength = grid.getWidth() / (800.0 / (4 * ppq));
+    overview.minLength = grid.getWidth() / (maxPixelsPerTick);
     overview.setRange (total, scrollTicks, grid.getWidth() / pixelsPerTick);
 }
 
@@ -2031,7 +2033,7 @@ void PlaylistComponent::showSongAfterOpen (bool newProject)
     if (flClipLook() && flOpenZoom)
     {
         // (round 190oj: File › New opens FL's new project at ~60 px a bar, measured on FL 2026: bar 5 at +240 px)
-        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), (newProject ? 60.0 : 16.0) / (double) juce::jmax<std::int64_t> (1, engine.getSong().barTicks()));
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, (newProject ? 60.0 : 16.0) / (double) juce::jmax<std::int64_t> (1, engine.getSong().barTicks()));
         updateScrollBars();
         repaint();
         return;
@@ -4039,6 +4041,10 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             style.gain = juce::jmin (style.gain, 8.0f);
         if (fl || liveLook)
             style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour (Live draws one too: audiolane y 476)
+        // issue #277 (round 190qr): zoomed in under ui::sampleDetailFrames frames a pixel (FL's deeper zoom), the samples
+        // themselves (the file the summary was made of; WaveformView checks it is the same length)
+        if (std::abs (perTick / pixelsPerTick) < ui::sampleDetailFrames)
+            style.samples = engine.getSampleLibrary().findLoaded (path);
         // #230 (round 190nq): FL's View › "Show fade previews" (on by default): the waveform with the clip's fades applied
         if (showFadePreviews && (c.effectiveFadeIn() > 0 || c.effectiveFadeOut() > 0))
             style.envelope = [&c, left = r.getX(), ppt = pixelsPerTick] (float x) { return clipops::fadePreviewGain (c, (double) (x - left) / ppt); };
@@ -5818,7 +5824,17 @@ juce::Rectangle<float> PlaylistComponent::gainHandle (int index) const
         return {};
     // FL 2026: a semicircle sitting on the clip's bottom edge, in the middle
     constexpr float radius = 5.0f;
-    return { r.getCentreX() - radius, r.getBottom() - radius - 1.0f, radius * 2.0f, radius + 1.0f };
+    auto centreX = r.getCentreX();
+    // issue #274 (round 190qr, the LYNX extra "The clip gain handle stays in view", off by default): when the clip's middle
+    // is scrolled out of view, the handle sits in the middle of the part that shows, so it can always be reached
+    if (const auto grid = gridArea().toFloat(); cliphandle::gainFollowsView() && (centreX < grid.getX() || centreX > grid.getRight()))
+    {
+        const auto shown = r.getHorizontalRange().getIntersectionWith (grid.getHorizontalRange());
+        if (shown.getLength() < 30.0f)
+            return {};
+        centreX = shown.getStart() + shown.getLength() * 0.5f;
+    }
+    return { centreX - radius, r.getBottom() - radius - 1.0f, radius * 2.0f, radius + 1.0f };
 }
 
 void PlaylistComponent::showGainMenu (int index)
@@ -5875,6 +5891,10 @@ juce::PopupMenu PlaylistComponent::gainMenu (int index)
                                  }),
                                  true);
     });
+    // issue #274 (round 190qr): the LYNX extra's switch
+    menu.addSeparator();
+    menu.addItem (tr ("The clip gain handle stays in view") + " (LYNX)", true, cliphandle::gainFollowsView(),
+                  [] { workflowextras::setExtra ("playlist.gainHandleFollowsView", ! cliphandle::gainFollowsView()); });
     return menu;
 }
 
@@ -7533,7 +7553,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
     {
         const auto width = (double) juce::jmax (1, gridArea().getWidth());
         timeZoomDrag.move (e.x, e.y, flmods::ctrl (e.mods));
-        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), width / timeZoomDrag.span);
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, width / timeZoomDrag.span);
         scrollTicks = juce::jmax (0.0, timeZoomDrag.centre - width * 0.5 / pixelsPerTick);
         zoomBeforeAll = 0.0;
         updateScrollBars();
@@ -8768,7 +8788,7 @@ void PlaylistComponent::zoomToTicks (double from, double to)
     // (round 190qe, UX-A3: glides with Animations on)
     settleViewGlide();
     auto target = currentView();
-    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), gridArea().getWidth() / (to - from));
+    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, gridArea().getWidth() / (to - from));
     target.scroll = juce::jmax (0.0, from);
     showView (clampedView (target));
 }
@@ -8776,7 +8796,7 @@ void PlaylistComponent::zoomToTicks (double from, double to)
 void PlaylistComponent::zoomIn (int anchorX)
 {
     const auto anchor = xToTick (anchorX);
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * 2.0);
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * 2.0);
     scrollTicks = juce::jmax (0.0, anchor - (anchorX - headerWidth) / pixelsPerTick);
     updateScrollBars();
     repaint();
@@ -8785,7 +8805,7 @@ void PlaylistComponent::zoomIn (int anchorX)
 void PlaylistComponent::zoomOut (int anchorX)
 {
     const auto anchor = xToTick (anchorX);
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick / 2.0);
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick / 2.0);
     scrollTicks = juce::jmax (0.0, anchor - (anchorX - headerWidth) / pixelsPerTick);
     updateScrollBars();
     repaint();
@@ -11598,6 +11618,10 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
         zoom.addItem (tr ("Zoom to the selection") + "\tShift+5", [this] { runAction ("playlist.zoomSelection"); });
         zoom.addItem (tr ("Previous view"), viewStack.depth() > 0, false, [this] { runAction ("playlist.previousView"); }); // round 190qe
         zoom.addItem (tr ("Centre the view on the playhead") + "\tShift+0", [this] { runAction ("playlist.centrePlayhead"); });
+        // issue #276 (round 190qr): the LYNX extra's switch
+        zoom.addSeparator();
+        zoom.addItem (tr ("Zoom around the song position") + " (LYNX)", true, zoomanchor::atSongPosition(),
+                      [] { workflowextras::setExtra ("editing.zoomAtSongPosition", ! zoomanchor::atSongPosition()); });
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
 
@@ -13338,11 +13362,15 @@ void PlaylistComponent::rippleDeleteSelection()
 void PlaylistComponent::zoomAroundCentre (double factor)
 {
     // round 190qe (UX-A2): the keys zoom around the playhead while it plays on screen, else the selection's centre on
-    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3)
+    // screen, else the view's centre (as before); the step glides with Animations on (UX-A3). Issue #276 (round 190qr,
+    // the LYNX extra "Zoom around the song position"): the song position when it is in view, before all of those
     settleViewGlide();
-    const auto anchor = keyZoomAnchorPx();
+    const auto grid = gridArea();
+    const auto anchor = zoomanchor::anchorX (zoomanchor::atSongPosition(), keyZoomAnchorPx() + grid.getX(), tickToX ((double) songPositionTick()),
+                                             (double) grid.getX(), (double) grid.getRight())
+                        - grid.getX();
     auto target = currentView();
-    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+    target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * factor);
     target.scroll = zoomanchor::scrollFor (scrollTicks, pixelsPerTick, target.pixelsPerUnit, anchor);
     showView (clampedView (target));
 }
@@ -13370,7 +13398,7 @@ void PlaylistComponent::zoomToSelection()
     auto range = [this, &target] (double from, double to) {
         if (to - from >= 1.0)
         {
-            target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), gridArea().getWidth() / (to - from));
+            target.pixelsPerUnit = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, gridArea().getWidth() / (to - from));
             target.scroll = juce::jmax (0.0, from);
         }
     };
@@ -13402,7 +13430,7 @@ void PlaylistComponent::zoomToSelection()
 viewstack::View PlaylistComponent::clampedView (const viewstack::View& v)
 {
     const auto saved = currentView();
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), v.pixelsPerUnit);
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, v.pixelsPerUnit);
     scrollTicks = juce::jmax (0.0, v.scroll);
     scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
@@ -13507,7 +13535,7 @@ viewstack::View PlaylistComponent::currentView() const
 void PlaylistComponent::applyView (const viewstack::View& v)
 {
     const auto zoomed = v.pixelsPerUnit != pixelsPerTick;
-    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), v.pixelsPerUnit);
+    pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, v.pixelsPerUnit);
     scrollTicks = juce::jmax (0.0, v.scroll);
     scrollY = juce::jmax (0, (int) std::lround (v.scrollY));
     updateScrollBars();
@@ -15716,7 +15744,7 @@ void PlaylistComponent::touchPinch (float scale, juce::Point<float> centre)
     settleViewGlide(); // (rollup 0.1.32 step 2: 190pm's touch gestures land 190qe's zoom glide first, as the wheel and pinch do)
     gliding = false;
     const auto anchorPixels = (double) juce::jmax (0.0f, centre.x - (float) headerWidth);
-    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * (double) scale);
+    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * (double) scale);
     scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
     pixelsPerTick = zoomed;
     zoomBeforeAll = 0.0;
@@ -15735,7 +15763,7 @@ void PlaylistComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
         return;
     }
     const auto anchorPixels = (double) juce::jmax (0, e.x - headerWidth);
-    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * factor);
+    const auto zoomed = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * factor);
     scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
     pixelsPerTick = zoomed;
     zoomBeforeAll = 0.0;
@@ -15820,8 +15848,11 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
     if (wheelzones::zoomsHere (e.x < headerWidth, ctrl, wheel.deltaY != 0.0f))
     {
         gliding = false;
-        const auto anchorPixels = (double) juce::jmax (0, e.x - headerWidth);
-        const auto zoomed = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), pixelsPerTick * gesture::wheelZoomFactor (wheel.deltaY, wheel.isSmooth));
+        // (issue #276, round 190qr: the LYNX extra "Zoom around the song position" keeps the playhead in place instead)
+        const auto grid = gridArea();
+        const auto anchorPixels = zoomanchor::anchorX (zoomanchor::atSongPosition(), (double) juce::jmax (0, e.x - headerWidth),
+                                                       tickToX ((double) songPositionTick()) - headerWidth, 0.0, (double) grid.getWidth());
+        const auto zoomed = juce::jlimit (4.0 / (4 * ppq), maxPixelsPerTick, pixelsPerTick * gesture::wheelZoomFactor (wheel.deltaY, wheel.isSmooth));
         scrollTicks = gesture::zoomAnchored (scrollTicks, pixelsPerTick, zoomed, anchorPixels);
         pixelsPerTick = zoomed;
         zoomBeforeAll = 0.0;

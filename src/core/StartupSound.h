@@ -22,4 +22,8 @@ constexpr double soundLength = 1.6;
 constexpr float peakLevel = 0.45f;
 
 StereoSound makeSound (double sampleRate);
+
+// Issue #280 (round 190qr): the LYNX extra "Play a sound when an export finishes" — the chime's three plucks, quicker and
+// rising (D, A, the D above, about 0.9 s), no whoosh: the same family as the start-up sound. Peak at peakLevel.
+StereoSound makeDoneSound (double sampleRate);
 } // namespace lynx::startup

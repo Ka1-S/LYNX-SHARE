@@ -241,6 +241,94 @@ float normalisingGain (const wave::Summary& summary)
 
 namespace
 {
+// Issue #277 (round 190qr): the samples themselves (WaveStyle::samples), zoomed far in: per lane and physical pixel
+// column the highest and lowest value the signal takes over the column (its frames, and the line between frames at the
+// column's edges), filled at least one physical pixel thick, so single cycles and the exact frame a cut lands on show.
+// A stereo view draws each channel, a merged one the mean of the two.
+void appendSampleWaveform (juce::Path& wave, float scale, juce::Rectangle<float> body, juce::Rectangle<float> visible, const SampleData& data,
+                           double startFrame, double framesPerPixel, const WaveStyle& style)
+{
+    const auto columns = (int) std::ceil (visible.getWidth() * scale) + 1;
+    const auto framesPerColumn = framesPerPixel / scale;
+    const auto firstFrame = startFrame + (double) (visible.getX() - body.getX()) * framesPerPixel;
+    const auto stereo = style.stereo && data.isStereo();
+    const auto lanes = stereo ? 2 : 1;
+    const auto laneHeight = body.getHeight() / (float) lanes;
+    const auto frames = (std::int64_t) data.frames();
+    const float* const left = data.leftData();
+    const float* const right = data.rightData();
+    std::vector<float> hi ((std::size_t) columns), lo ((std::size_t) columns);
+    std::vector<char> valid ((std::size_t) columns);
+
+    for (int lane = 0; lane < lanes; ++lane)
+    {
+        const auto at = [&] (std::int64_t f) {
+            f = std::clamp<std::int64_t> (f, 0, frames - 1);
+            return stereo ? (lane == 0 ? left[f] : right[f]) : (left[f] + right[f]) * 0.5f;
+        };
+        const auto atFraction = [&] (double f) {
+            const auto i = (std::int64_t) std::floor (f);
+            const auto t = (float) (f - (double) i);
+            return at (i) + (at (i + 1) - at (i)) * t;
+        };
+        for (int x = 0; x < columns; ++x)
+        {
+            auto from = firstFrame + (double) x * framesPerColumn;
+            auto to = from + framesPerColumn;
+            if (to < from)
+                std::swap (from, to);
+            if (to < 0.0 || from > (double) (frames - 1) || frames < 2)
+            {
+                valid[(std::size_t) x] = 0;
+                continue;
+            }
+            from = std::max (0.0, from);
+            to = std::min ((double) (frames - 1), to);
+            auto top = std::max (atFraction (from), atFraction (to)), bottom = std::min (atFraction (from), atFraction (to));
+            for (auto f = (std::int64_t) std::ceil (from); (double) f <= to; ++f)
+            {
+                top = std::max (top, at (f));
+                bottom = std::min (bottom, at (f));
+            }
+            auto gain = style.gain;
+            if (style.envelope) // (#230: a fade's gain, column by column)
+                gain *= juce::jlimit (0.0f, 1.0f, style.envelope (visible.getX() + (float) x / scale));
+            valid[(std::size_t) x] = 1;
+            hi[(std::size_t) x] = juce::jlimit (-1.0f, 1.0f, top * gain);
+            lo[(std::size_t) x] = juce::jlimit (-1.0f, 1.0f, bottom * gain);
+        }
+
+        auto centre = body.getY() + laneHeight * ((float) lane + 0.5f);
+        if (! style.silenceLine.isTransparent())
+            centre = (std::floor (centre * scale) + 0.5f) / scale;
+        const auto half = laneHeight * 0.5f - 1.0f;
+        const auto thick = 1.0f / scale; // (at least one physical pixel: a flat stretch stays a visible line)
+        const auto px = [&] (int i) { return visible.getX() + (float) i / scale; };
+        const auto yTop = [&] (int i) { return centre - hi[(std::size_t) i] * half - thick * 0.5f; };
+        const auto yBottom = [&] (int i) { return std::max (centre - lo[(std::size_t) i] * half + thick * 0.5f, yTop (i) + thick); };
+        int x = 0;
+        while (x < columns)
+        {
+            while (x < columns && ! valid[(std::size_t) x])
+                ++x;
+            if (x >= columns)
+                break;
+            const auto runStart = x;
+            while (x < columns && valid[(std::size_t) x])
+                ++x;
+            const auto runEnd = x;
+            wave.startNewSubPath (px (runStart), yTop (runStart));
+            for (int i = runStart + 1; i < runEnd; ++i)
+                wave.lineTo (px (i), yTop (i));
+            wave.lineTo (px (runEnd), yTop (runEnd - 1));
+            wave.lineTo (px (runEnd), yBottom (runEnd - 1));
+            for (int i = runEnd - 1; i >= runStart; --i)
+                wave.lineTo (px (i), yBottom (i));
+            wave.closeSubPath();
+        }
+    }
+}
+
 // The clean style: per lane, the peak envelope mirrored around the centre and filled as one anti-aliased
 // path in a single colour; no RMS layer, no outline, so it reads calmly at any zoom. The envelope is computed
 // per physical pixel and lightly smoothed (a 1-2-1 blend that never goes below the true peak), which removes
@@ -248,6 +336,11 @@ namespace
 void appendCleanWaveform (juce::Path& wave, float scale, juce::Rectangle<float> body, juce::Rectangle<float> visible, const wave::Summary& summary,
                           double startFrame, double framesPerPixel, const WaveStyle& style)
 {
+    if (style.samples != nullptr && std::abs (framesPerPixel) < sampleDetailFrames && style.samples->frames() == summary.frames)
+    {
+        appendSampleWaveform (wave, scale, body, visible, *style.samples, startFrame, framesPerPixel, style);
+        return;
+    }
     const auto columns = (int) std::ceil (visible.getWidth() * scale) + 1;
     const auto framesPerColumn = framesPerPixel / scale;
     const auto firstFrame = startFrame + (double) (visible.getX() - body.getX()) * framesPerPixel;

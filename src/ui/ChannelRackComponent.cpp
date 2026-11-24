@@ -237,7 +237,19 @@ int ChannelRackComponent::numSteps() const
 
     const auto& p = song.activePattern();
     const auto steps = (int) (p.effectiveLength (song.meter()) / ticksPerStep);
-    return juce::jlimit (16, 512, steps);
+    // issue #279 (round 190qr): FL shows the pattern's own steps, one bar of the time signature when it is empty (3/4:
+    // 12, 7/8: 14; FL 2026 shots 279-fl-rack-*.png); LYNX showed at least 16
+    return juce::jlimit (1, 512, steps);
+}
+
+int ChannelRackComponent::stepGroup() const
+{
+    return juce::jmax (1, 16 / meterUnit (engine.getSong().beatUnit));
+}
+
+juce::Colour ChannelRackComponent::stepOffAt (int step) const
+{
+    return theme::stepOff (step, stepGroup());
 }
 
 PreviewSpan ChannelRackComponent::previewSpan() const
@@ -1140,9 +1152,10 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         // round 190io: the idle keycaps (and the faint steps past the pattern's end) come eight at a time from one tile;
         // the steps that differ (lit, hovered, playing, loop repeats) are drawn over them one by one below
         const auto idleLimit = loopSteps > 0 ? juce::jmin (loopSteps, realSteps) : realSteps;
+        const auto stripsFit = stepGroup() >= 4; // (a strip is two 4-step halves of one colour each; x/8, x/16: step by step)
         const auto stripKind = [&] (int step) { // 1: a keycap strip covers it, 2: a ghost strip, 0: drawn alone
             const auto start = step / 8 * 8;
-            return start + 8 <= idleLimit ? 1 : start >= realSteps && start + 8 <= steps ? 2 : 0;
+            return ! stripsFit ? 0 : start + 8 <= idleLimit ? 1 : start >= realSteps && start + 8 <= steps ? 2 : 0;
         };
         // (the strip under the playing column is drawn cell by cell: the column's soft tint shows between its steps)
         const auto columnStrip = column ? playheadStep / 8 * 8 : -1;
@@ -1153,9 +1166,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 if (first.getX() + 8 * stepWidth < clip.getX() || first.getX() > clip.getRight())
                     continue;
                 if (kind == 1)
-                    drawIdleStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), selected ? bg3 : bg2);
+                    drawIdleStepStrip (g, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), selected ? bg3 : bg2);
                 else
-                    theme::drawStepStripOver (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, selected ? bg3 : bg2);
+                    theme::drawStepStripOver (g, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), true, selected ? bg3 : bg2);
             }
 
         for (int step = 0; step < steps; ++step)
@@ -1176,7 +1189,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // FL's loop ghosts: what the loop repeats here, faint; a step of its own past the loop point doesn't play
                 const auto source = step % loopSteps;
                 const auto repeated = pattern.hasStep (row, source) || hasNote (row, source);
-                auto fill = repeated ? stepOn : theme::stepOff (step);
+                auto fill = repeated ? stepOn : stepOffAt (step);
                 theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
                 if (repeated && step == playheadStep) // the repeat plays: lit as a hit (below)
                     paintStepHit (g, r.toFloat());
@@ -1193,7 +1206,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 continue;
             }
             const auto ghost = step >= realSteps && ! any; // after the pattern's end: faint until clicked
-            auto fill = any ? (onGrid ? stepOn : stepNote) : theme::stepOff (step);
+            auto fill = any ? (onGrid ? stepOn : stepNote) : stepOffAt (step);
             if (ghost) // a faint outlined cell, filled while hovered
             {
                 theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill.withMultipliedAlpha (hoverStepHere ? 0.9f : 0.35f));
@@ -1240,7 +1253,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                                                   (float) positionStripHeight - 3.0f);
         if (cell.getRight() < (float) clip.getX() || cell.getX() > (float) clip.getRight())
             continue;
-        theme::fillRoundRect (g, cell, 1.5f, step == playheadStep ? playhead : theme::stepOff (step).brighter (0.12f));
+        theme::fillRoundRect (g, cell, 1.5f, step == playheadStep ? playhead : stepOffAt (step).brighter (0.12f));
         // LYNX: each bar's first step marked (finding the bars on 32 / 64-step patterns)
         if (playheadColumn.load (std::memory_order_relaxed) && step % stepsPerBar == 0 && step != playheadStep)
         {
@@ -1544,7 +1557,8 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
     const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
     const auto scale = (int) std::round (s);
     const auto w = steps * stepWidth, h = rowHeight - 10;
-    if (! pianoRollView && ui::paintCache() && realSteps % 8 == 0 && steps % 8 == 0 && steps > 0 && scale >= 1 && scale <= 3
+    const auto stripsFit = stepGroup() >= 4; // (issue #279: x/8, x/16 alternate every 2 / 1 steps: drawn step by step)
+    if (stripsFit && ! pianoRollView && ui::paintCache() && realSteps % 8 == 0 && steps % 8 == 0 && steps > 0 && scale >= 1 && scale <= 3
         && std::abs (s - (float) scale) <= 1.0e-4f && bg2.isOpaque() && steps * stepWidth * scale <= 16384
         && dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr)
     {
@@ -1552,7 +1566,7 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
         for (const std::uint64_t v : { (std::uint64_t) realSteps, (std::uint64_t) scale, (std::uint64_t) theme::paletteStampNow(), (std::uint64_t) bg2.getARGB() })
             key = textcache::detail::mixHash (key, v);
         for (int start = 0; start < steps; start += 4)
-            key = textcache::detail::mixHash (key, (std::uint64_t) theme::stepOff (start).getARGB());
+            key = textcache::detail::mixHash (key, (std::uint64_t) stepOffAt (start).getARGB());
         auto& picture = autoStepsPicture;
         if (picture.key != key || ! picture.image.isValid())
         {
@@ -1566,9 +1580,9 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
             {
                 const auto first = juce::Rectangle<int> (start * stepWidth + 1, 0, stepWidth - 3, h); // (stepBounds, at the picture's origin)
                 if (start + 8 <= realSteps)
-                    drawIdleStepStrip (ig, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), bg2);
+                    drawIdleStepStrip (ig, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), bg2);
                 else
-                    theme::drawStepStripOver (ig, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, bg2);
+                    theme::drawStepStripOver (ig, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), true, bg2);
             }
         }
         shared = &picture.image;
@@ -1618,15 +1632,15 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
             const auto first = juce::Rectangle<int> (gridLeft() + start * stepWidth + 1, y + 5, stepWidth - 3, rowHeight - 10); // (stepBounds)
             if (first.getX() + 8 * stepWidth < clip.getX() || first.getX() > clip.getRight())
                 continue;
-            if (start + 8 <= realSteps)
-                drawIdleStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), bg2);
-            else if (start >= realSteps && start + 8 <= steps)
-                theme::drawStepStripOver (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true, bg2);
+            if (stripsFit && start + 8 <= realSteps)
+                drawIdleStepStrip (g, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), bg2);
+            else if (stripsFit && start >= realSteps && start + 8 <= steps)
+                theme::drawStepStripOver (g, first, stepWidth, stepOffAt (start), stepOffAt (start + 4), true, bg2);
             else
                 for (int step = start; step < juce::jmin (start + 8, steps); ++step)
                 {
                     const auto r = first.withX (gridLeft() + step * stepWidth + 1);
-                    const auto fill = theme::stepOff (step);
+                    const auto fill = stepOffAt (step);
                     if (step < realSteps)
                     {
                         paintKeycap (g, r, fill, false);
@@ -1667,7 +1681,7 @@ void ChannelRackComponent::paintAutomationSteps (juce::Graphics& g, juce::Rectan
         }
     }
     if (lastFromPicture && realSteps < steps) // (the colour the last ghost strip leaves set, as before)
-        g.setColour (theme::stepOff (steps - 8));
+        g.setColour (stepOffAt (steps - 8));
 }
 
 // FL's automation clip rows' controls column (round 190pb: each row from its cached picture where the scale is whole)
@@ -2655,7 +2669,7 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
 
         if (notes.empty())
         {
-            g.setColour (theme::stepOff (step));
+            g.setColour (stepOffAt (step));
             g.fillRect (x + w * 0.5f - 1.0f, base - 1.0f, 2.0f, 2.0f);
             continue;
         }

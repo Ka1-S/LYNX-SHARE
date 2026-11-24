@@ -187,4 +187,36 @@ StereoSound makeSound (double sampleRate)
 
     return sound;
 }
+StereoSound makeDoneSound (double sampleRate)
+{
+    StereoSound sound;
+    sound.sampleRate = sampleRate;
+    const auto frames = (std::size_t) (0.9 * sampleRate);
+    sound.left.assign (frames, 0.0f);
+    sound.right.assign (frames, 0.0f);
+    Noise noise;
+    noise.state = 0x0d0e5eedu;
+    addPluck (sound.left, sound.right, sampleRate, 0.0, 587.33, 0.5f, -0.3f, noise);
+    addPluck (sound.left, sound.right, sampleRate, 0.06, 880.00, 0.42f, 0.3f, noise);
+    addPluck (sound.left, sound.right, sampleRate, 0.12, 1174.66, 0.36f, 0.0f, noise);
+    const auto fade = (std::size_t) (0.2 * sampleRate);
+    float peak = 0.0f;
+    for (std::size_t n = 0; n < frames; ++n)
+    {
+        if (n + fade >= frames)
+        {
+            const auto g = (float) (frames - 1 - n) / (float) fade;
+            sound.left[n] *= g;
+            sound.right[n] *= g;
+        }
+        peak = std::max ({ peak, std::abs (sound.left[n]), std::abs (sound.right[n]) });
+    }
+    if (peak > 0.0f)
+        for (std::size_t n = 0; n < frames; ++n)
+        {
+            sound.left[n] *= peakLevel / peak;
+            sound.right[n] *= peakLevel / peak;
+        }
+    return sound;
+}
 } // namespace lynx::startup

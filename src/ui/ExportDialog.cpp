@@ -1,5 +1,6 @@
 #include "ui/ExportDialog.h"
 
+#include "core/ExportDone.h"
 #include "core/PatternBlocks.h"
 #include "core/ExportNaming.h"
 #include "core/ProjectKey.h"
@@ -76,6 +77,29 @@ void writeVideoWithMix (const Song& song, const exportopts::Options& o, const ju
     }).detach();
 }
 
+// Issue #280 (round 190qr, LYNX extras, off by default; core/ExportDone.h): the window that says an export finished,
+// and the chime. The chime plays once the render has given the plugins back (the caller posts it after its own delete).
+void showExportDoneWindow (const juce::String& title, const juce::String& text, const juce::File& folderOf)
+{
+    auto* w = new juce::AlertWindow (title, text, juce::MessageBoxIconType::InfoIcon);
+    w->addButton (tr ("Show in folder"), 2);
+    w->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+    w->enterModalState (true, juce::ModalCallbackFunction::create ([folderOf] (int result) {
+                            if (result == 2)
+                                folderOf.revealToUser();
+                        }),
+                        true);
+}
+
+void playExportDoneSoundLater()
+{
+    if (exportdone::sound())
+        juce::MessageManager::callAsync ([] {
+            if (exportdone::playSound)
+                exportdone::playSound();
+        });
+}
+
 class ExportThread final : public juce::ThreadWithProgressWindow
 {
 public:
@@ -106,6 +130,16 @@ public:
 
             onDone (ok);
         }
+        else if (ok && exportdone::window()) // issue #280 (round 190qr, LYNX extra): a window says it is done
+        {
+            showExportDoneWindow (tr ("Export complete"),
+                                  file.getFullPathName() + "\n\n" + tr ("Peak: {0} dBFS", { juce::String (juce::Decibels::gainToDecibels (job->getPeak()), 1) })
+                                      + (job->getInfo().isEmpty() ? juce::String() : "\n" + job->getInfo())
+                                      + (job->getNotice().isEmpty() ? juce::String() : "\n\n" + job->getNotice()),
+                                  file);
+            if (reveal)
+                file.revealToUser();
+        }
         else if (ok && reveal)
             file.revealToUser(); // "Show the file(s) when complete"
         else if (ok && job->getNotice().isEmpty())
@@ -129,6 +163,8 @@ public:
             then();
         // the export engine is torn down on the UI thread (plugins require this)
         juce::MessageManager::callAsync ([this] { delete this; });
+        if (ok && ! onDone)
+            playExportDoneSoundLater(); // (issue #280: after the delete above, so the plugins play again)
     }
 
 private:
@@ -200,7 +236,15 @@ public:
         const auto sectioned = plan.sectioned;
         if (! cancelled && written > 0 && afterRender)
             afterRender (files);
-        if (! cancelled && options.showWhenDone && written > 0)
+        if (! cancelled && written > 0 && exportdone::window()) // issue #280 (round 190qr, LYNX extra)
+        {
+            showExportDoneWindow (sectioned ? tr ("Sections exported") : tr ("Stems exported"),
+                                  tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }),
+                                  files.empty() ? baseFile : files.front());
+            if (options.showWhenDone)
+                baseFile.getParentDirectory().startAsProcess();
+        }
+        else if (! cancelled && options.showWhenDone && written > 0)
             baseFile.getParentDirectory().startAsProcess();
         else if (! cancelled && written > 0)
             ui::postHint ({ (sectioned ? tr ("Sections exported") : tr ("Stems exported")) + ": "
@@ -212,6 +256,8 @@ public:
                                                     tr ("{0} file(s) in {1}", { juce::String (written), baseFile.getParentDirectory().getFullPathName() }));
 
         juce::MessageManager::callAsync ([this] { delete this; });
+        if (! cancelled && written > 0)
+            playExportDoneSoundLater(); // (issue #280)
     }
 
 public:
