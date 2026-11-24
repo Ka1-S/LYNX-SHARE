@@ -1641,7 +1641,7 @@ public:
     void update()
     {
         const auto& song = engine.getSong();
-        const auto pattern = track >= 0 ? simpletracks::patternOf (song, track) : -1;
+        const auto pattern = track >= 0 ? simpletracks::editorPattern (song, track) : -1;
         const auto canHave = track >= 0 && (simpletracks::kindOf (song, track) == simpletracks::Kind::instrument
                                             || simpletracks::kindOf (song, track) == simpletracks::Kind::sampler);
         if (! shownInTree() || ! canHave)
@@ -1749,7 +1749,7 @@ public:
         g.fillAll (colour::bg1);
         const auto& song = engine.getSong();
         auto bar = getLocalBounds().removeFromTop (barHeight).reduced (12, 0);
-        const auto pattern = track >= 0 ? simpletracks::patternOf (song, track) : -1;
+        const auto pattern = track >= 0 ? simpletracks::editorPattern (song, track) : -1;
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
         if (pattern >= 0)

@@ -121,6 +121,10 @@ public:
     // timeline. Made the first time it shows.
     void trackSelected (int track);      // a click on a track header
     void showEffectsOfInsert (int insert); // "+FX" on a header: the dock, on its Effects tab, for the track of `insert`
+    // round 190qp: a double-clicked clip of an instrument track: the dock, on its Editor tab, for that track (the clip's
+    // pattern is the current one, so the tab shows it). False when the dock can't show it (not a Simple instrument /
+    // sampler track).
+    bool openNotesOf (int track);
     void toggleDock();                   // Ctrl+Alt+L
     void cycleDockTab();                 // Shift+Tab
     bool isDockShowing() const noexcept;

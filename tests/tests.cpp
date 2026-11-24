@@ -18110,3 +18110,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
 #include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
+#include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)

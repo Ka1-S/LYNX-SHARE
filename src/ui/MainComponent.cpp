@@ -821,6 +821,12 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             engine.setSelectedChannel (notes.front().channel);
         openPianoRoll();
     };
+    // round 190qp: a clip of an instrument track in Track-only mode / the Simple layout (its channel already selected)
+    playlist.onOpenTrackClipNotes = [this] (int track) {
+        if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr && simpleWorkflow->openNotesOf (track))
+            return;
+        openPianoRoll();
+    };
     picker.onOpenPattern = [this] { showPanel (Panel::channelRack); };
     picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };

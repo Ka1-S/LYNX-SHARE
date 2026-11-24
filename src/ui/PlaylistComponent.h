@@ -101,6 +101,10 @@ public:
 
     std::function<void()> onOpenPattern;
     std::function<void()> onOpenPianoRoll;
+    // round 190qp: a pattern clip on an instrument track double-clicked in Track-only mode or the Simple layout opens its
+    // instrument's notes (core/TrackOnly.h pianoRollChannelOf): the Simple dock's Editor tab, else the Piano roll. The
+    // channel is selected and the clip's pattern made current before the call.
+    std::function<void (int track)> onOpenTrackClipNotes;
     std::function<void (int pattern)> onRenamePattern;  // clip menu: Rename and color (pattern clips)
     std::function<void (int channel)> onOpenInSampler;  // clip menu: the audio clip's file in a new Sampler channel
     // round 190dx: a new instrument track's channel was made (or its generator replaced): the main window opens it as the

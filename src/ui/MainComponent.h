@@ -236,6 +236,8 @@ public:
     bool welcomeUpdatesForCheck() const noexcept { return welcomeUpdates; } // (rollup 0.1.31 step 2, issue #233)
     onboarding::Context& onboardingContextForCheck() noexcept { return onboardCtx; }
     bool mixerShownForCheck() const { return workspace.isPanelVisible (workspace::Panel::mixer); }
+    bool panelShownForCheck (workspace::Panel panel) const { return workspace.isPanelVisible (panel); } // (round 190qp)
+    void hidePanelForCheck (workspace::Panel panel) { workspace.hide (panel); refreshPanelButtons(); }
     void updateOnboarding(); // the song or the view changed: the Next-3 ticks and the empty-state hint
     // --demo (ui/DemoMode.cpp): the Remote Control API's ui.* / session.* operations, run on the message thread
     juce::var handleDemoOp (const juce::String& op, const juce::var& args);

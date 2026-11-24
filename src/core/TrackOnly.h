@@ -19,6 +19,7 @@
 //
 // Plain edits for AudioEngine::editSong. No JUCE: tested in tests/Workflow190iuTests.inc.
 
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 
@@ -53,6 +54,29 @@ inline int follow (Song& song, std::size_t channelsBefore)
         if (wantsTrack (song, c) && trackmodes::instrumentTracksOf (song, c).empty() && trackmodes::assignToNewInstrumentTrack (song, c) >= 0)
             ++made;
     return made;
+}
+
+// Round 190qp (Discord, 0.1.31: "double-clicking an empty clip opens the rack"): the channel whose Piano roll a
+// double-click on Playlist clip `clip` opens in Track-only mode and in the Simple layout. A pattern clip on an
+// instrument track is that instrument's part, so it opens in the instrument's Piano roll even while it is empty — FL's
+// "Auto" rule (Piano roll when the pattern has notes, else the Channel rack) would open the rack, which Track-only mode
+// hides and the Simple layout doesn't have. -1 when the clip is not a pattern clip on an instrument track, or when its
+// pattern holds notes of another channel (an imported pattern played on the track: the usual rule decides).
+// The Pattern layout with Track-only mode off keeps FL's rule (the caller asks only in those two cases).
+inline int pianoRollChannelOf (const Song& song, int clip)
+{
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return -1;
+    const auto& c = song.playlist[(std::size_t) clip];
+    if (c.kind != ClipKind::pattern || c.track < 0 || c.track >= (int) song.playlistTracks.size() || c.pattern < 0
+        || c.pattern >= (int) song.patterns.size())
+        return -1;
+    const auto& track = song.playlistTracks[(std::size_t) c.track];
+    const auto channel = track.channel;
+    if (track.mode != PlaylistTrackMode::instrument || channel < 0 || channel >= (int) song.channels.size())
+        return -1;
+    const auto& notes = song.patterns[(std::size_t) c.pattern].notes;
+    return std::all_of (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }) ? channel : -1;
 }
 
 // "Give every instrument its own track" (offered when the mode is switched on for a project made with the rack): each

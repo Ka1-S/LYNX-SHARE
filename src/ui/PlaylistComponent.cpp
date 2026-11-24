@@ -73,6 +73,7 @@
 #include "ui/WindowClipboard.h"
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
+#include "core/TrackOnly.h"
 #include "core/RegionLoop.h"
 #include "core/QuickRender.h"
 #include "core/TempoDetect.h"
@@ -14683,6 +14684,10 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         if (projection.isChild (h.track))
             hint.text = tr ("Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)");
+        // round 190qp (Discord, 0.1.31: "not sure how to make a MIDI clip"): the Simple layout's instrument tracks say how
+        else if (simpleHeaders && brush.kind == ClipKind::pattern && h.track >= 0 && h.track < (int) song.playlistTracks.size()
+                 && song.playlistTracks[(std::size_t) h.track].mode == PlaylistTrackMode::instrument)
+            hint.text = tr ("MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below");
         else if (trackclips::owns (song, h.track) && brush.kind == ClipKind::pattern) // round 190ne
             hint.text = tr ("Track clips: [LMB] draw a new empty clip  [Shift] drag a clip: a unique copy  [Shift+L] drag: a linked copy  [Ctrl+Alt+B] linked copies");
         else if (pointerclick::on)
@@ -14863,6 +14868,18 @@ void PlaylistComponent::openClipSource (int hit, bool other)
     }
     else if (clip.kind == ClipKind::pattern)
     {
+        // round 190qp (Discord, 0.1.31): in Track-only mode and the Simple layout a clip on an instrument track opens its
+        // instrument's notes, empty or not (Alt: the other editor, as below). The Pattern layout keeps FL's rule.
+        if (! other && (trackonly::active() || simpleHeaders))
+            if (const auto channel = trackonly::pianoRollChannelOf (engine.getSong(), hit); channel >= 0)
+            {
+                engine.setSelectedChannel (channel);
+                if (onOpenTrackClipNotes)
+                    onOpenTrackClipNotes (clip.track);
+                else if (onOpenPianoRoll)
+                    onOpenPianoRoll();
+                return;
+            }
         auto pianoRoll = editPatternsIn == 2
                          || (editPatternsIn == 0 && clip.pattern < (int) engine.getSong().patterns.size()
                              && hasPianoRollNotes (engine.getSong().patterns[(std::size_t) clip.pattern]));
