@@ -12,8 +12,8 @@ OUT="${OUT:-build-win}"
 JOBS="${JOBS:-$(nproc)}"
 TARGET=x86_64-windows-gnu
 
-# Single version source: project(LYNX VERSION x.y.z) in CMakeLists.txt
-VERSION="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+# Single version source: project(LYNX VERSION x.y.z[.r]) in CMakeLists.txt (r: a hotfix, e.g. 0.1.31.1)
+VERSION="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p' CMakeLists.txt)"
 [[ -n "$VERSION" ]] || { echo "could not read the version from CMakeLists.txt" >&2; exit 1; }
 
 mkdir -p "$OUT/juce" "$OUT/app" "$OUT/shim"
@@ -467,12 +467,13 @@ for obj in "$OUT"/app/*.o; do [[ -n "${KEEP_OBJ[$obj]:-}" ]] || { echo "removing
 
 echo "Resources (manifest, icons, version $VERSION)..."
 OUT_ABS="$(cd "$OUT" && pwd)"
-IFS=. read -r VMAJ VMIN VPAT <<< "$VERSION"
+IFS=. read -r VMAJ VMIN VPAT VREV <<< "$VERSION" # (VREV: a hotfix's fourth number, "0.1.31.1"; 0 when absent)
 {
     echo '#pragma once'
     echo "#define LYNX_VERSION_MAJOR $VMAJ"
     echo "#define LYNX_VERSION_MINOR $VMIN"
     echo "#define LYNX_VERSION_PATCH $VPAT"
+    echo "#define LYNX_VERSION_REVISION ${VREV:-0}"
     echo "#define LYNX_VERSION_STR \"$VERSION\""
 } > "$OUT/lynx_version.h"
 ( cd resources && "$ZIG" rc /i "$OUT_ABS" /fo "$OUT_ABS/LYNX.res" LYNX.rc )

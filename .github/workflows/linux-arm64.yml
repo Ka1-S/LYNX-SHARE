@@ -46,7 +46,7 @@ jobs:
         env:
           INPUT_LABEL: ${{ inputs.label }}
         run: |
-          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' CMakeLists.txt)"
+          version="$(sed -n 's/^project(LYNX VERSION \([0-9]*\.[0-9]*\.[0-9]*\(\.[0-9]*\)\{0,1\}\).*/\1/p' CMakeLists.txt)"
           [[ -n "$version" ]] || { echo "::error::no version in CMakeLists.txt"; exit 1; }
           label="${INPUT_LABEL:-$version-${GITHUB_SHA::7}}"
           echo "label=$label" >> "$GITHUB_OUTPUT"

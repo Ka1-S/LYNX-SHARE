@@ -64,7 +64,8 @@ fi
 [[ -n "$MAKENSIS" ]] || { echo "NSIS not found: install makensis or unzip the NSIS zip release into ~/opt"; exit 1; }
 
 winpath() { if [[ "$MAKENSIS" == *.exe ]]; then wslpath -w "$1"; else echo "$1"; fi; }
-ARGS=(-V2 -INPUTCHARSET UTF8 "-DVERSION=$VERSION" "-DSTAGE=$(winpath "$PWD/$STAGE")" "-DOUTFILE=$(winpath "$PWD/$DIST/$SETUP")"
+VIVERSION="$VERSION"; [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && VIVERSION="$VERSION.0" # (a hotfix has four numbers: 0.1.31.1)
+ARGS=(-V2 -INPUTCHARSET UTF8 "-DVERSION=$VERSION" "-DVIVERSION=$VIVERSION" "-DSTAGE=$(winpath "$PWD/$STAGE")" "-DOUTFILE=$(winpath "$PWD/$DIST/$SETUP")"
       "-DICON=$(winpath "$PWD/resources/LYNX.ico")" "$(winpath "$PWD/resources/installer/LYNX.nsi")")
 if [[ "$MAKENSIS" == *.exe ]]; then
     # Windows exe from WSL: run it from a Windows folder (a \\wsl$ working directory confuses cmd-based tools)

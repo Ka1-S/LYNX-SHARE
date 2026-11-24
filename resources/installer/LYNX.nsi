@@ -26,7 +26,12 @@ OutFile "${OUTFILE}"
 InstallDir "$LOCALAPPDATA\Programs\LYNX"
 InstallDirRegKey HKCU "Software\LYNX" "InstallDir"
 BrandingText "LYNX SHARE ${VERSION}"
+; a hotfix's version has four numbers already (0.1.31.1): the callers pass VIVERSION, four numbers either way
+!ifdef VIVERSION
+VIProductVersion "${VIVERSION}"
+!else
 VIProductVersion "${VERSION}.0"
+!endif
 VIAddVersionKey "ProductName" "LYNX SHARE"
 VIAddVersionKey "FileDescription" "LYNX SHARE installer"
 VIAddVersionKey "ProductVersion" "${VERSION}"
