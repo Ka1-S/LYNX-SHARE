@@ -295,7 +295,9 @@
                 const auto overridden = m.clipLaunch && m.touchFirst;
                 if (! overridden && ! sourceSilent && level > 1.0e-3 && moved < 1.0e-2 * level && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): its automation is not heard";
-                if (! overridden && compared > 0 && follows * 10 < compared * 9 && result == "OK")
+                // (80 %: the display reads the playhead the engine estimates from the wall clock, and this loop runs at four
+                // times the device's pace, so right at a clip's step the shown value may be a block early or late)
+                if (! overridden && compared > 0 && follows * 10 < compared * 8 && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): the control does not show its automation";
                 if (overridden && ((! sourceSilent && level > 1.0e-3 && moved > 1.0e-2 * level) || follows > 0) && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): overridden by hand, yet its automation still plays or shows";
