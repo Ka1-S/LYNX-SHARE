@@ -363,7 +363,7 @@ public:
         // the AppImage on Linux (round 161): its menu entry and the .lynx file type, in the user's ~/.local/share
         toggle (menuEntry, tr ("Show LYNX SHARE in the applications menu and open .lynx files with it"), options.menuEntry,
                 [this] (bool on) { options.menuEntry = on; });
-        menuEntry.setVisible (runningAsAppImage());
+        menuEntry.setVisible (runningAsAppImage() && ! appImageInMenuByManager()); // (issue #278: a manager has it in the menu)
 
         toggle (typingPiano, tr ("Typing keyboard to piano"), options.typingPiano, [this] (bool on) { options.typingPiano = on; });
         toggle (keepEditors, tr ("Keep channel editors open (a channel button click doesn't close the previous editor)"), options.keepEditorsOpen,

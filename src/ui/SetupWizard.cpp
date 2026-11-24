@@ -126,7 +126,7 @@ public:
         }
         // the Linux AppImage (round 161): an applications-menu entry and the .lynx file type, on by default
         body.addChildComponent (menuEntry);
-        menuEntry.setVisible (runningAsAppImage());
+        menuEntry.setVisible (runningAsAppImage() && ! appImageInMenuByManager()); // (issue #278: a manager has it in the menu)
         menuEntry.setToggleState (true, juce::dontSendNotification);
         // issue #233 (round 190ns): the one connection LYNX makes by itself, chosen here before it ever runs (the
         // automatic check waits for this wizard: updater::startAutomaticCheck)
