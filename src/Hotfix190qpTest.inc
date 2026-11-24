@@ -40,6 +40,7 @@
         std::vector<float> shown;      // the shown value of the target, every 4 blocks
         std::vector<float> expected;   // the automation's value at the same positions (an AutomationDisplay of the song)
         std::vector<float> meter;      // the peak of the insert the target acts on (a send: its destination), every 4 blocks
+        float sourcePeak = 0.0f;       // a send: the peak of its source insert over the window (silent: nothing to hear)
     };
 
     // How a run is driven: `ahead` = render-ahead; `clipLaunch` = the Clip-launch layout's override rule (Live's
@@ -117,6 +118,8 @@
                 run.out.insert (run.out.end(), l.begin(), l.end());
                 if (meterTrack >= 0)
                     peak = std::max ({ peak, e.getMeters().takePeak (meterTrack, 0), e.getMeters().takePeak (meterTrack, 1) });
+                if (target.kind == lynx::AutomationTargetKind::mixerSend && target.index >= 0)
+                    run.sourcePeak = std::max ({ run.sourcePeak, e.getMeters().takePeak (target.index, 0), e.getMeters().takePeak (target.index, 1) });
                 if (k % 4 == 3)
                 {
                     run.meter.push_back (std::exchange (peak, 0.0f));
@@ -282,18 +285,19 @@
                 const auto modeName = juce::String (m.ahead ? "render ahead" : "real time") + (m.clipLaunch ? ", Clip-launch" : "")
                                       + (m.touchFirst ? ", touched before Play" : "")
                                       + (m.lanes == 1 ? ", a flat lane added" : m.lanes == 2 ? ", clips moved into lanes" : "");
-                if (level <= 1.0e-3)
-                    log << "  (the insert is silent in this window: not judged) ";
+                const auto sourceSilent = c.target.kind == lynx::AutomationTargetKind::mixerSend && with.sourcePeak <= 1.0e-3f && off.sourcePeak <= 1.0e-3f;
+                if (level <= 1.0e-3 || sourceSilent)
+                    log << (sourceSilent ? "  (the send's source is silent in this window: not judged) " : "  (the insert is silent in this window: not judged) ");
                 log << autoLiveName (song, c.target) << " (automation " << c.automation << ", bar " << juce::String (c.from / bar + 1.0, 1)
                     << ", range " << juce::String (c.range, 3) << ", " << modeName << "): level " << juce::String (level, 5)
                     << ", with vs without " << juce::String (moved, 5) << " (Master " << juce::String (master, 5) << "), shown follows " << follows << " / " << compared << "\n";
                 // Live's override (Clip-launch, a control moved by hand): neither heard nor shown until Re-Enable Automation
                 const auto overridden = m.clipLaunch && m.touchFirst;
-                if (! overridden && level > 1.0e-3 && moved < 1.0e-2 * level && result == "OK")
+                if (! overridden && ! sourceSilent && level > 1.0e-3 && moved < 1.0e-2 * level && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): its automation is not heard";
                 if (! overridden && compared > 0 && follows * 10 < compared * 9 && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): the control does not show its automation";
-                if (overridden && ((level > 1.0e-3 && moved > 1.0e-2 * level) || follows > 0) && result == "OK")
+                if (overridden && ((! sourceSilent && level > 1.0e-3 && moved > 1.0e-2 * level) || follows > 0) && result == "OK")
                     result = "ERROR " + autoLiveName (song, c.target) + " (" + modeName + "): overridden by hand, yet its automation still plays or shows";
             }
         }
