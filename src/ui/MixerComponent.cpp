@@ -4335,7 +4335,15 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             openAudioEditorRecording (engine);
     });
     menu.addSeparator(); // (FL: a line before Reset)
-    menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
+    menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] {
+        // FL warns first: the reset removes the plugins (FUN_012a39c0)
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, tr ("Warning"),
+                                            tr ("This will reset the selected mixer track(s) and remove all plugins."), tr ("OK"), tr ("Cancel"), nullptr,
+                                            juce::ModalCallbackFunction::create ([this, targets] (int r) {
+                                                if (r == 1)
+                                                    engine.editSongStructural ([targets] (Song& s) { mixerops::resetToDefault (s, targets); });
+                                            }));
+    });
 
     // --- FL's "Routing" section -----------------------------------------------------------------------
     menu.addSectionHeader (tr ("Routing"));

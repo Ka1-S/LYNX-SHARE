@@ -1496,6 +1496,11 @@ void resetToDefault (Song& song, const std::vector<int>& tracks)
             m.invertPhase = m.swapChannels = false;
             m.eq = TrackEq {};
             m.muted = m.solo = false;
+            // FL loads Default.fst here (FUN_012a39c0, REA_rodada167q: "This will reset the selected mixer track(s) and
+            // remove all plugins"): the effect chain goes too, its automations with it
+            for (int i = (int) m.effects.size() - 1; i >= 0; --i)
+                removeEffectKeepRows (song, t, i);
+            m.chainBlend = 1.0f;
         }
 }
 
