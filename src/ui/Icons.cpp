@@ -614,6 +614,10 @@ Shape make (Icon icon)
             fi.addTriangle (4.0f, 12.0f, 11.0f, 7.0f, 11.0f, 17.0f);
             fi.addRectangle (10.0f, 10.8f, 9.0f, 2.4f);
             break;
+        case Icon::overflow: // round 190qg: "»", two chevrons pointing right
+            polyline (st, { { 6.0f, 7.0f }, { 11.0f, 12.0f }, { 6.0f, 17.0f } });
+            polyline (st, { { 13.0f, 7.0f }, { 18.0f, 12.0f }, { 13.0f, 17.0f } });
+            break;
         case Icon::search: // round 190on: a lens and its handle
             st.addEllipse (4.0f, 4.0f, 12.0f, 12.0f);
             line (st, 14.3f, 14.3f, 20.0f, 20.0f);

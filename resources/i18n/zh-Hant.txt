@@ -12742,3 +12742,15 @@ countries: tw hk mo
 "Previous view (before the zoom to the selection)" = "上一個檢視（縮放到所選內容之前）"
 "Restore selection" = "還原選取"
 "No earlier selection to restore" = "沒有可還原的先前選取"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL 經典 (單行)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "MIDI 輸入活動"
+"One row (FL single line)" = "單行 (FL 單行工具列)"
+"Grouped look (framed panels, steady spacing)" = "分組外觀 (帶框面板，間距固定)"
+"More toolbar items: what this window size has no room for" = "更多工具列項目：此視窗大小放不下的項目"
+"reconnect the MIDI inputs" = "重新連接 MIDI 輸入"
+"Nudge the tempo down" = "將速度向下微調"
+"Nudge the tempo up" = "將速度向上微調"
+"Launch quantization" = "啟動量化"

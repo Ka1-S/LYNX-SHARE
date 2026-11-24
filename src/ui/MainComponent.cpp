@@ -1304,7 +1304,22 @@ void MainComponent::paint (juce::Graphics& g)
 
     // round 170e3: each panel sits in its own quiet well (transport, master, recording, snap and pattern, windows,
     // file, meters), so the groups read at a glance; with "Separators" off, only hairlines between them
-    if (toolbarLayout.separators) // (the toolbar menu's "Separators")
+    if (toolbarLayout.grouped) // round 190qg: the Grouped look, each panel in a raised frame (LYNX's own)
+    {
+        for (const auto& r : panelBounds)
+            if (! r.isEmpty())
+            {
+                // raised (the default's wells are sunk): a lighter face, a control outline and a faint top light
+                const auto frame = r.toFloat().reduced (1.0f, 3.0f);
+                g.setColour (colour::bg4.withAlpha (0.45f));
+                g.fillRoundedRectangle (frame, radius::lg);
+                g.setColour (colour::borderStrong);
+                g.drawRoundedRectangle (frame.reduced (0.5f), radius::lg, 1.0f);
+                g.setColour (juce::Colours::white.withAlpha (0.05f));
+                g.fillRect (frame.reduced (radius::lg, 0.0f).withHeight (1.0f).translated (0.0f, 1.0f));
+            }
+    }
+    else if (toolbarLayout.separators) // (the toolbar menu's "Separators")
     {
         for (const auto& r : panelBounds)
             if (! r.isEmpty())
@@ -1419,6 +1434,14 @@ void MainComponent::resized()
         else
             layoutLiveControlBar (bar, menuWidth);
         layoutUnderToolbar();
+        return;
+    }
+    // round 190qg: FL's "Single line" toolbar (core/ToolbarLayout.h Layout::oneRow; ui/ToolbarOverflow.inc)
+    if (toolbarLayout.oneRow && toolbarLayout.visible)
+    {
+        layoutOneRowToolbar (bar, menuWidth);
+        layoutUnderToolbar();
+        placeExtendedHint();
         return;
     }
 
@@ -1656,16 +1679,90 @@ void MainComponent::resized()
     }
     if (! toolbarLayout.visible) // Ctrl+F11: only the menu and the hint bar, on one row
         visible.fill (false);
+    // round 190qg (Discord #feedback 11-23): nothing is hidden silently. What the window has no room for (whole panels,
+    // and the switches the tighter panel forms above leave out) goes to the overflow button at the right end; its room
+    // comes from the panels, never from the menus' column (they would be cut). When even the transport alone is wider than
+    // what the menus leave (an 800 px window at a large Interface size, the Minimal preset), it takes its tight form, then
+    // its time display and its tempo tapper go to the overflow too.
+    bool noTime = false, noTap = false;
+    juce::Rectangle<int> overflowArea;
+    auto layoutRoom = room;
+    const auto ow = toolbarlayout::overflowWidth (h) + 6;
+    const auto usedNow = [&] {
+        int u = 0;
+        for (int i = 0; i < toolbarlayout::groupCount; ++i)
+            u += visible[(std::size_t) i] ? widths[(std::size_t) i] + gap : 0;
+        return u;
+    };
+    const auto listOverflow = [&] {
+        std::vector<toolbarlayout::Item> inside;
+        if (noTap)
+            inside.push_back (toolbarlayout::Item::tapTempo);
+        if (noTime)
+            inside.push_back (toolbarlayout::Item::time);
+        if (compactRecord)
+            inside.insert (inside.end(), { toolbarlayout::Item::typingPiano, toolbarlayout::Item::midiLight });
+        if (! fileWide)
+            inside.push_back (toolbarlayout::Item::audioEditor);
+        overflowList = toolbarlayout::overflowItems (toolbarLayout, visible, inside);
+    };
+    listOverflow();
+    // (the hint column may give the overflow its room down to the menus' own width: at 1920 px the default keeps every
+    // panel it kept before; only where the menus set the column's width does a panel go)
+    const auto menuMin = juce::jmin (minHint, menuWidth + 8);
+    for (int pass = 0; pass < 2 && toolbarLayout.visible; ++pass)
+    {
+        if (! overflowList.empty() && layoutRoom == room)
+        {
+            layoutRoom -= ow;
+            // the output monitor gives up to the button's width first (at 1920 px the default then keeps its Chord panel,
+            // as FL 2026 does), down to 88 px; only then does a panel go
+            if (const auto short_ = usedNow() + menuMin - layoutRoom; short_ > 0 && visible[(std::size_t) Group::output])
+                widths[(std::size_t) Group::output] -= juce::jlimit (0, juce::jmax (0, widths[(std::size_t) Group::output] - 88), short_);
+            toolbarlayout::dropUntilFits (visible, widths, gap, layoutRoom, menuMin, compactRecord);
+        }
+        if (visible[(std::size_t) Group::transport] && usedNow() + menuMin > layoutRoom)
+        {
+            if (! compactRecord && bigWidth > h + 4)
+            {
+                const auto before = 3 * (bigWidth + 4) + tempoWidth + timeWidth;
+                big = h + 6;
+                bigWidth = h + 4;
+                tempoWidth = juce::jmin (tempoWidth, 84 + grow);
+                timeWidth = juce::jmin (timeWidth, 104 + grow);
+                widths[(std::size_t) Group::transport] -= before - (3 * (bigWidth + 4) + tempoWidth + timeWidth);
+            }
+            if (! noTime && usedNow() + menuMin > layoutRoom)
+            {
+                noTime = true;
+                widths[(std::size_t) Group::transport] -= 4 + timeWidth;
+            }
+            if (! noTap && usedNow() + menuMin > layoutRoom)
+            {
+                noTap = true;
+                widths[(std::size_t) Group::transport] -= 2 + tapWidth;
+            }
+        }
+        listOverflow();
+    }
+    if (! overflowList.empty())
+        overflowArea = toolbar.removeFromRight (ow).withTrimmedLeft (6);
     panelBounds = {};
     int used = 0;
     for (int i = 0; i < toolbarlayout::groupCount; ++i)
         used += visible[(std::size_t) i] ? widths[(std::size_t) i] + gap : 0;
 
-    auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, room - used)), maxHint, room - used);
+    auto hintWidth = juce::jlimit (juce::jmin (minHint, juce::jmax (160, layoutRoom - used)), maxHint, layoutRoom - used);
+    // round 190qg: the Grouped look keeps the hint column near its own width, so the panels stay where they are
+    const auto grouped = toolbarLayout.grouped;
+    if (grouped)
+        hintWidth = juce::jmin (hintWidth, juce::jmax (minHint, 400));
     // round 170e3: the spare room goes to useful things first (a wider output monitor, snap and pattern boxes, song
     // position and hint bar), then a little air between the panels, so no dead zone opens anywhere on a wide window
-    auto spare = juce::jmax (0, room - used - hintWidth);
-    auto grant = [&spare] (int share, int most) {
+    auto spare = juce::jmax (0, layoutRoom - used - hintWidth);
+    auto grant = [&spare, grouped] (int share, int most) {
+        if (grouped) // (round 190qg: the Grouped look's panels keep their widths; the room is its one spacer)
+            return 0;
         const auto g = juce::jmax (0, juce::jmin (most, spare * share / 100));
         spare -= g;
         return g;
@@ -1682,9 +1779,9 @@ void MainComponent::resized()
     hintWidth += grant (25, 500);
     const auto shownGroups = (int) std::count (visible.begin(), visible.end(), true);
     // at most twice the normal gap between the panels; what is still left goes to the output monitor and the hint bar
-    const auto extra = toolbarlayout::extraGap (spare, shownGroups, gap);
+    const auto extra = grouped ? 0 : toolbarlayout::extraGap (spare, shownGroups, gap);
     spare -= extra * shownGroups;
-    if (spare > 0)
+    if (spare > 0 && ! grouped)
     {
         const auto toOutput = visible[(std::size_t) Group::output] ? spare / 2 : 0;
         widths[(std::size_t) Group::output] += toOutput;
@@ -1826,9 +1923,17 @@ void MainComponent::resized()
                 const auto displays = juce::Rectangle<int> (panel.getX(), row1 + 3, panel.getWidth(), 2 * h - 6);
                 const auto displayHeight = displays.getHeight() - 10;
                 put (tempoDisplay, displays.withWidth (tempoWidth).withHeight (displayHeight));
-                put (tapTempoButton, displays.withTrimmedLeft (tempoWidth + 2).withWidth (tapWidth).withHeight (displayHeight));
-                put (timeDisplay, displays.withTrimmedLeft (tempoWidth + 2 + tapWidth + 4).withWidth (timeWidth).withHeight (displayHeight));
-                put (songPosition, displays.withTop (displays.getY() + displayHeight + 1).withWidth (tempoWidth + 2 + tapWidth + 4 + timeWidth));
+                // (round 190qg: on the narrowest windows the time and the tapper are in the overflow)
+                const auto tapRoom = noTap ? 0 : 2 + tapWidth, timeRoom = noTime ? 0 : 4 + timeWidth;
+                if (noTap)
+                    hide ({ &tapTempoButton });
+                else
+                    put (tapTempoButton, displays.withTrimmedLeft (tempoWidth + 2).withWidth (tapWidth).withHeight (displayHeight));
+                if (noTime)
+                    hide ({ &timeDisplay });
+                else
+                    put (timeDisplay, displays.withTrimmedLeft (tempoWidth + tapRoom + 4).withWidth (timeWidth).withHeight (displayHeight));
+                put (songPosition, displays.withTop (displays.getY() + displayHeight + 1).withWidth (tempoWidth + tapRoom + timeRoom));
                 break;
             }
             case Group::master: // master volume beside master pitch, each a big knob with its name and value under it
@@ -1858,12 +1963,15 @@ void MainComponent::resized()
                 break;
             case Group::snap: // global snap over the pattern selector, each with its name
             {
+                // round 190qg (cleanup, Grouped look): the two boxes start at the same x, after their icons alone (FL's
+                // boxes have no caption); the default keeps its captions (owner option in the 190qg HANDOFF)
+                const auto labelWidth = grouped ? h + 4 : captionWidth;
                 auto first = juce::Rectangle<int> (panel.getX(), row1, panel.getWidth(), h);
-                snapLabelArea = first.removeFromLeft (captionWidth);
+                snapLabelArea = first.removeFromLeft (labelWidth);
                 put (snapToggleButton, snapLabelArea.withWidth (h));
                 put (gridBox, first.reduced (0, 1));
                 auto second = juce::Rectangle<int> (panel.getX(), row2, panel.getWidth(), h);
-                patternLabelArea = second.removeFromLeft (captionWidth);
+                patternLabelArea = second.removeFromLeft (labelWidth);
                 put (patternMenuButton, second.removeFromRight (h));
                 if (narrowSnap) // (the pattern box keeps room for a name)
                 {
@@ -1908,6 +2016,7 @@ void MainComponent::resized()
             case Group::count_: break;
         }
     }
+    placeOverflowButton (overflowArea.isEmpty() ? overflowArea : overflowArea.withY (row1).withHeight (2 * h + 2)); // (round 190qg)
     layoutUnderToolbar();
     placeExtendedHint(); // round 190mr (DF-49)
 }
@@ -1971,6 +2080,8 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
     appliedIconSize = size;
     rowHeight = toolbarlayout::rowHeight (size);
     toolbarHeight = toolbarLayout.visible ? 2 * rowHeight + 12 : rowHeight + 6; // (round 170e3: room for the panel wells)
+    if (toolbarLayout.visible && toolbarLayout.oneRow && toolbarLook == toolbarlayout::Look::fl) // round 190qg: FL's "Single line"
+        toolbarHeight = toolbarlayout::oneRowHeight (rowHeight);
     if (toolbarLook == toolbarlayout::Look::live) // round 190iv: Live's menu row over its 38 px control bar
         toolbarHeight = toolbarlayout::livebar::menuRow + (toolbarLayout.visible ? toolbarlayout::livebar::band : 2);
 
@@ -2041,6 +2152,20 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
     menu.addItem (tr ("Hide the toolbar panels") + shortcutText ("view.toolbar"), true, ! toolbarLayout.visible, [this] {
         auto layout = toolbarLayout;
         layout.visible = ! layout.visible;
+        setToolbarLayout (layout);
+    });
+    // round 190qg: FL's "Single line" toolbar (any panels), and LYNX's Grouped look (Pattern layout only: the other
+    // layouts lay their own toolbars out)
+    const auto flLook = toolbarLook == toolbarlayout::Look::fl;
+    menu.addItem (tr ("One row (FL single line)"), flLook, toolbarLayout.oneRow, [this] {
+        auto layout = toolbarLayout;
+        layout.oneRow = ! layout.oneRow;
+        layout.visible = true;
+        setToolbarLayout (layout);
+    });
+    menu.addItem (tr ("Grouped look (framed panels, steady spacing)"), flLook, toolbarLayout.grouped, [this] {
+        auto layout = toolbarLayout;
+        layout.grouped = ! layout.grouped;
         setToolbarLayout (layout);
     });
 
@@ -3842,6 +3967,10 @@ void MainComponent::loadUiSettings()
             toolbarLayout.separators = on;
         else if (key == "toolbarVisible")
             toolbarLayout.visible = on;
+        else if (key == "toolbarOneRow") // round 190qg: FL's "Single line" toolbar
+            toolbarLayout.oneRow = on;
+        else if (key == "toolbarGrouped") // round 190qg: the Grouped look
+            toolbarLayout.grouped = on;
         else if (key == "menuDensity")
             theme::menus::setCompact (line.fromFirstOccurrenceOf ("=", false, false).trim() != "comfortable");
         else if (key == "uiScale")
@@ -4157,6 +4286,8 @@ void MainComponent::saveUiSettings()
                                       + "\nmenuDensity=" + juce::String (theme::menus::compact() ? "compact" : "comfortable")
                                       + "\ntoolbarSeparators=" + juce::String (toolbarLayout.separators ? 1 : 0)
                                       + "\ntoolbarVisible=" + juce::String (toolbarLayout.visible ? 1 : 0)
+                                      + "\ntoolbarOneRow=" + juce::String (toolbarLayout.oneRow ? 1 : 0)
+                                      + "\ntoolbarGrouped=" + juce::String (toolbarLayout.grouped ? 1 : 0)
                                       + "\nautosaveMinutes=" + juce::String (autosaveMinutes) + "\nautosaveKeep=" + juce::String (autosaveKeep)
                                       + "\naskUnusedRecordings=" + juce::String (askUnusedRecordings ? 1 : 0)
                                       + "\nmessagesHidden=" + messages::hiddenList()
@@ -12523,3 +12654,4 @@ void MainComponent::gamepadChanges (const gamepad::Changes& c, const gamepad::St
 
 // round 190iv: the toolbar per layout style (Simple capsules, Live control bar); kept in its own file
 #include "ui/ToolbarLooks.inc"
+#include "ui/ToolbarOverflow.inc" // round 190qg

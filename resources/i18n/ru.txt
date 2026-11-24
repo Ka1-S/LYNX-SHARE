@@ -12742,3 +12742,15 @@ countries: ru by kz
 "Previous view (before the zoom to the selection)" = "Предыдущий вид (до масштабирования к выделению)"
 "Restore selection" = "Восстановить выделение"
 "No earlier selection to restore" = "Нет предыдущего выделения для восстановления"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL классический (одна строка)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "Активность MIDI-входа"
+"One row (FL single line)" = "Одна строка (однострочная панель FL)"
+"Grouped look (framed panels, steady spacing)" = "Сгруппированный вид (панели в рамках, ровные интервалы)"
+"More toolbar items: what this window size has no room for" = "Ещё элементы панели: то, что не помещается при этом размере окна"
+"reconnect the MIDI inputs" = "переподключить MIDI-входы"
+"Nudge the tempo down" = "Подтолкнуть темп вниз"
+"Nudge the tempo up" = "Подтолкнуть темп вверх"
+"Launch quantization" = "Квантизация запуска"

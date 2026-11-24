@@ -12742,3 +12742,15 @@ countries: jp
 "Previous view (before the zoom to the selection)" = "前のビュー（選択範囲へのズーム前）"
 "Restore selection" = "選択を復元"
 "No earlier selection to restore" = "復元できる以前の選択はありません"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL クラシック (1 行)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "MIDI 入力のアクティビティ"
+"One row (FL single line)" = "1 行 (FL のシングルライン)"
+"Grouped look (framed panels, steady spacing)" = "グループ表示 (枠付きパネル、一定の間隔)"
+"More toolbar items: what this window size has no room for" = "その他のツールバー項目: このウィンドウサイズに収まらないもの"
+"reconnect the MIDI inputs" = "MIDI 入力を再接続"
+"Nudge the tempo down" = "テンポを下にナッジ"
+"Nudge the tempo up" = "テンポを上にナッジ"
+"Launch quantization" = "ローンチのクオンタイズ"

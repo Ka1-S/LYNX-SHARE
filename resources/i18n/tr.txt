@@ -12742,3 +12742,15 @@ countries: tr
 "Previous view (before the zoom to the selection)" = "Önceki görünüm (seçime yakınlaştırmadan önce)"
 "Restore selection" = "Seçimi geri yükle"
 "No earlier selection to restore" = "Geri yüklenecek önceki bir seçim yok"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL klasik (tek satır)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "MIDI giriş etkinliği"
+"One row (FL single line)" = "Tek satır (FL tek satır)"
+"Grouped look (framed panels, steady spacing)" = "Gruplanmış görünüm (çerçeveli paneller, sabit aralık)"
+"More toolbar items: what this window size has no room for" = "Diğer araç çubuğu öğeleri: bu pencere boyutuna sığmayanlar"
+"reconnect the MIDI inputs" = "MIDI girişlerini yeniden bağla"
+"Nudge the tempo down" = "Tempoyu aşağı it"
+"Nudge the tempo up" = "Tempoyu yukarı it"
+"Launch quantization" = "Başlatma kuantizasyonu"

@@ -12742,3 +12742,15 @@ countries: de at ch li lu
 "Previous view (before the zoom to the selection)" = "Vorherige Ansicht (vor dem Zoom auf die Auswahl)"
 "Restore selection" = "Auswahl wiederherstellen"
 "No earlier selection to restore" = "Keine frühere Auswahl zum Wiederherstellen"
+
+# round 190qg: the toolbar's overflow, FL's single line, the Grouped look
+"FL classic (one row)" = "FL klassisch (eine Zeile)"
+"Pattern / Song" = "Pattern / Song"
+"MIDI input activity" = "MIDI-Eingangsaktivität"
+"One row (FL single line)" = "Eine Zeile (FL einzeilig)"
+"Grouped look (framed panels, steady spacing)" = "Gruppierte Ansicht (gerahmte Bereiche, feste Abstände)"
+"More toolbar items: what this window size has no room for" = "Weitere Werkzeugleisten-Elemente: was bei dieser Fenstergröße keinen Platz hat"
+"reconnect the MIDI inputs" = "MIDI-Eingänge neu verbinden"
+"Nudge the tempo down" = "Tempo nach unten schieben"
+"Nudge the tempo up" = "Tempo nach oben schieben"
+"Launch quantization" = "Start-Quantisierung"

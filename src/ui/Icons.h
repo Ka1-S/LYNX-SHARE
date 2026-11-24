@@ -76,9 +76,10 @@ enum class Icon
     // Automation glyphs
     automationArm,     // two small rings joined by a rising line
     reEnableAutomation, // an arrow pointing left
-    search             // round 190on (P2): the command palette, a magnifier (no plus: Icon::zoom is the zoom tool's)
+    search,            // round 190on (P2): the command palette, a magnifier (no plus: Icon::zoom is the zoom tool's)
+    overflow           // round 190qg: the toolbar's overflow button, "»" (two chevrons pointing right; FL's is a ▸)
 };
-constexpr int iconCount = (int) Icon::search + 1;
+constexpr int iconCount = (int) Icon::overflow + 1;
 
 namespace icons
 {

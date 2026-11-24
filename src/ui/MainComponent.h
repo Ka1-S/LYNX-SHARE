@@ -142,6 +142,13 @@ public:
     juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
     void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
     juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    // Round 190qg (--toolbarshot190qg, --selftest): the toolbar's overflow ("»": what the window has no room for), the
+    // check that every item of the shown panels is on the toolbar or in it (an empty string = OK, else one line per
+    // problem), the overflow menu, and the Simple / Clip-launch "⋯" menus' lists of what their bars left out
+    const std::vector<toolbarlayout::Item>& getToolbarOverflowForSnapshot() const noexcept { return overflowList; }
+    juce::String checkToolbarItemsForSnapshot();
+    juce::PopupMenu makeToolbarOverflowMenuForSnapshot() { return makeToolbarOverflowMenu(); }
+    juce::Component& overflowButtonForSnapshot() noexcept { return overflowButton; }
     // round 190ld (--details190ldshot): FL's Count-in / Wait for input right-click menus, the Simple Cycle switch
     juce::PopupMenu countInMenuForSnapshot() { return makeCountInMenu(); }
     juce::PopupMenu waitInputMenuForSnapshot() { return makeWaitInputMenu(); }
@@ -949,6 +956,17 @@ private:
     juce::Rectangle<int> lastPaintClip; // round 190mh: paint()'s clip bounds in a frame (the tiles' atlas on the software renderer)
     void applyToolbarLook();                                // the widgets' looks for the layout style now shown
     void layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth);
+    // Round 190qg (ui/ToolbarOverflow.inc): the overflow button and its menu; FL's "Single line" toolbar; each Pattern-look
+    // item's widget; the "⋯" menu entries of the Simple / Clip-launch parts their bars left out
+    IconButton overflowButton { "toolbarOverflow", Icon::overflow };
+    std::vector<toolbarlayout::Item> overflowList;          // the items the toolbar had no room for, in toolbar order
+    void placeOverflowButton (juce::Rectangle<int> area);   // empty area: hidden
+    juce::PopupMenu makeToolbarOverflowMenu();
+    void addOverflowItem (juce::PopupMenu& menu, toolbarlayout::Item item);
+    juce::Component* toolbarItemComponent (toolbarlayout::Item item);
+    void layoutOneRowToolbar (juce::Rectangle<int> bar, int menuWidth);
+    juce::StringArray lookDroppedNames();                   // the names the "⋯" menu must list for the parts left out
+    void addLookDroppedItems (juce::PopupMenu& menu);       // those entries
     void layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidth);
     void layoutUnderToolbar();                              // the edit tray, the update bar and the workspace
     void paintLookToolbar (juce::Graphics& g);              // the Simple / Live band and capsules
@@ -999,6 +1017,9 @@ private:
     IconButton sessionViewButton { "sessionView", Icon::sessionView };
     IconButton arrangementViewButton { "arrangementView", Icon::arrangementView };
     std::array<bool, toolbarlayout::livebar::itemCount> liveShown {}; // the control-bar items that fit (the rest: "⋯")
+    // round 190qg: what the Clip-launch / Simple bars wanted to show, and what the Simple bar showed (the rest is in "⋯")
+    std::array<bool, toolbarlayout::livebar::itemCount> liveWanted {};
+    std::array<bool, toolbarlayout::simplebar::partCount> simpleWanted {}, simpleShown {};
     std::vector<juce::Rectangle<int>> lookCapsules;         // Simple: the capsules' outlines
     std::vector<juce::Rectangle<int>> lookDividers;         // Simple: the 1 px lines between capsule segments
     juce::Rectangle<int> lookMenuRow, lookBand;             // Clip-launch: the menu row and the control-bar band
