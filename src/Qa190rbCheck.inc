@@ -70,5 +70,39 @@
                 picture.deleteFile();
         }
 
+        // ---- crash report ef495e29 (0.1.31, Windows): NativeEffectEditor::paint -> pluginheader::describe. The help line
+        //      under LYNX's own panels named the control under the mouse with effectInfo().params[p], but a state-backed
+        //      control or a hidden parameter with a control has an index past the plain parameters
+        {
+            AudioEngine offline (false);
+            offline.setSong (Song::makeDefault());
+            offline.dispatchPendingMessages();
+            int extended = 0, failed = 0, kinds = 0;
+            auto kindsToCheck = plugui::ownLayoutKinds();
+            kindsToCheck.push_back (EffectKind::lynxTune);
+            for (const auto kind : kindsToCheck)
+            {
+                offline.editSong ([kind] (Song& s) {
+                    if (s.mixer.size() > 1)
+                        s.mixer[1].effects = { makeEffectSlot (kind) };
+                });
+                offline.dispatchPendingMessages();
+                const auto report = helpLineSelfTest (offline, 1, 0, (int) plugui::layoutFor (kind).pages.size());
+                for (const auto& line : juce::StringArray::fromLines (report))
+                {
+                    if (line.contains (": OK"))
+                        ++extended;
+                    if (line.contains ("FAIL"))
+                    {
+                        ++failed;
+                        log << "     " << line << "\n";
+                    }
+                }
+                ++kinds;
+            }
+            check ("Native editors: the help line under every control of " + juce::String (kinds) + " panels paints, " + juce::String (extended)
+                       + " of them past the plain parameters, none failed",
+                   failed == 0 && kinds > 0 && extended > 0);
+        }
         return result;
     }
