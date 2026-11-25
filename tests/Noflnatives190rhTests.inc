@@ -1,7 +1,10 @@
 // Round 190rh (QUEUE-0.1.33 item 78): FL's native engines without FL Studio installed (core/NativeData.h) — LYNX's own
 // data sets, the presets of the new banks, which set a channel plays and that it never changes by itself.
 
+#include "core/BassDrum.h"
 #include "core/FlInstall.h"
+#include "core/FlpExport.h"
+#include "core/Morphine.h"
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 #include "core/NativeEngines.h"
@@ -415,4 +418,70 @@ TEST (noflnatives190rh_toxic_drumsynth_boobass)
     old.instrument = InstrumentKind::toxic;
     old.pluginState = toxicDefaultState();
     CHECK (natives::dataSource (old) == natives::DataSource::notNeeded);
+}
+
+// The .flp export of every bank preset names nothing FL would look for and not find: no LYNX noise, no reserved path; the
+// report says so and the project keeps its own state
+TEST (noflnatives190rh_flp_export_names_nothing_of_lynx)
+{
+    using namespace lynx;
+    int noises = 0;
+    for (const auto kind : noflnatives190rh::kinds())
+    {
+        auto song = Song::makeDefault();
+        song.channels.clear();
+        for (const auto& preset : banks::bankOf (kind))
+        {
+            ChannelDef c;
+            c.instrument = kind;
+            c.name = "Channel";
+            preset.apply (c);
+            song.channels.push_back (c);
+        }
+        const auto before = song;
+        flpexport::Report report;
+        flpexport::Options options;
+        options.lynxOnly = flpexport::LynxOnly::substitute;
+        const auto project = flpexport::toProject (song, options, report);
+        int notes = 0, own = 0;
+        for (const auto& n : report.notes)
+            notes += n.find ("LYNX SHARE's own") != std::string::npos ? 1 : 0;
+        for (std::size_t i = 0; i < song.channels.size() && i < project.channels.size(); ++i)
+        {
+            const auto& st = song.channels[i].pluginState;
+            const auto name = kind == InstrumentKind::bassdrum ? bassDrumNoiseName (st) : kind == InstrumentKind::morphine ? morphineNoiseName (st) : std::string();
+            own += name.rfind ("LYNX ", 0) == 0 ? 1 : 0;
+            const auto& out = project.channels[i];
+            CHECK (! out.pluginState.empty() && out.samplePath.find ("lynxdata") == std::string::npos);
+            const std::string bytes (out.pluginState.begin(), out.pluginState.end());
+            CHECK (bytes.find ("lynxdata") == std::string::npos);
+            if (kind == InstrumentKind::bassdrum)
+                CHECK (bassDrumStateUsable (out.pluginState) && bassDrumNoiseName (out.pluginState).rfind ("LYNX ", 0) != 0);
+            if (kind == InstrumentKind::morphine)
+                CHECK (morphineStateUsable (out.pluginState) && morphineNoiseName (out.pluginState).rfind ("LYNX ", 0) != 0);
+            CHECK (st == before.channels[i].pluginState);
+        }
+        CHECK (notes == own);
+        noises += own;
+    }
+    CHECK (noises > 0);
+    // GMS names waves by FL's own file names
+    if (const auto fl = noflnatives190rh::realInstallation(); ! fl.empty())
+        for (const auto& preset : banks::bankOf (InstrumentKind::gms))
+        {
+            ChannelDef c;
+            c.instrument = InstrumentKind::gms;
+            preset.apply (c);
+            const std::string bytes (c.pluginState.begin(), c.pluginState.end());
+            for (auto at = bytes.find (".wav"); at != std::string::npos; at = bytes.find (".wav", at + 1))
+            {
+                auto from = at;
+                while (from > 0 && bytes[from - 1] >= ' ' && bytes[from - 1] < 127)
+                    --from;
+                auto name = bytes.substr (from, at + 4 - from);
+                if (const auto tag = name.rfind ("4nyS"); tag != std::string::npos)
+                    name = name.substr (tag + 4);
+                CHECK (! existingPathIgnoringCase (fl + "/Plugins/Fruity/Generators/GMS/Synth Waves/" + name).empty());
+            }
+        }
 }

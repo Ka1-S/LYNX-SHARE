@@ -2455,6 +2455,18 @@ std::string morphineNoiseName (const std::vector<std::uint8_t>& state)
     return p ? p->noise : std::string();
 }
 
+bool morphineTakeOutOwnNoise (std::vector<std::uint8_t>& state)
+{
+    const auto p = parseState (state);
+    if (! p || ! nativedata::isOwnNoise (p->noise))
+        return false;
+    const auto at = (std::size_t) p->globalOffset + 168; // (the name is 168 bytes after the first parameter, 1024 long)
+    if (at + 1024 > state.size())
+        return false;
+    std::fill_n (state.begin() + (std::ptrdiff_t) at, 1024, (std::uint8_t) 0);
+    return true;
+}
+
 int morphineParamOffset (const std::vector<std::uint8_t>& state, int index)
 {
     const auto p = parseState (state);

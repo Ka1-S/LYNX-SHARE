@@ -1,4 +1,6 @@
 #include "core/Sections.h"
+#include "core/BassDrum.h"
+#include "core/Morphine.h"
 #include "core/ChordLaneOps.h"
 #include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
@@ -1138,6 +1140,10 @@ struct Converter
             if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)
                 if (const auto kit = fpc::read (c.pluginState))
                     c.pluginState = fpc::write (*kit);
+            // LYNX's own noises (round 190rh): FL has none of that name and would ask for a missing file
+            if ((def.instrument == InstrumentKind::bassdrum && bassDrumTakeOutOwnNoise (c.pluginState))
+                || (def.instrument == InstrumentKind::morphine && morphineTakeOutOwnNoise (c.pluginState)))
+                report.notes.push_back (channelLabel (def, index) + ": its noise is LYNX SHARE's own and does not go to FL (the rest of the sound does)");
             const auto* g = generatorFor (def.instrument);
             if ((g != nullptr && g->channelSample) || samplerLike (def.instrument))
                 c.samplePath = path (def.samplePath);

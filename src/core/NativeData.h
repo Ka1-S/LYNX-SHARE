@@ -99,6 +99,9 @@ std::vector<std::int16_t> guitarPick (int index);
 std::vector<int> guitarChord (int root);
 std::vector<float> glideLengths (bool dynamic);
 
+// The name of one of LYNX's own noises ("LYNX Hiss"; a file of the user's would have an extension)
+bool isOwnNoise (const std::string& name);
+
 // GMS: one cycle (1024 points) of the wave of that name (core/NativeWavesGms.cpp); an unknown name is a saw
 std::vector<float> gmsWave (const std::string& name);
 

@@ -266,7 +266,7 @@ std::shared_ptr<const Wave> noiseFor (const std::string& folder, const std::stri
 {
     if (name.empty())
         return nullptr;
-    if (! folder.empty() && name.rfind ("LYNX ", 0) != 0)
+    if (! folder.empty() && ! nativedata::isOwnNoise (name))
         return readWaveAnySeparator (joinPath (joinPath (folder, "Noise Samples"), name));
     static std::mutex mutex;
     static std::map<std::string, std::shared_ptr<const Wave>> cache;
@@ -1067,6 +1067,14 @@ std::string bassDrumNoiseName (const std::vector<std::uint8_t>& state)
 {
     Patch p;
     return parse (state, p) ? p.noise : std::string();
+}
+
+bool bassDrumTakeOutOwnNoise (std::vector<std::uint8_t>& state)
+{
+    if (! nativedata::isOwnNoise (bassDrumNoiseName (state)))
+        return false;
+    std::fill_n (state.begin() + 12 + 256, 1024, (std::uint8_t) 0);
+    return true;
 }
 
 int bassDrumParamOffset (const std::vector<std::uint8_t>& state, int index)

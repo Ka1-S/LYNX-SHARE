@@ -184,4 +184,6 @@ std::string locate (const std::string& path)
     const auto there = under (root, path.substr (at));
     return ! there.empty() ? there : path;
 }
+bool isOwnNoise (const std::string& name) { return name.rfind ("LYNX ", 0) == 0 && name.find ('.') == std::string::npos; }
+
 } // namespace lynx::nativedata

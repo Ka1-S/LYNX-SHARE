@@ -34,6 +34,9 @@ bool morphineStateUsable (const std::vector<std::uint8_t>& state);
 
 // the noise sample file name of a state ("" = none)
 std::string morphineNoiseName (const std::vector<std::uint8_t>& state);
+// The state for FL (the .flp export): a noise that is LYNX's own ("LYNX ...", core/NativeData.h) is taken out, FL would ask
+// for it as a missing file. true = there was one
+bool morphineTakeOutOwnNoise (std::vector<std::uint8_t>& state);
 
 // byte offset of global parameter A[index] (0…39, float) inside the state, or −1 (used by the channel settings panel)
 int morphineParamOffset (const std::vector<std::uint8_t>& state, int index);

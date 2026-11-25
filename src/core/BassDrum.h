@@ -37,6 +37,9 @@ bool bassDrumDataUsable (const std::string& path);
 
 // the noise sample's file name in a state ("" = none)
 std::string bassDrumNoiseName (const std::vector<std::uint8_t>& state);
+// The state for FL (the .flp export): a noise that is LYNX's own ("LYNX ...", core/NativeData.h) is taken out, FL would ask
+// for it as a missing file. true = there was one
+bool bassDrumTakeOutOwnNoise (std::vector<std::uint8_t>& state);
 
 // byte offset of parameter index (0…22, float 0…1) inside the state, or −1
 int bassDrumParamOffset (const std::vector<std::uint8_t>& state, int index);
