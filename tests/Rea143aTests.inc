@@ -177,7 +177,8 @@ TEST (rea143_mixer_track_menu_operations)
     s.mixer[5].masterLevel = 0.5f;
     mixerops::resetRouting (s, { 5, 0 });
     CHECK (s.mixer[5].sends.empty() && s.mixer[5].toMaster && s.mixer[5].masterLevel == 1.0f);
-    // "Insert multiple...": blank inserts at the place, the rest moves right
+    // "Insert multiple...": blank inserts at the place, the rest moves right (the reset above cleared insert 2's name)
+    s.mixer[2].name = "Drums";
     const auto before = s.mixer.size();
     CHECK (mixerops::insertTracks (s, 2, 3) == 3 && s.mixer.size() == before + 3 && s.mixer[5].name == "Drums");
 }
