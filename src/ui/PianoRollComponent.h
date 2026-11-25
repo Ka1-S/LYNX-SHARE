@@ -498,6 +498,7 @@ private:
     std::vector<int> selectionOrAll() const;         // selection, or all of the channel's notes if empty
     void setSelection (std::vector<int> indices);
     void sortNotes();                                // sorts while keeping the selection (no undo step)
+    bool dragNotesValid() const; // round 190rb: the notes a drag holds are still the pattern's
     void editNotes (const std::function<void (Pattern&)>& edit, bool undoable = true);
     // Freeze (round 190ay): the notes of a frozen channel are read-only. True = the channel shown is frozen; the hint
     // bar says "Unfreeze to edit" (the edit is refused, not silently dropped).

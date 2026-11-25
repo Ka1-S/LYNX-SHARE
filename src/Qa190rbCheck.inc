@@ -350,5 +350,55 @@
                    before >= 16 && afterKey == 0);
         }
 
+        // ---- UI monkey test, seed 59 (release build): "double free or corruption" after an undo during a Piano roll drag.
+        //      A drag of notes holds their indices from the press; the song changed under it and the move wrote past the
+        //      pattern's notes. Such a drag ends now
+        {
+            auto song = Song::makeDefault();
+            song.currentPattern = 0;
+            if (! song.patterns.empty() && ! song.channels.empty())
+            {
+                song.patterns[0].notes.clear();
+                for (int k = 0; k < 8; ++k)
+                {
+                    Note n;
+                    n.channel = 0;
+                    n.key = 60 + k;
+                    n.start = (std::int64_t) k * ppq;
+                    n.length = ppq / 2;
+                    song.patterns[0].notes.push_back (n);
+                }
+            }
+            AudioEngine offline (false);
+            offline.setSong (song);
+            offline.setSelectedChannel (0);
+            MainComponent ui (offline, false);
+            ui.setSize (1600, 1000);
+            ui.showPanelsForSnapshot ({ workspace::Panel::pianoRoll });
+            offline.dispatchPendingMessages();
+            ui.resized();
+            auto& pr = ui.getPianoRollForSnapshot();
+            pr.runAction ("pianoRoll.zoomAll"); // (the pattern's notes in view)
+            pr.scrollToNotes();
+            offline.dispatchPendingMessages();
+            const auto target = pr.firstVisibleNoteForSnapshot();
+            check ("Piano roll: a note of the channel on screen (" + juce::String (target.index) + ")", target.index >= 0);
+            if (target.index >= 0)
+            {
+                const auto at = target.bounds.getCentre();
+                pr.pressForSnapshot (at);
+                // the song changes under the drag (Ctrl+Z while the button is down): the pattern's notes are gone
+                offline.editSong ([] (Song& s) {
+                    if (! s.patterns.empty())
+                        s.patterns[0].notes = {};
+                });
+                pr.dragForSnapshot (at + juce::Point<int> (60, -20));
+                pr.dragForSnapshot (at + juce::Point<int> (120, -40));
+                pr.releaseForSnapshot (at + juce::Point<int> (120, -40));
+                offline.dispatchPendingMessages();
+                check ("Piano roll: a note drag whose notes went with the song's change ends, nothing written",
+                       ! offline.getSong().patterns.empty() && offline.getSong().patterns[0].notes.empty());
+            }
+        }
         return result;
     }
