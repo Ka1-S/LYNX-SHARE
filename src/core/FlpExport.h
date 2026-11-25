@@ -44,6 +44,11 @@ struct Options
     // FL's install folder (%FLStudioFactoryData%; "" = no FL here): a Fruity Dance sheet inside it is written as FL
     // writes it (round 190bf)
     std::string flFactoryData;
+    // whether a folder exists on this computer (round 190rc): the song's FL project data folder (0xCA) is written only
+    // when it does. FL 2026 stops a 26.x project whose data folder is missing at "Invalid project data folder" (an .flp
+    // imported from another computer keeps its maker's folder, e.g. C:\Users\<someone>\...\Projects\<song>\); FL's own
+    // projects without one save it empty. Not set = written as it is.
+    std::function<bool (const std::string&)> folderExists;
     int ppq = 0; // the file's PPQ (0 = 96 when the notes and clips fit it, else 960)
 };
 

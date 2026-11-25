@@ -23,6 +23,8 @@ flpexport::Options optionsFor (PluginHost* host, flpexport::LynxOnly mode)
     o.lynxOnly = mode;
     if (const auto fl = findFlStudio(); fl.installDir.isDirectory())
         o.flFactoryData = fl.installDir.getFullPathName().toStdString();
+    // (round 190rc: FL's project data folder only when it is on this computer; a Windows path on Linux / macOS is not)
+    o.folderExists = [] (const std::string& path) { return juce::File::isAbsolutePath (str (path)) && juce::File (str (path)).isDirectory(); };
     if (host != nullptr)
         o.pluginRecord = [host] (const PluginRef& ref, bool instrument) { return host->flWrapperRecord (ref, instrument); };
     o.sampleSeconds = [] (const std::string& path) {
