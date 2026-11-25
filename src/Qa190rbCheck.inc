@@ -542,6 +542,30 @@
             check ("Quit: a call-out box still open is deleted before the UI and the engine", openBefore && gone && ! modalDialogOpen());
         }
 
+        // ---- round 190rf, UI monkey on Windows (seed 2009): the Project picker painted a pattern the song no longer has
+        //      (another project opened under it)
+        {
+            AudioEngine offline (false);
+            auto song = Song::makeDefault();
+            while (song.patterns.size() < 12)
+                song.patterns.push_back (song.patterns.front());
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            ProjectPickerTargets targets;
+            targets.close = [] {};
+            auto view = makeProjectPickerView (offline, targets);
+            view->setBounds (0, 0, 1280, 800);
+            view->setAlpha (1.0f);
+            auto small = Song::makeDefault();
+            small.patterns.resize (1);
+            offline.setSong (std::move (small));
+            offline.dispatchPendingMessages();
+            juce::Image image (juce::Image::ARGB, 1280, 800, true, juce::SoftwareImageType());
+            juce::Graphics g (image);
+            view->paintEntireComponent (g, true);
+            check ("Project picker: paints while the song under it has fewer patterns", true);
+        }
+
        #if JUCE_LINUX
         // ---- round 190rf, crash reports 81399325 / 335428f3 / e45746ce (0.1.29 / 0.1.30 / 0.1.31, Linux): an abort
         //      ("terminate called") at exit after the X server went away. Xlib calls exit(), the static hang watch's
