@@ -570,6 +570,38 @@ void hostedStateClearIsRejectedBeforeCommit()
            "Hosted-state rejection changed its input");
 }
 
+// Round 190rj: 0.1.31's exportMarkers (in every new project) and other fields of 0.1.30 / 0.1.31 were not on the list: an
+// edit of their object was refused, so project.edit changed nothing in a new project.
+void documentFieldsOfNewProjects()
+{
+    auto song = fixture();
+    song.exportMarkers = true;
+    song.tracker.rowsPerBeat = 8;
+    song.patterns[0].trackClip = true;
+    song.mixer[1].cue = true;
+    if (song.arrangements.empty())
+        song.arrangements.emplace_back();
+    auto& section = song.arrangements[0].sections.emplace_back();
+    section.length = 4 * ppq;
+    section.name = "Verse";
+    section.uid = 1;
+    auto& chord = song.arrangements[0].chords.emplace_back();
+    chord.length = 4 * ppq;
+    chord.uid = 1;
+    song.playlistTracks.resize (3);
+    song.playlistTracks[1].ownClips = true;
+    const auto edited = remote_document::stage (song, json (R"([
+        {"op":"replace","path":"/bpm","value":131},
+        {"op":"replace","path":"/patterns/0/name","value":"Edited"},
+        {"op":"add","path":"/mixer/1/pan","value":0.25}
+    ])"));
+    check (edited.bpm == 131.0 && edited.patterns[0].name == "Edited" && edited.mixer[1].pan == 0.25f, "The edit of a 0.1.31 project was not applied");
+    check (edited.exportMarkers && edited.tracker.rowsPerBeat == 8 && edited.patterns[0].trackClip && edited.mixer[1].cue
+           && edited.arrangements[0].sections.size() == 1 && edited.arrangements[0].chords.size() == 1 && edited.playlistTracks[1].ownClips,
+           "The edit of a 0.1.31 project lost one of its fields");
+    refusesWith ([&] { remote_document::stage (song, json (R"([{"op":"replace","path":"/tracker/rowsPerBeat","value":4}])")); }, "read-only");
+}
+
 void documentFieldAllowlist()
 {
     auto source = fixture();
@@ -889,6 +921,7 @@ int main()
         run ("documentIoPolicy", documentIoPolicy);
         run ("hostedStateClearIsRejectedBeforeCommit", hostedStateClearIsRejectedBeforeCommit);
         run ("documentFieldAllowlist", documentFieldAllowlist);
+        run ("documentFieldsOfNewProjects", documentFieldsOfNewProjects);
         run ("richDocumentAllowlist", richDocumentAllowlist);
         run ("currentFieldsAllowlist", currentFieldsAllowlist);
         run ("knownNativeStatePolicy", knownNativeStatePolicy);

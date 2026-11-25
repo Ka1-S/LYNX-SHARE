@@ -65,6 +65,21 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // formulas and targets, as remoteMappings)
         add (S::root, "playlistRowHeight linkTracksToMixer");
         add (S::root, "slideNoteProps"); // (issue #236, round 190od: slide notes move the note properties)
+        // Round 190rj: fields of 0.1.30 / 0.1.31 that were never reviewed here. exportMarkers is in every new project
+        // (round 190pr), so each of these made every edit of its object — the root: of the whole project — refused.
+        // Plain musical / view data is editable; rows that hold effect chains or other objects pass through unchanged.
+        add (S::root, "exportMarkers playlistTrackNest playlistOwnClips");
+        add (S::root, "playlistTrackVersions tracker araDocuments", S::readOnly);
+        add (S::mixer, "cue current");
+        add (S::pattern, "trackClip heldNotes markerKeys");
+        add (S::arrangement, "sections chords");
+        add (S::channel, "followChords");
+        add (S::channel, "ara polyEdit", S::readOnly);
+        add (S::effect, "displayView");
+        add (S::effect, "ara", S::readOnly);
+        add (S::origin, "trial", S::readOnly);
+        add (S::grid, "cue", S::readOnly);
+        add (S::gridClip, "startMarker clipScale");
         add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
         add (S::root, "clipNotes190lq", S::readOnly); // (round 190lq: FL's law for the notes of audio clip channels' mark)
