@@ -418,7 +418,22 @@ void applyOwnership (juce::Component& window)
 
     if (auto* top = dynamic_cast<juce::TopLevelWindow*> (&window))
         if (auto* peer = top->getPeer())
+        {
+           #if JUCE_LINUX || JUCE_BSD
+            // Round 190rd (perf 9, plugin / editor window open time): JUCE's X11 setIcon reads the icon pixel by pixel
+            // (Image::getPixelAt, then a colour and a mask pixmap) and sends it as _NET_WM_ICON: the 512 px logo cost ~90 M
+            // instructions (~25 ms) on every editor window opened, 90 % of a native editor's open. A 128 px icon (what a
+            // task bar or a window switcher shows) is 16 times less, and a window keeps the one its native window got.
+            const auto stamp = (juce::int64) (juce::pointer_sized_int) peer;
+            if ((juce::int64) window.getProperties().getWithDefault ("lynxIconPeer", 0) != stamp)
+            {
+                peer->setIcon (logoAt (128));
+                window.getProperties().set ("lynxIconPeer", stamp);
+            }
+           #else
             peer->setIcon (logoImage());
+           #endif
+        }
    #if JUCE_WINDOWS
     auto* owner = mainWindow().getComponent();
     if (owner == nullptr || owner == &window || window.getWindowHandle() == nullptr || owner->getWindowHandle() == nullptr)
