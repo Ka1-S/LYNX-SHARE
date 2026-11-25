@@ -28,3 +28,25 @@ TEST (sweep190re_undo_keeps_the_project_clock)
     CHECK (keepNormal != std::string::npos && keepNormal < engine.find ("\n}\n", normal));
     CHECK (keepSession != std::string::npos && keepSession < engine.find ("\n}\n", session));
 }
+
+// "Nothing to play in Song mode yet" (round 190np's tip) stayed up after it stopped being true: a project opened, a clip
+// placed, Pattern mode, the Clip-launch or Simple layout. The empty-state refresh (every song change and layout switch)
+// closes it when the signal no longer holds.
+TEST (sweep190re_song_mode_tip_follows_the_song)
+{
+    using namespace lynx;
+    auto s = Song::makeDefault();
+    s.playlist.clear();
+    s.arrangements.clear();
+    CHECK (onboarding::songModeEmptySignal (true, s, layoutstyle::Style::pattern));
+    CHECK (! onboarding::songModeEmptySignal (false, s, layoutstyle::Style::pattern));     // (Pattern mode)
+    CHECK (! onboarding::songModeEmptySignal (true, s, layoutstyle::Style::clipLaunch));   // (other layouts)
+    CHECK (! onboarding::songModeEmptySignal (true, s, layoutstyle::Style::simple));
+    s.playlist.push_back ({ 0, 0, 0, 4 * ppq, 0 });
+    CHECK (! onboarding::songModeEmptySignal (true, s, layoutstyle::Style::pattern));      // (a clip placed / a project opened)
+    const auto ui = i18ntest::readFile ("src/ui/MainOnboarding.cpp");
+    const auto refresh = ui.find ("void MainComponent::updateEmptyHint()");
+    const auto close = ui.find ("tipCard->getTip() == onboarding::Tip::songModeEmpty", refresh);
+    CHECK (refresh != std::string::npos && close != std::string::npos && close < ui.find ("\n}\n", refresh));
+    CHECK (ui.find ("closeTip();", close) < ui.find ("\n}\n", refresh));
+}
