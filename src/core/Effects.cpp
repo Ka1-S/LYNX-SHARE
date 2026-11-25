@@ -1713,6 +1713,7 @@ public:
             lastParams = params;
             flMode = true;
             fl.set (peqfl::fromParams (params));
+            publishLatency();
         }
     }
 
@@ -1722,6 +1723,7 @@ public:
         if (! flMode)
             lastParams.fill (-1.0f);
         fl.prepare (sr);
+        publishLatency();
         reset();
     }
 
@@ -1733,7 +1735,10 @@ public:
         fl.reset();
     }
 
-    int latencySamples() const noexcept override { return flMode ? fl.latencySamples() : 0; }
+    int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
+    // Round 190rf (ThreadSanitizer): the UI thread asks for the latency (the plan of every new snapshot) while the audio
+    // thread runs process(), which frees the linear-phase engine when its mode goes: the latency is a number published here
+    void publishLatency() noexcept { latency.store (flMode ? fl.latencySamples() : 0, std::memory_order_relaxed); }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
@@ -1745,13 +1750,18 @@ public:
                 lastParams = params;
                 flMode = true;
                 fl.set (peqfl::fromParams (params));
+                publishLatency();
             }
             fl.process (l, r, n);
             tail = -1;
             listen (l, r, n, params);
             return;
         }
-        flMode = false;
+        if (flMode)
+        {
+            flMode = false;
+            publishLatency();
+        }
 
         if (params != lastParams)
         {
@@ -1844,6 +1854,7 @@ private:
     EffectParams lastParams {};
     peqfl::Engine fl;
     bool flMode = false;
+    std::atomic<int> latency { 0 }; // (publishLatency)
     int tail = -1;
 
 public:

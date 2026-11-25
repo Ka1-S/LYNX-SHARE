@@ -166,3 +166,36 @@ TEST (qa190rf_worker_pool_never_returns_before_its_round_is_done)
     CHECK (early == 0);
     CHECK (outside.load() == 0);
 }
+
+// Round 190rf (ThreadSanitizer): the EQ's latency is asked by the UI thread (the plan of every new snapshot) while the
+// audio thread switches FL's linear-phase mode, which frees the linear-phase engine: it is a published number now. The
+// sanitizer builds name the old read of the freed engine; here: the numbers are the two modes' own.
+TEST (qa190rf_parametric_eq_latency_is_asked_while_the_mode_switches)
+{
+    using namespace lynx;
+    auto params = makeEffectSlot (EffectKind::parametricEq).params;
+    params[(std::size_t) peqfl::lawParam] = 0.5f; // FL's Parametric EQ 2
+    auto linear = params;
+    linear[(std::size_t) peqfl::linearParam] = 1.0f;
+    auto eq = makeEffect (EffectKind::parametricEq);
+    eq->prepare (48000.0);
+    std::vector<float> l (64, 0.1f), r (64, 0.1f);
+    eq->process (l.data(), r.data(), 64, linear, 120.0);
+    const auto with = eq->latencySamples();
+    eq->process (l.data(), r.data(), 64, params, 120.0);
+    const auto without = eq->latencySamples();
+    CHECK (with > 0);
+    CHECK (without == 0);
+    std::atomic<bool> stop { false };
+    std::atomic<int> others { 0 };
+    std::thread ui ([&] {
+        while (! stop.load())
+            if (const auto now = eq->latencySamples(); now != with && now != without)
+                others.fetch_add (1);
+    });
+    for (int k = 0; k < 400; ++k)
+        eq->process (l.data(), r.data(), 64, (k & 1) != 0 ? linear : params, 120.0);
+    stop.store (true);
+    ui.join();
+    CHECK (others.load() == 0);
+}
