@@ -246,7 +246,7 @@ bool sameGlobals (const Song& a, const Song& b)
     return a.bpm == b.bpm && a.beatsPerBar == b.beatsPerBar && a.beatUnit == b.beatUnit && a.swing == b.swing && a.channelGroups == b.channelGroups && a.masterPitch == b.masterPitch
            && a.info == b.info && a.projectId == b.projectId && a.performanceMode == b.performanceMode && a.substitutesBypassed == b.substitutesBypassed
            && a.cleanMixer == b.cleanMixer && a.autoCrossfades == b.autoCrossfades && a.linkTracksToMixer == b.linkTracksToMixer && a.compCrossfadeMs == b.compCrossfadeMs && a.playTruncatedNotes == b.playTruncatedNotes && a.muteRunsEffects == b.muteRunsEffects && a.slideNoteProps == b.slideNoteProps && a.exportMarkers == b.exportMarkers && a.patternClipTakeover == b.patternClipTakeover && a.mutedInsertsSkip == b.mutedInsertsSkip
-           && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.flPluginLevels == b.flPluginLevels && a.autoPdc == b.autoPdc
+           && a.fastDeclick == b.fastDeclick && a.panTriangular == b.panTriangular && a.flPluginLevels == b.flPluginLevels && a.flTrialSaved == b.flTrialSaved && a.autoPdc == b.autoPdc
            && a.compensateAutomations == b.compensateAutomations && a.compensateMixerLevels == b.compensateMixerLevels && a.timeSignatureMode == b.timeSignatureMode && a.scaleHighlight == b.scaleHighlight
            && a.dataFolder == b.dataFolder && a.patternBlocksOn == b.patternBlocksOn;
 }
@@ -277,6 +277,7 @@ void copyGlobals (const Song& from, Song& to)
     to.fastDeclick = from.fastDeclick;
     to.panTriangular = from.panTriangular;
     to.flPluginLevels = from.flPluginLevels;
+    to.flTrialSaved = from.flTrialSaved; // (round 190qt: the host's project came from an FL trial save)
     to.autoPdc = from.autoPdc;
     to.compensateAutomations = from.compensateAutomations;
     to.compensateMixerLevels = from.compensateMixerLevels;

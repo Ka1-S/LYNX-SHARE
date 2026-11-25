@@ -320,6 +320,43 @@ void notOurs()
     EXPECT (! crossclipboard::fromJson ("{\"lynxClipboard\":2,\"kind\":\"notes\"}").has_value());
     EXPECT (crossclipboard::kindFromName ("mixerTracks") == crossclipboard::Kind::mixerTracks);
 }
+// Round 190qt (owner's option A): a project from an FL trial save (Song::flTrialSaved) keeps the mark through a .lynx
+// save and reopen; a project without it writes no key (older .lynx files and readers unchanged); clips and channels
+// copied to another window carry it in their fragment, mixer track states on the payload
+void trialMark190qt()
+{
+    auto song = source();
+    EXPECT (! ProjectFile::toJson (song).contains ("flTrialSaved"));
+    juce::String error;
+    auto back = ProjectFile::fromJson (ProjectFile::toJson (song), error);
+    EXPECT (back.has_value() && ! back->flTrialSaved);
+    song.flTrialSaved = true;
+    back = ProjectFile::fromJson (ProjectFile::toJson (song), error);
+    EXPECT (back.has_value() && back->flTrialSaved);
+    if (back) // saved again after the reopen
+    {
+        const auto twice = ProjectFile::fromJson (ProjectFile::toJson (*back), error);
+        EXPECT (twice.has_value() && twice->flTrialSaved);
+    }
+
+    auto c = payload (crossclipboard::Kind::clips);
+    c.fragment = crosspaste::clipsFragment (song, song.playlist);
+    const auto clipsBack = roundTrip (c);
+    EXPECT (clipsBack.fragment.flTrialSaved);
+    auto other = Song::makeDefault();
+    EXPECT (! crosspaste::importClips (other, clipsBack.fragment).empty() && other.flTrialSaved);
+
+    auto ch = payload (crossclipboard::Kind::channels);
+    ch.fragment = crosspaste::channelsFragment (song, { 0 });
+    const auto channelsBack = roundTrip (ch, 16); // (through the side file)
+    EXPECT (channelsBack.fragment.flTrialSaved);
+
+    auto m = payload (crossclipboard::Kind::mixerTracks);
+    m.mixerTracks = { song.mixer.size() > 1 ? song.mixer[1] : MixerTrack {} };
+    EXPECT (! roundTrip (m).flTrialSaved);
+    m.flTrialSaved = true;
+    EXPECT (roundTrip (m).flTrialSaved);
+}
 } // namespace
 
 int main()
@@ -330,6 +367,7 @@ int main()
     channelsThroughTheSideFile();
     stepsMixerAndPoints();
     notOurs();
+    trialMark190qt();
     sideFolder().deleteRecursively();
     std::printf ("cross-window clipboard tests: %d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

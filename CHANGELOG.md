@@ -3,6 +3,11 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
+## 0.1.32 alpha (unreleased: the release round writes the rest of these notes)
+
+- Export to FL Studio keeps FL Studio's trial-save mark: a project that came from a trial save (also after a .lynx save,
+  imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
+
 ## 0.1.31.1 alpha — fixes
 
 A hotfix for 0.1.31.

@@ -3217,6 +3217,12 @@ struct Song
     // project's hosted plugin channels follow FL (set by the .flp import, saved as "pluginLevels": "fl"). Off: LYNX's
     // own law, which every project saved before keeps (same sound as when it was made).
     bool flPluginLevels = false;
+    // Round 190qt (owner's option A, 11-24): the project came from an .flp an unregistered (trial) FL Studio saved (.flp
+    // event 0x1C = 0, REA round 190gy; FL's trial refuses to open such a project). Export to FL Studio (and its zipped
+    // loop package) writes it as a trial save again, so FL's own trial rules apply as if FL had saved it. Kept when the
+    // project is saved (.lynx "flTrialSaved"), and taken on by a project that imports tracks or pastes clips, channels or
+    // mixer track states from such a project; never cleared by LYNX. New projects and other formats: false.
+    bool flTrialSaved = false;
     // FL's mixer menu › Plugin delay compensation (REA round 168j, .flp 0x1D / 0x27): "Automatic" off = the delay
     // compensation ignores the plugins' latencies (FL's planner FUN_010ff3b0 skips the generators' and the effects'
     // latencies; the tracks' manual latencies still apply); "Compensate automations" = automation of a mixer effect

@@ -479,6 +479,9 @@ struct Project
     // event 0xED (2 × f64 Delphi TDateTime, days since 1899-12-30): the creation date and the working time in days
     double createdDays = 0.0, workDays = 0.0;   // event 0x50 (i16): the main pitch knob in cents (FL saves it in FUN_00f40840, REA round 167g)
     bool performanceMode = false; // event 0x1F (round 165m)
+    // event 0x1C = 0: saved by an unregistered (trial) FL Studio (REA round 190gy; FL's trial refuses to open such a
+    // project). writeProject writes 0x1C = 0 for it and scrambles the values after it as FL does (round 190qt)
+    bool trialSaved = false;
     int panLaw = 0;      // event 0x17: 0 = FL's circular (sin/cos) pan law, 2 = triangular (REA_rodada76 §9)
     std::uint32_t flagsA9 = 0;
     bool autoCrossfades = false; // event 0x2C (FL 21+); files without it load with it off, as in FL

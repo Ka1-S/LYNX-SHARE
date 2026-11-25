@@ -3858,6 +3858,13 @@ static std::vector<MixerTrack>& copiedTrackStates()
     return states;
 }
 
+// round 190qt: the copied states came from a project of an FL trial save (Song::flTrialSaved); a paste passes it on
+static bool& copiedTrackStatesTrial()
+{
+    static bool trial = false;
+    return trial;
+}
+
 static void copyTrackStates (AudioEngine& engine, std::vector<int> tracks)
 {
     std::sort (tracks.begin(), tracks.end());
@@ -3873,9 +3880,11 @@ static void copyTrackStates (AudioEngine& engine, std::vector<int> tracks)
     if (states.empty())
         return;
     copiedTrackStates() = states;
+    copiedTrackStatesTrial() = song.flTrialSaved;
     crossclipboard::Payload copy;
     copy.kind = crossclipboard::Kind::mixerTracks;
     copy.mixerTracks = std::move (states);
+    copy.flTrialSaved = song.flTrialSaved;
     windowclip::publish (std::move (copy));
 }
 
@@ -3890,10 +3899,13 @@ static void pasteTrackStates (AudioEngine& engine, std::vector<int> targets)
 {
     const auto incoming = windowclip::incoming (crossclipboard::Kind::mixerTracks);
     const auto& states = incoming ? incoming->mixerTracks : copiedTrackStates();
+    const bool trial = incoming ? incoming->flTrialSaved : copiedTrackStatesTrial();
     std::sort (targets.begin(), targets.end());
     if (states.empty() || targets.empty())
         return;
     engine.editSong ([&] (Song& s) {
+        if (trial) // (round 190qt: content from an FL trial save keeps the mark, never the reverse)
+            s.flTrialSaved = true;
         const auto count = (int) s.mixer.size();
         for (std::size_t i = 0; i < (states.size() == 1 ? targets.size() : states.size()); ++i)
         {

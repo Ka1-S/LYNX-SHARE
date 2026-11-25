@@ -148,6 +148,7 @@ Song clipsFragment (const Song& song, const std::vector<Clip>& clips, const trac
 {
     Song f;
     f.bpm = song.bpm;
+    f.flTrialSaved = song.flTrialSaved; // (round 190qt: the copy carries its project's FL trial mark)
     f.beatsPerBar = song.beatsPerBar;
     f.beatUnit = song.beatUnit;
     f.patterns.clear();
@@ -382,6 +383,8 @@ std::vector<Clip> importClips (Song& song, const Song& fragment)
         c.gridSlot = -1;
         out.push_back (c);
     }
+    if (! out.empty() && fragment.flTrialSaved) // (round 190qt: content from an FL trial save keeps the mark, never the reverse)
+        song.flTrialSaved = true;
     return out;
 }
 
@@ -391,6 +394,7 @@ Song channelsFragment (const Song& song, std::vector<int> channels)
     channels.erase (std::unique (channels.begin(), channels.end()), channels.end());
     Song f;
     f.bpm = song.bpm;
+    f.flTrialSaved = song.flTrialSaved; // (round 190qt)
     f.channels.clear();
     f.patterns.clear();
     IndexMap map;
@@ -425,6 +429,8 @@ std::vector<int> importChannels (Song& song, const Song& fragment, int at)
         for (const auto k : fragment.channels[(std::size_t) i].layer.children)
             if (k >= 0 && k < (int) added.size() && k != i)
                 song.channels[(std::size_t) added[(std::size_t) i]].layer.children.push_back (added[(std::size_t) k]);
+    if (! added.empty() && fragment.flTrialSaved) // (round 190qt)
+        song.flTrialSaved = true;
     return added;
 }
 } // namespace lynx::crosspaste

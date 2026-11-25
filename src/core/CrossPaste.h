@@ -29,6 +29,7 @@ Song clipsFragment (const Song& song, const std::vector<Clip>& clips, const trac
 // the end of the Channel Rack. A pattern or automation clip equal to one of the song's is that one (pasting the same
 // thing twice adds nothing new); the rest is added: patterns, automation clips, clip envelopes, grooves (one with the
 // same name and settings is reused). Mixer, VCA and tempo targets keep their numbers.
+// A fragment of a project from an FL trial save (Song::flTrialSaved, round 190qt) gives `song` the mark (both kinds).
 std::vector<Clip> importClips (Song& song, const Song& fragment);
 
 // --- channels (Channel Rack › Copy channels / Paste channels) -----------------------------------------------------

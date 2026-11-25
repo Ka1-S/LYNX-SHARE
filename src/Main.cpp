@@ -9477,6 +9477,9 @@ private:
         // round 190qs (issue #282): FL's trial mark travels with its plugin in Export to FL Studio (src/Issue282Check.inc)
         juce::String issue282Log;
         const auto issue282Result = issue282Check (issue282Log);
+        // round 190qt (owner's option A): a project from an FL trial save goes back to FL as one (src/TrialMark190qtCheck.inc)
+        juce::String trialmark190qtLog;
+        const auto trialmark190qtResult = trialMark190qtCheck (trialmark190qtLog);
 
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
@@ -10706,7 +10709,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && trialmark190qtResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && hotfixPlacesResult == "OK" // (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -10824,6 +10827,7 @@ private:
                << "issue258=" << issue258Result << "\n"
                << "autolive190qp=" << autolive190qpResult << "\n"
                << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
+               << "trialmark190qt=" << trialmark190qtResult << (trialmark190qtResult == "OK" ? juce::String() : " | " + trialmark190qtLog.replace ("\n", "; ")) << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -20667,6 +20671,7 @@ private:
 #include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
 #include "Hotfix190qpWf.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes; Export... with folders in the name)
 #include "Issue282Check.inc" // round 190qs: issue #282, FL's trial mark and the Patcher generator in Export to FL Studio
+#include "TrialMark190qtCheck.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

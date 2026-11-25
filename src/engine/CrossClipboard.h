@@ -33,6 +33,9 @@ struct Payload
     juce::String stamp;  // unique for each copy (the window that made it knows its own)
     int pid = 0;         // the process that copied it
     juce::String from;   // the project it was copied from (its name; shown when it is pasted)
+    // the project it was copied from came from an FL trial save (Song::flTrialSaved, round 190qt): the paste gives the
+    // other project the mark. Clips and channels carry it in their fragment; mixer track states here
+    bool flTrialSaved = false;
 
     std::vector<Note> notes;             // notes
     Song fragment;                       // clips, channels (core/CrossPaste.h)

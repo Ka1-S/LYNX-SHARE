@@ -638,6 +638,10 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 project.performanceMode = e.value != 0;
                 break;
 
+            case 0x1C: // "saved by a registered FL" (REA round 190gy; the reader unscrambles what follows a 0 itself)
+                project.trialSaved = e.value == 0;
+                break;
+
             case evTempo:
                 project.tempo = e.value / 1000.0;
                 hasFineTempo = true;
