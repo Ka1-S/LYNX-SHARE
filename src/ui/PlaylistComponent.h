@@ -833,7 +833,7 @@ private:
     void setSelection (std::vector<int> indices);
     // sorts while keeping the selection (no undo step); `placed` = the clips the edit put somewhere (moved, painted,
     // pasted…): their audio clips follow an audio track (issue #15, trackmodes::followAudioTracks)
-    std::vector<int> sortClips (std::vector<int> placed = {}); // returns where the placed clips are now
+    std::vector<int> sortClips (std::vector<int> placed = {}, bool changedTrack = false); // returns where the placed clips are now
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
     void showRulerMenu (int x, int y = -1);               // markers, time signature and loop

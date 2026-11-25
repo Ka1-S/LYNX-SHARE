@@ -455,6 +455,11 @@ void MainComponent::updateOnboarding()
 void MainComponent::updateEmptyHint()
 {
     using onboarding::EmptyHint;
+    // round 190re (regression sweep): "Nothing to play in Song mode yet" goes as soon as it is no longer true: a project
+    // opened, a clip placed, Pattern mode, another layout. It stayed up over a full Playlist until clicked away.
+    if (tipCard != nullptr && tipCard->getTip() == onboarding::Tip::songModeEmpty
+        && ! onboarding::songModeEmptySignal (engine.getSong().mode == PlayMode::song, engine.getSong(), layoutStyle))
+        closeTip();
     auto kind = EmptyHint::none;
     if (onboardingOn)
     {

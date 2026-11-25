@@ -407,3 +407,83 @@ bool isBusTrack (const Song& song, int track) noexcept
     return busSources (song, track) > 0;
 }
 } // namespace lynx::trackclips
+
+namespace lynx::trackonly
+{
+int followTracks (Song& song, const std::vector<int>& moved)
+{
+    // the one channel all of a pattern's notes are on; -1 when there is none
+    const auto onlyChannel = [&song] (int pattern) {
+        const auto& notes = song.patterns[(std::size_t) pattern].notes;
+        if (notes.empty())
+            return -1;
+        const auto channel = notes.front().channel;
+        return std::all_of (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }) ? channel : -1;
+    };
+    std::map<std::pair<int, int>, std::vector<int>> groups; // (pattern, the destination's channel) -> its moved clips
+    for (const auto i : moved)
+    {
+        if (i < 0 || i >= (int) song.playlist.size())
+            continue;
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.kind != ClipKind::pattern || c.pattern < 0 || c.pattern >= (int) song.patterns.size() || c.track < 0
+            || c.track >= (int) song.playlistTracks.size())
+            continue;
+        const auto& track = song.playlistTracks[(std::size_t) c.track];
+        if (track.mode != PlaylistTrackMode::instrument || ! trackmodes::canBeInstrumentTrack (song, track.channel))
+            continue;
+        if (const auto from = onlyChannel (c.pattern); from >= 0 && from != track.channel)
+            groups[{ c.pattern, track.channel }].push_back (i);
+    }
+    const auto used = trackclips::uses (song);
+    int followed = 0;
+    for (const auto& [key, clips] : groups)
+    {
+        const auto [source, to] = key;
+        auto pattern = source;
+        if (used[(std::size_t) source] > (int) clips.size()) // (other clips play it too: they keep their instrument)
+        {
+            auto copy = song.patterns[(std::size_t) source];
+            copy.uid = 0;
+            if (copy.trackClip)
+                copy.name = trackclips::newClipName (song, song.playlist[(std::size_t) clips.front()].track);
+            else
+                for (int n = 2;; ++n)
+                    if (auto name = song.patterns[(std::size_t) source].name + " #" + std::to_string (n);
+                        std::none_of (song.patterns.begin(), song.patterns.end(), [&name] (const Pattern& p) { return p.name == name; }))
+                    {
+                        copy.name = std::move (name);
+                        break;
+                    }
+            song.patterns.push_back (std::move (copy));
+            pattern = (int) song.patterns.size() - 1;
+        }
+        auto& p = song.patterns[(std::size_t) pattern];
+        const auto from = p.notes.front().channel;
+        for (auto& n : p.notes)
+            n.channel = to;
+        const auto loopTaken = std::any_of (p.channelLoops.begin(), p.channelLoops.end(), [to = to] (const ChannelLoop& l) { return l.channel == to; });
+        for (auto& l : p.channelLoops)
+            if (l.channel == from && ! loopTaken)
+                l.channel = to;
+        for (auto& lane : p.events)
+        {
+            auto target = lane.target;
+            const auto knob = target.kind == AutomationTargetKind::channelVolume || target.kind == AutomationTargetKind::channelPan
+                              || target.kind == AutomationTargetKind::channelAdjust
+                              || (target.kind == AutomationTargetKind::channelParam && target.param == channelPitchParam);
+            if (! knob || target.index != from)
+                continue;
+            target.index = to;
+            if (std::none_of (p.events.begin(), p.events.end(), [&target] (const PatternEvents& e) { return e.target == target; }))
+                lane.target = target;
+        }
+        for (const auto i : clips)
+        {
+            song.playlist[(std::size_t) i].pattern = pattern;
+            ++followed;
+        }
+    }
+    return followed;
+}
+} // namespace lynx::trackonly

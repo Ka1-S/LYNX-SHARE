@@ -82,6 +82,24 @@ inline int pianoRollChannelOf (const Song& song, int clip)
     return std::all_of (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }) ? channel : -1;
 }
 
+// Round 190re (Discord 11-25, sidthenugget): a clip moved to another track in Track-only mode and in the Simple layout plays
+// that track's instrument, as a MIDI clip moved to another track does in Live. `moved`: clips (indices into song.playlist)
+// that an edit has just put on another track than they had. Per clip on an instrument track:
+//  - only a pattern clip whose notes are all ONE other channel's follows (a pattern of several instruments, or one with no
+//    notes, has no instrument of its own to swap and stays as it is);
+//  - a pattern that other clips play too (the arrangements, the clip grid, pattern blocks) is copied first, so those keep
+//    their instrument; moved clips of one pattern that land on one track share the copy;
+//  - the notes, the channel's loop and its volume / pan / pitch lanes go to the track's channel; lanes of the old plug-in's
+//    own parameters stay where they are (they mean nothing on another plug-in).
+// The clip keeps its name, colour, place and length. A track that is no instrument track changes nothing. The Pattern
+// layout keeps FL's way (a clip plays its pattern's channels on any track): the caller asks only in the two modes. Returns
+// how many clips follow.
+inline bool clipsFollowTracks() noexcept
+{
+    return active() || layoutstyle::current() == layoutstyle::Style::simple;
+}
+int followTracks (Song& song, const std::vector<int>& moved);
+
 // "Give every instrument its own track" (offered when the mode is switched on for a project made with the rack): each
 // instrument channel without an instrument track gets one. Returns how many.
 inline int assignAll (Song& song) { return follow (song, 0); }

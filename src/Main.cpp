@@ -1900,6 +1900,35 @@ public:
             return;
         }
 
+        if (args.contains ("--sweep190retracks"))
+        {
+            // LYNX --sweep190retracks <report.txt> (round 190re, Discord 11-25): a clip dragged onto another instrument's track in
+            // Track-only, Simple and the Pattern layout (src/Sweep190re.inc sweep190reTrackMove); result=OK / FAIL
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::StringArray errors, log;
+            sweep190reTrackMove (errors, log);
+            log.add (errors.isEmpty() ? "result=OK" : "result=FAIL");
+            juce::File (args[args.indexOf ("--sweep190retracks") + 1].unquoted()).replaceWithText (log.joinIntoString ("\n") + "\n");
+            setApplicationReturnValue (errors.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--sweep190re"))
+        {
+            // LYNX --sweep190re <folder> [project]... [--fast] (round 190re, the 0.1.32 regression sweep): each project opened
+            // through File › Open, the layouts and panels switched, saved and reopened, ten edit kinds undone and redone
+            // (src/Sweep190re.inc); <folder>/checks.txt, result=OK
+            const auto i = args.indexOf ("--sweep190re");
+            juce::StringArray projects;
+            for (int k = i + 2; k < args.size(); ++k)
+                if (! args[k].startsWith ("--"))
+                    projects.add (args[k].unquoted());
+            setApplicationReturnValue (runSweep190re (args[i + 1].unquoted(), projects, args.contains ("--fast")) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--hotfixui190qp"))
         {
             // LYNX --hotfixui190qp <prefix> [--plugin file]... (hotfix 0.1.31.1, round 190qp): the Clip-launch Arrangement's
@@ -11546,6 +11575,7 @@ private:
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
         const auto hotfix190qpWfResult = hotfix190qpWfCheck(); // round 190qp (0.1.31.1): track clips' notes, Export... with folders
+        const auto sweep190reResult = sweep190reSelfTest(); // round 190re: the 0.1.32 regression sweep's fast part (src/Sweep190re.inc)
         const auto renderAgainResult = lynx::renderagain::check(); // round 190ou: offline renders made again
         const auto determinismResult = lynx::determinism190po::check(); // round 190po: one render on any threads (Windows' x87)
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
@@ -11563,6 +11593,7 @@ private:
                         && issues190qoResult == "OK" // (round 190qo)
                         && flparity190prResult == "OK"
                         && hotfix190qpWfResult == "OK" // (round 190qp)
+                        && sweep190reResult == "OK" // (round 190re)
                         && renderAgainResult.startsWith ("OK") && determinismResult.startsWith ("OK")
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK") && modulators190oxResult == "OK"
@@ -11700,6 +11731,7 @@ private:
                << "renderagain190ou=" << renderAgainResult << "\n"
                << "determinism190po=" << determinismResult << "\n"
                << "hotfix190qp_wf=" << hotfix190qpWfResult << "\n"
+               << "sweep190re=" << sweep190reResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -21793,6 +21825,7 @@ private:
 #include "MultiEditor255Test.inc" // round 190ou: issue #255, several plugin editors in use
 #include "Issue258Test.inc" // round 190pv: issue #258, a cloned channel's own automation
 #include "Hotfix190qpTest.inc" // round 190qp: imported automation heard and shown (issue #253)
+#include "Sweep190re.inc" // round 190re: the 0.1.32 regression sweep (open, layouts, panels, reload, undo)
 #include "Hotfix190qpWf.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes; Export... with folders in the name)
 #include "Issue282Check.inc" // round 190qs: issue #282, FL's trial mark and the Patcher generator in Export to FL Studio
 #include "ToolbarShot190qg.inc" // round 190qg: the toolbar never hides anything silently (walk, pictures)

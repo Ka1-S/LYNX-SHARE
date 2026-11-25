@@ -6204,19 +6204,21 @@ void PlaylistComponent::setSelection (std::vector<int> indices)
         onSelectionChanged();
 }
 
-std::vector<int> PlaylistComponent::sortClips (std::vector<int> placed)
+std::vector<int> PlaylistComponent::sortClips (std::vector<int> placed, bool changedTrack)
 {
     auto tracked = selection;
     const auto selected = tracked.size();
     tracked.insert (tracked.end(), placed.begin(), placed.end());
     std::vector<int> conflicts;
-    engine.editSong ([&tracked, &conflicts, selected] (Song& s) {
+    engine.editSong ([&tracked, &conflicts, selected, changedTrack] (Song& s) {
         noteedit::sortByStartTracking (s.playlist, tracked);
         // the placed audio clips on an audio track play through its mixer track (round 146a; issue #15: only those,
         // FL's way — a shared channel waits for the "Make clip unique?" answer)
         const std::vector<int> moved (tracked.begin() + (std::ptrdiff_t) selected, tracked.end());
         conflicts = trackmodes::audioTrackConflicts (s, moved);
         trackmodes::followAudioTracks (s, moved);
+        if (changedTrack && trackonly::clipsFollowTracks()) // (round 190re: 1 track = 1 instrument)
+            trackonly::followTracks (s, moved);
     }, false);
     placed.assign (tracked.begin() + (std::ptrdiff_t) selected, tracked.end());
     tracked.resize (selected);
@@ -8725,7 +8727,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
                         arrange::carryLaneAutomation (s, c.track, c.from, c.to, c.delta, copy);
                 });
         }
-        sortClips (moved);
+        sortClips (moved, true);
         dragCopies = false;
     }
     else if (drag == Drag::paint)
@@ -9380,17 +9382,18 @@ void PlaylistComponent::moveClips (std::vector<int> chosen, std::int64_t delta, 
     }
 
     auto edge = delta < 0 ? std::numeric_limits<std::int64_t>::max() : std::numeric_limits<std::int64_t>::min();
-    engine.editSong ([&chosen, &edge, delta, tracks] (Song& s) {
+    auto rows = 0; // (what the move came to: 0 at the first / last track)
+    engine.editSong ([&chosen, &edge, &rows, delta, tracks] (Song& s) {
         if (delta != 0)
             clipops::shiftClipsInTime (s.playlist, chosen, delta);
         if (tracks != 0)
-            clipops::shiftClipsTrack (s.playlist, chosen, tracks);
+            rows = clipops::shiftClipsTrack (s.playlist, chosen, tracks);
         for (auto i : chosen)
             if (i >= 0 && i < (int) s.playlist.size())
                 edge = delta < 0 ? std::min (edge, s.playlist[(std::size_t) i].start) : std::max (edge, s.playlist[(std::size_t) i].end());
     }, newUndoStep);
     // (only a change of track can put an audio clip on another audio track: a move in time asks nothing)
-    sortClips (tracks != 0 ? std::move (chosen) : std::vector<int> {});
+    sortClips (tracks != 0 ? std::move (chosen) : std::vector<int> {}, rows != 0);
 
     if (keepInView && delta != 0) // FL scrolls to keep the leading edge of the moved clips in view (FUN_00e7e290)
         if (const auto to = clipops::scrollToShowEdge (scrollTicks, (double) gridArea().getWidth(), pixelsPerTick, edge, delta > 0);

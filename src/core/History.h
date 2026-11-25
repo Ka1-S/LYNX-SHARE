@@ -24,4 +24,14 @@ ChangeLabel describeChange (const Song& before, const Song& after);
 
 // Same, already formatted in English ("Notes: Pattern 1"); used by the tests and logs.
 std::string describeChangeText (const Song& before, const Song& after);
+
+// Round 190re (0.1.32 regression sweep): the project's clock is not part of the history. Undo and redo put back a whole
+// earlier Song, whose working time was the count of that moment: every undo took the time since that edit off the
+// project's working time (Settings › Info, the .flp's work days), and an undo past the first save cleared "Created".
+// A history step keeps the clock of the song it leaves (as "Reset working time", which is no undo step either).
+inline void keepProjectClock (ProjectInfo& restored, const ProjectInfo& current) noexcept
+{
+    restored.created = current.created;
+    restored.workSeconds = current.workSeconds;
+}
 } // namespace lynx

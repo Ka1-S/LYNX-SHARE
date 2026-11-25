@@ -1100,7 +1100,9 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
                 clip.channel = channel->second;
                 clip.track = made.track;
                 const auto offset = region.offset / region.playbackRate * ticksPerSecond;
-                clip.offset = (std::int64_t) std::floor (offset);
+                // (round 190re: rounded, so the sub-tick rest is in -0.5..0.5 as a .lynx keeps it; floor left up to 0.99,
+                // which a saved and reopened project clamped to 0.5: the clip played up to half a tick earlier)
+                clip.offset = (std::int64_t) std::llround (offset);
                 clip.offsetFraction = (float) (offset - (double) clip.offset);
                 clip.gain = (float) region.gain;
                 clip.pitch = (float) std::clamp (region.pitchShift, -12.0, 12.0);
