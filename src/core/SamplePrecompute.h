@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 // FL Studio's Sampler "Precomputed effects" (docs/analise/REA_rodada167h.md §2, from FLEngine's FUN_00ff0db0): the
 // played region is cut out of the file and processed once, in FL's order — region crop with a declick at each cut
 // edge, ping pong loop, reverse, fade in / fade out, fade stereo, remove DC, reverse polarity, normalize, loop
@@ -547,6 +549,26 @@ struct PlayedSpan
 {
     std::int64_t first = 0, frames = 0;
 };
+
+// Round 190rd: the span of a file of `frames` frames when no precomputed effect is needed (nullopt: one is, and the
+// samples themselves decide it): what playedSpan gives, from the length alone (the Playlist draws a clip of a file
+// nothing holds decoded from its waveform summary, without decoding the file on the message thread).
+inline std::optional<PlayedSpan> playedSpanOfLength (std::int64_t frames, const SamplerSettings& s, bool wholeRegion)
+{
+    if (frames < 2)
+        return PlayedSpan { 0, frames };
+    auto settings = s;
+    if (wholeRegion)
+        settings.regionStart = 0.0f, settings.regionEnd = 1.0f;
+    if (needed (settings))
+        return std::nullopt;
+    const auto start = (double) std::clamp (std::min (settings.regionStart, settings.regionEnd), 0.0f, 1.0f);
+    const auto end = (double) std::clamp (settings.regionEnd, 0.0f, 1.0f);
+    const auto total = (double) (frames - 1);
+    const auto t0 = (std::int64_t) std::nearbyint (start * total);
+    const auto t1 = std::min<std::int64_t> (frames - 1, t0 + (std::int64_t) std::nearbyint (std::max (0.0, end - start) * total));
+    return PlayedSpan { t0, std::max<std::int64_t> (1, t1 - t0 + 1) };
+}
 
 inline PlayedSpan playedSpan (const SampleData& in, const SamplerSettings& s, bool wholeRegion)
 {
