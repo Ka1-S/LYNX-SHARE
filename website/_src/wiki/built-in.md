@@ -58,7 +58,7 @@ How close each engine is to the original is stated per engine, from Exact to Pla
 
 ## Engines that need your FL Studio installation
 
-LYNX SHARE contains no Image-Line code, audio or wave data. Some engines need the waves, samples, impulses or tables that belong to the original plugin, and read them from your own FL Studio installation while they run.
+LYNX SHARE contains no Image-Line code, audio or wave data. Some engines need the waves, samples, impulses or tables that belong to the original plugin, and read them from your own FL Studio installation while they run. Without FL Studio, most of them play a data set LYNX SHARE generates itself, so they work on any computer but do not sound exactly like the original; FL Keys needs FL Studio for its samples.
 
 | Type | Engines |
 |---|---|

@@ -31,7 +31,6 @@
         { "GMS", "Sub Layer", 5.9 },
         { "GMS", "Wide Reese", 5.8 },
         { "GMS", "Wobble", 12.6 },
-        { "GMS", "Growl", -2.1 },
         { "GMS", "Wide Pad", -1.9 },
         { "GMS", "Silk Pad", -2.4 },
         { "GMS", "Choir Air", 4.7 },

@@ -136,7 +136,6 @@ std::vector<Preset> gmsBank()
         make ("Sub Layer", "Bass", { "Square Smooth", "Sine", "Smooth Sub" }, { { octave, 0.25f }, { osc3Mix, 0.6f }, { cutoff, 0.5f } }, {}, { "sub" }),
         make ("Wide Reese", "Bass", {}, { { octave, 0.25f }, { unison, v4 }, { uniDetune, 0.55f }, { cutoff, 0.5f } }, {}, { "detuned" }),
         make ("Wobble", "Bass", { "Saw", "Saw", "Sine" }, { { octave, 0.25f }, { cutoff, 0.35f }, { resonance, 0.45f }, { lfo1, 0.65f }, { lfo1Sync, 0.6f }, { lfo1Rate, 0.6f } }, {}, { "lfo" }),
-        make ("Growl", "Bass", { "Throat", "Vocal", "Sine" }, { { octave, 0.25f }, { mono, 1.0f }, { modKind, fm }, { modulation, 0.3f }, { lfo1, 0.5f }, { lfo1Dest, toMod } }, { { distortion, 0.35f, 0.5f } }, { "growl" }),
         make ("Wide Pad", "Pad", {}, { { unison, v7 }, { attack, 0.7f }, { release, 0.6f }, { cutoff, 0.6f }, { sustain, 1.0f } }, { { reverbFx, 0.6f, 0.4f } }, { "slow" }),
         make ("Silk Pad", "Pad", { "Silk", "String", "Sine" }, { { unison, v4 }, { attack, 0.65f }, { release, 0.6f }, { sustain, 1.0f } }, { { reverbFx, 0.6f, 0.45f }, { phaser, 0.4f, 0.4f } }, { "soft" }),
         make ("Choir Air", "Pad", { "Vocal", "Vocal", "Sine" }, { { unison, v4 }, { osc2Pitch, semis (12) }, { attack, 0.65f }, { release, 0.6f }, { noise, 0.2f } }, { { reverbFx, 0.7f, 0.5f } }, { "voice" }),

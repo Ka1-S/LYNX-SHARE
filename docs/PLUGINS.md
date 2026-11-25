@@ -226,28 +226,28 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | DX10 engine | Fruity DX10 | Exact | 64/64 installation states and 12/12 project channels |
 | SimSynth engine | SimSynth | Exact | all 76 installation states; automation not wired |
 | Fruit Kick engine | Fruit Kick | Exact | release fades and all 8 filter types included |
-| BassDrum engine † | BassDrum | Exact | 228/228 cases at 44.1 and 48 kHz |
-| Toxic engine † | Toxic Biohazard | Exact | 3 demo channels, voice and effects; the step sequencer and the MIDI page run too (round 169h) |
+| BassDrum engine †‡ | BassDrum | Exact | 228/228 cases at 44.1 and 48 kHz |
+| Toxic engine †‡ | Toxic Biohazard | Exact | 3 demo channels, voice and effects; the step sequencer and the MIDI page run too (round 169h) |
 | Plucked! engine | Plucked! | Exact | for the same random seed (FL seeds from the clock) |
 | BeepMap engine | BeepMap | Exact | 9 preset/render-test states; only uncompressed 24/32-bit BMPs |
 | Drumaxx engine | Drumaxx | Exact | all 133 states on random notes; its pattern sequencer and separate outputs are not played |
-| Slayer engine † | FL Slayer | Exact | 64 presets and 340 random parameter sets; the engine's 5 ms control-grid phase depends on FL's history |
+| Slayer engine †‡ | FL Slayer | Exact | 64 presets and 340 random parameter sets; the engine's 5 ms control-grid phase depends on FL's history |
 | MiniSynth engine †‡ | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB; without FL its oscillator is LYNX SHARE's own (similar: a textbook saw, brighter than FL's); 24 LYNX presets |
-| Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo's "Kepler-2" states run on the same port |
+| Kepler engine †‡ | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo's "Kepler-2" states run on the same port |
 | PoiZone engine | PoiZone | Near-exact | 384/385 presets bit-identical with the delay off; delay filters median −79 dB |
 | Transistor Bass engine †‡ | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; the "303 Pulse" cycles come from FL's `engine_x64.dll` (FL 2025 and 2026 builds); without FL the same sound except "303 Pulse", which uses LYNX SHARE's own cycles (similar); 24 LYNX presets |
-| Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
+| Sawer engine †‡ | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
 | Granulizer engine | Fruity Granulizer | Near-exact | within −128 dB on 100 random states; slice modes and tempo sync not played |
 | Wave Traveller engine | Wave Traveller | Exact | bit-identical with the DLL: the render test, demo states, every curve segment type, mutes, the 19 presets, live and render (sinc) modes, 44.1 / 48 kHz; samples not at 16-bit / 44.1 kHz use LYNX's conversion (REA_rodada167f-wavetraveller) |
-| Autogun engine † | Autogun | Near-exact | within −127 dB on the template states (Ogun engine + Soundgoodizer stage) |
-| DrumSynth engine † | Fruity DrumSynth Live | Near-exact | all 120 patches; recorded waves need the exact engine DLL build; sends and Mod X/Y not modelled |
-| BooBass engine † | BooBass | Near-exact | needs the exact engine DLL build (otherwise a saw approximation) |
+| Autogun engine †‡ | Autogun | Near-exact | within −127 dB on the template states (Ogun engine + Soundgoodizer stage) |
+| DrumSynth engine †‡ | Fruity DrumSynth Live | Near-exact | all 120 patches; FL's recorded waves are read from its engine DLL; sends and Mod X/Y not modelled |
+| BooBass engine †‡ | BooBass | Near-exact | FL's multisample is read from its engine DLL; without FL a multisample LYNX SHARE computes plays |
 | Sytrus engine | Sytrus | Close | plays imported projects and presets; a new instance starts from FL's Default preset (FL installed); median −117 dB on 268 demo channels, 265 within −60 dB; chaotic FM patches can't be sample-exact; states older than v17 use the synth conversion |
 | Harmor engine † | Harmor | Close | 97/99 demo channels within −60 dB (median −80 dB) incl. image synthesis and the effects rack; resynthesis (a sample in the IMG section) since round natives190kj: 18 of the 24 factory resynthesis presets null below −50 dB against FL's DLL, LYNX-made test samples −78…−80 dB; every filter / resonance shape of the factory presets is modelled |
 | Harmless engine † | Harmless | Close | 135/139 demo channels within −60 dB with the effects rack |
 | Ogun engine | Ogun | Close | 20/20 demo channels within −60 dB; Random spectra are deterministic |
-| GMS engine † | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
-| Morphine engine † | Morphine | Close | model within −60 dB on 7/7 demo channels; release loops and unison not modelled |
+| GMS engine †‡ | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
+| Morphine engine †‡ | Morphine | Close | model within −60 dB on 7/7 demo channels; release loops and unison not modelled |
 | Sakura / Drumpad models | Sakura, Drumpad | Close | physical models rebuilt from the engines; Sakura's resonators within −72 dB; no CC sources |
 | Sampler (FL voice) | Channel sampler, Fruity Slicer | Near-exact | FL's interpolators and sampler voice (within one 16-bit code of FL's renders); per-plugin extras partly; WAV loop points not read |
 | Slicex engine | Slicex | Near-exact | FL's state read and written byte for byte; regions on keys, layering, articulators, group filter and declick, compared with FL's renders of plain and edited states; editor in FL's layout (Snap and View menus not there yet) |
