@@ -9016,7 +9016,7 @@ private:
                 else if (back->remoteMappings.size() != 1 || back->remoteMappings[0].action != lynx::RemoteAction::play
                          || countOf (copy, "{0} key / MIDI mapping(s) of Overdub") != 1 || detailOf (copy, "{0} key / MIDI mapping(s) of Overdub") != "1")
                     rollup031s5Result = juce::String ("ERROR gap190og's transport mappings in the copy for ") + release;
-                else if (copy.json.contains ("smartDisable") || back->channels[(std::size_t) synthIndex].smartDisable || song.mixer[2].effects.back().engineRev != 2
+                else if (copy.json.contains ("smartDisable") || back->channels[(std::size_t) synthIndex].smartDisable || song.mixer[2].effects.back().engineRev < 2 // (round 190qz: 3 is current)
                          || backEmberRev != (is130 ? 1 : 0))
                     rollup031s5Result = juce::String ("ERROR 190ok's smart disable / engine revision in the copy for ") + release + " (rev " + juce::String (backEmberRev) + ")";
                 else if (back->automations != song.automations)
@@ -9655,6 +9655,32 @@ private:
             boo.instrument = lynx::InstrumentKind::boobass;
             song.channels.push_back (font);
             song.channels.push_back (boo);
+            // round 190qz: an Envelope Controller (channel revision 6) and a Peak Controller (slot revision 3) with links; an
+            // Effector at round 190qz-khs's law 55 (kHs Delay) on insert 2
+            lynx::ChannelDef envelope;
+            envelope.name = "Envelope 190qz";
+            envelope.instrument = lynx::InstrumentKind::controller;
+            envelope.controllerState = lynx::writeEnvelopeController (lynx::defaultEnvelopeController());
+            song.channels.push_back (envelope);
+            {
+                auto& bus2 = song.mixer[2];
+                bus2.effects.clear();
+                auto peakCtl = lynx::makeEffectSlot (lynx::EffectKind::peakController);
+                auto delay55 = lynx::makeEffectSlot (lynx::EffectKind::effector);
+                delay55.row = 1;
+                delay55.params[(std::size_t) lynx::khsdsp::lawParam] = lynx::khsdsp::lawValue (lynx::khsdsp::Law::delay);
+                bus2.effects = { peakCtl, delay55 };
+                lynx::Automation envLink, peakLink;
+                envLink.name = "Envelope link 190qz";
+                envLink.target = { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 };
+                envLink.source.channel = fontChannel + 2;
+                peakLink.name = "Peak link 190qz";
+                peakLink.target = { lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 };
+                peakLink.source.track = 2;
+                peakLink.source.slot = 0;
+                song.automations.push_back (envLink);
+                song.automations.push_back (peakLink);
+            }
 
             if (song.patterns.empty())
                 song.patterns.emplace_back();
@@ -9679,15 +9705,17 @@ private:
                                           "Automation of 3x Osc's parameters does nothing", "Effector's newer Kilohearts laws",
                                           "Effector's Kilohearts Flanger and Dual Delay laws",
                                           "Slide notes move only the pitch on these channels", // (round 190qo, revision 5)
-                                          "SoundFont channels play low velocities much quieter", "BooBass plays every note at full level" };
+                                          "SoundFont channels play low velocities much quieter", "BooBass plays every note at full level",
+                                          "Peak and Envelope Controller links set their targets from the start", // (round 190qz)
+                                          "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path" }; // (round 190qz-khs)
             const auto countOf = [] (const lynx::olderlynx::Copy& c, const char* begin) {
                 return (int) std::count_if (c.lost.begin(), c.lost.end(), [begin] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (begin); });
             };
             const auto rels = lynx::olderlynx::releases();
             if (oscParam < 0)
                 rollup032Result = "ERROR set-up: no 3x Osc FL target";
-            else if (song.channels[(std::size_t) first].engineRev != 5 || song.channels[(std::size_t) fontChannel].engineRev != 5) // (round 190qo: 5, issue #271's slide velocity)
-                rollup032Result = "ERROR set-up: a new channel is not at revision 5";
+            else if (song.channels[(std::size_t) first].engineRev != 6 || song.channels[(std::size_t) fontChannel].engineRev != 6) // (round 190qo: 5, issue #271's slide velocity; round 190qz: 6)
+                rollup032Result = "ERROR set-up: a new channel is not at revision 6";
             else if (rels.size() != 4 || rels[0] != "0.1.31" || rels[1] != "0.1.30" || rels[2] != "0.1.28" || rels[3] != "0.1.27")
                 rollup032Result = "ERROR the release list: " + rels.joinIntoString (" ");
             for (const auto* release : { "0.1.31", "0.1.30", "0.1.28" })
@@ -9739,6 +9767,8 @@ private:
                     rollup032Result = "ERROR the copy for " + rel + ": Effector's [12] is left";
                 else if (! revOk)
                     rollup032Result = "ERROR the copy for " + rel + ": engine revisions";
+                else if ((int) root["mixer"][2]["effects"][0]["engineRev"] > 2 || root["mixer"][2]["effects"][1]["params"].size() > lynx::khsdsp::lawParam)
+                    rollup032Result = "ERROR the copy for " + rel + ": round 190qz's Peak Controller revision / Effector law 55";
             }
             if (rollup032Result == "OK")
                 if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.31"); ! plain.ok || ! plain.lost.empty())

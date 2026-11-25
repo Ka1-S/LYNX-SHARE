@@ -1066,7 +1066,9 @@ struct ChannelDef
     // res, envelopes; threeosc::isFlTarget) moves them as in FL (before: ignored).
     // SoundFont 5 (round 190qo, issue #271): a slide note moves the sounding notes' velocity and pan, as FL's SoundFont
     // Player does (before: the pitch only).
-    int engineRev = 5;
+    // Envelope Controller 6 (round 190qz): an output sends nothing to its links before
+    // a note has reached it, so their targets keep their own values, as in FL (before: the output's base from the start).
+    int engineRev = 6;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
     float swingMix = 1.0f;   // how much of the global swing applies to this channel (0..1), as in FL
@@ -1395,8 +1397,10 @@ struct EffectSlot
     // smoothers keep their state in double precision instead of the x87 unit's (FL's own arithmetic; the same samples
     // on every demo state measured, the old law stays for old projects). 2 (round 190ok, owner decision D3, through the
     // plugin quality gate): LYNX's own devices compute their per-sample tanh / exp / log / pow / sin with core/FastMath.h
-    // (Effect::setEngineRev; a project saved with 0 or 1 keeps the C library's results, bit for bit).
-    int engineRev = 2;
+    // (Effect::setEngineRev; a project saved with 0 or 1 keeps the C library's results, bit for bit). 3 (round 190qz): the
+    // Peak Controller sends nothing to its links until it has processed a block (a slot bypassed from the start leaves its
+    // targets at their own values, as in FL; before: 0 from the start).
+    int engineRev = 3;
     std::string samplePath;                       // audio file the effect plays (Newtone/Newtime source sample); "" = none
     // When set (id or foreign), this built-in effect is a LYNX substitute for that missing third-party plugin
     // (core/PluginSubstitutes.h): the original reference is kept byte for byte, saved with the project, and the slot

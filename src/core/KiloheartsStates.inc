@@ -845,7 +845,8 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
     if (kind == EffectKind::effector
         && (type == "ring_mod" || type == "reverser" || type == "resonator" || type == "phase_distortion" || type == "shaper"
             || type == "comb_filter" || type == "chorus" || type == "trance_gate" || type == "phaser" || type == "distortion" || type == "bitcrush" || type == "frequency_shifter" || type == "unison"
-            || type == "dirty_filter" || type == "flanger" || type == "dualdelay"))
+            || type == "dirty_filter" || type == "flanger" || type == "dualdelay"
+            || type == "vocal_filter" || type == "delay" || type == "clipper"))
     {
         namespace k = khsdsp;
         auto hidden = [&] (int index, double v) { slot.params[(std::size_t) index] = (float) std::clamp (v, 0.0, 1.0); ++n; };
@@ -856,8 +857,10 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
         if (type == "ring_mod")
         {
             typeIs (11); // Ring
-            hidden (k::lawParam, k::lawValue (k::Law::ringMod));
-            hidden (k::valueParam, k::enc::ringHzValue (m.num ("frequency", 440.0)));
+            // round 190qz: law 53, the plug-in's own 2× path (REA_rodada190qz-khs); the frequency / 32 768 exactly (law 8,
+            // round 190nb's, stays for slots saved with it)
+            hidden (k::lawParam, k::lawValue (k::Law::ringMod2));
+            hidden (k::valueParam, std::clamp (m.num ("frequency", 440.0), 0.0, 32768.0) / 32768.0);
             hidden (k::valueParam + 1, m.num ("spread", 0.0));
             hidden (k::valueParam + 2, m.num ("bias", 0.0));
             hidden (k::valueParam + 3, 0.5 * (std::clamp (m.num ("rectify", 0.0), -1.0, 1.0) + 1.0));
@@ -1020,6 +1023,48 @@ int translateKilohearts (const std::vector<std::uint8_t>& state, EffectSlot& slo
             hidden (k::valueParam + 7, m.num ("spread", 0.5));
             hidden (k::valueParam + 8, 0.5 * (std::clamp (m.num ("tone", 0.0), -1.0, 1.0) + 1.0));
             hidden (k::valueParam + 9, m.num ("duck", 0.0));
+        }
+        else if (type == "vocal_filter")
+        {
+            // round 190qz: VocalFilterDsp read in HeartCore (REA_rodada190qz-khs §3); cutoffs / 32 768 and Q / 64 exactly
+            typeIs (10); // Vowel
+            hidden (k::lawParam, k::lawValue (k::Law::formant));
+            hidden (k::valueParam, std::clamp (m.num ("cutoff_1", 550.0), 0.0, 32768.0) / 32768.0);
+            hidden (k::valueParam + 1, std::clamp (m.num ("cutoff_2", 1500.0), 0.0, 32768.0) / 32768.0);
+            hidden (k::valueParam + 2, std::clamp (m.num ("q", 4.0), 0.0, 64.0) / 64.0);
+            hidden (k::valueParam + 3, m.flag ("lows", true) ? 1.0 : 0.0);
+            hidden (k::valueParam + 4, m.flag ("highs", true) ? 1.0 : 0.0);
+        }
+        else if (type == "delay")
+        {
+            // round 190qz: DelayDsp read in HeartCore (REA_rodada190qz-khs §4); the time / 16 exactly
+            typeIs (5); // Delay
+            hidden (k::lawParam, k::lawValue (k::Law::delay));
+            hidden (k::valueParam, std::clamp (m.num ("delay_time", 0.2), 0.0, 16.0) / k::enc::ddSeconds);
+            hidden (k::valueParam + 1, std::clamp (m.num ("delay_numerator", 3.0), 1.0, 64.0) / 64.0);
+            static constexpr const char* dens[7] { "denominator_4", "denominator_4t", "denominator_8", "denominator_8t",
+                                                    "denominator_16", "denominator_16t", "denominator_32" };
+            int d = 4;
+            for (int i = 0; i < 7; ++i)
+                if (m.str ("delay_denominator") == dens[i])
+                    d = i;
+            hidden (k::valueParam + 2, d / 6.0);
+            hidden (k::valueParam + 3, m.str ("sync_mode") == "sync" ? 1.0 : 0.0);
+            hidden (k::valueParam + 4, m.num ("feedback", 0.5));
+            hidden (k::valueParam + 5, 0.5 * (std::clamp (m.num ("pan", 0.0), -1.0, 1.0) + 1.0));
+            hidden (k::valueParam + 6, m.flag ("ping_pong", false) ? 1.0 : 0.0);
+            hidden (k::valueParam + 7, m.num ("duck", 0.0));
+            hidden (k::valueParam + 8, 0.5 * (std::clamp (m.num ("tone", 0.0), -1.0, 1.0) + 1.0));
+        }
+        else if (type == "clipper")
+        {
+            // round 190qz: ClipperDsp read in HeartCore (REA_rodada190qz-khs §5); linear gains / 16, threshold / 2 exactly
+            typeIs (0); // Distort
+            hidden (k::lawParam, k::lawValue (k::Law::clipper));
+            hidden (k::valueParam, std::clamp (m.num ("threshold", 1.0), 0.0, 2.0) / 2.0);
+            hidden (k::valueParam + 1, std::clamp (m.num ("knee", 0.0), 0.0, 1.0));
+            hidden (k::valueParam + 2, std::clamp (m.num ("pre_gain", 1.0), 0.0, 16.0) / 16.0);
+            hidden (k::valueParam + 3, std::clamp (m.num ("post_gain", 1.0), 0.0, 16.0) / 16.0);
         }
         else if (type == "phaser")
         {

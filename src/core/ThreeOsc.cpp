@@ -1027,6 +1027,8 @@ public:
     {
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
+        // round 190qz (ChannelDef::engineRev 6 on): a note's own Mod X / Y reach the voice as FL's Final.FCut / FRes
+        noteModulation.store (channel.engineRev >= 6);
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         // a channel from a .flm (core/ThreeOsc.h): the note's velocity is the voice's level as it is, times a gain
@@ -1133,8 +1135,25 @@ public:
         slotVel[(std::size_t) slot] = (float) vel;
         slotNote[(std::size_t) slot] = startingNoteId(); // (round 190ej: the note whose end releases it)
         notePan[(std::size_t) slot] = nextPan;
+        // round 190qz: the note's Mod X / Y (0…1, 0.5 = centre) as the voice's Final.FCut / FRes, (b − 128) / 128 of FL's
+        // byte (REA_rodada76 §1), added to the channel's filter X / Y in the voice processor (flvp::filter) — what FL's 3x
+        // Osc does with every generator's voice (RawFL's "3xOsc #5": 16 notes at Mod X 40, its top oscillator 16 dB down
+        // in FL's render with no effect on). Desktop channels at engine revision 6 on; before (and FLM's), centre.
+        if (noteModulation.load (std::memory_order_relaxed) && ! current.mobile)
+        {
+            auto& pr = engine.voices[(std::size_t) slot].proc;
+            pr.noteCut = std::clamp (nextModX, 0.0f, 1.0f) * 2.0f - 1.0f;
+            pr.noteRes = std::clamp (nextModY, 0.0f, 1.0f) * 2.0f - 1.0f;
+        }
         nextPan = 0.0f;
         nextCents = 0.0f;
+        nextModX = nextModY = 0.5f;
+    }
+
+    void setNextNoteModulation (float modX, float modY) noexcept override
+    {
+        nextModX = modX;
+        nextModY = modY;
     }
 
     void noteOff (int key) noexcept override
@@ -1372,6 +1391,8 @@ private:
     std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's note id (round 190ej)
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, tickPhase = 0.0, lastTicks = -1.0;
     float nextPan = 0.0f, nextCents = 0.0f;
+    float nextModX = 0.5f, nextModY = 0.5f;
+    std::atomic<bool> noteModulation { false };
 };
 } // namespace
 

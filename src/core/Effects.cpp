@@ -3286,9 +3286,15 @@ public:
     }
 
     float controlOutput (int output) const noexcept override { return std::max (0.0f, out[(std::size_t) std::clamp (output, 0, 2)]); }
+    // round 190qz (EffectSlot::engineRev 3 on): FL's Peak Controller sends nothing until it has processed a block (a slot
+    // bypassed from the start leaves its links' targets at their own values; FL render of RawFL's "3xOsc #5" with the slot
+    // off). Below revision 3 it sent 0 from the start, as before.
+    bool controlSent (int output) const noexcept override { return rev < 3 || out[(std::size_t) std::clamp (output, 0, 2)] >= 0.0f; }
+    void setEngineRev (int r) noexcept override { rev = r; }
 
 private:
     double sampleRate = 44100.0, detector = 0.0, songBeats = 0.0, freePhase = 0.0;
+    int rev = 0;
     bool playing = false;
     float out[3] { -1.0f, -1.0f, -1.0f };
 };

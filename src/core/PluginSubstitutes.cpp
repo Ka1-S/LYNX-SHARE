@@ -1095,10 +1095,11 @@ lynx = Facet EQ
 names = kHs 3-Band EQ
 translate = kilohearts
 
+# round 190qz: Effector law 54 (VocalFilterDsp read in HeartCore); a slot saved on Facet EQ keeps it
 [khs-formant-filter]
 product = kHs Formant Filter
 vendor = Kilohearts
-lynx = Facet EQ
+lynx = Effector
 names = kHs Formant Filter
 translate = kilohearts
 
@@ -1144,10 +1145,11 @@ lynx = Limiter
 names = kHs Limiter
 translate = kilohearts
 
+# round 190qz: Effector law 56 (ClipperDsp read in HeartCore); a slot saved on Fruity Soft Clipper keeps it
 [khs-clipper]
 product = kHs Clipper
 vendor = Kilohearts
-lynx = Fruity Soft Clipper
+lynx = Effector
 names = kHs Clipper
 translate = kilohearts
 
@@ -1235,10 +1237,11 @@ lynx = Reeverb 2
 names = kHs Reverb
 translate = kilohearts
 
+# round 190qz: Effector law 55 (DelayDsp read in HeartCore); a slot saved on Echoform keeps it
 [khs-delay]
 product = kHs Delay
 vendor = Kilohearts
-lynx = Echoform
+lynx = Effector
 names = kHs Delay
 translate = kilohearts
 

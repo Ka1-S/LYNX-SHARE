@@ -4192,6 +4192,8 @@ public:
                         a.lfoAmp.time[(std::size_t) i] = (float) (a.lfoAmp.time[(std::size_t) i] * beat);
             }
         }
+        // (set here, not through the mailbox: the rack reads it before the first block renders)
+        sendsOnNotes.store (channel.engineRev >= 6 && ! data.keyboard && ! data.articulators.continuous, std::memory_order_relaxed);
         mailbox.write (data);
     }
 
@@ -4323,9 +4325,19 @@ public:
         return output >= 0 && output < (int) values.size() ? values[(std::size_t) output] : 0.0f;
     }
     static constexpr int lastKeyOutput = 8, lastVelocityOutput = 9;
+    // round 190qz (ChannelDef::engineRev 6 on): an Envelope Controller's output sends nothing before a note has reached it
+    // (FL's tick sends a value only when it changes and keeps none without a voice: its links' targets keep their own
+    // values; FL renders of Asher Postman's "Basic Sidechain" → Love Philter, the intro and the solo with the controller
+    // off). Continuous output sends from the start. Below revision 6 the base was sent from the start, as before.
+    bool controlSent (int output) const noexcept override
+    {
+        return ! sendsOnNotes.load (std::memory_order_relaxed) || output < 0 || output >= (int) voices.size()
+               || voices[(std::size_t) output].used;
+    }
 
 private:
     std::atomic<float> lastKey { -1.0f }, lastVelocity { -1.0f };
+    std::atomic<bool> sendsOnNotes { false };
     struct Data
     {
         EnvelopeControllerData articulators {};

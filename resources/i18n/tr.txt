@@ -12845,3 +12845,5 @@ countries: tr
 "Convert" = "Dönüştür"
 "Track-only: {0} clips on their instruments' tracks, {1} patterns split, {2} tracks made" = "Yalnızca iz: enstrümanlarının izlerinde {0} klip, {1} pattern bölündü, {2} iz oluşturuldu"
 "This pattern plays one channel only: there is nothing to split." = "Bu pattern yalnızca tek bir kanal çalıyor: bölünecek bir şey yok."
+"Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "Bu sürümde Peak Controller ve Envelope Controller bağlantıları, denetleyici bir değer göndermeden önce hedeflerini en baştan ayarlar: {0}"
+"Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Effector'ün daha yeni Kilohearts yasaları (kHs Ring Mod'un aşırı örneklenmiş yolu; kHs Formant Filter, kHs Delay ve kHs Clipper yerine geçenler) önceki Ring Mod yasasını ve Effector'ün kendi Vowel, Delay ve Distort'unu çalar: {0}"

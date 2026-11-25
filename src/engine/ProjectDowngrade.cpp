@@ -2381,7 +2381,12 @@ void toRelease0130 (juce::var& root, Losses& lost)
 // - round 190py: the channel PITCH target and a desktop 3x Osc's live automation (lines), ChannelDef::engineRev 4 written at
 //   3 (revision 4 changes only that 3x Osc automation, so every channel plays the same in 0.1.31);
 // - round 190py-khs: Effector's hidden Kilohearts laws 50 Flanger, 51 Dual Delay, 52 Ensemble (0.1.31 reads codes 41 … 49
-//   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them.
+//   only: a newer code plays Effector's visible Type there): [12 …] are cut with 0.1.30's lines for them;
+// - round 190qz-khs: Effector's hidden Kilohearts laws 53 Ring Mod (the plug-in's 2× path), 54 Formant Filter, 55 Delay,
+//   56 Clipper: a Ring Mod slot goes back to round 190nb's law 8 (its frequency re-encoded; the oversampling and the
+//   15 Hz high pass go), the other three are cut (Effector plays its visible Type: Vowel, Delay, Distort), one line.
+// - round 190qz: Peak / Envelope Controller links before the controller's first value (a line), EffectSlot::engineRev 3
+//   written at 2 (revision 3 changes only the Peak Controller's first value).
 // Not in projects, so nothing to change here: round 190px's caches (a stretched copy with identical channels has header
 // channels −2, which 0.1.31 refuses and stretches again; the stream cache's .R.same marker leaves no .R.pcm, which 0.1.31
 // takes for a missing cache and decodes again), 190qh's views (ui-options), Touch mode (ui-options), the new-track slot
@@ -2488,6 +2493,64 @@ void toRelease0131 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("SoundFont channels play low velocities much quieter in this release (the older velocity curve): {0}"), listOf (fonts), true });
         if (! boobass.isEmpty())
             lost.push_back ({ TR_NOOP ("BooBass plays every note at full level in this release, whatever its velocity: {0}"), listOf (boobass), true });
+    // round 190qz: a Peak Controller (EffectSlot::engineRev 3) or an Envelope Controller (ChannelDef::engineRev 6) leaves its
+    // links' targets at their own values until it sends its first value, as FL's do; 0.1.31 sends 0 / the output's base from
+    // the start. A line naming the controllers that have links; the slots are written at revision 2 (the channels at 3
+    // below), so the copy plays the same in newer LYNX.
+    {
+        juce::StringArray controllers;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+            {
+                const auto& src = a["source"];
+                if (! src.isArray() || src.size() < 4)
+                    continue;
+                const int track = src[0], slot = src[1], channel = src[3];
+                if (channel >= 0)
+                {
+                    const auto& c = root["channels"][channel];
+                    if (c.isObject() && c["instrument"].toString() == "controller" && (int) c["engineRev"] >= 6)
+                        addOnce (controllers, channelName (c, channel));
+                }
+                else if (track >= 0 && slot >= 0)
+                {
+                    const auto& e = root["mixer"][track]["effects"][slot];
+                    if (e.isObject() && e["kind"].toString() == "peakController" && (int) e["engineRev"] >= 3)
+                        addOnce (controllers, insertName (root["mixer"], track));
+                }
+            }
+        if (! controllers.isEmpty())
+            lost.push_back ({ TR_NOOP ("Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}"),
+                              listOf (controllers), true });
+        forEachEffect (root, [] (juce::DynamicObject& e, const juce::String&) {
+            if ((int) e.getProperty ("engineRev") > 2)
+                e.setProperty ("engineRev", 2);
+        });
+    }
+
+    // round 190qz-khs: laws 53 … 56 (0.1.31 reads codes up to 49; 50 … 52 are cut above)
+    {
+        juce::StringArray khs;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "effector" || params->size() <= khsdsp::lawParam)
+                return;
+            const auto law = khsdsp::lawOf ((float) (double) (*params)[khsdsp::lawParam]);
+            if (law != khsdsp::Law::ringMod2 && law != khsdsp::Law::formant && law != khsdsp::Law::delay && law != khsdsp::Law::clipper)
+                return;
+            addOnce (khs, where);
+            if (law == khsdsp::Law::ringMod2 && params->size() > khsdsp::valueParam)
+            {
+                const double hz = std::clamp ((double) (*params)[khsdsp::valueParam], 0.0, 1.0) * 32768.0;
+                params->set (khsdsp::lawParam, (double) khsdsp::lawValue (khsdsp::Law::ringMod));
+                params->set (khsdsp::valueParam, (double) khsdsp::enc::ringHzValue (hz));
+                return;
+            }
+            params->removeRange (khsdsp::lawParam, params->size() - khsdsp::lawParam);
+        });
+        if (! khs.isEmpty())
+            lost.push_back ({ TR_NOOP ("Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}"),
+                              listOf (khs), true });
     }
 
     forEachChannel (root, [&] (juce::DynamicObject& c, int) {

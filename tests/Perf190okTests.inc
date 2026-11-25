@@ -253,7 +253,7 @@ TEST (perf190ok_new_slots_take_revision_2_old_ones_render_as_before)
     for (const auto kind : { EffectKind::ember, EffectKind::prismMultiband, EffectKind::crestCompressor })
     {
         auto slot = makeEffectSlot (kind);
-        CHECK (slot.engineRev == 2);
+        CHECK (slot.engineRev >= 2); // (round 190qz: 3, the Peak Controller's first value)
         if (kind == EffectKind::ember)
             slot.params[(std::size_t) mixsuite::ember::drive] = 0.6f;
         std::vector<std::vector<float>> outL, outR;
