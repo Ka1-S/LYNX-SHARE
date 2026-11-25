@@ -2523,7 +2523,7 @@ public:
             tablePath = channel.samplePath;
             table = tablePath.empty() ? std::vector<float> {} : sawerReadTable (tablePath);
             if (table.empty() && ! tablePath.empty()) // LYNX's own cycle: asked for, or FL's is not on this computer (round 190rh)
-                table = nativedata::coupledSawCycle();
+                table = nativedata::sawCycle();
         }
         loadedState = channel.pluginState;
         loadedPoly = mp;

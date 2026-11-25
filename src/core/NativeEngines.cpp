@@ -151,7 +151,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::lynxModel, "LYNX Model", "", own, false }, // (round 190ni: LYNX's own physical models, from its bank's Marimba)
         { InstrumentKind::dx10, "Fruity DX10", "Fruity DX10", own, false },
         { InstrumentKind::plucked, "Plucked!", "Plucked!", own, false },
-        { InstrumentKind::sawer, "Sawer", "Sawer", fl, false },
+        { InstrumentKind::sawer, "Sawer", "Sawer", own, false },
         { InstrumentKind::beepmap, "BeepMap", "BeepMap", own, false },
         { InstrumentKind::flkeys, "FL Keys", "FL Keys", fl, false },
         { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },

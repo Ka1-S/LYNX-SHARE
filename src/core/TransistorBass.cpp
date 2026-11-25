@@ -3279,8 +3279,9 @@ int transistorBassOversampling (const std::vector<std::uint8_t>& state)
     return st.usable ? st.oversampling : 0;
 }
 
-// The layout of REA_rodada57 §2.2, the values of FL's own "Sequencer off" preset around the patch: wrapper version 2,
-// engine stream version 5, program 60, 128 programs (program k = patch k + sequence k), sequences of 16 gated C5 steps.
+// The layout of REA_rodada57 §2.2 with neutral values around the patch (round 190rh: they used to follow a saved state):
+// program C5, every sequence 16 empty steps at C5, no shuffle, sequence and MIDI volume at rest: wrapper version 2,
+// engine stream version 5, program 60, 128 programs (program k = patch k + sequence k).
 // `sequence` (round 190rh): its steps as sequence 60, the sequencer on, and every program = patch 60 + sequence 60
 // transposed by its key (with the sequencer on a note picks the program of its key, §2.10: the line follows the keys)
 std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling, int engine,
@@ -3311,13 +3312,13 @@ std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>&
         for (std::size_t s = 0; s < 32; ++s)
         {
             TransistorBassProgram::Step step;
-            step.note = 60, step.gate = true;
+            step.note = 60; // (no gate: an empty step)
             if (drawn && s < sequence.size())
                 step = sequence[s];
             put ((std::int16_t) 1), put ((std::int8_t) (step.slide ? 1 : 0)), put ((std::int32_t) step.note), put ((std::int8_t) (step.gate ? 1 : 0));
-            put (0.5), put (0.5f), put ((std::int8_t) (step.accent ? 1 : 0));
+            put (0.0), put (0.5f), put ((std::int8_t) (step.accent ? 1 : 0));
         }
-        put (125.0), put ((std::int8_t) 0), put (0.0);
+        put (120.0), put ((std::int8_t) 0), put (0.0); // (internal BPM, off; no shuffle)
     }
     put ((std::int32_t) (shared ? 4 : 0));                                        // sequencer (stored 0 / 4)
     put ((std::int32_t) 0), put ((std::int32_t) 0), put (0.0f), put (1.0f);      // sequence transpose, …, MIDI volume
@@ -3329,7 +3330,7 @@ std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>&
         out.insert (out.end(), p, p + sizeof (v));
     };
     top ((std::uint32_t) 2);
-    top ((std::uint32_t) 1), top ((std::uint64_t) 8), top ((std::uint32_t) 2), top ((std::uint32_t) 2); // the editor's 8 bytes
+    top ((std::uint32_t) 1), top ((std::uint64_t) 8), top ((std::uint64_t) 0); // the editor's 8 bytes
     top ((std::uint32_t) 2), top ((std::uint64_t) (e.size() + 12)), top ((std::uint32_t) 0), top ((std::uint64_t) e.size());
     out.insert (out.end(), e.begin(), e.end());
     return out;

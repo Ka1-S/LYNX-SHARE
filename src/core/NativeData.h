@@ -48,15 +48,16 @@ std::string locate (const std::string& path);
 // ---- LYNX's own sets -----------------------------------------------------------------------------------------------
 // All deterministic: the same on every computer (apart from the last bits of the platform's sin / exp).
 
-// Transistor Bass' "303 Pulse": `count` single cycles at `rate`, longest first, one per semitone from 16.35 Hz up. A
-// transistor square as the literature describes the TB-303's (a saturated low side, a high side that sags through the
-// coupling capacitor, a duty cycle that narrows as the pitch rises), zero mean.
+// Transistor Bass' "303 Pulse": `count` single cycles at `rate`, longest first, one per semitone from 16.35 Hz up: the
+// engine's saw through a saturating transistor stage (Open303's published shape) and a 10 Hz coupling, zero mean.
 std::vector<std::vector<float>> bassPulseCycles (double rate, int count);
 
-// MiniSynth's oscillator: 1024 cosine amplitudes and phases of a falling saw whose reset is not instant (the capacitor
-// recovers exponentially over a twentieth of the cycle), as an analogue ramp oscillator's
-void softResetSaw (std::vector<float>& amplitude, std::vector<float>& phase);
+// MiniSynth's oscillator: 1024 cosine amplitudes and phases, the Fourier series of a falling saw
+void fallingSaw (std::vector<float>& amplitude, std::vector<float>& phase);
 
-// Sawer's oscillator: one cycle of 8192 points, an analogue saw through a coupling high-pass and a small phase turn
-std::vector<float> coupledSawCycle();
+// Sawer's oscillator: one cycle of 8192 points of a band-limited falling saw
+std::vector<float> sawCycle();
+
+// the level of each set: 1 = the textbook shape's own; placed so that rendered audio is as loud as the plugin's
+constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507;
 } // namespace lynx::nativedata

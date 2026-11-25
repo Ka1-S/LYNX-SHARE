@@ -161,7 +161,7 @@ std::shared_ptr<const Tables> ownTables()
 {
     static const auto t = [] {
         std::vector<float> amp, phase;
-        nativedata::softResetSaw (amp, phase);
+        nativedata::fallingSaw (amp, phase);
         return buildTables (tableBytes (amp, phase));
     }();
     return t;
