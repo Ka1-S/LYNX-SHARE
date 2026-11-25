@@ -348,8 +348,12 @@ public:
             const auto& item = activeLayout().items[(std::size_t) hoverItem];
             if (const auto p = paramOf (item); p >= 0)
             {
-                const auto what = pluginheader::describe (kind, effectInfo (kind).params[(std::size_t) p].name);
-                text = (item.label != nullptr && *item.label != 0 ? tr (item.label) : utf8 (effectInfo (kind).params[(std::size_t) p].name))
+                // round 190rb: plugui::paramName, not effectInfo().params[p]: a state-backed control (Maximus' bands, the
+                // band tables...) and a hidden parameter with a control have indices past the plain parameters, and
+                // reading the vector there crashed the editor's paint (crash report ef495e29, 0.1.31)
+                const auto* name = plugui::paramName (kind, p);
+                const auto what = pluginheader::describe (kind, name);
+                text = (item.label != nullptr && *item.label != 0 ? tr (item.label) : utf8 (name))
                        + (what.isNotEmpty() ? juce::String::fromUTF8 (" \xe2\x80\x94 ") + what : juce::String());
             }
         }
@@ -367,7 +371,7 @@ public:
     {
         const auto p = paramOf (item);
         return (item.type == Item::knob || (item.type == Item::vslider && ! hasStyle (item, plugui::captionLeft))) && p >= 0 && hasHelpLine()
-               && item.label != nullptr && ! hasStyle (item, plugui::noCaption) && juce::String (effectInfo (kind).params[(std::size_t) p].name) == "Mix";
+               && item.label != nullptr && ! hasStyle (item, plugui::noCaption) && juce::String (plugui::paramName (kind, p)) == "Mix";
     }
     juce::Rectangle<float> captionArea (const LayoutItem& item) const
     {
@@ -5746,6 +5750,41 @@ public: // (the class stays public from here, as before)
 public:
     // Round 170c (#14): every stepper of the current page driven by synthetic input — a click on each arrow, a click on
     // the value (its menu), a drag up and down, wheel notches, trackpad scrolls. One line per stepper: OK / FAIL and why.
+    // Round 190rb: the help line under every control of every page with a parameter (hover, paint): one line per
+    // control whose parameter index lies past the plain parameters (a state-backed control or a hidden parameter with a
+    // control, the indices that crashed the paint in 0.1.31), "<name>: OK <text>" or "FAIL ...", then "checked N"
+    juce::String helpLineSelfTest()
+    {
+        juce::String report;
+        if (! hasHelpLine())
+            return report;
+        if (getWidth() <= 0 || getHeight() <= 0)
+            setSize (juce::jmax (200, activeLayout().width), juce::jmax (150, activeLayout().height + (int) (headerHeight + footerHeight())));
+        juce::Image image (juce::Image::ARGB, getWidth(), getHeight(), true);
+        juce::Graphics g (image);
+        const auto plain = (int) effectInfo (kind).params.size();
+        int checked = 0;
+        const auto& items = activeLayout().items;
+        for (std::size_t i = 0; i < items.size(); ++i)
+        {
+            const auto p = paramOf (items[i]);
+            if (p < 0)
+                continue;
+            hoverItem = (int) i;
+            paintHelpLine (g);
+            ++checked;
+            if (p >= plain)
+            {
+                const auto* name = plugui::paramName (kind, p);
+                report << juce::String (effectInfo (kind).name) << " / " << (items[i].param != nullptr ? items[i].param : "?") << ": "
+                       << (name != nullptr && *name != 0 ? "OK" : "FAIL no name") << "\n";
+            }
+        }
+        hoverItem = -1;
+        report << juce::String (effectInfo (kind).name) << " checked " << checked << "\n";
+        return report;
+    }
+
     juce::String stepperSelfTest()
     {
         juce::String report;
@@ -7368,6 +7407,17 @@ juce::String stepperSelfTest (AudioEngine& engine, int track, int slot, int page
     {
         NativeEffectEditor editor (engine, track, slot, 1.0f, page);
         report << editor.stepperSelfTest();
+    }
+    return report;
+}
+
+juce::String helpLineSelfTest (AudioEngine& engine, int track, int slot, int pages)
+{
+    juce::String report;
+    for (int page = 0; page < juce::jmax (1, pages); ++page)
+    {
+        NativeEffectEditor editor (engine, track, slot, 1.0f, page);
+        report << editor.helpLineSelfTest();
     }
     return report;
 }

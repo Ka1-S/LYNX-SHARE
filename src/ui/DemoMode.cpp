@@ -53,7 +53,9 @@ juce::StringArray operations()
     return { "ui.window", "ui.find", "ui.click", "ui.hover", "ui.list", "ui.layout", "ui.select_track", "ui.show", "ui.welcome", "ui.clipmenu", "ui.polyeditor",
              "ui.open", "ui.action", "ui.editor", "ui.place", "ui.polynotes", "session.start", "session.status",
              // round 190pl (tutorial batch 2)
-             "ui.export", "file.export", "file.save", "midi.input", "plugin.scan", "ui.drag", "ui.controlmenu", "mixer.route", "ui.repaint", "ui.type" };
+             "ui.export", "file.export", "file.save", "midi.input", "plugin.scan", "ui.drag", "ui.controlmenu", "mixer.route", "ui.repaint", "ui.type",
+             // round 190rb (the UI monkey test, tools/ui_monkey.py): quit through the app's own shutdown
+             "app.quit" };
 }
 
 bool isLocalRelay (const juce::String& url)
@@ -909,6 +911,23 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
             if (auto* top = desktop.getComponent (i); top != nullptr && top->isShowing())
                 top->repaint();
         return object ({ { "repainted", desktop.getNumComponents() } });
+    }
+    // Round 190rb: quit as the window's close button does (the shutdown path every user run ends with: engine, plugins,
+    // windows torn down in order), after this answer is sent. "discard": true quits without the save question (the
+    // project is let go, as "Don't save" does); otherwise unsaved changes are asked about first.
+    if (op == "app.quit")
+    {
+        const auto discard = args["discard"].isBool() && (bool) args["discard"];
+        juce::Timer::callAfterDelay (200, [discard] {
+            if (auto* app = juce::JUCEApplication::getInstance())
+            {
+                if (discard)
+                    app->quit();
+                else
+                    app->systemRequestedQuit();
+            }
+        });
+        return object ({ { "quitting", true } });
     }
     const auto formatOf = [&args]() -> int {
         static const char* names[] { "wav", "mp3", "ogg", "flac", "aiff", "m4a" };

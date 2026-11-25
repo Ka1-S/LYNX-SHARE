@@ -354,6 +354,19 @@ struct TrackerComponent::Impl
 
     const Song& song() const { return engine.getSong(); }
 
+    // Round 190rb (UI monkey test, seed 15 of the release build: TrackerComponent::paint -> paintCell -> tracker::fxActive
+    // on a note past the pattern's end): the layout is built again by the song's change message, and a paint (a timer's
+    // repaint) or a key can come before it, right after an undo or another project. The note a placed cell stands for,
+    // or nullptr when the layout is a step behind the song.
+    const Note* noteOf (const Layout& l, const Placed& placed) const
+    {
+        const auto& s = song();
+        if (l.pattern < 0 || l.pattern >= (int) s.patterns.size())
+            return nullptr;
+        const auto& notes = s.patterns[(std::size_t) l.pattern].notes;
+        return placed.note >= 0 && placed.note < (int) notes.size() ? &notes[(std::size_t) placed.note] : nullptr;
+    }
+
     int patternIndex() const
     {
         const auto& s = song();
@@ -751,7 +764,10 @@ struct TrackerComponent::Impl
             fx = Fx::volume;
         else if (c.field == Field::fxValue && cell.kind == Cell::Kind::start)
         {
-            const auto list = shownFx (l, *cell.placed, song().patterns[(std::size_t) l.pattern].notes[(std::size_t) cell.placed->note]);
+            const auto* note = noteOf (l, *cell.placed);
+            if (note == nullptr)
+                return;
+            const auto list = shownFx (l, *cell.placed, *note);
             if (c.fxSlot >= (int) list.size())
                 return;
             fx = list[(std::size_t) c.fxSlot];
@@ -938,7 +954,9 @@ struct TrackerComponent::Impl
             g.setColour (colour::selectionFill);
             g.fillRect (juce::Rectangle<int> (ox + cg.x - 2, y, cg.width + 2, h));
         }
-        const Note* n = cell.kind == Cell::Kind::start && notes != nullptr ? &(*notes)[(std::size_t) cell.placed->note] : nullptr;
+        const Note* n = cell.kind == Cell::Kind::start && notes != nullptr && cell.placed->note >= 0 && cell.placed->note < (int) notes->size()
+                            ? &(*notes)[(std::size_t) cell.placed->note]
+                            : nullptr; // (round 190rb: nothing when the layout is a step behind the song, see noteOf)
         // the note's fx in their slot order (tracker::shownFx, without a list made per cell)
         std::array<Fx, fxKinds> fxList {};
         int fxCount = 0;
@@ -1403,9 +1421,12 @@ struct TrackerComponent::Impl
                     fx = Fx::volume;
                 else if (cell.kind == Cell::Kind::start)
                 {
-                    const auto list = shownFx (l, *cell.placed, song().patterns[(std::size_t) l.pattern].notes[(std::size_t) cell.placed->note]);
-                    if (c.fxSlot < (int) list.size())
-                        fx = list[(std::size_t) c.fxSlot];
+                    if (const auto* note = noteOf (l, *cell.placed))
+                    {
+                        const auto list = shownFx (l, *cell.placed, *note);
+                        if (c.fxSlot < (int) list.size())
+                            fx = list[(std::size_t) c.fxSlot];
+                    }
                 }
                 text << (fx ? tr (fxDescription (*fx)) : tr ("type G P Y R T M B for a note field"));
                 break;
@@ -1898,6 +1919,7 @@ void TrackerComponent::paint (juce::Graphics& g)
 bool TrackerComponent::keyPressed (const juce::KeyPress& key)
 {
     auto& i = *impl;
+    i.refresh(); // (round 190rb: a key can come before the song's change message; the layout must be the song's)
     const auto& l = layout;
     const auto code = key.getKeyCode();
     const auto mods = key.getModifiers();
@@ -2115,6 +2137,7 @@ void TrackerComponent::visibilityChanged()
 void TrackerComponent::mouseDown (const juce::MouseEvent& e)
 {
     auto& i = *impl;
+    i.refresh(); // (round 190rb: as keyPressed)
     grabKeyboardFocus();
     const auto hit = i.hitAt (e.getPosition());
     if (hit.track < 0)

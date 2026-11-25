@@ -78,6 +78,7 @@ public:
     };
     // where a part is drawn (empty when it is not shown); `column` -2 = Main
     juce::Rectangle<int> partBounds (int column, Part part, int row = 0) const;
+    bool returnRow (int insert) const; // (round 190rb: a send row's insert is a Live return the song still has)
     Hit hitAt (juce::Point<int> p) const;
     const std::vector<int>& sendTargets() const noexcept { return rows; }
 

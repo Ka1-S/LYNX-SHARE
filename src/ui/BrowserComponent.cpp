@@ -1546,6 +1546,30 @@ public:
         rebuild();
     }
 
+    // round 190rb: the rows whose parent is not a node of this tree any more (0 = sound; a check for --qa190rbtest)
+    int danglingParents() const
+    {
+        std::set<const Node*> live;
+        std::function<void (const Node&)> walk = [&] (const Node& n) {
+            live.insert (&n);
+            for (const auto& c : n.children)
+                walk (*c);
+            for (const auto& t : n.thumbRows)
+                walk (*t);
+        };
+        if (root != nullptr)
+            walk (*root);
+        for (const auto& n : flatNodes)
+            walk (*n);
+        int bad = 0;
+        for (const auto* r : rows)
+            if (r->parent != nullptr && live.count (r->parent) == 0)
+                ++bad;
+        return bad;
+    }
+
+    int pictureRows() const { return (int) std::count_if (rows.begin(), rows.end(), [] (const Node* n) { return n->thumbPart >= 0; }); }
+
     void rebuild()
     {
         rows.clear();
@@ -1638,7 +1662,14 @@ public:
                 {
                     n.children = std::move (fresh.children);
                     for (auto& c : n.children)
+                    {
                         c->parent = &n;
+                        // round 190rb: the lines of an entry's picture (DF-109) hang under the same section; they still
+                        // pointed at `fresh`, gone at the end of this block, and paint() walks a row's parents for the
+                        // tree guides (crash report 68413071, 0.1.31.1: FileTree::paint)
+                        for (auto& t : c->thumbRows)
+                            t->parent = &n;
+                    }
                     changed = true;
                 }
                 else
@@ -6417,6 +6448,9 @@ void BrowserComponent::showFactoryContentForSnapshot (const juce::StringArray& o
 }
 
 juce::StringArray BrowserComponent::rowLabelsForCheck() const { return tree->rowLabels(); }
+int BrowserComponent::danglingRowParentsForCheck() const { return tree->danglingParents(); }
+int BrowserComponent::pictureRowsForCheck() const { return tree->pictureRows(); }
+void BrowserComponent::refreshProjectForCheck() { tree->refreshProject(); }
 
 // round 190kx (--loopinfo190kxshot): waits for the loop analysis of what is listed, then fills the rows / Loop Browser
 bool BrowserComponent::waitLoopInfoForSnapshot (int timeoutMs)

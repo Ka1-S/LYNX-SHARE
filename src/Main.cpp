@@ -436,6 +436,17 @@ struct StartupTrace
 StartupTrace startupTrace;
 void startupMarkHook (const char* step) { startupTrace.mark (step); }
 
+// Round 190rb: a sanitizer build (-DLYNX_SANITIZE) leaves SIGSEGV / SIGBUS / SIGFPE / SIGABRT to ASan and UBSan (their
+// report names the bad access and where the memory came from); LYNX_CRASHGUARD=1 installs LYNX's handlers anyway
+bool sanitizerOwnsSignals()
+{
+#if defined(LYNX_SANITIZER_BUILD)
+    return juce::SystemStats::getEnvironmentVariable ("LYNX_CRASHGUARD", {}) != "1";
+#else
+    return false;
+#endif
+}
+
 juce::File crashFolderForTest; // --faulttest: where the crash file goes instead of the settings' autosave folder
 // Crashed: try to save the project and write the backtrace (like FL's "emergency save").
 void onCrash (void* exceptionPointers)
@@ -790,8 +801,11 @@ public:
             return;
         }
 
-        // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
-        juce::SystemStats::setApplicationCrashHandler (onCrash);
+        // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave. A sanitizer build
+        // (-DLYNX_SANITIZE, round 190rb) leaves the fault signals to ASan / UBSan, whose reports name the bad access,
+        // unless LYNX_CRASHGUARD=1 asks for LYNX's own handlers (their tests)
+        if (! sanitizerOwnsSignals())
+            juce::SystemStats::setApplicationCrashHandler (onCrash);
         // rollup step 12: the crash handler's watchdog and its allocation-free crash file (platform/CrashGuard.h)
         lynx::crashguard::prepareCrashWatchdog (lynx::platform::settingsFile ("autosave").getFullPathName().toStdString());
         // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
@@ -839,7 +853,8 @@ public:
             }
             lynx::crashguard::faultForTest (args[i + 1] == "unwalkable");
         }
-        lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
+        if (! sanitizerOwnsSignals())
+            lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
 
         // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
         lynx::sfz::setDecoder ([] (const std::string& path, lynx::sfz::Audio& out) {
@@ -2029,6 +2044,18 @@ public:
             const auto i = args.indexOf ("--feel190qetest");
             const auto arg = [&args] (int k) { return k < args.size() && ! args[k].startsWith ("--") ? args[k].unquoted() : juce::String(); };
             setApplicationReturnValue (runFeel190qeTest (arg (i + 1), arg (i + 2), arg (i + 3)) ? 0 : 1);
+            quit();
+            return;
+        }
+        if (args.contains ("--qa190rbtest"))
+        {
+            // LYNX --qa190rbtest report.txt (round 190rb, the 0.1.32 quality round's crash / memory fixes; also in
+            // --selftest): src/Qa190rbCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto result = qa190rbCheck (log);
+            juce::File (args[args.indexOf ("--qa190rbtest") + 1].unquoted()).replaceWithText (log + "qa190rb=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
             quit();
             return;
         }
@@ -9990,6 +10017,11 @@ private:
         juce::String issues190qrLog;
         const auto issues190qrResult = issues190qrCheck (issues190qrLog);
 
+        // round 190rb (0.1.32 quality release): the crash / memory fixes of the crash reports, the sanitizer build and the
+        // UI monkey test (src/Qa190rbCheck.inc)
+        juce::String qa190rbLog;
+        const auto qa190rbResult = qa190rbCheck (qa190rbLog);
+
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
         // thresholds in a .lynxtheme (D2-MX7; none written for the default look), the three unbound actions (D2-MX1, MX8)
@@ -11409,7 +11441,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11532,6 +11564,7 @@ private:
                << "autolive190qp=" << autolive190qpResult << "\n"
                << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
                << "issues190qr=" << issues190qrResult << "\n"
+               << "qa190rb=" << qa190rbResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
@@ -21498,6 +21531,7 @@ private:
 #include "Issue282Check.inc" // round 190qs: issue #282, FL's trial mark and the Patcher generator in Export to FL Studio
 #include "ToolbarShot190qg.inc" // round 190qg: the toolbar never hides anything silently (walk, pictures)
 #include "Issues190qrCheck.inc" // round 190qr: issues #274-#281 (markers, rack meter, zoom, extras)
+#include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

@@ -1,0 +1,2 @@
+# AddressSanitizer suppressions for the sanitizer build (round 190rb): system libraries only (interceptor reports in
+# code LYNX does not build). Never LYNX or JUCE code.
