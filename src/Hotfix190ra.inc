@@ -633,7 +633,7 @@
                         st->ui->getRackForSnapshot().toggleEditor (*channel, false);
                         st->pause (1500);
                     });
-                    st->steps.push_back ([st, channel, counts, m, hostFirst] {
+                    st->steps.push_back ([this, st, channel, counts, m, hostFirst] {
                         if (*channel < 0)
                             return;
                         auto* w = hotfixUiFindIn190ra ("Kys190");
@@ -645,6 +645,15 @@
                         *counts = {};
                         juce::Process::makeForegroundProcess(); // (the system gives the focus only to the active program's windows)
                         w->toFront (true);
+                        // a text field of the main window still holds JUCE's focus (the Browser's search after a search, a
+                        // name box), as it can when the user clicks into the plugin
+                        if (textField190ra == nullptr)
+                        {
+                            textField190ra = std::make_unique<juce::TextEditor> ("focus190ra");
+                            st->ui->addAndMakeVisible (*textField190ra);
+                            textField190ra->setBounds (4, 4, 60, 20);
+                        }
+                        textField190ra->grabKeyboardFocus();
                         const auto posted = postKeyToPluginViewForTest (*w, 'Z');
                         st->note (m + (hostFirst ? ", keyboard button off (LYNX first)" : ", keyboard button on (the plugin first)") + ": key posted "
                                   + juce::String ((int) posted) + ", focus seen in " + focusedPluginViewForTest());
@@ -658,19 +667,21 @@
                        #if JUCE_WINDOWS
                         if (hostFirst)
                             st->check (m + ", keyboard button off: Z plays the typing keyboard before the plugin", counts->first >= 1);
-                        else // (Surge XT leaves Z unused: it comes back, as from a detached window)
-                            st->check (m + ", keyboard button on: Z the plugin leaves comes back to the typing keyboard", counts->left >= 1);
+                        else // (Surge XT leaves Z unused: it comes back and plays, as from a detached window)
+                            st->check (m + ", keyboard button on: Z the plugin leaves plays the typing keyboard, a text field of the main window focused",
+                                       counts->played >= 1);
                        #endif
                         st->ui->getRackForSnapshot().toggleEditor (*channel, false); // closed again
                         st->pause (800);
                     });
                 }
-            st->steps.push_back ([st] {
+            st->steps.push_back ([this, st] {
                 setSecondaryWindowKeyHandler ([ui = juce::Component::SafePointer<MainComponent> (st->ui)] (const juce::KeyPress& k) { return ui != nullptr && ui->keyFromSecondaryWindow (k); });
                 setPluginViewPlainKeyHandler ([] (juce::Component& w) { return PluginWindows::letsHostProcessKeys (w); },
                                               [ui = juce::Component::SafePointer<MainComponent> (st->ui)] (const juce::KeyPress& k) { return ui != nullptr && ui->keyFromPluginView (k, true); },
                                               [ui = juce::Component::SafePointer<MainComponent> (st->ui)] (const juce::KeyPress& k) { return ui != nullptr && ui->keyFromPluginView (k, false); });
                 PluginWindows::closeAll();
+                textField190ra = nullptr;
             });
         }
 
@@ -701,3 +712,4 @@
         hotfix190ra->startTimer (20);
     }
     std::unique_ptr<juce::Component> manyRowsPage190ra;
+    std::unique_ptr<juce::TextEditor> textField190ra;
