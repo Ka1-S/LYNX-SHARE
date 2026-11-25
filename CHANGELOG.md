@@ -42,6 +42,11 @@ The short version of each release. The full notes, with measurements, known issu
 - Export to FL Studio keeps FL Studio's trial-save mark: a project that came from a trial save (also after a .lynx save,
   imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
 
+**Fixed**
+- Track-only mode and the Simple layout: a clip moved or copied onto another instrument's track plays that instrument (Discord).
+- Undo and redo keep the project's working time; Export to FL Studio's report names each mixer slot it left out; audio clips of
+  GarageBand and BandLab imports keep their exact start after a save.
+
 ## 0.1.31.2 alpha — fixes
 
 A second hotfix for 0.1.31.
