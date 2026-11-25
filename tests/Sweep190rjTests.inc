@@ -109,3 +109,13 @@ TEST (sweep190rj_session_settings_compare_and_copy_the_same_fields)
         if (compared.count (f) == 0)
             std::printf ("  copyGlobals copies %s, sameGlobals does not compare it\n", f.c_str());
 }
+
+// "Nothing to play in Song mode yet" came up over the window when the first take was recorded into an empty Playlist
+TEST (sweep190rj_no_empty_song_tip_while_recording)
+{
+    const auto main = i18ntest::readFile ("src/ui/MainComponent.cpp");
+    const auto at = main.find ("maybeShowTip (onboarding::Tip::songModeEmpty, &songModeButton);");
+    CHECK (at != std::string::npos);
+    const auto line = main.rfind ("if (onboardingOn", at);
+    CHECK (line != std::string::npos && main.substr (line, at - line).find ("! engine.isRecording()") != std::string::npos);
+}
