@@ -18115,3 +18115,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)
+#include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
