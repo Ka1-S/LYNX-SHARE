@@ -22282,7 +22282,7 @@ private:
                 {
                     if (plain (it.getItem().text) == plain (lynx::tr ("Auto-create audio clip (the rendered files go on the Playlist)")))
                         after = i;
-                    if (plain (it.getItem().text) == plain (lynx::tr ("Latency compensation")))
+                    if (plain (it.getItem().text) == plain (lynx::tr ("Line up recordings with the audio latency")))
                     {
                         at = i;
                         ticked = it.getItem().isTicked;
@@ -22292,7 +22292,7 @@ private:
                    juce::String (after) + " " + juce::String (at));
             saveMenus (juce::StringArray { "Disk recording" }, std::vector<juce::PopupMenu> { disk != nullptr ? *disk : juce::PopupMenu() },
                        prefix + "-disk-recording.png");
-            check ("latency_comp_toggles", disk != nullptr && click (*disk, lynx::tr ("Latency compensation")) && ! engine.getRecordOptions().latencyCompensation);
+            check ("latency_comp_toggles", disk != nullptr && click (*disk, lynx::tr ("Line up recordings with the audio latency")) && ! engine.getRecordOptions().latencyCompensation);
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");

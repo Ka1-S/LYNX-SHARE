@@ -13061,3 +13061,6 @@ countries: tw hk mo
 "MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI 檔案：[2xLMB] 以專案開啟  拖到 Channel Rack 或 Piano roll 以匯入（拖到 Playlist：Playlist 選單 › \"拖放到播放清單的 MIDI 檔案變為樣式片段\"）"
 "This will reset the selected mixer track(s) and remove all plugins." = "這將重設所選的混音器軌道並移除所有外掛。"
 "Instrument: [LMB] open or close its window" = "樂器：[LMB] 開啟或關閉其視窗"
+# rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
+"Let other apps on this PC control LYNX (Remote API)" = "允許這台電腦上的其他應用程式控制 LYNX（遠端 API）"
+"Line up recordings with the audio latency" = "依音訊延遲對齊錄音"

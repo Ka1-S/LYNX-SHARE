@@ -13061,3 +13061,6 @@ countries: de at ch li lu
 "MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI-Datei: [2xLMB] als Projekt öffnen  auf das Channel Rack oder die Piano Roll ziehen, um sie zu importieren (auf die Playlist: Playlist-Menü › \"Auf die Playlist gezogene MIDI-Dateien werden zu Pattern-Clips\")"
 "This will reset the selected mixer track(s) and remove all plugins." = "Dadurch werden die ausgewählten Mixerspuren zurückgesetzt und alle Plugins entfernt."
 "Instrument: [LMB] open or close its window" = "Instrument: [LMB] sein Fenster öffnen oder schließen"
+# rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
+"Let other apps on this PC control LYNX (Remote API)" = "Andere Apps auf diesem PC LYNX steuern lassen (Remote-API)"
+"Line up recordings with the audio latency" = "Aufnahmen an die Audiolatenz angleichen"

@@ -212,7 +212,7 @@ public:
         add (remoteTitle);
         add (remoteControl);
         add (remoteStatus);
-        toggle (remoteControl, tr ("Enable local remote control"), options.remoteControl,
+        toggle (remoteControl, tr ("Let other apps on this PC control LYNX (Remote API)"), options.remoteControl, // (owner wording, 11-25)
                 [this] (bool on) { options.remoteControl = on; });
         remoteControl.setEnabled (hooks.setGeneral != nullptr);
         remoteControl.setTooltip (tr ("Allows authenticated local applications to read and edit this project."));

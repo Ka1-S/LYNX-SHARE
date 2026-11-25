@@ -13061,3 +13061,6 @@ countries: kr
 "MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI 파일: [2xLMB] 프로젝트로 열기  Channel Rack 또는 Piano roll로 드래그해 가져오기 (Playlist로: Playlist 메뉴 › \"플레이리스트에 놓은 MIDI 파일을 패턴 클립으로 만들기\")"
 "This will reset the selected mixer track(s) and remove all plugins." = "선택한 믹서 트랙을 초기화하고 모든 플러그인을 제거합니다."
 "Instrument: [LMB] open or close its window" = "악기: [LMB] 창 열기/닫기"
+# rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
+"Let other apps on this PC control LYNX (Remote API)" = "이 PC의 다른 앱이 LYNX를 제어하도록 허용 (원격 API)"
+"Line up recordings with the audio latency" = "녹음을 오디오 지연 시간에 맞추기"
