@@ -195,6 +195,7 @@ public:
     int stepsRowsForCheck() const;
     int stepsCountForCheck() const;
     void stepsClickForCheck (int row, int step);
+    void stepsHoverCellForCheck (int row, int step); // round 190rb: the mouse over a step (its tooltip)
     void stepsLetterForCheck (int letter);
     void stepsAddClipForCheck();
     int stepsMessagesShownForCheck() const; // round 190nr: visible "Make a beat first..." bubbles

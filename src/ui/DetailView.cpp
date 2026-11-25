@@ -970,7 +970,8 @@ private:
         const auto area = chainArea();
         auto x = area.getX() - scroll;
         const auto top = area.getY(), height = area.getHeight();
-        if (channel >= 0)
+        // (round 190rb: `channel` can be a step behind the song too, e.g. right after another project was opened)
+        if (channel >= 0 && channel < (int) engine.getSong().channels.size())
         {
             Card c;
             c.kind = Card::instrument;
@@ -1045,6 +1046,25 @@ private:
         }
     }
 
+    // Round 190rb (ASan, UI monkey seed 101: heap-use-after-free in the onPreferredWidthChanged lambda below, called from
+    // a Rack card's own resize): a card asks for a new layout from inside its own code, and that layout can replace the
+    // very card (its slot's kind changed) or drop it (its slot went); deleting it there pulled the card out from under
+    // its running code. A card that goes leaves the chain at once and is deleted on the next message.
+    void retire (std::unique_ptr<DetailCard> card)
+    {
+        if (card == nullptr)
+            return;
+        if (auto* extra = card->titleAccessory())
+            cardHost.removeChildComponent (extra);
+        cardHost.removeChildComponent (card.get());
+        card->setVisible (false);
+        retiredCards.push_back (std::move (card));
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<DeviceChain> (this)] {
+            if (safe != nullptr)
+                safe->retiredCards.clear();
+        });
+    }
+
     // the custom card of `key`, made once (again when the slot's kind changes); nullptr = an ordinary card
     DetailCard* customFor (std::uint64_t key, int kind, const std::function<std::unique_ptr<DetailCard>()>& make)
     {
@@ -1054,8 +1074,7 @@ private:
         if (entry.kind != kind)
         {
             entry.kind = kind;
-            if (entry.card != nullptr)
-                cardHost.removeChildComponent (entry.card.get());
+            retire (std::move (entry.card)); // (round 190rb: not deleted here, see retire)
             entry.card = make();
             if (entry.card != nullptr)
             {
@@ -1100,9 +1119,7 @@ private:
         {
             if (it->second.card != nullptr && shown.count (it->second.card.get()) == 0)
             {
-                if (auto* extra = it->second.card->titleAccessory())
-                    cardHost.removeChildComponent (extra);
-                cardHost.removeChildComponent (it->second.card.get());
+                retire (std::move (it->second.card));
                 it = customs.erase (it);
             }
             else
@@ -1754,7 +1771,7 @@ private:
         g.drawText ((insert >= 0 ? insertName (song, insert) : tr ("None")) + (choice ? juce::String::fromUTF8 (" \xe2\x96\xbe") : juce::String()),
                     box.reduced (choice ? 6 : 0, 0), juce::Justification::centredLeft, true);
         r = r.withTop (box.getBottom() + 8);
-        if (channel >= 0)
+        if (channel >= 0 && channel < (int) song.channels.size()) // (round 190rb, ASan / monkey seed 104: a step behind the song)
         {
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption));
@@ -1923,7 +1940,7 @@ private:
             const auto spec = knobSpec (c, k);
             const auto value = knobValue (c, k);
             const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
-                               : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.kind == Card::effect && fx != nullptr                ? knobParamName (*fx, c.knobs[(std::size_t) k])
                                : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
                                                                                         : tr ("Volume");
             auto rr = r;
@@ -1962,7 +1979,7 @@ private:
             const auto spec = knobSpec (c, k);
             const auto value = knobValue (c, k);
             const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
-                               : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.kind == Card::effect && fx != nullptr                ? knobParamName (*fx, c.knobs[(std::size_t) k])
                                : c.knobs[(std::size_t) k] >= engineKnobBase             ? engineKnobLabel (c, c.knobs[(std::size_t) k] - engineKnobBase)
                                : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
                                                                                         : tr ("Volume");
@@ -1997,6 +2014,15 @@ private:
             return {};
         const auto it = keys.find ((int) kind);
         return it != keys.end() ? it->second : std::string();
+    }
+
+    // Round 190rb (crash reports 52879e1b / a49ceeeb, 0.1.29: paintBody read effectInfo().params past its end): the cards
+    // can be a step behind the song until they are laid out again (an effect just replaced by a plugin, which has no plain
+    // parameters, or by another effect): a knob's parameter that the slot's effect does not have has no name
+    static juce::String knobParamName (const EffectSlot& fx, int param)
+    {
+        const auto& params = effectInfo (fx.kind).params;
+        return param >= 0 && param < (int) params.size() ? utf8 (params[(std::size_t) param].name) : juce::String();
     }
 
     // the effect has a parameter called Mix of its own: the slot's dry/wet is then labelled "Slot mix"
@@ -2207,6 +2233,7 @@ private:
     std::unique_ptr<pluginheader::PresetBar> presetBar; // (round 190ce: the Save preset dialog of the card last asked)
     juce::Component cardHost;  // the chain area: custom card bodies live here (clipped to it)
     std::map<std::uint64_t, CustomEntry> customs;
+    std::vector<std::unique_ptr<DetailCard>> retiredCards; // (round 190rb: replaced or dropped cards, until the next message)
     juce::ScrollBar scrollBar { false };
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     std::uint32_t shownGeneration = 0; // (hotfix 0.1.31.1: the AutomationDisplay generation last drawn)

@@ -1102,7 +1102,18 @@ private:
             return;
         auto& tabs = tabsOf();
         if (tabs.getCurrentTabIndex() != m.page)
+        {
             tabs.setCurrentTabIndex (m.page);
+            // round 190rb (ASan, UI monkey seed 107: heap-use-after-free): a page that comes into view gets the look and
+            // feel again, and a slider makes its +/- buttons anew then, so the match's control can be gone. The search
+            // runs again on the page now shown (it stays shown: no second switch)
+            target = m.target.getComponent();
+            if (target == nullptr)
+            {
+                search (true);
+                return;
+            }
+        }
         // scroll the page's viewport to it (a third from the top)
         if (auto* viewport = target->findParentComponentOfClass<juce::Viewport>())
             if (auto* content = viewport->getViewedComponent())

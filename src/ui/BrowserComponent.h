@@ -210,6 +210,9 @@ public:
     // and the rows listed now (tree / tag-filter results)
     void showFactoryContentForSnapshot (const juce::StringArray& openFolders);
     juce::StringArray rowLabelsForCheck() const;
+    int danglingRowParentsForCheck() const; // round 190rb: rows whose parent node is gone (0 = sound)
+    int pictureRowsForCheck() const;        // round 190rb: the rows that are lines of an entry's picture (DF-109)
+    void refreshProjectForCheck();          // round 190rb: Current project listed again now (as 300 ms after an edit)
     bool waitLoopInfoForSnapshot (int timeoutMs);     // round 190kx: the loop analysis of the listed files, rows filled
     juce::StringArray loopRowTextsForCheck() const;   // round 190kx: "name: 4 bars · 102 BPM · D minor" per row that has one
     std::size_t loopInfoQueuedForCheck();             // round 190kx: files the loop analysis still has to do

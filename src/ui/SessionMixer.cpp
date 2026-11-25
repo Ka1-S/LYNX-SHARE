@@ -571,6 +571,15 @@ void SessionMixerComponent::addViewItems (juce::PopupMenu& menu)
 
 // --- geometry ---------------------------------------------------------------------------------------------------------
 
+// Round 190rb (ASan, UI monkey seed 113: heap-buffer-overflow in livePartBounds while painting): the send rows are laid
+// out from the song, and the song can lose inserts (another project opened, inserts deleted) a moment before the next
+// layout; a row's insert the song no longer has is no return
+bool SessionMixerComponent::returnRow (int insert) const
+{
+    const auto& mixer = engine.getSong().mixer;
+    return insert >= 0 && insert < (int) mixer.size() && mixer[(std::size_t) insert].liveReturn;
+}
+
 juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, int row) const
 {
     if (column != mainColumn && ! isReturn (column) && (column < 0 || column >= columns))
@@ -620,7 +629,7 @@ juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, i
             // the meter and its handle: from the handle's left to the scale
             return sections.volume > 0 && strip.insert >= 0 ? juce::Rectangle<int> (x0 + pad + 48, volumeY + 6, 20, sessionmixer::volumeHeight - 12) : juce::Rectangle<int>();
         case Part::post: // (round 190kc) a return's Pre / Post toggle, in the Main strip beside that return's row
-            if (sections.sends == 0 || ! main || row < 0 || row >= (int) rows.size() || ! engine.getSong().mixer[(std::size_t) rows[(std::size_t) row]].liveReturn)
+            if (sections.sends == 0 || ! main || row < 0 || row >= (int) rows.size() || ! returnRow (rows[(std::size_t) row]))
                 return {};
             return { x0 + pad + 8, sendsY + 7 + row * sessionmixer::sendRowHeight, 34, 14 };
         case Part::xfadeA:
@@ -697,7 +706,7 @@ juce::Rectangle<int> SessionMixerComponent::livePartBounds (int column, Part par
         case Part::arm: // y 771..783 (round 190kc: a return has none, live-session.png x 1390..1463)
             return sections.volume > 0 && ! main && ! ret ? R (centreX - 11, volumeY + 137, 23, 13) : R();
         case Part::post: // (round 190kc) A at x 13 y 12 from the Main strip's (x 1540) and Sends' (y 577) top, B 34 right and 17 down
-            if (sections.sends == 0 || ! main || row < 0 || row >= (int) rows.size() || ! engine.getSong().mixer[(std::size_t) rows[(std::size_t) row]].liveReturn)
+            if (sections.sends == 0 || ! main || row < 0 || row >= (int) rows.size() || ! returnRow (rows[(std::size_t) row]))
                 return {};
             return { x0 + 15 + (row % 2) * 34, sendsY + 12 + row * liveSendPitch, 26, 13 };
         case Part::xfadeA:

@@ -1,0 +1,34 @@
+# LeakSanitizer suppressions for the sanitizer build (scripts/build-sanitize.sh, round 190rb): system libraries and
+# third-party code (each line names one whose own allocations LSan reports at exit), and LYNX's caches that are kept for
+# the process' life on purpose (listed at the end, each with its reason). A leak in LYNX's own code is fixed, not added.
+leak:libfontconfig.so
+leak:libfreetype.so
+leak:libX11.so
+leak:libXext.so
+leak:libXrandr.so
+leak:libXcursor.so
+leak:libxcb.so
+leak:libasound.so
+leak:libglib-2.0.so
+leak:libgobject-2.0.so
+leak:libgio-2.0.so
+leak:libdbus-1.so
+leak:libGLX.so
+leak:libGL.so
+leak:libEGL.so
+leak:libGLdispatch.so
+leak:libgallium
+leak:_dri.so
+leak:libLLVM
+leak:libpipewire-0.3.so
+leak:libjack.so
+leak:libcurl.so
+# lilv (bundled with JUCE's LV2 host): lilv_world_set_option keeps a copy of LV2_PATH that lilv_world_free does not
+# free (39 bytes per LV2PluginFormat, once per scan; seen in every run of the app)
+leak:lilv_world_set_option
+# lilv: lilv_world_load_all keeps the plugin classes of an earlier load (lilv_world_load_plugin_classes replaces the
+# list without freeing it): ~16 KB each time JUCE's LV2 format scans (PluginHost::describeLv2, the background scan)
+leak:lilv_world_load_plugin_classes
+# LYNX's intentional caches (kept for the process' life: the audio thread may hold them; their index is a function-local
+# static vector that is destroyed at exit, after which LSan no longer sees the pointers)
+leak:lynx::wt::table

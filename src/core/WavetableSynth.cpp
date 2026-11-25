@@ -2391,7 +2391,10 @@ struct Engine::Impl
             const float* sincK = nullptr;
             if constexpr (clean)
             {
-                if (const auto lv = std::min (sampleLevelFor (std::abs (inc)), (int) levels->levels.size()); lv > 0)
+                // round 190rb (crash report b230f196, 0.1.30: sampleStepClean on the audio thread): a voice started with
+                // Clean keeps it, but a new sample comes without its levels until the UI thread has made them (null here
+                // meanwhile): the voice reads the sample itself until then
+                if (const auto lv = levels != nullptr ? std::min (sampleLevelFor (std::abs (inc)), (int) levels->levels.size()) : 0; lv > 0)
                 {
                     const auto& lev = levels->levels[(std::size_t) (lv - 1)];
                     rl = lev.l.data() + SampleLevels::guard;

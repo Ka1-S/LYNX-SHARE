@@ -76,6 +76,9 @@
             // a middle-click on a filled slot changes nothing here (FL's slot menu / the window, as before)
             const auto filled = engine.getSong().mixer[1].effects.size();
             check ("206_mixer_one_effect", filled == 1, juce::String ((int) filled));
+            // round 190rb (ASan: stack-use-after-scope in the next block): the editor this block opened stays in the
+            // native editors' window list, bound to this block's engine; it goes with the engine
+            NativeEffectWindows::closeAll();
         }
 
         // ================= #206: a middle-click on "+ Add" in a linked track's insert effects column =================

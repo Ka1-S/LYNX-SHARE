@@ -832,6 +832,11 @@ VoicePitchShifter::~VoicePitchShifter() = default;
 
 void VoicePitchShifter::allocate (double sampleRate, StretchMethod method)
 {
+    // round 190rb (crash report 36351db8, 0.1.29: integer division by zero in Signalsmith's configure, from
+    // ShifterStock::topUp while the rack was built): a rate of 0 (no device open yet, a device that reports none) gave
+    // 0-sample blocks. A shifter made at an unusable rate works at 44.1 kHz; the rack is built again at the real rate.
+    if (! std::isfinite (sampleRate) || sampleRate < 8000.0)
+        sampleRate = 44100.0;
     impl = std::make_unique<Impl>();
     // real time (measured round 162): 100 ms blocks, overlap 4 — pitch exact to 0.05 cent down to 55 Hz, about 2 % of a
     // core per voice and ~1 ms to prime a note (60 ms blocks missed low notes by 40 cents); drums: 80 ms

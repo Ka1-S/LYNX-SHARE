@@ -14,6 +14,20 @@ if(NOT MSVC)
     add_compile_options(-ffp-contract=off)
 endif()
 
+# Sanitizer builds (round 190rb, the 0.1.32 quality release): -DLYNX_SANITIZE=address,undefined (any -fsanitize= list:
+# address, undefined, thread, leak ...) for every target, app, tests and tools alike. GCC / Clang only. Use with
+# -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O1 -g -DNDEBUG" -DLYNX_LTO=OFF (scripts/build-sanitize.sh).
+# UBSan reports and goes on (the run lists every report); ASan stops at its first error, as always.
+set(LYNX_SANITIZE "" CACHE STRING "Build everything with -fsanitize=<list> (e.g. address,undefined); empty = off")
+if(LYNX_SANITIZE AND NOT MSVC)
+    add_compile_options(-fsanitize=${LYNX_SANITIZE} -fno-omit-frame-pointer -fno-optimize-sibling-calls)
+    add_link_options(-fsanitize=${LYNX_SANITIZE})
+    add_compile_definitions(LYNX_SANITIZER_BUILD=1)
+    # tests/tests.cpp is one huge translation unit: at -O1 under ASan + UBSan g++ 15 passed 20 GB for it alone (round
+    # 190rb), so it is compiled without optimisation there (the code it tests, lynx_core, keeps -O1)
+    set_source_files_properties(tests/tests.cpp PROPERTIES COMPILE_OPTIONS "-O0")
+endif()
+
 # Linux on ARM makes a plain `char` unsigned (x86 and Apple arm64: signed). The readers of FL's, Live's and the other
 # formats were written and tested with a signed char: Linux arm64 builds keep it (round 190oy)
 if(NOT MSVC AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
