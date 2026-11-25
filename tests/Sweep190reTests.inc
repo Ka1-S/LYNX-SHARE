@@ -50,3 +50,33 @@ TEST (sweep190re_song_mode_tip_follows_the_song)
     CHECK (refresh != std::string::npos && close != std::string::npos && close < ui.find ("\n}\n", refresh));
     CHECK (ui.find ("closeTip();", close) < ui.find ("\n}\n", refresh));
 }
+
+// Export › FL Studio project's report: the Master slots left out (a user's 0.1.29 project: a limiter, then five plugins
+// that are not installed here and a visualizer) all read "Master slot 2: Plugin (LYNX only)". Each is now named by its own
+// slot, and a missing hosted plugin by its name, as a channel's is.
+TEST (sweep190re_flp_export_report_names_each_left_out_slot)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.mixer.resize (std::max<std::size_t> (song.mixer.size(), 2));
+    auto& master = song.mixer[0].effects;
+    master.clear();
+    master.push_back (makeEffectSlot (EffectKind::limiter));
+    for (const auto* name : { "TR5 Saturator X", "CamelCrusher" })
+    {
+        auto fx = makeEffectSlot (EffectKind::plugin);
+        fx.plugin.name = name;
+        master.push_back (fx);
+    }
+    master.push_back (makeEffectSlot (EffectKind::visualizer));
+    flpexport::Options options; // (no plugin records: nothing is installed)
+    flpexport::Report report;
+    flpexport::exportFlp (song, options, report);
+    const auto has = [&report] (const std::string& text) {
+        return std::any_of (report.dropped.begin(), report.dropped.end(), [&text] (const std::string& l) { return l.find (text) != std::string::npos; });
+    };
+    CHECK (has ("slot 2: plugin 'TR5 Saturator X' (not found)"));
+    CHECK (has ("slot 3: plugin 'CamelCrusher' (not found)"));
+    CHECK (has ("slot 4: ") && has ("(LYNX only)"));
+    CHECK (! has ("Plugin (LYNX only)"));
+}

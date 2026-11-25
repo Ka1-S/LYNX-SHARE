@@ -2009,8 +2009,13 @@ struct Converter
                 }
                 if (slot.plugin.empty())
                 {
+                    // round 190re: a slot left out takes no FL row, so it is named by its own place in LYNX (before, by the next
+                    // free FL row: five slots left out in a row all read "slot 2"), and a hosted plugin missing on this computer
+                    // by its name, as a channel's is (before: "Plugin (LYNX only)")
+                    const auto where = insertLabel (song, t) + " slot " + std::to_string (s + 1) + ": ";
                     if (song.slotActive (fx))
-                        report.dropped.push_back (label + effectInfo (fx.kind).name + " (LYNX only)");
+                        report.dropped.push_back (fx.kind == EffectKind::plugin ? where + "plugin '" + fx.plugin.name + "' (not found)"
+                                                                                : where + effectInfo (fx.kind).name + " (LYNX only)");
                     continue;
                 }
                 if (! what.empty())
