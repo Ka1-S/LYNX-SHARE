@@ -799,6 +799,9 @@ private:
     void moveClips (std::vector<int> chosen, std::int64_t delta, int tracks, bool newUndoStep, bool keepInView); // (keys and wheel nudge)
     void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
     void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
+    void makeUniqueAsSample (const std::vector<int>& clips, const juce::File& file); // (round 190ri: on a worker, with progress and Cancel)
+    void makeClipUniqueAsSampleAsked (int clip, bool ask);
+    std::unique_ptr<juce::FileChooser> fileChooser;
     void showFadeHandleMenu (int index, int side); // FL's fade handle menu (round 189i)
     void selectBySelectedSource();
     // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is

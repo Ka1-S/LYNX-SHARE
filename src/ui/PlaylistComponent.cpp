@@ -57,8 +57,11 @@
 #include "core/TransportEdit.h"
 
 #include "core/ClipOps.h"
+#include "core/CopyName.h"
 #include "core/FlClipMenu.h"
 #include "core/Rack.h"
+#include "engine/UniqueSamples.h"
+#include "ui/FileChoosers.h"
 #include "core/Slicer.h"
 
 #include "core/EditorPolish.h"
@@ -12624,10 +12627,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
             menu.addSubMenu (label (e), chop);
         }
         else if (t == "Make unique as sample") // (round 189g)
-            menu.addItem (label (e), [this, targets] {
-                setSelection (targets);
-                makeSelectionUniqueAsSample();
-            });
+            menu.addItem (label (e), [this, index] { makeClipUniqueAsSampleAsked (index, ! juce::ModifierKeys::currentModifiers.isShiftDown()); });
         else if (t == "Edit sample") // (FL: the clip's channel sample into its editor, EEAUEditSampleMenuClick)
             menu.addItem (label (e), sample != nullptr, false, [this, ch, index] { openAudioEditorForChannel (engine, ch, index); });
         else if (t == "Extract stems from sample")
@@ -14282,76 +14282,95 @@ void PlaylistComponent::makeSelectionUnique()
     run();
 }
 
+namespace
+{
+// "Make unique as sample" off the message thread (round 190ri: 628 clips wrote for almost three minutes with the window frozen):
+// progress and Cancel; the song changes in one undo step at the end, and not at all when cancelled
+class UniqueSampleThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    UniqueSampleThread (AudioEngine& e, uniquesamples::Plan p)
+        : juce::ThreadWithProgressWindow (tr ("Make unique as sample"), true, true), engine (e), plan (std::move (p))
+    {
+        setStatusMessage (tr ("{0} clips", { juce::String ((int) plan.parts.size()) }));
+    }
+    void run() override
+    {
+        ok = uniquesamples::render (plan, [this] (double p) {
+            setProgress (p);
+            return ! threadShouldExit();
+        });
+    }
+    void threadComplete (bool) override
+    {
+        if (ok)
+            finish (engine, plan);
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+    static void finish (AudioEngine& e, const uniquesamples::Plan& p)
+    {
+        for (const auto& part : p.parts)
+            if (part.written)
+                e.getSampleLibrary().forget (part.file.getFullPathName()); // (a file that was replaced)
+        if (std::any_of (p.parts.begin(), p.parts.end(), [] (const uniquesamples::Part& part) { return part.written; }))
+            e.editSong ([&p] (Song& s) { uniquesamples::apply (s, p); });
+    }
+
+private:
+    AudioEngine& engine;
+    uniquesamples::Plan plan;
+    bool ok = false;
+};
+} // namespace
+
 void PlaylistComponent::makeSelectionUniqueAsSample()
 {
-    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): what each
-    // selected audio clip plays is saved as "<sample> - Part_<n>.wav" (an earlier " - Part_" suffix is dropped first), in
-    // the project's Samples folder, without a file dialog from this menu; a new audio clip channel copied from the old one
-    // plays the file, and the clip now starts at the file's start. The clip's own pitch, stretch and reverse are rendered
-    // into the file and reset on the clip (round 189l), so it sounds the same. LYNX writes the file next to the source
-    // sample when the project has no data folder.
-    const auto& song = engine.getSong();
-    struct Part
-    {
-        int clip;
-        std::string path, name;
-    };
-    std::vector<Part> parts;
-    for (const auto i : selection)
-    {
-        if (i < 0 || i >= (int) song.playlist.size())
-            continue;
-        const auto& c = song.playlist[(std::size_t) i];
-        if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
-            continue;
-        const juce::File source (juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].samplePath.c_str()));
-        const auto audio = engine.renderClipAudio ((std::size_t) i);
-        if (audio.left.empty())
-            continue;
+    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): every selected
+    // audio clip, one file each, with no file dialog (engine/UniqueSamples.h; live check round 190ri). The clip's own pitch,
+    // stretch and reverse are rendered into the file and reset on the clip (round 189l), so it sounds the same.
+    makeUniqueAsSample (selection, {});
+}
 
-        auto folder = song.dataFolder.empty() ? source.getParentDirectory() : juce::File (juce::String::fromUTF8 (song.dataFolder.c_str())).getChildFile ("Samples");
-        if (! folder.createDirectory().wasOk())
-            folder = source.getParentDirectory();
-        auto base = source.getFileNameWithoutExtension();
-        if (const auto at = base.lastIndexOf (" - Part_"); at > 0)
-            base = base.substring (0, at);
-        juce::File out;
-        for (int n = 1;; ++n)
-            if (out = folder.getChildFile (base + " - Part_" + juce::String (n) + ".wav"); ! out.exists())
-                break;
-
-        const auto frames = (int) audio.left.size();
-        const auto stereo = audio.left != audio.right;
-        juce::AudioBuffer<float> buffer (stereo ? 2 : 1, frames);
-        buffer.copyFrom (0, 0, audio.left.data(), frames);
-        if (stereo)
-            buffer.copyFrom (1, 0, audio.right.data(), frames);
-        juce::WavAudioFormat wav;
-        std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
-        std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), audio.sampleRate, (unsigned int) buffer.getNumChannels(), 32, {}, 0) : nullptr);
-        if (writer == nullptr)
-            continue;
-        stream.release(); // (the writer owns it now)
-        if (! writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples()))
-            continue;
-        writer.reset();
-        parts.push_back ({ i, out.getFullPathName().toStdString(), out.getFileNameWithoutExtension().toStdString() });
-    }
-    if (parts.empty())
+void PlaylistComponent::makeUniqueAsSample (const std::vector<int>& clips, const juce::File& file)
+{
+    auto plan = uniquesamples::makePlan (engine.getSong(), engine.getTransport().sampleRate.load(), clips);
+    if (plan.parts.empty())
         return;
+    if (plan.parts.size() == 1)
+        plan.parts.front().file = file;
+    std::int64_t ticks = 0;
+    for (const auto& p : plan.parts)
+        ticks += p.was.length;
+    if (plan.parts.size() <= 4 && (double) ticks * 60.0 / (juce::jmax (1.0, plan.song.bpm) * ppq) < 20.0) // (a moment: no window)
+    {
+        if (uniquesamples::render (plan, [] (double) { return true; }))
+            UniqueSampleThread::finish (engine, plan);
+        return;
+    }
+    (new UniqueSampleThread (engine, std::move (plan)))->launchThread();
+}
 
-    engine.editSong ([parts] (Song& s) {
-        for (const auto& p : parts)
-        {
-            auto& clip = s.playlist[(std::size_t) p.clip];
-            auto copy = s.channels[(std::size_t) clip.channel];
-            copy.samplePath = p.path;
-            copy.name = quickrender::uniqueChannelName (s, p.name);
-            s.channels.push_back (std::move (copy));
-            clipenv::shift (s, clip, -((double) clip.offset + (double) clip.offsetFraction)); // (round 190gi: its envelopes stay on their audio)
-            clipops::resetRenderedClip (clip, (int) s.channels.size() - 1);
-        }
-    });
+void PlaylistComponent::makeClipUniqueAsSampleAsked (int clip, bool ask)
+{
+    // the clip menu's item (FL 2026 live, round 190ri): the clicked clip alone, its file asked for ("Save sample selection",
+    // the next "<sample> - Part_<n>" offered); Shift skips the question (FL's manual)
+    const auto plan = uniquesamples::makePlan (engine.getSong(), engine.getTransport().sampleRate.load(), { clip });
+    if (plan.parts.empty())
+        return;
+    if (! ask)
+        return makeUniqueAsSample ({ clip }, {});
+    const auto& p = plan.parts.front();
+    int n = 1;
+    fileChooser = ui::makeFileChooser (tr ("Save sample selection"), uniquesamples::nextFree (p.folder, uniquesamples::baseName (p.source), n), "*.wav");
+    ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                       [safe = juce::Component::SafePointer<PlaylistComponent> (this), clip, was = p.was] (const juce::FileChooser& fc) {
+                           const auto file = fc.getResult();
+                           if (safe == nullptr || file == juce::File() || clip >= (int) safe->engine.getSong().playlist.size())
+                               return;
+                           const auto& now = safe->engine.getSong().playlist[(std::size_t) clip];
+                           if (now.kind == was.kind && now.channel == was.channel && now.start == was.start && now.track == was.track)
+                               safe->makeUniqueAsSample ({ clip }, file.hasFileExtension ("wav") ? file : file.withFileExtension ("wav"));
+                       });
 }
 
 void PlaylistComponent::lockAllTracks (bool lock)
