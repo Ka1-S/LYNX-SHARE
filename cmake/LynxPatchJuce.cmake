@@ -371,6 +371,14 @@
 #    (an unordered_map look-up on a freed VST3 RunLoop::Impl right after the main loop's callback). A callback that is
 #    no longer registered when its turn comes is skipped now.
 #
+# 54. (round 190rf, the 0.1.32 quality release; 52 = 190rb's event loop, 53 = 190rd's):
+#    a) Every platform, juce_graphics/native/juce_RenderingHelpers.h: the software and OpenGL renderers' glyph cache (one
+#       for the process, behind a lock) returned a reference to the cached glyph after its lock was gone; the caller
+#       copied it afterwards. With two threads drawing text (the visualizer's text layers on its OpenGL thread while the
+#       message thread paints) the entry could be freed in between: evicted, or the cache emptied by a font change. The
+#       copy, which every caller made anyway, is made while the lock is held. One 0.1.30 Windows report (inside the
+#       cache's tree on the OpenGL thread, seconds after "visualizer GPU: start").
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -590,6 +598,9 @@ function(lynx_patch_juce_file file)
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL|"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL||NL|    // LYNX patch (issue #11): clipping to an empty path leaves nothing (Quartz would ignore it)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|    {|NL|        CGContextClipToRect (context.get(), CGRectZero);|NL|        lastClipRect.reset();|NL|        return;|NL|    }|NL|")
     elseif(file MATCHES "juce_RenderingHelpers.h$")
+        lynx_juce_fix("glyph cache copies its glyph under the lock (fix 54a)" "LYNX patch (fix 54a): the glyph's layers"
+            "    const auto& get (const Font& font, const int glyphNumber)|NL|    {|NL|        const ScopedLock sl { lock };"
+            "    // LYNX patch (fix 54a): the glyph's layers are copied while the lock is held (JUCE returned a reference into the|NL|    // cache after the lock was gone; another thread drawing text could free it before the caller's copy)|NL|    std::vector<GlyphLayer> get (const Font& font, const int glyphNumber)|NL|    {|NL|        const ScopedLock sl { lock };")
         lynx_juce_fix("path edge tables over the path's own rows (fix 45)" "LYNX patch (round 190ms, fix 45): the edge table over the clip's rows"
             "            if (path.getBoundsTransformed (trans).getSmallestIntegerContainer().intersects (clipRect))|NL|                fillShape (*new EdgeTableRegionType (clipRect, path, trans), false);"
             "            // LYNX patch (round 190ms, fix 45): the edge table over the clip's rows from one above the path's to one below|NL|            // (all its columns), not over every row of the clip (a row per pixel row of the clip for every shape); the|NL|            // same pixels (cmake/LynxPatchJuce.cmake)|NL|            const auto lynxPathArea = path.getBoundsTransformed (trans).getSmallestIntegerContainer();|NL||NL|            if (lynxPathArea.intersects (clipRect))|NL|            {|NL|                const auto lynxNear = [] (int v) { return v > -0x1000000 && v < 0x1000000; };|NL|                const auto lynxArea = lynxNear (lynxPathArea.getY()) && lynxNear (lynxPathArea.getBottom())|NL|                                          ? Rectangle<int>::leftTopRightBottom (clipRect.getX(), jmax (clipRect.getY(), lynxPathArea.getY() - 1),|NL|                                                                                clipRect.getRight(), jmin (clipRect.getBottom(), lynxPathArea.getBottom() + 1))|NL|                                          : clipRect;|NL|                fillShape (*new EdgeTableRegionType (lynxArea, path, trans), false);|NL|            }")

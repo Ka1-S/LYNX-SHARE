@@ -487,6 +487,43 @@
                     ::close (fd);
         }
        #endif
+
+        // ---- round 190rf, crash report e107bcb1 (0.1.30, Windows): inside JUCE's glyph cache on the visualizer's OpenGL
+        //      thread. The cache (one for the process, behind a lock) returned a reference to a cached glyph after its
+        //      lock was gone and the caller copied it afterwards; another thread could free the entry in between (an
+        //      eviction, or a font change emptying the cache). JUCE fix 54a copies the glyph under the lock. Here a
+        //      thread draws big glyphs (their edge tables are big blocks, freed back to the system) into a software image
+        //      while this thread empties the caches as a font change does: the old code read the freed blocks
+        {
+            std::atomic<bool> stop { false };
+            std::atomic<int> drawn { 0 };
+            std::thread painter ([&] {
+                juce::Image image (juce::Image::ARGB, 96, 96, true, juce::SoftwareImageType());
+                for (int k = 0; ! stop.load(); ++k)
+                {
+                    juce::Graphics g (image);
+                    g.setColour (juce::Colours::white);
+                    g.setFont (juce::FontOptions (700.0f + (float) (k % 40)));
+                    g.drawSingleLineText ("W", 0, 90);
+                    drawn.fetch_add (1);
+                }
+            });
+            const auto until = juce::Time::getMillisecondCounterHiRes() + 1500.0;
+            int cleared = 0;
+            while (juce::Time::getMillisecondCounterHiRes() < until || drawn.load() < 20)
+            {
+                juce::Typeface::clearTypefaceCache();
+                ++cleared;
+                juce::Thread::yield();
+                if (juce::Time::getMillisecondCounterHiRes() > until + 20000.0)
+                    break; // (a stuck painter is reported below, never waited for forever)
+            }
+            stop = true;
+            painter.join();
+            check ("Glyph cache: text drawn on another thread while the caches are emptied (" + juce::String (drawn.load()) + " drawings, "
+                       + juce::String (cleared) + " clears)",
+                   drawn.load() >= 20);
+        }
        #if JUCE_LINUX
         // ---- round 190rf, crash reports 81399325 / 335428f3 / e45746ce (0.1.29 / 0.1.30 / 0.1.31, Linux): an abort
         //      ("terminate called") at exit after the X server went away. Xlib calls exit(), the static hang watch's
