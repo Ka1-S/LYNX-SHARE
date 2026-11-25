@@ -2244,7 +2244,7 @@ void CustomizePanel::paint (juce::Graphics& g)
     g.setColour (colour::textSecondary);
     g.drawText (tr ("Icon size"), bottom.removeFromTop (28).withWidth (104), juce::Justification::centredLeft);
     bottom.removeFromTop (6);
-    g.drawText (tr ("UI scale"), bottom.removeFromTop (28).withWidth (104), juce::Justification::centredLeft);
+    g.drawText (tr ("Interface size"), /* (round 190qw, 190qx §2.1: one value, one name, as Settings) */ bottom.removeFromTop (28).withWidth (104), juce::Justification::centredLeft);
 }
 
 void CustomizePanel::mouseDown (const juce::MouseEvent& e)

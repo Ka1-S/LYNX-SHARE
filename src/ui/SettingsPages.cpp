@@ -248,13 +248,13 @@ public:
         scaleBox.setSelectedId (options.uiScale, juce::dontSendNotification);
         scaleBox.onChange = [this] { change ([&] { options.uiScale = scaleBox.getSelectedId(); }); };
 
-        styleLabel (menuLabel, tr ("Menu density"));
+        styleLabel (menuLabel, tr ("Menu spacing")); // (round 190qw, 190qx §2.1: "density" is jargon)
         menuBox.addItem (tr ("Compact"), 1);
         menuBox.addItem (tr ("Comfortable"), 2);
         menuBox.setSelectedId (options.compactMenus ? 1 : 2, juce::dontSendNotification);
         menuBox.onChange = [this] { change ([&] { options.compactMenus = menuBox.getSelectedId() == 1; }); };
 
-        styleLabel (wavesLabel, tr ("Waveforms"));
+        styleLabel (wavesLabel, tr ("Waveform colors")); // (round 190qw, 190qx §2.1: the box picks colours)
         wavesBox.addItem (tr ("Clean (the clip colour)"), 1);
         wavesBox.addItem (tr ("Spectral colours (warm = bass, cool = treble)"), 2);
         wavesBox.setSelectedId (options.waveSpectral ? 2 : 1, juce::dontSendNotification);
@@ -273,7 +273,7 @@ public:
         blackNotesBox.onChange = [this] { change ([&] { options.noteFlats = blackNotesBox.getSelectedId() == 2; }); };
         toggle (everyKeyNames, tr ("Note names on every Piano roll key"), options.noteNamesEveryKey, [this] (bool on) { options.noteNamesEveryKey = on; });
         toggle (rackColumn, tr ("Playhead column in the Channel Rack"), options.rackPlayheadColumn, [this] (bool on) { options.rackPlayheadColumn = on; });
-        toggle (rackStepColour, tr ("Steps use channel colour"), options.rackStepsChannelColour, [this] (bool on) { options.rackStepsChannelColour = on; });
+        toggle (rackStepColour, tr ("Steps use channel color"), options.rackStepsChannelColour, [this] (bool on) { options.rackStepsChannelColour = on; });
         // (FL's "Show complete piano roll preview" is in the Channel rack menu's Options, as in FL: round 190cj)
         styleLabel (pluginStyleLabel, tr ("Plugin style"));
         pluginStyleBox.addItem (tr ("Automatic (each plugin its own style)"), 1);

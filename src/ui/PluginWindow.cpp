@@ -1210,8 +1210,8 @@ public:
         onPin = std::move (set);
         pin.setVisible (onPin != nullptr);
         pin.setEnabled (available);
-        pin.setTooltip (available ? tr ("Pin on top: keep this window above LYNX SHARE's other windows")
-                                  : tr ("Pin on top is not available for a plugin in a separate process"));
+        pin.setTooltip (available ? tr ("Always on top: keep this window above LYNX SHARE's other windows") // (round 190qw, 190qx §2.1: the video
+                                  : tr ("Always on top is not available for a plugin in a separate process")); // window's name too)
         resized();
     }
     void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
@@ -1865,7 +1865,7 @@ public:
 
     void addPinItem (juce::PopupMenu& menu) override
     {
-        menu.addItem (tr ("Pin on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
+        menu.addItem (tr ("Always on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
             if (safe != nullptr)
                 safe->setPinned (! safe->pinned, true);
         });

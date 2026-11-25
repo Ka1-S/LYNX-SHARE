@@ -2230,7 +2230,7 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
             layout.uiScale = percent;
             setToolbarLayout (layout);
         });
-    menu.addSubMenu (tr ("UI scale"), scales);
+    menu.addSubMenu (tr ("Interface size"), scales); // (round 190qw, 190qx §2.1: Settings' name)
 
     menu.addSeparator();
     menu.addItem (tr ("Customize toolbar..."), [this] { showCustomizeToolbar(); });

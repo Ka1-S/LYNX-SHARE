@@ -855,7 +855,7 @@ public:
             fitBox.addItem (fits[i], i + 1);
         fitBox.onChange = [this] { edit ([this] (themes::Spec& s) { s.fit = (themes::ImageFit) juce::jlimit (0, themes::imageFitCount - 1, fitBox.getSelectedId() - 1); }); };
         styleLabel (opacityLabel, tr ("Image opacity"));
-        styleLabel (dimLabel, tr ("Dim"));
+        styleLabel (dimLabel, tr ("Darken image")); // (round 190qw, 190qx §2.1: "Dim" alone read as a noun)
         for (auto* s : { &opacitySlider, &dimSlider })
         {
             s->setRange (0.0, 100.0, 1.0);
@@ -1009,7 +1009,7 @@ private:
             r.removeFromLeft (8);
             soundPlay.setBounds (r.removeFromLeft (80));
             r.removeFromLeft (8);
-            soundDefault.setBounds (r.removeFromLeft (90));
+            soundDefault.setBounds (r.removeFromLeft (120)); // (round 190qw: "Default sound")
             r.removeFromLeft (10);
             soundName.setBounds (r.withTrimmedTop (6));
         }
@@ -1351,7 +1351,7 @@ private:
     PresetGrid presetGrid;
     std::size_t shownPresets = 0;
     juce::TextButton importButton { tr ("Import...") }, exportButton { tr ("Export...") }, savePreset { tr ("Save preset...") },
-        resetButton { tr ("Default") }, imageButton { tr ("Choose image...") }, removeImage { tr ("Remove") };
+        resetButton { tr ("Default theme") } /* (round 190qw, 190qx §2.1: two "Default" buttons on one page) */, imageButton { tr ("Choose image...") }, removeImage { tr ("Remove") };
     juce::Label presetNote, adjustNote, contrastNote, imageName, fitLabel, opacityLabel, dimLabel, imageListLabel, imageNote, soundName, soundNote, abNote;
     std::array<juce::Slider, knobCount> knobs;
     std::array<juce::Label, knobCount> knobLabels;
@@ -1374,7 +1374,7 @@ private:
     juce::ComboBox imageList;
     juce::Array<juce::File> backgroundFiles;
     juce::TextButton openBackgrounds { tr ("Open folder") }, soundButton { tr ("Choose sound...") }, soundPlay { tr ("Play") },
-        soundDefault { tr ("Default") };
+        soundDefault { tr ("Default sound") }; // (round 190qw, 190qx §2.1)
     SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") }, optionsTitle { tr ("Options") };
     juce::ToggleButton clipsNoteColours;
     juce::ToggleButton meterZones; // (round 190qh)
