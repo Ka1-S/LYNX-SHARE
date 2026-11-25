@@ -135,12 +135,15 @@ struct Ogun
     }
 };
 
+// Autogun plays the same state at a quarter of the level: its bank is written 12 dB louder, as far as the knob goes
+thread_local double extraDb = 0.0;
+
 Preset make (const char* name, const char* category, const std::function<void (Ogun&)>& design, std::vector<std::string> tags = {})
 {
     Ogun o;
     design (o);
     // (the level knob's law: (3^(v / 128) - 1) / 2)
-    o.P[0] = (int) std::lround (std::clamp (128.0 * std::log (((std::pow (3.0, o.P[0] / 128.0) - 1.0) * std::pow (10.0, trimDb ("Ogun", name) / 20.0)) + 1.0) / std::log (3.0), 1.0, 128.0));
+    o.P[0] = (int) std::lround (std::clamp (128.0 * std::log (((std::pow (3.0, o.P[0] / 128.0) - 1.0) * std::pow (10.0, (trimDb ("Ogun", name) + extraDb) / 20.0)) + 1.0) / std::log (3.0), 1.0, 128.0));
     Preset p;
     p.name = name;
     p.category = category;
@@ -188,7 +191,9 @@ std::vector<Preset> ogunBank()
 // Autogun is Ogun's engine on the same state (REA_rodada57), at a quarter of its level: the same sounds, the level knob up
 std::vector<Preset> autogunBank()
 {
+    extraDb = 12.0;
     auto bank = ogunBank();
+    extraDb = 0.0;
     for (auto& p : bank)
         p.apply = [ogun = p.apply] (ChannelDef& c) {
             const auto path = c.samplePath; // (FL's SG.dat: the Magic Dust stage)

@@ -47,6 +47,16 @@ std::vector<std::uint8_t> wrapped (const std::vector<std::uint8_t>& stream)
     return s.b;
 }
 
+// FL keeps Kepler Exo's engine state inside a wrapper (REA_rodada167d §1): 1, 1, its size, 0, the state, then 68 bytes
+std::vector<std::uint8_t> exoWrapped (const std::vector<std::uint8_t>& engine)
+{
+    Bytes s;
+    s.i (1), s.i (1), s.i ((std::uint32_t) engine.size()), s.i (0);
+    s.b.insert (s.b.end(), engine.begin(), engine.end());
+    s.b.resize (s.b.size() + 68, 0);
+    return s.b;
+}
+
 enum Panel // Kepler's 36, in the stream's order
 {
     arpOn, arpMode, arpRange, arpRate, arpSync, lfoRate, lfoSync, lfoDelay, lfoTrigMode, lfoTrigger, dcoLfo, pwAmount, pwSource, pulseOn,
@@ -114,11 +124,15 @@ Preset makeExo (const char* name, const char* category, Values values, std::vect
             p[(std::size_t) i] = v;
         Bytes s;
         s.name ("Kepler-2");
-        s.i (1), s.i (exoCount);
+        s.i (4), s.i (exoCount);
         for (const auto v : p)
             s.f (v);
-        s.i (0); // no modulation slots
-        c.pluginState = wrapped (s.b);
+        s.i (1), s.i (8); // the matrix: eight slots without a source and a destination
+        for (int k = 0; k < 16; ++k)
+            s.i (0xffffffffu);
+        for (int k = 0; k < 3; ++k)
+            s.b.push_back (0); // arpeggiator restart, x4 oversampling, the other oscillator: off
+        c.pluginState = exoWrapped (wrapped (s.b));
         c.modelParams.clear();
         if (c.samplePath.empty())
             c.samplePath = nativedata::ownPath (InstrumentKind::keplerExo);

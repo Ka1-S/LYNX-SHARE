@@ -40,6 +40,8 @@ bool keplerStateUsable (const std::vector<std::uint8_t>& state);
 bool keplerDllUsable (const std::string& path);
 // true for a "Kepler-2" (Kepler Exo) state the engine can play, and for the analysed build of Kepler Exo's DLL
 bool keplerExoState (const std::vector<std::uint8_t>& state);
+// ... in the wrapper FL 2026 keeps it in (REA_rodada167d §1): the plugin crashes on a state without it (round 190rh)
+bool keplerExoWrapped (const std::vector<std::uint8_t>& state);
 bool keplerExoDllUsable (const std::string& path);
 // the engine's own start value of Kepler Exo's internal parameter `index` (its constructor's table)
 float keplerExoDefault (int index) noexcept;

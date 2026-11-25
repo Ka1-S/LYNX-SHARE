@@ -1,5 +1,6 @@
 #include "core/Sections.h"
 #include "core/BassDrum.h"
+#include "core/Kepler.h"
 #include "core/Morphine.h"
 #include "core/ChordLaneOps.h"
 #include "core/ClipEnvelope.h"
@@ -1140,6 +1141,11 @@ struct Converter
             if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)
                 if (const auto kit = fpc::read (c.pluginState))
                     c.pluginState = fpc::write (*kit);
+            if (def.instrument == InstrumentKind::keplerExo && ! keplerExoWrapped (c.pluginState))
+            {
+                c.pluginState.clear(); // (FL's own default: the plugin crashes on a state that is not in its wrapper)
+                report.notes.push_back (channelLabel (def, index) + ": its settings are not in FL's layout, so FL starts Kepler Exo on its default sound");
+            }
             // LYNX's own noises (round 190rh): FL has none of that name and would ask for a missing file
             if ((def.instrument == InstrumentKind::bassdrum && bassDrumTakeOutOwnNoise (c.pluginState))
                 || (def.instrument == InstrumentKind::morphine && morphineTakeOutOwnNoise (c.pluginState)))

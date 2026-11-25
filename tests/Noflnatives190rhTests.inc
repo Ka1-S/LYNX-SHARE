@@ -455,6 +455,8 @@ TEST (noflnatives190rh_flp_export_names_nothing_of_lynx)
             CHECK (! out.pluginState.empty() && out.samplePath.find ("lynxdata") == std::string::npos);
             const std::string bytes (out.pluginState.begin(), out.pluginState.end());
             CHECK (bytes.find ("lynxdata") == std::string::npos);
+            if (kind == InstrumentKind::keplerExo)
+                CHECK (keplerExoState (out.pluginState) && keplerExoWrapped (out.pluginState));
             if (kind == InstrumentKind::bassdrum)
                 CHECK (bassDrumStateUsable (out.pluginState) && bassDrumNoiseName (out.pluginState).rfind ("LYNX ", 0) != 0);
             if (kind == InstrumentKind::morphine)
