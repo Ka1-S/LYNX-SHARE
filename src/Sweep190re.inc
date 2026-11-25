@@ -293,14 +293,113 @@
         return fails == 0 && oks > 0;
     }
 
+    // Discord 11-25 (sidthenugget): in Track-only mode, a clip dragged onto another instrument's track. Real drags on the
+    // main window's Playlist, in Track-only, Simple and the Pattern layout (FL: the clip keeps playing its own channel).
+    // Errors are added to `errors`, what happened to `log`.
+    void sweep190reTrackMove (juce::StringArray& errors, juce::StringArray& log)
+    {
+        using namespace lynx;
+        const juce::ScopedValueSetter<bool> shown (ui::showingForShots(), true);
+        const auto wasTrackOnly = trackonly::enabled();
+        const auto wasStyle = layoutstyle::current();
+        struct Mode { const char* name; layoutstyle::Style style; bool trackOnly, follows; };
+        for (const Mode mode : { Mode { "Track-only", layoutstyle::Style::pattern, true, true }, Mode { "Simple", layoutstyle::Style::simple, false, true },
+                                 Mode { "Pattern", layoutstyle::Style::pattern, false, false } })
+        {
+            trackonly::setEnabled (mode.trackOnly);
+            layoutstyle::setCurrent (layoutstyle::Style::pattern); // (process-wide; the window before this one left its own)
+            AudioEngine e (false);
+            MainComponent m (e, false);
+            m.setSize (1600, 900);
+            m.setVisible (true);
+            if (mode.style == layoutstyle::Style::pattern && ! mode.trackOnly) // (FL's way must be back after a real switch)
+                m.setLayoutStyle (layoutstyle::Style::simple);
+            m.setLayoutStyle (mode.style);
+            auto song = Song::makeDefault();
+            song.channels.resize (2);
+            for (int c = 0; c < 2; ++c)
+            {
+                song.channels[(std::size_t) c].name = c == 0 ? "Keys" : "Bass";
+                song.channels[(std::size_t) c].instrument = InstrumentKind::synth;
+            }
+            song.playlistTracks.resize (3);
+            trackmodes::makeInstrumentTrack (song, 0, 0);
+            trackmodes::makeInstrumentTrack (song, 1, 1);
+            song.patterns.assign (1, Pattern {});
+            song.patterns[0].name = "Riff";
+            song.patterns[0].notes = { { 0, ppq, 0, 60 }, { ppq, ppq, 0, 64 } };
+            song.playlist.clear();
+            for (const auto start : { 0, 8 }) // (two clips of one pattern)
+            {
+                Clip c;
+                c.pattern = 0;
+                c.track = 0;
+                c.start = start * 4 * ppq;
+                c.length = 4 * 4 * ppq;
+                song.playlist.push_back (c);
+            }
+            song.mode = PlayMode::song;
+            e.setSong (std::move (song));
+            e.dispatchPendingMessages();
+            auto& pl = m.getPlaylistForSnapshot();
+            m.showDesktopForSnapshot (false);
+            pl.setViewForSnapshot (70.0, 0, 0);
+            e.dispatchPendingMessages();
+            const auto channelsOf = [&e] (int clip) {
+                std::set<int> out;
+                for (const auto& n : e.getSong().patterns[(std::size_t) e.getSong().playlist[(std::size_t) clip].pattern].notes)
+                    out.insert (n.channel);
+                return out;
+            };
+            const auto drag = [&pl, &e] (int clip, juce::Point<int> by) {
+                const auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const auto now = juce::Time::getCurrentTime();
+                const auto from = pl.clipBoundsForSnapshot (clip).getCentre();
+                const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
+                const auto at = [&] (juce::Point<int> p, juce::ModifierKeys mods) {
+                    return juce::MouseEvent (source, p.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &pl, &pl, now, from.toFloat(), now, 1, p != from);
+                };
+                pl.mouseDown (at (from, left));
+                for (int k = 1; k <= 6; ++k)
+                    pl.mouseDrag (at (from + by * k / 6, left));
+                pl.mouseUp (at (from + by, {}));
+                e.dispatchPendingMessages();
+            };
+            const auto say = [&] (const juce::String& what, bool ok) {
+                log.add (juce::String (ok ? "ok   " : "FAIL ") + mode.name + ": " + what);
+                if (! ok)
+                    errors.add (juce::String (mode.name) + ": " + what);
+            };
+            const auto rows = pl.trackRowForSnapshot (1).getCentreY() - pl.trackRowForSnapshot (0).getCentreY();
+            const auto before = ProjectFile::toJson (e.getSong(), false);
+            drag (0, { 0, rows });
+            int moved = -1, stayed = -1; // (the drop sorts the clips)
+            for (int i = 0; i < (int) e.getSong().playlist.size(); ++i)
+                (e.getSong().playlist[(std::size_t) i].track == 1 ? moved : stayed) = i;
+            say ("the drag moved one clip to the Bass track", moved >= 0 && stayed >= 0);
+            if (moved < 0 || stayed < 0)
+                continue;
+            const auto want = std::set<int> { mode.follows ? 1 : 0 };
+            say ("the moved clip plays " + juce::String (mode.follows ? "the Bass track's instrument" : "its own channel (FL)"), channelsOf (moved) == want);
+            say ("the other clip of that pattern still plays Keys", channelsOf (stayed) == std::set<int> { 0 });
+            e.undo();
+            e.dispatchPendingMessages();
+            say ("one undo puts the song back", sweep190reFirstDiff (before, ProjectFile::toJson (e.getSong(), false)).isEmpty());
+        }
+        layoutstyle::setCurrent (wasStyle);
+        trackonly::setEnabled (wasTrackOnly);
+    }
+
     // The self-test's `sweep190re` item: the fast part of the sweep. "OK" or what failed.
     //  1. undo / redo keep the project's working time (it went back to the undone step's count);
     //  2. "Nothing to play in Song mode yet" goes when it stops being true (a clip placed, a project opened, another layout);
-    //  3. --sweep190re on a small generated project (File › Open path, four layouts, five panels, save / reload, ten undo kinds).
+    //  3. --sweep190re on a small generated project (File › Open path, four layouts, five panels, save / reload, ten undo kinds);
+    //  4. a clip dragged onto another instrument's track (Track-only and Simple: that instrument; Pattern: FL's way).
     juce::String sweep190reSelfTest()
     {
         using namespace lynx;
         juce::StringArray errors;
+        const auto wasStyle = layoutstyle::current();
         { // 1
             AudioEngine e (false);
             e.capturePluginStates(); // (what a save does first: the working time so far goes into the song; the clock starts)
@@ -397,5 +496,10 @@
             }
             folder.deleteRecursively();
         }
+        { // 4
+            juce::StringArray log;
+            sweep190reTrackMove (errors, log);
+        }
+        layoutstyle::setCurrent (wasStyle);
         return errors.isEmpty() ? juce::String ("OK") : "ERROR " + errors.joinIntoString ("; ");
     }

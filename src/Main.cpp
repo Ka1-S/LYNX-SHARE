@@ -1857,6 +1857,20 @@ public:
             return;
         }
 
+        if (args.contains ("--sweep190retracks"))
+        {
+            // LYNX --sweep190retracks <report.txt> (round 190re, Discord 11-25): a clip dragged onto another instrument's track in
+            // Track-only, Simple and the Pattern layout (src/Sweep190re.inc sweep190reTrackMove); result=OK / FAIL
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::StringArray errors, log;
+            sweep190reTrackMove (errors, log);
+            log.add (errors.isEmpty() ? "result=OK" : "result=FAIL");
+            juce::File (args[args.indexOf ("--sweep190retracks") + 1].unquoted()).replaceWithText (log.joinIntoString ("\n") + "\n");
+            setApplicationReturnValue (errors.isEmpty() ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--sweep190re"))
         {
             // LYNX --sweep190re <folder> [project]... [--fast] (round 190re, the 0.1.32 regression sweep): each project opened
