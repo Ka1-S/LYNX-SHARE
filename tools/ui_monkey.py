@@ -85,6 +85,12 @@ class Monkey:
             if not dev.exists():
                 dev.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<DEVICESETUP deviceType="Windows Audio" audioOutputDeviceName=""'
                                ' audioInputDeviceName="" audioDeviceRate="48000.0" audioDeviceBufferSize="512"/>\n')
+            # the plugin scan looks in an empty folder: no installed plugin is loaded (licence windows on a desktop nobody sees)
+            empty = self.out / "no-plugins"
+            empty.mkdir(exist_ok=True)
+            folders = dev.parent / "plugin-folders.txt"
+            if not folders.exists():
+                folders.write_text(str(empty) + "\n")
             e.update({"LYNX_PROFILE_DIR": str(self.profile), "LYNX_CONTROL_ENABLED": "1",
                       "LYNX_CONTROL_DISCOVERY": str(self.profile / "control/connection.json"), "TEMP": str(tmp), "TMP": str(tmp)})
             return e
