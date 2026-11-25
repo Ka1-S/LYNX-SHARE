@@ -534,6 +534,21 @@ std::vector<std::pair<std::string, std::string>> sessionInfo; // "info.<key>=val
 std::vector<std::string> sessionPlugins;                       // "plugin=" lines: third-party plugins loaded
 constexpr std::size_t maxSteps = 60; // (round 159: the crash report sends the last 60; was 10)
 
+// Round 190rf (ThreadSanitizer): std::localtime's result is one buffer for the process; the hang watch's thread and the
+// message thread both stamp lines (Windows' is per thread)
+const std::tm* localTime (std::time_t now, std::tm& parts) noexcept
+{
+#if defined(_WIN32)
+    if (const auto* t = std::localtime (&now))
+        parts = *t;
+    else
+        return nullptr;
+    return &parts;
+#else
+    return localtime_r (&now, &parts);
+#endif
+}
+
 std::FILE* openUtf8 (const std::string& path, const char* mode)
 {
 #if defined(_WIN32)
@@ -594,7 +609,7 @@ void note (const std::string& step) noexcept
             return;
         char stamp[32] = {};
         const auto now = std::time (nullptr);
-        if (const auto* t = std::localtime (&now))
+        if (std::tm parts {}; const auto* t = localTime (now, parts))
             std::strftime (stamp, sizeof (stamp), "%H:%M:%S ", t);
         std::string line = stamp + step;
         for (auto& c : line)
@@ -1589,6 +1604,7 @@ void* sampledFrames[64];
 std::uintptr_t sampledStackTop = 0; // the sampled (UI) thread's stack end, from startHangWatch (0: unknown)
 void onSampleSignal (int, siginfo_t*, void* context)
 {
+    const auto kept = errno; // (round 190rf: as below)
     auto n = backtrace (sampledFrames, 64);
     if (n < 5 && context != nullptr) // (fewer than 3 frames beyond the handler and the trampoline)
     {
@@ -1616,11 +1632,14 @@ void onSampleSignal (int, siginfo_t*, void* context)
         }
     }
     sampledCount.store (n, std::memory_order_release);
+    errno = kept;
 }
 #else
 void onSampleSignal (int)
 {
+    const auto kept = errno; // (round 190rf, ThreadSanitizer: the interrupted code may be about to read its own errno)
     sampledCount.store (backtrace (sampledFrames, 64), std::memory_order_release);
+    errno = kept;
 }
 #endif
 
@@ -1660,7 +1679,7 @@ std::string timeStamp (const char* format)
 {
     char stamp[40] = {};
     const auto now = std::time (nullptr);
-    if (const auto* t = std::localtime (&now))
+    if (std::tm parts {}; const auto* t = localTime (now, parts))
         std::strftime (stamp, sizeof (stamp), format, t);
     return stamp;
 }
