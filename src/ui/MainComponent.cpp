@@ -2564,6 +2564,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
 
+    // FL: with the typing keyboard on, Alt + a tool's letter picks the tool (round 190ri)
+    if (const auto tool = keyMap.findToolWithAlt (chord, focusContext(), typingPiano); ! tool.empty() && runAction (tool))
+        return true;
+
     // #228 (round 190nq, LYNX extra): "?" (on any keyboard layout) that nothing above used — the Clip-launch Info View
     // keeps it in Live's look — opens the action search
     if (key.getTextCharacter() == '?' && ! key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown()

@@ -138,7 +138,8 @@ std::vector<Action> makeActions()
         { "pattern.nextEmptyNoName", TR_NOOP ("Next empty pattern (no naming)"), Context::global, { chord (f4, ctrl) } },
         { "pattern.rename", TR_NOOP ("Rename and color the pattern"), Context::global, { chord (f2) } },
         { "pattern.insert", TR_NOOP ("Insert an empty pattern before the current one"), Context::global, { chord (insert, ctrl | shift) } },
-        { "pattern.clone", TR_NOOP ("Clone the current pattern"), Context::global, { chord ('C', ctrl | shift), chord ('C', alt) } },
+        // (round 190ri: Alt+C was a second key; in FL it is the Playlist's Slice tool while the typing keyboard is on, findToolWithAlt)
+        { "pattern.clone", TR_NOOP ("Clone the current pattern"), Context::global, { chord ('C', ctrl | shift) } },
         { "pattern.delete", TR_NOOP ("Delete the current pattern"), Context::global, { chord (del, ctrl | shift) } },
         { "pattern.moveUp", TR_NOOP ("Move the current pattern up"), Context::global, { chord (up, ctrl | shift) } },
         { "pattern.moveDown", TR_NOOP ("Move the current pattern down"), Context::global, { chord (down, ctrl | shift) } },
@@ -1336,6 +1337,16 @@ std::string KeyMap::find (const Chord& c, Context focus, bool typingPiano) const
     }
 
     return globalMatch != nullptr ? globalMatch->id : std::string();
+}
+
+std::string KeyMap::findToolWithAlt (const Chord& c, Context focus, bool typingPiano) const
+{
+    if (! typingPiano || (c.mods & (ctrl | shift | alt)) != alt || c.key < 'A' || c.key > 'Z' || ! find (c, focus, typingPiano).empty())
+        return {};
+    auto plain = c;
+    plain.mods = none;
+    const auto id = find (plain, focus, false);
+    return id.rfind ("playlist.tool.", 0) == 0 || id.rfind ("pianoRoll.tool.", 0) == 0 ? id : std::string();
 }
 
 const std::vector<Chord>& KeyMap::chordsFor (const std::string& actionId) const
