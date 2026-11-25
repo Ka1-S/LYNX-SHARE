@@ -1,0 +1,21 @@
+# ThreadSanitizer suppressions for the sanitizer build (scripts/build-sanitize.sh with SAN=thread, round 190rf). Only
+# system libraries and third-party code that LYNX cannot change are listed (each line with its reason); a race in LYNX's
+# own code is fixed, never added here. Libraries that are not built with -fsanitize=thread make TSan see their internal
+# synchronisation as races, so the calls made from inside them are not checked:
+called_from_lib:libasound.so
+called_from_lib:libpipewire-0.3.so
+called_from_lib:libjack.so
+called_from_lib:libfontconfig.so
+called_from_lib:libfreetype.so
+called_from_lib:libglib-2.0.so
+called_from_lib:libgio-2.0.so
+called_from_lib:libdbus-1.so
+called_from_lib:libX11.so
+called_from_lib:libxcb.so
+called_from_lib:libGLX.so
+called_from_lib:libGLX_mesa.so
+called_from_lib:libGL.so
+called_from_lib:libEGL.so
+called_from_lib:libgallium
+called_from_lib:libLLVM
+called_from_lib:libcurl.so
