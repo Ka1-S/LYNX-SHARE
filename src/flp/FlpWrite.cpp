@@ -164,32 +164,32 @@ std::uint32_t bgr (std::uint32_t rgb) noexcept
     return ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | ((rgb >> 16) & 0xFF);
 }
 
+// FLhd (id, size, format, channels, PPQ) + the FLdt id and size: the file offset of the first event
+constexpr std::size_t eventsOffset = 4 + 4 + 6 + 4 + 4;
+
 struct Out
 {
     std::vector<std::uint8_t> bytes;
+    // A trial save (Project::trialSaved, round 190qt): from the event after 0x1C = 0 on, FL's saver (FLEngine 2026
+    // FUN_00f40840 → FUN_00a9ece0, REA round 190gy) XORs value byte j of every u8 / u16 / u32 event with
+    // (0x79 − the value's file offset + 3·j) mod 256; event IDs, data sizes and data bytes stay as they are
+    bool scramble = false;
 
     void raw (const void* p, std::size_t n)
     {
         const auto* b = (const std::uint8_t*) p;
         bytes.insert (bytes.end(), b, b + n);
     }
-    void u8 (std::uint32_t id, std::uint32_t v)
+    void value (std::uint32_t id, std::uint32_t v, int size)
     {
         bytes.push_back ((std::uint8_t) id);
-        bytes.push_back ((std::uint8_t) v);
+        auto key = (std::uint8_t) (0x79u - (std::uint32_t) (eventsOffset + bytes.size()));
+        for (int k = 0; k < size; ++k, key = (std::uint8_t) (key + 3))
+            bytes.push_back ((std::uint8_t) ((std::uint8_t) (v >> (8 * k)) ^ (scramble ? key : 0)));
     }
-    void u16 (std::uint32_t id, std::uint32_t v)
-    {
-        bytes.push_back ((std::uint8_t) id);
-        bytes.push_back ((std::uint8_t) (v & 0xFF));
-        bytes.push_back ((std::uint8_t) ((v >> 8) & 0xFF));
-    }
-    void u32 (std::uint32_t id, std::uint32_t v)
-    {
-        bytes.push_back ((std::uint8_t) id);
-        for (int k = 0; k < 4; ++k)
-            bytes.push_back ((std::uint8_t) (v >> (8 * k)));
-    }
+    void u8 (std::uint32_t id, std::uint32_t v) { value (id, v, 1); }
+    void u16 (std::uint32_t id, std::uint32_t v) { value (id, v, 2); }
+    void u32 (std::uint32_t id, std::uint32_t v) { value (id, v, 4); }
     void data (std::uint32_t id, const std::vector<std::uint8_t>& d)
     {
         bytes.push_back ((std::uint8_t) id);
@@ -756,7 +756,8 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
     out.data (evVersion, ansiText (options.version));
     out.u32 (evBuild, options.build);
     out.u32 (evFileFlags, 15); // stretch times as floats, 88-byte playlist records (REA_rodada2 §4.2)
-    out.u8 (evRegistered, 1);
+    out.u8 (evRegistered, p.trialSaved ? 0 : 1); // (round 190qt: a trial save goes back as one, FL's values scrambled after it)
+    out.scramble = p.trialSaved;
     out.u8 (evSaved25, 1);
     out.u32 (evTempo, (std::uint32_t) std::lround (std::clamp (p.tempo, 10.0, 522.0) * 1000.0));
     out.u16 (evCurrentPattern, (std::uint32_t) std::clamp (p.currentPattern > 0 ? p.currentPattern : 1, 1, 999));

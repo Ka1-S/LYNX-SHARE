@@ -1099,6 +1099,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.beatUnit = meterUnit (project.beatUnit); // (round 190fg; 4 in every demo project)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
+    song.flTrialSaved = project.trialSaved;              // 0x1C = 0: an FL trial save, exported as one again (round 190qt)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
     song.slideNoteProps = true;                           // FL's slide notes move the note properties (issue #236)
     song.exportMarkers = true;                            // FL's export follows the Start and skip markers (round 190pr)

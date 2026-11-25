@@ -713,6 +713,12 @@ Result importTracks (Song& song, const Song& input, const std::vector<int>& chos
         result.notes.push_back ("From the other project's arrangement \"" + input.arrangements[(std::size_t) std::clamp (input.currentArrangement, 0, (int) input.arrangements.size() - 1)].name
                                 + "\" (the one it opens on)");
     result.ok = ! result.tracks.empty() || ! result.channels.empty();
+    // round 190qt (owner's option A): content from an FL trial save keeps the project's trial mark (never the reverse)
+    if (result.ok && input.flTrialSaved && ! song.flTrialSaved)
+    {
+        song.flTrialSaved = true;
+        result.notes.push_back ("The other project came from an FL Studio trial save, so FL Studio's trial will treat this project's FL Studio export as one");
+    }
     return result;
 }
 } // namespace lynx::trackimport

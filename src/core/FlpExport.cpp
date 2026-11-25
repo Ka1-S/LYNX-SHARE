@@ -144,6 +144,9 @@ bool keepsTrialMark (const ChannelDef& def, const std::string& generator)
     return generator == "FPC" ? def.instrument == InstrumentKind::fpc : generator == "Fruity Wrapper";
 }
 
+// the export report's line for a project from an FL trial save (Song::flTrialSaved, round 190qt)
+const char* const trialProjectNote = "This project came from an FL Studio trial save, so FL Studio's trial will treat it as one.";
+
 std::string trialNote (const std::string& label, const std::string& plugin)
 {
     return label + ": " + plugin + " was saved by a trial of FL Studio. Where " + plugin
@@ -845,6 +848,11 @@ struct Converter
         out.showInfo = song.info.showOnOpen;
         out.currentArrangement = std::max (0, song.currentArrangement);
         out.playTruncatedNotes = song.playTruncatedNotes;
+        // round 190qt (owner's option A): a project from an FL trial save goes back as one (0x1C = 0, FL's values
+        // scrambled after it), so FL's trial treats it as FL's own trial save; every other project stays registered
+        out.trialSaved = song.flTrialSaved;
+        if (song.flTrialSaved)
+            report.notes.push_back (trialProjectNote);
         out.autoPdc = song.autoPdc;
         out.compensateAutomations = song.compensateAutomations;
         out.timeSignatureMode = song.timeSignatureMode;

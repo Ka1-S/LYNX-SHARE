@@ -18138,3 +18138,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Discord1124_190quTests.inc" // round 190qu (0.1.32): Discord 11-24 (automation lanes, Split by channel, Track-only, Simple)
 #include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
 #include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
+#include "TrialMark190qtTests.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)

@@ -68,6 +68,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
         add (S::root, "clipNotes190lq", S::readOnly); // (round 190lq: FL's law for the notes of audio clip channels' mark)
+        add (S::root, "flTrialSaved", S::readOnly); // (round 190qt: the project came from an FL trial save; never cleared from outside)
         add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
         add (S::root, "windowLayout", S::readOnly); // (round 190mr, DF-141: each user's own window layout, never merged)
         add (S::root, "mixerLevelPdc190hq"); // (round 190hq: Mixer › Plugin delay compensation › compensate fader and route automations)

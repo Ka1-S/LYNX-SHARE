@@ -64,6 +64,8 @@ juce::String toJson (const Payload& payload)
     root->setProperty ("stamp", payload.stamp);
     root->setProperty ("pid", payload.pid);
     root->setProperty ("from", payload.from);
+    if (payload.flTrialSaved) // (round 190qt; older readers ignore it)
+        root->setProperty ("flTrialSaved", true);
     switch (payload.kind)
     {
         case Kind::notes:
@@ -136,6 +138,7 @@ std::optional<Payload> fromJson (const juce::String& json)
     out.stamp = root["stamp"].toString();
     out.pid = (int) root.getProperty ("pid", 0);
     out.from = root["from"].toString();
+    out.flTrialSaved = (bool) root.getProperty ("flTrialSaved", false);
     switch (*kind)
     {
         case Kind::notes:
