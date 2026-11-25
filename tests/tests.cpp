@@ -18110,6 +18110,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue258_190pvTests.inc" // round 190pv: issue #258, a cloned channel's own automation drives its sound
 #include "Issues190qbTests.inc" // round 190qb: issue follow-ups (#215 folders in the export name)
 #include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
+#include "Hotfix190raTests.inc" // round 190ra (0.1.31.2): a set pattern length grows with the notes drawn past it
+#include "Hotfix190raLanesTests.inc" // round 190ra (0.1.31.2): round 190qu's automation lanes that play what the clips played
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)

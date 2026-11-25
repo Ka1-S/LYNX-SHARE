@@ -247,6 +247,9 @@ public:
     void openNextWithoutPlugins (bool on) { nextOpenWithoutPlugins = on; }
     juce::StringArray getMenuNamesForSnapshot() { return getMenuBarNames(); }
     juce::PopupMenu getMenuForSnapshot (int index) { return getMenuForIndex (index, {}); }
+    juce::Component& typingPianoButtonForTest() noexcept { return typingPianoButton; } // (hotfix 0.1.31.2, round 190ra)
+    void showShortcutManagerForTest() { showShortcutManager(); } // (round 190ra, #244)
+    void setTypingPianoForTest (bool on) { setTypingPiano (on); } // (round 190ra)
     liveui::Context getLiveContextForSnapshot() { return liveContext(); } // (rollup 0.1.31 step 3: --rollup031s3shot)
     // issue #232 stage 2 (round 190nz, --tabs2shot190nz): the Window menu and the audio device bar without other windows
     juce::PopupMenu windowMenuForSnapshot() { return windowMenu(); }
@@ -740,6 +743,7 @@ private:
     // right-click on the metronome: on/off, its volume, count-in (FL keeps the metronome's options there)
     void showMetronomeMenu();
     void showTypingPianoMenu();
+    juce::PopupMenu buildTypingPianoMenu(); // (what showTypingPianoMenu shows; also the Options / View menus' submenu)
     // the metronome volume knob in a callout under the metronome button
     void showMetronomeVolume();
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)
