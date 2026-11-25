@@ -74,19 +74,19 @@ bool isBlackKey (int key)
 // after FL's top-to-bottom gradient) with a 1 px edge at 72 % of it, radius 2 (one flat fill on rows under 8 px); `edge`: the state's outline (selected, hovered),
 // transparent for the note's own edge. The label is dark on a light note and light on a dark one (≥ 4.5:1 on the
 // velocity range of LYNX's red), bold, at the small text size.
-void paintNoteBody (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill, juce::Colour edge)
+void paintNoteBody (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill, juce::Colour edge, float corner = 2.0f)
 {
     // (perf: two solid fills instead of a gradient, whose brush the Direct2D renderer makes again for every note; the
     // upper half lighter reads as FL's top-lit note)
     g.setColour (fill.withMultipliedBrightness (0.96f));
-    g.fillRoundedRectangle (r, 2.0f);
+    g.fillRoundedRectangle (r, corner);
     if (r.getHeight() >= 8.0f)
     {
         g.setColour (fill.withMultipliedBrightness (1.06f));
         g.fillRect (juce::Rectangle<float> (r.getX() + 1.0f, r.getY() + 1.0f, r.getWidth() - 2.0f, std::floor (r.getHeight() * 0.45f)));
     }
     g.setColour (edge.isTransparent() ? fill.withMultipliedBrightness (0.72f) : edge);
-    g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
+    g.drawRoundedRectangle (r.reduced (0.5f), corner, 1.0f);
 }
 
 juce::Colour noteLabelColour (juce::Colour fill)
@@ -1848,7 +1848,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (! rows.shown (n.key))
                     continue;
-                const auto r = noteRect (n.start, n.length, n.key);
+                const auto r = noteRect (n);
                 if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight() || outside (r, 2.0f))
                     continue;
                 g.setColour (textPrimary.withAlpha (0.30f));
@@ -1863,7 +1863,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (! ghostShown (n.channel) || ! rows.shown (n.key))
                     continue;
-                const auto r = noteRect (n.start, n.length, n.key);
+                const auto r = noteRect (n);
                 if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight() || outside (r, 2.0f))
                     continue;
                 g.setColour (textPrimary.withAlpha (0.14f));
@@ -1877,7 +1877,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (edits (n) || ! showGhosts || ! ghostShown (n.channel) || ! rows.shown (n.key))
                 continue;
 
-            const auto r = noteRect (n.start, n.length, n.key);
+            const auto r = noteRect (n);
             if (outside (r, 2.0f))
                 continue;
             const auto hovered = &n - pattern.notes.data() == hover.ghost;
@@ -1902,7 +1902,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (! edits (n) || ! rows.shown (n.key))
                 continue;
 
-            const auto r = noteRect (n.start, n.length, n.key);
+            const auto r = noteRect (n);
             if (outside (r, 2.0f)) // (its outline, grips, marks and label all lie inside r)
                 continue;
             const auto selected = isSelected (i);
@@ -1924,8 +1924,10 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (hovered)
                     fill = fill.brighter (0.18f);
-                paintNoteBody (g, r, fill, selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : juce::Colour());
+                paintNoteBody (g, r, fill, selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : juce::Colour(), stepslide::is (n) ? 3.0f : 2.0f);
             }
+            if (stepslide::is (n)) // FL's pill (issue #272): the body alone
+                continue;
 
             // "All" channels: whose note it is, by the channel's colour on its left edge (issue #12)
             if (allChannels && n.channel >= 0 && n.channel < (int) song.channels.size() && r.getWidth() > 5.0f)
@@ -2021,7 +2023,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (! edits (n) || ! rows.shown (n.key))
                     continue;
-                const auto r = noteRect (n.start, n.length, n.key);
+                const auto r = noteRect (n);
                 const auto fill = theme::noteGroupColour (n.colour, n.velocity);
                 paintNoteBody (g, r, fill, {});
                 if (gesture::noteLabelFits (r.getWidth(), rowHeight))
@@ -2689,7 +2691,8 @@ int PianoRollComponent::ghostAt (int x, int y) const
     {
         const auto& n = notes[(std::size_t) i];
 
-        if (! edits (n) && n.key == key && ghostShown (n.channel) && x >= tickToX ((double) n.start) && x < tickToX ((double) (n.start + n.length)))
+        if (! edits (n) && n.key == key && ghostShown (n.channel)
+            && (stepslide::is (n) ? noteRect (n).contains ((float) x, (float) y) : x >= tickToX ((double) n.start) && x < tickToX ((double) (n.start + n.length))))
             return i;
     }
 
@@ -4377,6 +4380,16 @@ PianoRollComponent::Hover PianoRollComponent::hoverAt (juce::Point<int> p) const
         if (! edits (n) || n.key != h.key)
             continue;
 
+        if (stepslide::is (n)) // (FL's pill: its 7 px, the body alone)
+        {
+            if (noteRect (n).contains (p.toFloat()))
+            {
+                h.note = i;
+                h.zone = gesture::Zone::body;
+                return h;
+            }
+            continue;
+        }
         if (const auto zone = gesture::zoneAt (p.x, tickToX ((double) n.start), tickToX ((double) (n.start + n.length)), rules);
             zone != gesture::Zone::outside)
         {
@@ -5745,7 +5758,7 @@ void PianoRollComponent::feedMagicLasso (juce::Point<int> p, bool buttonDown)
     for (const auto i : channelNotes())
     {
         const auto& n = notes[(std::size_t) i];
-        const auto r = noteRect (n.start, n.length, n.key);
+        const auto r = noteRect (n);
         if (! r.toNearestInt().intersects (grid))
             continue;
         if (magiclasso::rectInsidePolygon (loop, magiclasso::innerRect ({ (double) r.getX(), (double) r.getY(), (double) r.getRight(), (double) r.getBottom() })))
@@ -6323,7 +6336,7 @@ PianoRollComponent::NoteOnScreen PianoRollComponent::firstVisibleNoteForSnapshot
     for (const auto i : channelNotes())
     {
         const auto& n = notes[(std::size_t) i];
-        if (const auto r = noteRect (n.start, n.length, n.key).toNearestInt(); grid.contains (r) && i != skip)
+        if (const auto r = noteRect (n).toNearestInt(); grid.contains (r) && i != skip)
         {
             if (skip < 0)
                 return { i, r };
@@ -6481,7 +6494,7 @@ void PianoRollComponent::fadeOut (const std::vector<int>& notes)
         if (i >= 0 && i < (int) pattern.notes.size())
         {
             const auto& n = pattern.notes[(std::size_t) i];
-            if (const auto r = noteRect (n.start, n.length, n.key); r.intersects (grid))
+            if (const auto r = noteRect (n); r.intersects (grid))
                 deleteFade.add (r, theme::noteGroupColour (n.colour, n.velocity));
         }
 }

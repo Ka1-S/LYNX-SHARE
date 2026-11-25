@@ -1,4 +1,5 @@
 #include "core/FlCurve.h"
+#include "core/StepSlide.h"
 #include "core/FlpImport.h"
 #include "core/RackAutomation.h" // round 190oo (PAT-7)
 #include "core/FlmImport.h" // round 190fn: the FL Studio Mobile Rack generator
@@ -3767,6 +3768,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             if (n.length == 0)
                 if (const auto g = flGenerator.find (n.channel); g != flGenerator.end() && g->second)
                     note.held = true;
+            if (n.length == 0 && n.slide()) // (issue #272: on every channel, a slide of no length)
+                stepslide::make (note);
             note.channel = it->second;
             note.key = n.key; // FL and MIDI use the same numbering; only the octave name differs
             note.velocity = std::clamp (n.velocity / 128.0f, 0.0f, 1.0f);

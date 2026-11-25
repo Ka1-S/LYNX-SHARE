@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/StepSlide.h"
 #include "core/ChordLane.h"
 #include "core/EditorFeel.h" // round 190qe (R1)
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -264,6 +265,8 @@ public:
     EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
     // issue #242 (round 190od): the toolbar scale box as a click opens it (JUCE's ComboBox marks the popup active first)
+    juce::Rectangle<float> noteRectForTests (const Note& n) const { return noteRect (n); } // (round 190ri, issue #272)
+    void setPixelsPerTickForTests (double p) { pixelsPerTick = p; updateScrollBars(); repaint(); }
     juce::ComboBox& scaleBoxForTests() noexcept { return scaleBox; }
     ui::DeleteFade& deleteFadeForSnapshot() noexcept { return deleteFade; } // (round 190oq, issue #250)
     void deleteSelectionForSnapshot() { deleteSelection(); }
@@ -464,6 +467,11 @@ private:
     std::int64_t newNoteLength() const;
     // round 190jo (FM-15): a note's box, FL's anatomy: the whole row but the 1 px line under it, from its start to 1 px
     // before its end (at least 4 px wide)
+    juce::Rectangle<float> noteRect (const Note& n) const // (a slide note of no length: FL's pill, centred on its start)
+    {
+        auto r = noteRect (n.start, n.length, n.key);
+        return stepslide::is (n) ? r.withX ((float) tickToX ((double) n.start) - std::floor (stepslide::pillWidth * 0.5f)).withWidth (stepslide::pillWidth) : r;
+    }
     juce::Rectangle<float> noteRect (std::int64_t start, std::int64_t length, int key) const
     {
         return { (float) tickToX ((double) start), (float) keyToY (key), juce::jmax (4.0f, (float) (length * pixelsPerTick) - 1.0f),

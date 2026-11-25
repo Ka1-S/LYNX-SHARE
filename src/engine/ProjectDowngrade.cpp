@@ -1897,7 +1897,15 @@ void toRelease0130 (juce::var& root, Losses& lost)
                 if (auto* po = objectOf (p))
                 {
                     if (auto* h = arrayOf (po->getProperty ("heldNotes")))
-                        held += h->size();
+                    {
+                        // (a slide note of no length, issue #272, is kept as one tick, which 0.1.30 plays as one: not counted)
+                        const auto* notes = arrayOf (po->getProperty ("notes"));
+                        for (const auto& at : *h)
+                        {
+                            const auto* note = notes != nullptr && juce::isPositiveAndBelow ((int) at, notes->size()) ? notes->getReference ((int) at).getArray() : nullptr;
+                            held += note == nullptr || note->size() < 9 || ! (bool) (*note)[8] ? 1 : 0;
+                        }
+                    }
                     drop (*po, "heldNotes");
                 }
         if (held > 0)
