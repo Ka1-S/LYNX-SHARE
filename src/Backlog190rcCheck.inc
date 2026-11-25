@@ -274,7 +274,7 @@
             song.channels.resize (2);
             song.channels[0].name = "Lead";
             song.channels[1].name = "Bass";
-            const int keys[2][8] = { { 72, 74, 76, 79, 77, 76, 74, 72 }, { 48, 48, 55, 55, 53, 53, 50, 50 } };
+            const int keys[2][8] = { { 72, 74, 76, 79, 77, 76, 74, 72 }, { 64, 64, 67, 67, 65, 65, 62, 62 } };
             for (int p = 0; p < 2; ++p)
             {
                 Pattern pat;
@@ -305,7 +305,7 @@
             const auto ghosts = polish::clipGhostNotes (engine.getSong(), 0, 0, 2000, true);
             check ("ghosts: the Bass track's 8 notes under the Lead clip (" + juce::String ((int) ghosts.size()) + ")", ghosts.size() == 8u);
             PianoRollComponent roll (engine);
-            roll.setBounds (0, 0, 900, 420);
+            roll.setBounds (0, 0, 900, 640);
             roll.setVisible (true);
             roll.scrollToNotes (true);
             engine.dispatchPendingMessages();
