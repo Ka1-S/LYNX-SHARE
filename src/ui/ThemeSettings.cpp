@@ -137,6 +137,7 @@ void apply (const themes::Spec& spec, bool save)
     const auto before = theme::currentPalette();
     state() = spec;
     const auto after = themes::adjustedPalette (spec); // (round 190jp: with the Adjustments and the colour dots)
+    theme::softLook = spec.soft; // (round 190qw: before the palette, whose new stamp redraws the cached tiles)
     theme::setPalette (after);
     applyDrawingDots (spec);
     theme::menus::setStyle (spec.menuStyle);
@@ -156,6 +157,7 @@ void loadSaved()
     if (auto spec = loadFile (savedFile()))
     {
         state() = *spec;
+        theme::softLook = spec->soft; // (round 190qw)
         theme::setPalette (themes::adjustedPalette (*spec));
         applyDrawingDots (*spec);
         theme::menus::setStyle (spec->menuStyle);
@@ -198,6 +200,8 @@ juce::String toJson (const themes::Spec& spec)
         o->setProperty ("menuStyle", juce::String (themes::menuStyleId (spec.menuStyle)));
     if (spec.clipsUseNoteColours) // (round 190od: FL's OverrideClips)
         o->setProperty ("clipsUseNoteColors", true);
+    if (spec.soft) // (round 190qw: the Soft look; files without it keep the default look)
+        o->setProperty ("look", "soft");
     if (spec.meterZones) // (round 190qh: the meters' own thresholds; files without them keep each meter's own)
     {
         o->setProperty ("meterYellowDb", spec.meterYellowDb);
@@ -244,6 +248,7 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
         spec.gridIntensity = (float) juce::jlimit (themes::gridIntensityMin, themes::gridIntensityMax, (double) v["gridIntensity"]);
     spec.menuStyle = themes::menuStyleFromId (v["menuStyle"].toString().toStdString());
     spec.clipsUseNoteColours = (bool) v.getProperty ("clipsUseNoteColors", false);
+    spec.soft = v["look"].toString() == "soft"; // (round 190qw)
     if (! v["meterYellowDb"].isVoid() && ! v["meterRedDb"].isVoid())
     {
         spec.meterZones = true;
@@ -643,7 +648,7 @@ public:
                                                                  &removeImage, &imageName, &fitLabel, &fitBox, &opacityLabel, &opacitySlider, &dimLabel,
                                                                  &dimSlider, &imageListLabel, &imageList, &openBackgrounds, &imageNote, &soundTitle,
                                                                  &soundName, &soundButton, &soundPlay, &soundDefault, &soundNote, &slotA, &slotB, &abNote, &lookTitle,
-                                                                 &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
+                                                                 &lookLabel, &lookBox, &menuStyleLabel, &menuStyleBox, &gridLabel, &gridSlider, &lookNote,
                                                                  &optionsTitle, &clipsNoteColours, &meterZones, &meterYellowLabel, &meterYellow,
                                                                  &meterRedLabel, &meterRed, &tracksFromAccent })
             add (*c);
@@ -692,6 +697,13 @@ public:
 
         // round 190je: the menus' palette (FL's classic light grey as an option, design190ia FW-16) and how strongly the
         // editors' grid lines show (Live's "Grid Line Intensity", FM-18); presets leave both alone
+        // round 190qw (queue item 67, a LYNX option): the Soft look, flatter and quieter than the FL-like default
+        styleLabel (lookLabel, tr ("Appearance"));
+        lookBox.addItem (tr ("LYNX (default)"), 1);
+        lookBox.addItem (tr ("Soft (flat, muted colors, slimmer rows)"), 2);
+        lookBox.setTooltip (tr ("Soft: flat steps and buttons, muted track, pattern and channel colors, slimmer Channel rack rows and plugin header"));
+        lookBox.setComponentID ("theme.look");
+        lookBox.onChange = [this] { edit ([soft = lookBox.getSelectedId() == 2] (themes::Spec& s) { s.soft = soft; }); };
         styleLabel (menuStyleLabel, tr ("Menu style"));
         menuStyleBox.addItem (tr ("LYNX dark (default)"), 1);
         menuStyleBox.addItem (tr ("FL classic (light)"), 2);
@@ -843,7 +855,7 @@ public:
             fitBox.addItem (fits[i], i + 1);
         fitBox.onChange = [this] { edit ([this] (themes::Spec& s) { s.fit = (themes::ImageFit) juce::jlimit (0, themes::imageFitCount - 1, fitBox.getSelectedId() - 1); }); };
         styleLabel (opacityLabel, tr ("Image opacity"));
-        styleLabel (dimLabel, tr ("Dim"));
+        styleLabel (dimLabel, tr ("Darken image")); // (round 190qw, 190qx §2.1: "Dim" alone read as a noun)
         for (auto* s : { &opacitySlider, &dimSlider })
         {
             s->setRange (0.0, 100.0, 1.0);
@@ -970,6 +982,12 @@ private:
         }
         adjustNote.setBounds (row (18));
         optionsTitle.setBounds (row (24)); // (FL's Options, round 190od)
+        {
+            // round 190qw (queue item 67): Appearance, LYNX (default) or Soft
+            auto r = row (26);
+            lookLabel.setBounds (r.removeFromLeft (130));
+            lookBox.setBounds (r.removeFromLeft (juce::jmin (300, r.getWidth())));
+        }
         clipsNoteColours.setBounds (row (24));
         tracksFromAccent.setBounds (row (24));
 
@@ -1003,6 +1021,13 @@ private:
             r.removeFromLeft (8);
             openBackgrounds.setBounds (r.removeFromLeft (juce::jmin (130, r.getWidth())));
         }
+        // (round 190qw: the image's fit, opacity and dim in its own section, above its note; they were laid out under "Menus and grid")
+        for (auto [label, control] : { std::pair<juce::Component*, juce::Component*> { &fitLabel, &fitBox }, { &opacityLabel, &opacitySlider }, { &dimLabel, &dimSlider } })
+        {
+            auto r = row (26);
+            label->setBounds (r.removeFromLeft (130));
+            control->setBounds (r.removeFromLeft (juce::jmin (300, r.getWidth())));
+        }
         imageNote.setBounds (row (32));
         lookTitle.setBounds (row (24));
         for (auto [label, control] : { std::pair<juce::Component*, juce::Component*> { &menuStyleLabel, &menuStyleBox }, { &gridLabel, &gridSlider } })
@@ -1012,12 +1037,6 @@ private:
             control->setBounds (r.removeFromLeft (juce::jmin (300, r.getWidth())));
         }
         lookNote.setBounds (row (32));
-        for (auto [label, control] : { std::pair<juce::Component*, juce::Component*> { &fitLabel, &fitBox }, { &opacityLabel, &opacitySlider }, { &dimLabel, &dimSlider } })
-        {
-            auto r = row (26);
-            label->setBounds (r.removeFromLeft (130));
-            control->setBounds (r.removeFromLeft (juce::jmin (300, r.getWidth())));
-        }
 
         soundTitle.setBounds (row (24));
         {
@@ -1026,7 +1045,7 @@ private:
             r.removeFromLeft (8);
             soundPlay.setBounds (r.removeFromLeft (80));
             r.removeFromLeft (8);
-            soundDefault.setBounds (r.removeFromLeft (90));
+            soundDefault.setBounds (r.removeFromLeft (120)); // (round 190qw: "Default sound")
             r.removeFromLeft (10);
             soundName.setBounds (r.withTrimmedTop (6));
         }
@@ -1216,6 +1235,7 @@ private:
         for (auto* c : std::initializer_list<juce::Component*> { &fitBox, &opacitySlider, &dimSlider })
             c->setEnabled (! spec.image.empty());
         menuStyleBox.setSelectedId (spec.menuStyle == themes::MenuStyle::flClassic ? 2 : 1, juce::dontSendNotification);
+        lookBox.setSelectedId (spec.soft ? 2 : 1, juce::dontSendNotification);
         gridSlider.setValue (std::round (spec.gridIntensity * 100.0f), juce::dontSendNotification);
     }
 
@@ -1234,8 +1254,10 @@ private:
                 const auto sound = s.startupSound;
                 const auto menuStyle = s.menuStyle;
                 const auto grid = s.gridIntensity; // (presets leave the menus and the grid alone, round 190je)
+                const auto soft = s.soft;          // (and the Soft look, round 190qw)
                 s = chosen.spec;
                 s.menuStyle = menuStyle;
+                s.soft = soft;
                 s.gridIntensity = grid;
                 s.image = image;
                 s.fit = fit;
@@ -1365,7 +1387,7 @@ private:
     PresetGrid presetGrid;
     std::size_t shownPresets = 0;
     juce::TextButton importButton { tr ("Import...") }, exportButton { tr ("Export...") }, savePreset { tr ("Save preset...") },
-        resetButton { tr ("Default") }, imageButton { tr ("Choose image...") }, removeImage { tr ("Remove") };
+        resetButton { tr ("Default theme") } /* (round 190qw, 190qx §2.1: two "Default" buttons on one page) */, imageButton { tr ("Choose image...") }, removeImage { tr ("Remove") };
     juce::Label presetNote, adjustNote, contrastNote, imageName, fitLabel, opacityLabel, dimLabel, imageListLabel, imageNote, soundName, soundNote, abNote;
     std::array<juce::Slider, knobCount> knobs;
     std::array<juce::Label, knobCount> knobLabels;
@@ -1388,15 +1410,15 @@ private:
     juce::ComboBox imageList;
     juce::Array<juce::File> backgroundFiles;
     juce::TextButton openBackgrounds { tr ("Open folder") }, soundButton { tr ("Choose sound...") }, soundPlay { tr ("Play") },
-        soundDefault { tr ("Default") };
+        soundDefault { tr ("Default sound") }; // (round 190qw, 190qx §2.1)
     SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") }, optionsTitle { tr ("Options") };
     juce::ToggleButton clipsNoteColours;
     juce::ToggleButton meterZones; // (round 190qh)
     juce::Label meterYellowLabel, meterRedLabel;
     juce::Slider meterYellow, meterRed;
     juce::ToggleButton tracksFromAccent; // (issue #238, round 190qj)
-    juce::Label menuStyleLabel, gridLabel, lookNote;
-    juce::ComboBox menuStyleBox;
+    juce::Label lookLabel, menuStyleLabel, gridLabel, lookNote;
+    juce::ComboBox lookBox, menuStyleBox; // (lookBox: round 190qw)
     juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     ColourWell accentWell { tr ("Accent color") }, backgroundWell { tr ("Background") }, workspaceWell { tr ("Workspace") };
     ColourWell* selected = nullptr;

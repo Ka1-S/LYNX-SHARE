@@ -36,6 +36,7 @@
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/SimpleLook.h" // round 190oo (O-4)
+#include "ui/ThemeSettings.h" // round 190qw (the Soft look on the LYNX extras page)
 #include "ui/TouchInput.h" // round 190pm (P23)
 #include "ui/Updater.h"
 
@@ -243,17 +244,17 @@ public:
 
         styleLabel (scaleLabel, tr ("Interface size"));
         for (auto percent : toolbarlayout::uiScales)
-            scaleBox.addItem (juce::String (percent) + "%", percent);
+            scaleBox.addItem (juce::String (percent) + " %", percent); // (round 190qw: as Text size above it, "100 %")
         scaleBox.setSelectedId (options.uiScale, juce::dontSendNotification);
         scaleBox.onChange = [this] { change ([&] { options.uiScale = scaleBox.getSelectedId(); }); };
 
-        styleLabel (menuLabel, tr ("Menu density"));
+        styleLabel (menuLabel, tr ("Menu spacing")); // (round 190qw, 190qx §2.1: "density" is jargon)
         menuBox.addItem (tr ("Compact"), 1);
         menuBox.addItem (tr ("Comfortable"), 2);
         menuBox.setSelectedId (options.compactMenus ? 1 : 2, juce::dontSendNotification);
         menuBox.onChange = [this] { change ([&] { options.compactMenus = menuBox.getSelectedId() == 1; }); };
 
-        styleLabel (wavesLabel, tr ("Waveforms"));
+        styleLabel (wavesLabel, tr ("Waveform colors")); // (round 190qw, 190qx §2.1: the box picks colours)
         wavesBox.addItem (tr ("Clean (the clip colour)"), 1);
         wavesBox.addItem (tr ("Spectral colours (warm = bass, cool = treble)"), 2);
         wavesBox.setSelectedId (options.waveSpectral ? 2 : 1, juce::dontSendNotification);
@@ -272,7 +273,7 @@ public:
         blackNotesBox.onChange = [this] { change ([&] { options.noteFlats = blackNotesBox.getSelectedId() == 2; }); };
         toggle (everyKeyNames, tr ("Note names on every Piano roll key"), options.noteNamesEveryKey, [this] (bool on) { options.noteNamesEveryKey = on; });
         toggle (rackColumn, tr ("Playhead column in the Channel Rack"), options.rackPlayheadColumn, [this] (bool on) { options.rackPlayheadColumn = on; });
-        toggle (rackStepColour, tr ("Steps use channel colour"), options.rackStepsChannelColour, [this] (bool on) { options.rackStepsChannelColour = on; });
+        toggle (rackStepColour, tr ("Steps use channel color"), options.rackStepsChannelColour, [this] (bool on) { options.rackStepsChannelColour = on; });
         // (FL's "Show complete piano roll preview" is in the Channel rack menu's Options, as in FL: round 190cj)
         styleLabel (pluginStyleLabel, tr ("Plugin style"));
         pluginStyleBox.addItem (tr ("Automatic (each plugin its own style)"), 1);
@@ -3238,6 +3239,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "simple.projectName") return ui::simplelook::projectNameShown(); // round 190oo (O-4)
     if (id == "simple.touchMode") return ui::touchmode::enabled(); // round 190pm (P23)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
+    if (id == "theme.softLook") return themeui::current().soft; // round 190qw (queue item 67)
     return false;
 }
 
@@ -3254,6 +3256,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
 
     if (workflowextras::setExtra (id, on)) // round 190iu (ui/WorkflowExtras.h): saves through its own hook
         return;
+
+    if (id == "theme.softLook") // round 190qw (queue item 67): the theme's Soft look, as Options › Theme › Appearance sets it
+    {
+        auto spec = themeui::current();
+        spec.soft = on;
+        themeui::apply (spec, persistent);
+        return;
+    }
 
     if (id == "mixer.peakValues" || id == "mixer.correlation") // round 190qh (listed in rollup 0.1.32 step 2)
     {

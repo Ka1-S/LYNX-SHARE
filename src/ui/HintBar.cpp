@@ -148,7 +148,8 @@ bool layOut (const std::vector<Item>& items, float width, int maxLines, std::vec
     for (std::size_t i = 0; i < items.size();)
     {
         auto end = i + 1;
-        while (end < items.size() && items[end - 1].kind != Item::Kind::word)
+        // (round 190qw: and a word glued to the key after it stays with it: "[F5]-[F9] windows" broke as "[F5]-" / "[F9]")
+        while (end < items.size() && (items[end - 1].kind != Item::Kind::word || (items[end].kind != Item::Kind::word && items[end].gap == 0.0f)))
             ++end;
 
         float chunkWidth = 0.0f;

@@ -236,6 +236,10 @@ inline constexpr Item items[] = {
     { "toolbar.grouped", TR_NOOP ("Toolbar"), TR_NOOP ("Grouped look (framed panels, steady spacing)"),
       TR_NOOP ("The main toolbar draws each panel in a raised frame and keeps the panels in their places when the window is resized (the spare room goes into one gap). Off, as in FL Studio: sunk panels spread over the width. Pattern layout. Also in the toolbar's right-click menu."),
       "ui-options.txt:toolbarGrouped" },
+    // round 190qw (queue item 67, Discord 11-23): 0.1.29's flatter look as a theme option; kept in the theme, not in ui-options
+    { "theme.softLook", TR_NOOP ("Appearance"), TR_NOOP ("Soft look (flat, muted colors, slimmer rows)"),
+      TR_NOOP ("Flat steps and buttons, muted track, pattern and channel colors, slimmer Channel rack rows and plugin header, close to how LYNX 0.1.29 looked. The FL-like look stays the default. Also in Options › Theme › Appearance."),
+      "theme.lynxtheme:look" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },

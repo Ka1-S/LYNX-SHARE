@@ -39,9 +39,11 @@ TEST (extras190qk_default_lists)
     // FL-exact: FL's own two on, the stretched clips' loop (issue #25) off
     CHECK (extras::flExactOn ("general.escCloses") && extras::flExactOn ("general.startPage"));
     CHECK (! extras::flExactOn ("general.stretchedClipsLoop") && extras::defaultOn ("general.stretchedClipsLoop"));
-    // every extra but the game controller is kept in ui-options.txt
+    // every extra but the game controller and the Soft look (round 190qw: kept in the theme) is kept in ui-options.txt
     for (const auto& item : extras::items)
-        CHECK (extras::uiKeyOf (item).empty() == (item.id == "midi.gamepad"));
+        CHECK (extras::uiKeyOf (item).empty() == (item.id == "midi.gamepad" || item.id == "theme.softLook"));
+    // the Soft look (round 190qw) is off by default and in FL-exact
+    CHECK (! extras::defaultOn ("theme.softLook") && ! extras::flExactOn ("theme.softLook"));
 }
 
 TEST (extras190qk_user_set_list_text)

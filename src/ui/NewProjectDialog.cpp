@@ -172,6 +172,15 @@ public:
             onPick();
     }
 
+    // round 190qw (design190oj WG-9): the description is cut to one line in the 240 px list (en: "...on the first inserts, a
+    // lim..."; de: three cut): its whole text as the row's tooltip
+    juce::String getTooltipForRow (int row) override
+    {
+        if (row < 0 || row >= (int) items.size() || items[(std::size_t) row].description.isEmpty())
+            return {};
+        return items[(std::size_t) row].description;
+    }
+
     void returnKeyPressed (int) override
     {
         if (onActivate)

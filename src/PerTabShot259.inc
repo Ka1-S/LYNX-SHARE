@@ -385,7 +385,7 @@
                                + ", content " + State::text (sizes->second));
                 if (editor != nullptr)
                     st->check (p->name + ": the content is the editor under the strip (no wider than the editor or the strip's need)",
-                               sizes->second.getHeight() == editor->getHeight() + 46 && sizes->second.getWidth() >= editor->getWidth());
+                               sizes->second.getHeight() == editor->getHeight() + (lynx::theme::soft() && p->channel < 0 ? 36 : 46) && sizes->second.getWidth() >= editor->getWidth()); // (round 190qw: an effect's strip is 36 px in the Soft look)
                 st->grabAs (tag + "-plugin");
             });
             st->steps.push_back ([st, p, tag] {

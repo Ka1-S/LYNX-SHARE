@@ -1943,7 +1943,7 @@ private:
                     theme::drawLiveKnobAutomationLed (g, knob);
             }
             g.setColour (hot ? colour::textPrimary : ll::text);
-            g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
+            g.drawFittedText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, 1, 0.75f); // (round 190qw: narrowed before "..."; "1/8 dot. (...")
         }
     }
 
@@ -1976,7 +1976,7 @@ private:
             drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), spec.minimum < 0.0, (hover.card == i && hover.knob == k) || (knobCard == i && knobDrag == k) ? colour::accent : colour::knobArc,
                       hover.card == i && hover.knob == k);
             g.setColour (colour::textPrimary);
-            g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
+            g.drawFittedText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, 1, 0.75f); // (round 190qw: narrowed before "..."; "1/8 dot. (...")
         }
     }
 

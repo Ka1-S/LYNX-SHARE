@@ -1284,7 +1284,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
 
             const auto& channel = song.channels[(std::size_t) row];
             const auto selected = ! autoOnly && std::binary_search (selection.begin(), selection.end(), row); // (round 190ow)
-            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
+            // (round 190qw: the Soft look's slimmer plate, 20 px in FL's 30 px row)
+            const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + (theme::soft() ? 5.0f : 3.0f), (float) nameWidth,
+                                                          (float) rowHeight - (theme::soft() ? 10.0f : 6.0f));
 
             if (selected) // selected rows are subtly lifted
             {
@@ -1329,6 +1331,21 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // name button: filled with the channel colour as FL's (round 190io, design190ia FM-10: FL's Synth Bass
                 // #11479C, Grv Kick #892019), its brightness held where white text reads (0.42-0.58), a slight top-down
                 // gradient (+6 % / -6 %); FL's grey #485156 for a channel without a colour; muted = greyed and darker
+                // round 190qw (the Soft look, queue item 67): 0.1.29's plate instead, dark and tinted with the colour, the
+                // colour in a strip at its left
+                if (theme::soft())
+                {
+                    auto plate = hovered (Area::name) ? bg5 : bg4;
+                    const auto own = channel.colour != 0 ? theme::tame (juce::Colour (channel.colour)) : bg6.brighter (0.2f);
+                    if (channel.colour != 0)
+                        plate = plate.interpolatedWith (own, row == primary ? 0.42f : 0.32f);
+                    if (channel.muted)
+                        plate = plate.interpolatedWith (bg2, 0.5f);
+                    theme::fillRoundRect (g, nameArea, theme::radius::sm, plate);
+                    theme::fillRoundRect (g, nameArea.withWidth (3.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f), 1.5f,
+                                          channel.muted ? own.withMultipliedAlpha (0.5f) : own);
+                }
+                else
                 {
                     auto fill = theme::colourFill (channel.colour != 0 ? juce::Colour (channel.colour) : theme::colour::defaultTrack, 0.42f, 0.58f);
                     if (channel.muted)
@@ -1396,18 +1413,18 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 {
                     iconWidth = 18.0f;
                     ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getRight() - 6.0f - rightUsed - 14.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
-                                       onAccent.withAlpha (channel.muted ? 0.45f : 0.85f));
+                                       (theme::soft() ? textSecondary : onAccent).withAlpha (channel.muted ? 0.45f : 0.85f));
                 }
                 // white on the colour (FL), the name's middle dropped when it is too long ("Titey..m #2", FM-14), centred in
                 // the room left of the icon and tags as FL centres it (round 190jp: "Synth Bass" on the button's centre line,
                 // "Titey Tom" between the left edge and the icon)
-                g.setColour (onAccent.withAlpha (channel.muted ? 0.5f : frozen ? 0.7f : 0.92f));
-                g.setFont (theme::font (theme::type::body + 1.0f));
+                g.setColour ((theme::soft() ? textPrimary : onAccent).withAlpha (channel.muted ? 0.5f : frozen ? 0.7f : 0.92f));
+                g.setFont (theme::font (theme::type::body + (theme::soft() ? 0.0f : 1.0f))); // (Soft: the body size, as 0.1.29)
                 // FL's Channel rack menu › Options › Channel name alignment › Left (round 190kd): the name from the left edge,
                 // as LYNX drew it before 190jp
-                const auto left = nameAlignLeft;
+                const auto left = nameAlignLeft || theme::soft(); // (round 190qw: the Soft look's names start after the strip)
                 const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : left ? 5.0f : 6.0f;
-                const auto textArea = nameArea.withTrimmedLeft (left ? 7.0f : 6.0f).withTrimmedRight (rightTrim);
+                const auto textArea = nameArea.withTrimmedLeft (theme::soft() ? 11.0f : left ? 7.0f : 6.0f).withTrimmedRight (rightTrim);
                 textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
                                      left ? juce::Justification::centredLeft : juce::Justification::centred, false);
                 g.setFont (theme::font (theme::type::body));
@@ -1806,8 +1823,19 @@ void ChannelRackComponent::paintAutomationButton (juce::Graphics& g, int a, int 
         g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (high), 1.0f);
         g.drawLine (juce::Line<float> (low + along, high - along), 1.0f);
     }
-    const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + 3, (float) nameWidth, (float) rowHeight - 6);
-    if (rest)
+    // (round 190qw: the Soft look's slimmer plate, 20 px in FL's 30 px row)
+    const auto nameArea = juce::Rectangle<float> ((float) nameLeft(), (float) y + (theme::soft() ? 5.0f : 3.0f), (float) nameWidth,
+                                                  (float) rowHeight - (theme::soft() ? 10.0f : 6.0f));
+    if (rest && theme::soft()) // (round 190qw: the Soft look's plate, as the channels' above it)
+    {
+        const auto own = automation.colour != 0 ? theme::tame (juce::Colour (automation.colour)) : bg6.brighter (0.2f);
+        auto plate = hoverArea == Area::autoName && hoverRow == a ? bg5 : bg4;
+        if (automation.colour != 0)
+            plate = plate.interpolatedWith (own, 0.32f);
+        theme::fillRoundRect (g, nameArea, theme::radius::sm, plate);
+        theme::fillRoundRect (g, nameArea.withWidth (3.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f), 1.5f, own);
+    }
+    else if (rest)
     {
         auto fill = theme::colourFill (automation.colour != 0 ? juce::Colour (automation.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
         if (hoverArea == Area::autoName && hoverRow == a)
@@ -1816,12 +1844,14 @@ void ChannelRackComponent::paintAutomationButton (juce::Graphics& g, int a, int 
     }
     if (! curves) // (the name with the straight parts: a name squeezed to fit is drawn as paths, which depend on where they are drawn)
         return;
-    g.setColour (onAccent.withAlpha (0.92f));
-    g.setFont (theme::font (theme::type::body + 1.0f));
-    const auto textArea = nameArea.withTrimmedLeft (nameAlignLeft ? 7.0f : 6.0f).withTrimmedRight (nameAlignLeft ? 5.0f : 6.0f);
+    const auto soft = theme::soft(); // (round 190qw: the Soft look's names, as the channels')
+    g.setColour ((soft ? textPrimary : onAccent).withAlpha (0.92f));
+    g.setFont (theme::font (theme::type::body + (soft ? 0.0f : 1.0f)));
+    const auto left = nameAlignLeft || soft;
+    const auto textArea = nameArea.withTrimmedLeft (soft ? 11.0f : left ? 7.0f : 6.0f).withTrimmedRight (left ? 5.0f : 6.0f);
     const auto name = automation.name.empty() ? tr ("Automation clip") : juce::String::fromUTF8 (automation.name.c_str());
     textcache::drawText (g, theme::fitMiddle (name, g.getCurrentFont(), textArea.getWidth()), textArea,
-                         nameAlignLeft ? juce::Justification::centredLeft : juce::Justification::centred, false);
+                         left ? juce::Justification::centredLeft : juce::Justification::centred, false);
     g.setFont (theme::font (theme::type::body));
 }
 

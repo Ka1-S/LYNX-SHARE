@@ -620,8 +620,9 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
 
 juce::Rectangle<int> MixerStrips::foldArea (int t) const
 {
-    // the chevron left of the number on a group's first strip (round 177a)
-    return { stripX (t) + 1, 3, 12, 15 };
+    // the chevron on a group's first strip (round 177a), left of the icon (round 190qw: it was drawn over the record-arm dot
+    // left of the number)
+    return { stripX (t) + 1, rows().iconY, 12, 16 };
 }
 
 float MixerStrips::tabLevel (int t) const noexcept
@@ -1036,7 +1037,7 @@ void MixerStrips::paintCurrentStrip (juce::Graphics& g)
     const auto meter = currentMeter();
     theme::fillRoundRect (g, meter.toFloat(), 2.0f, colour::bg0);
     g.setFont (font (8.0f));
-    g.setColour (colour::textDisabled);
+    g.setColour (colour::textSecondary); // (round 190qw, design190oj PAT-12: textDisabled read faint at 8 px)
     for (int db = 3; db >= -39; db -= 3)
     {
         const auto y = (float) meter.getBottom() - meterPosition (juce::Decibels::decibelsToGain ((float) db)) * (float) meter.getHeight();
@@ -2007,8 +2008,22 @@ void MixerStrips::paint (juce::Graphics& g)
         {
         g.setColour (bandInk);
         g.setFont (font (compactLayout ? 10.0f : type::body, true));
-        textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 14),
-                                   juce::Justification::centred, 1, 0.6f);
+        {
+            // round 190qw: centred on the band, moved right just enough to clear the record-arm dot where the centred number
+            // would touch it (two-digit numbers on the narrow strips: "20" was drawn over the dot)
+            const auto number = t == 0 ? juce::String ("M") : juce::String (t);
+            auto box = juce::Rectangle<int> (x, 4, plateWidth, 14);
+            const auto textWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), number));
+            auto justification = juce::Justification (juce::Justification::centred);
+            if (const auto arm = armArea (t); t > 0 && rows().armY < 0 && x + (plateWidth - textWidth) / 2 < arm.getRight() + 2)
+            {
+                // (and clear of the effects dot narrow strips draw at the band's right; a number that still doesn't fit narrows)
+                const auto rightLimit = x + plateWidth - (! track.effects.empty() && sp.fxBadge && plateWidth < 56 ? 8 : 1);
+                box = juce::Rectangle<int> (arm.getRight() + 2, 4, textWidth + 2, 14).getIntersection (juce::Rectangle<int>::leftTopRightBottom (x, 4, rightLimit, 18));
+                justification = juce::Justification::centredLeft;
+            }
+            textcache::drawFittedText (g, number, box, justification, 1, 0.6f);
+        }
 
         if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
         {
@@ -5822,7 +5837,8 @@ juce::Rectangle<int> EffectsPanel::armBounds() const
 
 juce::Rectangle<int> EffectsPanel::inputBoxBounds() const
 {
-    return { 38, panelHeader + 2, getWidth() - 46, inputRowHeight - 8 };
+    const auto left = track > 0 ? 38 : 8; // (round 190qw: the Master has no arm button, its box lines up with the slots)
+    return { left, panelHeader + 2, getWidth() - 8 - left, inputRowHeight - 8 };
 }
 
 void EffectsPanel::groupIntoRack (int slot, bool all)
@@ -7194,7 +7210,7 @@ void EffectsPanel::paint (juce::Graphics& g)
         shape.lineTo (tab.getRight() - 6.0f, tab.getBottom() - 0.5f);
         shape.lineTo (tab.getX() + 6.0f, tab.getBottom() - 0.5f);
         shape.closeSubPath();
-        const auto tint = ! canAdd ? colour::textDisabled : hoverAddTab ? colour::accent.brighter (0.2f) : colour::accent;
+        const auto tint = ! canAdd ? colour::textDisabled : hoverAddTab ? colour::accent.brighter (0.2f) : colour::textSecondary; // (round 190qw)
         g.setColour (hoverAddTab && canAdd ? colour::accent.withAlpha (0.18f) : colour::bg2);
         g.fillPath (shape);
         g.setColour (tint);

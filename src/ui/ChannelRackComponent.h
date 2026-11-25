@@ -235,6 +235,8 @@ public:
     bool isShown (int row) const;          // not hidden by the filter
     std::function<void()> onFilterChanged; // the title shows the filter's name and the graph editor's state
 
+    // (round 190qw: FL's pitch in the Soft look too, whose plates and steps are drawn slimmer inside it: a variable row
+    // height cost +1 % instructions on the rack's playhead-column frames, over the paint gate)
     static constexpr int rowHeight = 30;
     static constexpr int muteWidth = 26;
     static constexpr int knobWidth = 28;

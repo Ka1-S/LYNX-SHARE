@@ -1166,6 +1166,18 @@ public:
 
     bool isHeaderCollapsed() const noexcept { return headerCollapsed; }
 
+    // round 190qw: a theme change may switch the Soft look, whose header is slimmer
+    void lookAndFeelChanged() override
+    {
+        if (laidOutHeader != currentHeaderHeight())
+        {
+            laidOutHeader = currentHeaderHeight();
+            fitShownPage();
+            resized();
+        }
+    }
+    int laidOutHeader = 46; // (the strip height the window was last sized for)
+
     void setHeaderCollapsed (bool collapsed)
     {
         if (headerCollapsed == collapsed)
@@ -1198,8 +1210,8 @@ public:
         onPin = std::move (set);
         pin.setVisible (onPin != nullptr);
         pin.setEnabled (available);
-        pin.setTooltip (available ? tr ("Pin on top: keep this window above LYNX SHARE's other windows")
-                                  : tr ("Pin on top is not available for a plugin in a separate process"));
+        pin.setTooltip (available ? tr ("Always on top: keep this window above LYNX SHARE's other windows") // (round 190qw, 190qx §2.1: the video
+                                  : tr ("Always on top is not available for a plugin in a separate process")); // window's name too)
         resized();
     }
     void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
@@ -1348,7 +1360,9 @@ public:
 
 private:
     // round 190in (FW-5 / FW-7): FL's 46 px strip; ▸, two 44 px tabs, the keyboard button, the presets
-    static constexpr int headerHeight = 46;
+    // round 190qw (queue item 67): an effect's strip is 36 px in the Soft look (Options › Theme › Appearance); a channel's keeps
+    // FL's 46 px, where its ON / PAN / VOL / PITCH / TRACK captions sit under the knobs
+    int headerHeight() const noexcept { return theme::soft() && channelControls == nullptr ? 36 : 46; }
     // the window is at least as wide as its strip needs (round 190pw, PR #259: only what the strip shows: a docked
     // frame's title strip holds the ▸ and the presets, and a strip hidden by the gear needs nothing), so a small editor
     // never squeezes the tabs, the keyboard button or a channel's ON / PAN / VOL ... TRACK
@@ -1395,7 +1409,7 @@ private:
             fitEditor();
     }
 
-    int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight; }
+    int currentHeaderHeight() const noexcept { return headerCollapsed ? 0 : headerHeight(); }
 
     void show (bool showSettings)
     {
@@ -1851,7 +1865,7 @@ public:
 
     void addPinItem (juce::PopupMenu& menu) override
     {
-        menu.addItem (tr ("Pin on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
+        menu.addItem (tr ("Always on top"), pinnable(), pinned, [safe = juce::Component::SafePointer<PluginWindow> (this)] {
             if (safe != nullptr)
                 safe->setPinned (! safe->pinned, true);
         });
