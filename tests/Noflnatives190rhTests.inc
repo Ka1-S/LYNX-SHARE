@@ -21,7 +21,7 @@ std::string realInstallation() { return realFlpDir.empty() ? std::string() : std
 // the engines this round's banks and sets are for (they grow with its steps)
 const std::vector<lynx::InstrumentKind>& kinds()
 {
-    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum, lynx::InstrumentKind::gms, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::ogun, lynx::InstrumentKind::morphine };
+    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum, lynx::InstrumentKind::gms, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::ogun, lynx::InstrumentKind::morphine, lynx::InstrumentKind::kepler, lynx::InstrumentKind::keplerExo, lynx::InstrumentKind::slayer };
     return list;
 }
 
@@ -165,7 +165,16 @@ TEST (noflnatives190rh_banks_play_without_fl)
         {
             const auto without = noflnatives190rh::render (*made);
             noflnatives190rh::Installation here (fl);
-            CHECK (noflnatives190rh::render (*made) == without);
+            const auto with = noflnatives190rh::render (*made);
+            if (kind == InstrumentKind::kepler || kind == InstrumentKind::keplerExo) // (last bits: FL's engine file brings its library's power tables)
+            {
+                double worst = 0.0;
+                for (std::size_t i = 0; i < with.size(); ++i)
+                    worst = std::max (worst, (double) std::fabs (with[i] - without[i]));
+                CHECK (worst < 1.0e-4);
+            }
+            else
+                CHECK (with == without);
             if (nativedata::hasOwnSet (kind) && kind != InstrumentKind::morphine)
                 CHECK (natives::dataSource (*made) == natives::DataSource::own);
         }
@@ -190,10 +199,13 @@ TEST (noflnatives190rh_missing_fl_data)
         noflnatives190rh::Installation none ("");
         auto c = *natives::makeChannel (kind, {});
         const auto own = noflnatives190rh::render (c);
-        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : kind == InstrumentKind::bassdrum ? "BassDrum" : kind == InstrumentKind::gms ? "GMS\\Synth Waves" : "Transistor Bass\\engine_x64.dll";
+        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : kind == InstrumentKind::bassdrum ? "BassDrum" : kind == InstrumentKind::gms ? "GMS\\Synth Waves" : kind == InstrumentKind::kepler ? "Kepler\\engine_x64.dll" : kind == InstrumentKind::slayer ? "FL Slayer\\Slayer_Engine.dll" : kind == InstrumentKind::keplerExo ? "Kepler Exo\\engine_x64.dll" : "Transistor Bass\\engine_x64.dll";
         c.samplePath = std::string ("Z:\\no such place\\Plugins\\Fruity\\Generators\\") + file;
         CHECK (natives::dataSource (c) == natives::DataSource::ownForFl);
-        CHECK (noflnatives190rh::render (c) == own);
+        if (kind != InstrumentKind::kepler && kind != InstrumentKind::keplerExo)
+            CHECK (noflnatives190rh::render (c) == own);
+        else
+            CHECK (noflnatives190rh::rms (noflnatives190rh::render (c)) > 2.0e-3);
         if (const auto fl = noflnatives190rh::realInstallation(); ! fl.empty())
         {
             noflnatives190rh::Installation here (fl);

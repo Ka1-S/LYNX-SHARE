@@ -323,6 +323,8 @@ add_library(lynx_core STATIC
     src/core/OgunBank.cpp
     src/core/MorphineBank.cpp
     src/core/NativeSlots.cpp
+    src/core/KeplerBank.cpp
+    src/core/SlayerBank.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
     src/core/GranulizerBank.cpp

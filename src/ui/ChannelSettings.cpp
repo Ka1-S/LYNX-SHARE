@@ -566,7 +566,7 @@ public:
         fruityDance = def.instrument == InstrumentKind::fruitydance;
         pocketSuperSaw = def.instrument == InstrumentKind::pocketSuperSaw; // round 190by
         // round 168q: the engines that run FL's own files say so when this computer lacks them
-        engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath));
+        engineFilesMissing = false;
         dataSource = natives::dataSource (def); // round 190rh: LYNX's own data set in place of FL's says so too
         engineFilesMissing = engineFilesMissing || dataSource == natives::DataSource::missing || dataSource == natives::DataSource::ownForFl;
         sytrus = def.instrument == InstrumentKind::sytrus;
@@ -1051,7 +1051,7 @@ public:
                 addModelParam (def, p);
             // Toxic Biohazard without the user's DLL: the drawn wave (0) and the sine (1) only — the built-in waves
             // 2…32 are FL's files
-            if (toxic && ! toxicDllUsable (def.samplePath))
+            if (toxic && ! toxicDllUsable (def.samplePath) && dataSource != natives::DataSource::own && dataSource != natives::DataSource::ownForFl)
                 for (auto& k : knobs)
                     if (k->getName().endsWith (" wave"))
                         k->setRange (0.0, 1.0, 1.0);

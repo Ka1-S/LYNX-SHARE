@@ -13,6 +13,8 @@
 #include <mutex>
 
 #include "core/FlVoiceProcessor.h" // flvp::panLaw (FL's ComputeLRVol law)
+#include "core/DataLocator.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 
 // The engine switches the x87 rounding mode (§2.1): the compiler must not assume round-to-nearest.
@@ -132,8 +134,41 @@ struct DllData
     std::array<float, 7> glideA {}, glideB {};        // glide tables of the two solo modes
 };
 
-std::shared_ptr<const DllData> loadDll (const std::string& path)
+// the engine's data block (picks, chords, glide tables) in any build that has it, as it lies in FL Studio 2026's and 2025's
+constexpr DataBlock dataBlock { 0xd58367aa01ae41abull, 63634, "74273d2ef12017916b0eb1b09194975aabd883f4ca73d189b08521a596830c27" };
+constexpr std::uint32_t dataBlockVa = 0x100152e0;
+
+// LYNX's own picks, chords and glide lengths (core/NativeData.h)
+std::shared_ptr<const DllData> ownData()
 {
+    static const auto own = [] {
+        auto t = std::make_shared<DllData>();
+        for (int i = 0; i < 29; ++i)
+        {
+            auto pick = nativedata::guitarPick (i);
+            auto& v = t->picks[(std::size_t) i];
+            v.push_back ((std::int16_t) pick.size()); // (the count first, as in the engine's data)
+            v.insert (v.end(), pick.begin(), pick.end());
+        }
+        for (int r = 0; r < 12; ++r)
+        {
+            const auto chord = nativedata::guitarChord (r);
+            for (int k = 0; k < 6; ++k)
+                t->chords[(std::size_t) (6 * r + k)] = (std::int8_t) chord[(std::size_t) k];
+        }
+        const auto a = nativedata::glideLengths (false), b = nativedata::glideLengths (true);
+        std::copy (a.begin(), a.end(), t->glideA.begin());
+        std::copy (b.begin(), b.end(), t->glideB.begin());
+        return std::shared_ptr<const DllData> (std::move (t));
+    }();
+    return own;
+}
+
+std::shared_ptr<const DllData> loadDll (const std::string& saved)
+{
+    if (saved.empty() || nativedata::isOwn (saved))
+        return nullptr;
+    const auto path = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     static std::mutex lock;
     static std::map<std::string, std::weak_ptr<const DllData>> cache;
     std::lock_guard<std::mutex> g (lock);
@@ -149,8 +184,15 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
     if (! in)
         return nullptr;
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
-    if (b.size() < 0x1000 || (sha256Hex (b.data(), b.size()) != engineSha256 && peImageSha256Hex (b) != engineImageSha256))
+    if (b.size() < 0x1000)
         return nullptr;
+    std::ptrdiff_t moved = -1;
+    if (sha256Hex (b.data(), b.size()) != engineSha256 && peImageSha256Hex (b) != engineImageSha256)
+    {
+        moved = locateBlock (b, dataBlock);
+        if (moved < 0)
+            return nullptr;
+    }
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;
     rd (0x3c, pe);
@@ -171,6 +213,8 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
         secs.push_back (s);
     }
     auto offset = [&] (std::uint32_t va) -> std::size_t {
+        if (moved >= 0)
+            return (std::size_t) moved + (va - dataBlockVa);
         const auto rva = va - imageBase;
         for (const auto& s : secs)
             if (rva >= s.va && rva < s.va + std::min (s.vs, s.rs))
@@ -2414,6 +2458,8 @@ public:
         usable = nextUsable;
         dllPath = channel.samplePath;
         data = loadDll (dllPath);
+        if (data == nullptr && ! dllPath.empty())
+            data = ownData();
         for (std::size_t i = 0; i < 29; ++i)
             uiParams[i].store (params[i]);
         delete incoming.exchange (build().release());

@@ -131,7 +131,7 @@ CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaContr
 CORE="$CORE src/core/LinkFormula.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
-CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/FlInstall.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/TransistorBassBank.cpp src/core/MiniSynthBank.cpp src/core/SawerBank.cpp src/core/BassDrumBank.cpp src/core/NativeWavesGms.cpp src/core/GmsBank.cpp src/core/SytrusBank.cpp src/core/OgunBank.cpp src/core/MorphineBank.cpp src/core/NativeSlots.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp"
+CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/FlInstall.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/TransistorBassBank.cpp src/core/MiniSynthBank.cpp src/core/SawerBank.cpp src/core/BassDrumBank.cpp src/core/NativeWavesGms.cpp src/core/GmsBank.cpp src/core/SytrusBank.cpp src/core/OgunBank.cpp src/core/MorphineBank.cpp src/core/NativeSlots.cpp src/core/KeplerBank.cpp src/core/SlayerBank.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp"
 # FL's Layer channel and the round 164 controllers
 CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/core/VoltageController.cpp"
 # crash / freeze reports: consent, anonymiser, report JSON, GitHub issue URL (round 159)
@@ -341,19 +341,19 @@ $CXX $FLAGS $CORE $WAVPACK tools/gmsrender.cpp -o build-local/gmsrender 2> >(gre
 $CXX $FLAGS src/core/Morphine.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp tools/morphinerender.cpp -o build-local/morphinerender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruitKick.cpp src/core/FlangusFastDist.cpp tools/fruitkickrender.cpp -o build-local/fruitkickrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/BassDrum.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp tools/bassdrumrender.cpp -o build-local/bassdrumrender 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Toxic.cpp src/core/ToxicFx.cpp tools/toxicrender.cpp -o build-local/toxicrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Toxic.cpp src/core/ToxicFx.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/NativeWavesGms.cpp tools/toxicrender.cpp -o build-local/toxicrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/ogunrender.cpp -o build-local/ogunrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/MiniSynth.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp tools/minisynthrender.cpp -o build-local/minisynthrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/SimSynth.cpp tools/simsynthrender.cpp -o build-local/simsynthrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/Dx10.cpp tools/dx10render.cpp -o build-local/dx10render 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Kepler.cpp src/core/IldspMath.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Kepler.cpp src/core/IldspMath.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp tools/keplerrender.cpp -o build-local/keplerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/TransistorBass.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp tools/tbassrender.cpp -o build-local/tbassrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/PoiZone.cpp tools/poizonerender.cpp -o build-local/poizonerender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/bankrender.cpp -o build-local/bankrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/FruityDelay.cpp tools/fdelayrender.cpp -o build-local/fdelayrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/distructorrender.cpp -o build-local/distructorrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/ThreeOsc.cpp tools/threeoscrender.cpp -o build-local/threeoscrender 2> >(grep -v 'glibc version' >&2)
-$CXX $FLAGS src/core/Slayer.cpp tools/slayerrender.cpp -o build-local/slayerrender 2> >(grep -v 'glibc version' >&2)
+$CXX $FLAGS src/core/Slayer.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/NativeWavesGms.cpp tools/slayerrender.cpp -o build-local/slayerrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/wavetravellerrender.cpp -o build-local/wavetravellerrender 2> >(grep -v 'glibc version' >&2)
 
 # (the tools queued above: build them in parallel, at most half the cores at once, an LTO link takes ~4 GB)

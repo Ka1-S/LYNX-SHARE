@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -19,6 +20,8 @@
 #include <map>
 #include <mutex>
 
+#include "core/DataLocator.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 #include "core/Song.h"
 
@@ -575,8 +578,45 @@ std::vector<float> blitRows()
     return rows;
 }
 
-std::shared_ptr<const Tables> loadTables (const std::string& path)
+// the two blocks in any build that has them (FL Studio 2025.1.6's engine holds the same bytes at other places, round 190rh)
+constexpr DataBlock lfoBlock { 0x5a1e3a413088fcf6ull, 4340, "bf93736f57996ca9be3b9c89c09b1f62025348bff5db362fe8ac57a34fec1056" };
+constexpr DataBlock noiseBlock { 0xb9dc6719de40fe64ull, 1364490, "f50b94a372ba2ab678d67727fe87329523141bb3f38f90addba3d4cc82bded44" };
+
+// LYNX's own tables (core/NativeData.h): asked for by the channel, or FL's engine is not on this computer
+std::shared_ptr<const Tables> ownTables (bool exo)
 {
+    const auto make = [] (bool isExo) {
+        auto t = std::make_shared<Tables>();
+        t->exo = isExo;
+        const auto lfo = nativedata::triangleCycle (lfoPoints);
+        std::copy (lfo.begin(), lfo.end(), t->lfo.begin());
+        t->lfo[lfoPoints] = t->lfo[0];
+        t->noise = nativedata::whiteNoise16 (noisePoints);
+        t->blit = blitRows();
+        return std::shared_ptr<const Tables> (std::move (t));
+    };
+    if (exo)
+    {
+        static const auto two = make (true);
+        return two;
+    }
+    static const auto one = make (false);
+    return one;
+}
+
+bool namesExo (const std::string& path)
+{
+    std::string plain;
+    for (const auto c : path)
+        plain.push_back ((char) std::tolower ((unsigned char) c));
+    return plain.find ("kepler exo") != std::string::npos;
+}
+
+std::shared_ptr<const Tables> loadTables (const std::string& saved)
+{
+    if (saved.empty() || nativedata::isOwn (saved))
+        return nullptr;
+    const auto path = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     static std::mutex lock;
     static std::map<std::string, std::weak_ptr<const Tables>> cache;
     std::lock_guard<std::mutex> g (lock);
@@ -596,9 +636,16 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
     if (b.size() < 0x1000)
         return nullptr;
     const auto hash = peImageSha256Hex (b); // (a re-signed copy of the same build is the same image, round 169g)
-    const bool exo = hash == exoEngineSha256;
-    if (! exo && hash != engineSha256)
-        return nullptr;
+    const bool known = hash == exoEngineSha256 || hash == engineSha256;
+    const bool exo = known ? hash == exoEngineSha256 : namesExo (path);
+    std::ptrdiff_t lfoAt = -1, noiseAt = -1;
+    if (! known) // another build: the blocks by their content (its power tables are not looked for: core/Kepler.cpp computes them)
+    {
+        lfoAt = locateBlock (b, lfoBlock);
+        noiseAt = lfoAt < 0 ? -1 : locateBlock (b, noiseBlock);
+        if (noiseAt < 0)
+            return nullptr;
+    }
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;
     rd (0x3c, pe);
@@ -625,7 +672,7 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
     auto t = std::make_shared<Tables>();
     t->exo = exo;
     // LFO shape: 2 170 int16, centred on (min + max)/2 and scaled by 1/((max − min)/2) in float (§2.1)
-    const auto lo = offset (0x252ED0);
+    const auto lo = known ? offset (0x252ED0) : (std::size_t) lfoAt;
     if (lo + 2 * lfoPoints > b.size())
         return nullptr;
     std::array<std::int16_t, lfoPoints> raw {};
@@ -636,13 +683,13 @@ std::shared_ptr<const Tables> loadTables (const std::string& path)
         t->lfo[(std::size_t) i] = ((float) raw[(std::size_t) i] - centre) * scale;
     t->lfo[lfoPoints] = t->lfo[0];
     // noise oscillator: 683 269 int16 (§2.2)
-    const auto no = offset (0x105CC0);
+    const auto no = known ? offset (0x105CC0) : (std::size_t) noiseAt;
     if (no + 2 * (std::size_t) noisePoints > b.size())
         return nullptr;
     t->noise.resize ((std::size_t) noisePoints);
     std::memcpy (t->noise.data(), b.data() + no, 2 * (std::size_t) noisePoints);
     // the library's 2^(j/64) tables (§1 of REA_rodada165g-kepler): powf's rounded values, pow's 24-bit heads and tails
-    if (crtExp.load (std::memory_order_acquire) == nullptr)
+    if (known && crtExp.load (std::memory_order_acquire) == nullptr)
     {
         const auto fo = offset (exo ? 0xF1A20 : 0xF19B0), ho = offset (exo ? 0xF1C20 : 0xF1BB0), to = offset (exo ? 0xF1E20 : 0xF1DB0);
         if (fo + 512 > b.size() || ho + 512 > b.size() || to + 512 > b.size())
@@ -3894,6 +3941,8 @@ public:
         dll = channel.samplePath;
         patch = parseState (state);
         tables = loadTables (dll);
+        if (tables == nullptr && ! dll.empty())
+            tables = ownTables (patch.exo);
         delete incoming.exchange (build().release()); // built here, swapped in by the audio thread
     }
 
@@ -4134,6 +4183,8 @@ bool keplerExoState (const std::vector<std::uint8_t>& state)
     const auto p = parseState (state);
     return p.usable && p.exo;
 }
+
+float keplerExoDefault (int index) noexcept { return exoDefaultParam (index); }
 
 bool keplerExoDllUsable (const std::string& path)
 {

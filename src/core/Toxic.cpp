@@ -15,6 +15,8 @@
 #include <optional>
 #include <vector>
 
+#include "core/DataLocator.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 #include "core/ToxicFx.h"
 
@@ -204,11 +206,35 @@ std::vector<std::uint8_t> readFile (std::string path)
 struct BuiltinSpectra
 {
     std::array<Spectrum, 33> waves {};
-    bool fromDll = false;
+    bool fromDll = false; // FL's
+    bool usable = false;  // waves 2…32 are there (FL's or LYNX's own)
 };
 
-std::shared_ptr<const BuiltinSpectra> builtinSpectra (const std::string& dllPath)
+// the constants the 31 spectra are pieced together from, in FL Studio 2026's file; another build that keeps the block
+// together is read at its own place (round 190rh)
+constexpr std::size_t wavesAt = 0x8b0c0;
+constexpr DataBlock wavesBlock { 0x545756f2b8941b3aull, 22688, "149f856f9b92efa20c113a84b0c803f65aadc744c2375ae72a9c5ba60470e10d" };
+
+// LYNX's own waves 2…32 (core/NativeData.h)
+std::shared_ptr<const BuiltinSpectra> ownSpectra()
 {
+    static const auto own = [] {
+        auto s = std::make_shared<BuiltinSpectra>();
+        s->waves[1].amp[0] = 1.0f;
+        s->usable = true;
+        for (int w = 2; w <= 32; ++w)
+            for (int h = 1; h <= 128; ++h)
+                s->waves[(std::size_t) w].amp[(std::size_t) (h - 1)] = nativedata::toxicHarmonic (w, h);
+        return std::shared_ptr<const BuiltinSpectra> (std::move (s));
+    }();
+    return own;
+}
+
+std::shared_ptr<const BuiltinSpectra> builtinSpectra (const std::string& saved)
+{
+    if (nativedata::isOwn (saved))
+        return ownSpectra();
+    const auto dllPath = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     static std::mutex m;
     static std::map<std::string, std::shared_ptr<const BuiltinSpectra>> cache;
     std::lock_guard<std::mutex> lock (m);
@@ -217,13 +243,19 @@ std::shared_ptr<const BuiltinSpectra> builtinSpectra (const std::string& dllPath
     auto out = std::make_shared<BuiltinSpectra>();
     out->waves[1].amp[0] = 1.0f;
     const auto b = dllPath.empty() ? std::vector<std::uint8_t> {} : readFile (dllPath);
-    if (b.size() > 0x1000 && sha256Hex (b.data(), b.size()) == dllSha256)
+    std::ptrdiff_t moved = -1;
+    if (b.size() > 0x1000)
+        moved = sha256Hex (b.data(), b.size()) == dllSha256 ? (std::ptrdiff_t) wavesAt : locateBlock (b, wavesBlock);
+    if (moved < 0 && nativedata::isFlFile (dllPath))
+        return ownSpectra(); // (FL's are not on this computer, or in a build LYNX can't read; not cached: they may come back)
+    if (moved >= 0)
     {
-        out->fromDll = true;
+        out->fromDll = out->usable = true;
         for (int w = 1; w <= 32; ++w)
             for (int c = 0; c < 64; ++c)
             {
-                const auto at = (std::size_t) waveChunks[w - 1][c];
+                const auto from = (std::size_t) waveChunks[w - 1][c];
+                const auto at = from == 0 ? from : from - wavesAt + (std::size_t) moved;
                 float v[4] = {};
                 if (at != 0 && at + 16 <= b.size())
                     std::memcpy (v, b.data() + at, 16);
@@ -2038,7 +2070,7 @@ public:
         dllPath = channel.samplePath;
         auto s = std::make_unique<Setup>();
         s->spectra = builtinSpectra (dllPath);
-        if (auto p = parseState (state); p && (! needsDll (*p) || s->spectra->fromDll))
+        if (auto p = parseState (state); p && (! needsDll (*p) || s->spectra->usable))
         {
             s->patch = *p;
             s->valid = true;
@@ -2271,7 +2303,7 @@ std::vector<float> toxicWaveShape (const std::vector<std::uint8_t>& state, const
     else
     {
         builtins = builtinSpectra (w == 1 ? std::string() : dllPath);
-        if (w > 1 && ! builtins->fromDll)
+        if (w > 1 && ! builtins->usable)
             return {};
         spectrum = &builtins->waves[(std::size_t) w];
     }
@@ -2405,7 +2437,7 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
 {
     const auto p = parseState (state);
     const auto spectra = builtinSpectra (dllPath);
-    if (! p || length <= 0 || (needsDll (*p) && ! spectra->fromDll))
+    if (! p || length <= 0 || (needsDll (*p) && ! spectra->usable))
         return {};
     auto plugin = std::make_unique<Plugin>();
     plugin->init (sampleRate, *p, spectra, effects);

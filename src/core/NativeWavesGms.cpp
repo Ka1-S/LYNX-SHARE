@@ -6,6 +6,7 @@
 #include "core/NativeData.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <functional>
@@ -87,6 +88,39 @@ const std::map<std::string, std::function<Cycle()>>& recipes()
     return r;
 }
 } // namespace
+
+// Toxic Biohazard: thirty-one spectra in families (plain waves, organs, formants, bells, combs, noise-like), each scaled so
+// that the cycle peaks near 1; LYNX's own order
+float toxicHarmonic (int wave, int harmonic)
+{
+    static const auto table = [] {
+        std::vector<std::array<float, 128>> t (33);
+        for (int w = 2; w <= 32; ++w)
+        {
+            const auto amplitude = [w] (int n) -> double {
+                const auto h = (double) n;
+                if (w == 2) return 1.0 / h;                                              // saw
+                if (w == 3) return odd (n) / h;                                          // square
+                if (w == 4) return odd (n) / (h * h);                                    // triangle
+                if (w <= 8) return std::fabs (std::sin (pi * h * (0.40 - 0.07 * (w - 5)))) / h; // pulses
+                if (w <= 12) return std::exp (-h / (4.0 * (w - 8))) / h;                 // duller saws
+                if (w <= 16) return n <= 16 && (n & (n - 1)) == 0 ? std::pow (0.9 - 0.12 * (w - 13), std::log2 (h)) : n == 3 * (w - 12) ? 0.3 : 0.0; // organs
+                if (w <= 21) return (formant (h, 2.0 + 2.0 * (w - 17), 1.5) + 0.5 * formant (h, 8.0 + 3.0 * (w - 17), 2.0)) / std::sqrt (h); // vowels
+                if (w <= 25) return n == 1 ? 1.0 : n == 3 + (w - 22) * 2 ? 0.6 : n == 7 + (w - 22) * 4 ? 0.4 : n == 17 + (w - 22) * 5 ? 0.25 : 0.0;  // bells
+                if (w <= 29) return (1.0 + std::cos (h * (0.5 + 0.35 * (w - 26)))) / (2.0 * std::pow (h, 0.8));                                      // combs
+                return (n * (w * 7 + 3) % 11 < 5 ? 1.0 : 0.1) / std::sqrt (h);           // rough
+            };
+            double sum = 0.0;
+            for (int h = 1; h <= 128; ++h)
+                sum += amplitude (h) * amplitude (h);
+            const auto g = 0.67 / std::sqrt (std::max (sum, 1.0e-9)); // (the level: rendered audio, the mean of the waves)
+            for (int h = 1; h <= 128; ++h)
+                t[(std::size_t) w][(std::size_t) (h - 1)] = (float) (g * amplitude (h));
+        }
+        return t;
+    }();
+    return wave >= 2 && wave <= 32 && harmonic >= 1 && harmonic <= 128 ? table[(std::size_t) wave][(std::size_t) (harmonic - 1)] : 0.0f;
+}
 
 std::vector<float> gmsWave (const std::string& name)
 {

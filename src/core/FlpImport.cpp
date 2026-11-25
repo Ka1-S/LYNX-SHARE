@@ -1651,7 +1651,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (drumSynthDll->empty() || ! options.fileExists || ! options.fileExists (*drumSynthDll) || ! drumSynthDllUsable (*drumSynthDll))
                         drumSynthDll = std::string();
                 }
-                def.samplePath = *drumSynthDll;
+                def.samplePath = drumSynthDll->empty() && options.roots.factoryData.empty() ? nativedata::ownPath (InstrumentKind::drumsynth) : *drumSynthDll; // (round 190rh: no FL here: LYNX's own waves)
             }
             else if (const auto sound = drumSynthLiveSound (c.pluginState))
                 for (const auto& candidate : drumSampleCandidates (*sound))
@@ -2052,6 +2052,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.modelParams = { c.rootNote >= 0 && c.rootNote <= 127 ? (float) (60 - c.rootNote) : 0.0f };
                     adoptedFromPlugin = true;
                 }
+                else if (slayerStateUsable (c.pluginState))
+                {
+                    playOwnData (InstrumentKind::slayer, "FL Slayer: FL's recorded picks, chords and glide tables");
+                    def.modelParams = { c.rootNote >= 0 && c.rootNote <= 127 ? (float) (60 - c.rootNote) : 0.0f };
+                }
             }
             else if (name == "fruity video player")
             {
@@ -2163,6 +2168,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = dll;
                     adoptedFromPlugin = true;
                 }
+                else if (keplerStateUsable (c.pluginState) && ! keplerExoState (c.pluginState))
+                    playOwnData (InstrumentKind::kepler, "Kepler: FL's LFO shape and noise");
                 else if (synthFromKepler (c.pluginState, fromPlugin, pluginGain))
                     adopt();
             }
@@ -2178,6 +2185,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = dll;
                     adoptedFromPlugin = true;
                 }
+                else if (keplerExoState (c.pluginState) && keplerStateUsable (c.pluginState))
+                    playOwnData (InstrumentKind::keplerExo, "Kepler Exo: FL's LFO shape and noise");
             }
             else if (name == "boobass")
             {
@@ -2192,6 +2201,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     for (std::size_t k = 0; k < 3; ++k)
                         def.modelParams.push_back ((float) std::clamp ((int) word (4 + 4 * k), 0, 65535));
                     adoptedFromPlugin = true;
+                }
+                else if (c.pluginState.size() >= 16 && word (0) == 1 && (dll.empty() || ! options.fileExists || ! options.fileExists (dll)))
+                {
+                    playOwnData (InstrumentKind::boobass, "BooBass: FL's multisample");
+                    def.pluginState.clear(); // (its three knobs are the channel's parameters)
+                    for (std::size_t k = 0; k < 3; ++k)
+                        def.modelParams.push_back ((float) std::clamp ((int) word (4 + 4 * k), 0, 65535));
                 }
                 else if (synthFromBooBass (c.pluginState, fromPlugin))
                     adopt();
@@ -2247,6 +2263,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         def.samplePath = dll;
                     adoptedFromPlugin = true;
                 }
+                else if (toxicStateUsable (c.pluginState) && ! dllFound && (dll.empty() || ! options.fileExists || ! options.fileExists (dll)))
+                    playOwnData (InstrumentKind::toxic, "Toxic Biohazard: FL's built-in waves");
                 else if (synthFromToxic (c.pluginState, fromPlugin, pluginGain))
                     adopt();
             }

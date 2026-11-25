@@ -2,6 +2,7 @@
 #include "core/Vfx.h"
 #include "core/DrumParamRanges.h"
 #include "core/HostSlide.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 
 #include <algorithm>
@@ -1808,6 +1809,63 @@ constexpr const char* booBassSha256 = "4e10efcd9f945860911e7cdff9c4065c4f193b58d
 // directory), not the multisample: tests/Crash169gTests.inc renders both alike
 constexpr const char* booBassImageSha256Fl25 = "ed3affa1bf8e0fef431857a4f2d38d831512531f410ef091fa87a888574ac323";
 
+// one cycle of a loop → 16 384-point periodic Catmull-Rom table, × −0.5·gain (with 4 guards each side)
+void booBassLoop (BooBassZone& zone, const std::vector<float>& src, float gl)
+{
+    const auto n = (int) src.size();
+    zone.loop.assign (16384 + 8, 0.0f);
+    const auto step = (float) n * 6.1035156e-05f;
+    float pos = 0.0f;
+    for (int k = 0; k < 16384; ++k)
+    {
+        const auto i = (int) pos;
+        const auto t = pos - (float) i;
+        auto at = [&] (int j) { return src[(std::size_t) (((j % n) + n) % n)]; };
+        const auto xm1 = at (i - 1), x0 = at (i), x1 = at (i + 1), x2 = at (i + 2);
+        const auto A = (x2 - xm1) * 0.5f + (x0 - x1) * 1.5f;
+        const auto B = ((xm1 - x0 * 2.5f) + x1) + x1 - x2 * 0.5f;
+        const auto C = (x1 - xm1) * 0.5f;
+        zone.loop[(std::size_t) k + 4] = -((((A * t + B) * t + C) * t + x0) * gl) * 0.5f;
+        pos += step;
+    }
+    for (int g = 0; g < 4; ++g)
+        zone.loop[(std::size_t) g] = zone.loop[16384 + (std::size_t) g], zone.loop[16388 + (std::size_t) g] = zone.loop[4 + (std::size_t) g];
+}
+
+// LYNX's own multisample (core/NativeData.h), in the same six zones
+std::unique_ptr<BooBassTables> ownBooBassTables()
+{
+    auto tables = std::make_unique<BooBassTables>();
+    std::size_t z = 0;
+    for (const auto& s : nativedata::bassString())
+    {
+        if (z >= tables->zones.size())
+            break;
+        auto& zone = tables->zones[z++];
+        zone.root = 100 * s.semitone;
+        zone.attack.assign (s.attack.size() + 8, 0.0f);
+        for (std::size_t i = 0; i < s.attack.size(); ++i)
+            zone.attack[i + 4] = s.attack[i] * 0.5f;
+        for (std::size_t g = 0; g < 4; ++g)
+            zone.attack[g] = zone.attack[4], zone.attack[s.attack.size() + 4 + g] = zone.attack[s.attack.size() + 3];
+        zone.attackLength = (double) s.attack.size() - 1.0;
+        booBassLoop (zone, s.loop, -1.0f); // (the loop's sign is FL's data convention: LYNX's carries the attack on)
+    }
+    return tables;
+}
+
+std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path);
+// what a channel plays: FL's multisample; LYNX's own when its path says so or FL's is not on this computer (round 190rh)
+std::unique_ptr<BooBassTables> booBassTablesFor (const std::string& saved)
+{
+    if (saved.empty())
+        return nullptr;
+    if (! nativedata::isOwn (saved))
+        if (auto fl = loadBooBassTables (nativedata::locate (saved)))
+            return fl;
+    return ownBooBassTables();
+}
+
 std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
 {
     std::ifstream in (path, std::ios::binary);
@@ -1822,8 +1880,11 @@ std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
     const std::vector<std::uint8_t> b ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
     if (b.size() < 0x1000)
         return nullptr;
+    // the decoded builds: the tables' place is known. Another build: found by the six roots (round 190rh), then read by the same
+    // relative places, every size checked
+    std::uint64_t rootsAt = 0xCB9E0;
     if (const auto image = peImageSha256Hex (b); image != booBassSha256 && image != booBassImageSha256Fl25)
-        return nullptr; // only the decoded builds
+        rootsAt = 0;
     auto rd = [&] (std::size_t off, auto& v) { if (off + sizeof (v) <= b.size()) std::memcpy (&v, b.data() + off, sizeof (v)); };
     std::uint32_t pe = 0;
     rd (0x3c, pe);
@@ -1850,6 +1911,17 @@ std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
                 return (std::size_t) (s.ro + r - s.va);
         return b.size();
     };
+    if (rootsAt == 0)
+    {
+        static constexpr std::int32_t wanted[6] { 1100, 1600, 2300, 2800, 3500, 4000 };
+        for (std::size_t at = 0; at + sizeof (wanted) <= b.size() && rootsAt == 0; at += 4)
+            if (std::memcmp (b.data() + at, wanted, sizeof (wanted)) == 0)
+                for (const auto& sec : secs)
+                    if (at >= sec.ro && at < (std::size_t) sec.ro + sec.rs)
+                        rootsAt = sec.va + (at - sec.ro);
+        if (rootsAt < 0xC0)
+            return nullptr;
+    }
     auto u64 = [&] (std::uint64_t va) { std::uint64_t v = 0; rd (offset (va), v); return v; };
     auto i32 = [&] (std::uint64_t va) { std::int32_t v = 0; rd (offset (va), v); return v; };
     auto f32 = [&] (std::uint64_t va) { float v = 0; rd (offset (va), v); return v; };
@@ -1867,11 +1939,11 @@ std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
     for (int z = 0; z < 6; ++z)
     {
         auto& zone = tables->zones[(std::size_t) z];
-        const auto att = samples (base + 0xCB920 + 16 * (std::uint64_t) z), loop = samples (base + 0xCB980 + 16 * (std::uint64_t) z);
+        const auto att = samples (base + rootsAt - 0xC0 + 16 * (std::uint64_t) z), loop = samples (base + rootsAt - 0x60 + 16 * (std::uint64_t) z);
         if (att.empty() || loop.empty())
             return nullptr;
-        zone.root = i32 (base + 0xCB9E0 + 4 * (std::uint64_t) z);
-        const auto attDb = f32 (base + 0xCB9F8 + 4 * (std::uint64_t) z), loopDb = f32 (base + 0xCBA10 + 4 * (std::uint64_t) z);
+        zone.root = i32 (base + rootsAt + 4 * (std::uint64_t) z);
+        const auto attDb = f32 (base + rootsAt + 0x18 + 4 * (std::uint64_t) z), loopDb = f32 (base + rootsAt + 0x30 + 4 * (std::uint64_t) z);
         const auto ga = (float) std::pow (10.0, -attDb / 20.0);
         zone.attack.assign (att.size() + 8, 0.0f);
         for (std::size_t i = 0; i < att.size(); ++i)
@@ -1885,23 +1957,7 @@ std::unique_ptr<BooBassTables> loadBooBassTables (const std::string& path)
         for (int i = 0; i < n; ++i)
             src[(std::size_t) i] = loop[(std::size_t) i] * 3.0517578e-05f;
         const auto gl = (float) std::pow (10.0, -loopDb / 20.0);
-        zone.loop.assign (16384 + 8, 0.0f);
-        const auto step = (float) n * 6.1035156e-05f;
-        float pos = 0.0f;
-        for (int k = 0; k < 16384; ++k)
-        {
-            const auto i = (int) pos;
-            const auto t = pos - (float) i;
-            auto at = [&] (int j) { return src[(std::size_t) (((j % n) + n) % n)]; };
-            const auto xm1 = at (i - 1), x0 = at (i), x1 = at (i + 1), x2 = at (i + 2);
-            const auto A = (x2 - xm1) * 0.5f + (x0 - x1) * 1.5f;
-            const auto B = ((xm1 - x0 * 2.5f) + x1) + x1 - x2 * 0.5f;
-            const auto C = (x1 - xm1) * 0.5f;
-            zone.loop[(std::size_t) k + 4] = -((((A * t + B) * t + C) * t + x0) * gl) * 0.5f;
-            pos += step;
-        }
-        for (int g = 0; g < 4; ++g)
-            zone.loop[(std::size_t) g] = zone.loop[16384 + (std::size_t) g], zone.loop[16388 + (std::size_t) g] = zone.loop[4 + (std::size_t) g];
+        booBassLoop (zone, src, gl);
     }
     static constexpr int roots[6] { 1100, 1600, 2300, 2800, 3500, 4000 };
     for (int z = 0; z < 6; ++z)
@@ -1946,7 +2002,7 @@ public:
         if (channel.samplePath != loadedPath)
         {
             loadedPath = channel.samplePath;
-            if (auto t = loadBooBassTables (loadedPath))
+            if (auto t = booBassTablesFor (loadedPath))
                 delete incoming.exchange (t.release());
         }
         std::array<float, 3> k { 32767, 32767, 32767 };
@@ -2249,5 +2305,5 @@ private:
 std::unique_ptr<Instrument> makeSakuraInstrument() { return std::make_unique<SakuraInstrument>(); }
 std::unique_ptr<Instrument> makeDrumpadInstrument() { return std::make_unique<DrumpadInstrument>(); }
 std::unique_ptr<Instrument> makeBooBassInstrument() { return std::make_unique<BooBassInstrument>(); }
-bool booBassDllUsable (const std::string& path) { return loadBooBassTables (path) != nullptr; }
+bool booBassDllUsable (const std::string& path) { return ! path.empty() && ! nativedata::isOwn (path) && loadBooBassTables (nativedata::locate (path)) != nullptr; }
 } // namespace lynx

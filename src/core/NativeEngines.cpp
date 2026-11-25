@@ -146,10 +146,10 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::toxic, "Toxic Biohazard", "Toxic Biohazard", own, false },
         { InstrumentKind::poizone, "PoiZone", "PoiZone", own, false },
         { InstrumentKind::sakura, "Sakura", "Sakura", own, false },
-        { InstrumentKind::kepler, "Kepler", "Kepler", fl, false },
-        { InstrumentKind::keplerExo, "Kepler Exo", "Kepler Exo", fl, false },
+        { InstrumentKind::kepler, "Kepler", "Kepler", own, false },
+        { InstrumentKind::keplerExo, "Kepler Exo", "Kepler Exo", own, false },
         { InstrumentKind::transistorbass, "Transistor Bass", "Transistor Bass", own, false },
-        { InstrumentKind::boobass, "BooBass", "", fl, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
+        { InstrumentKind::boobass, "BooBass", "", own, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
         { InstrumentKind::simsynth, "SimSynth", "SimSynth", own, false },
         { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", own, false },
         { InstrumentKind::pocketSuperSaw, "Pocket SuperSaw", "", own, false }, // (FL Studio Mobile's SuperSaw: plays from its defaults)
@@ -162,12 +162,13 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::sawer, "Sawer", "Sawer", own, false },
         { InstrumentKind::beepmap, "BeepMap", "BeepMap", own, false },
         { InstrumentKind::flkeys, "FL Keys", "FL Keys", fl, false },
-        { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },
+        { InstrumentKind::slayer, "FL Slayer", "FL Slayer", own, false },
         { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", own, false },
         { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
         { InstrumentKind::fruityslicer, "Fruity Slicer", "Fruity Slicer", own, false },
         { InstrumentKind::slicex, "Slicex", "", own, false }, // (round 190r: a new one is FL's Default preset values, decks empty)
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", own, false },
+        { InstrumentKind::drumsynth, "Fruity DrumSynth Live", "", own, false }, // (round 190rh: from LYNX's bank; FL's own presets are 24-patch kits the engine does not read)
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", own, false },
         { InstrumentKind::fpc, "FPC", "FPC", own, false }, // (without FL: FL's empty kit; the kits are FL's and the user's .fst files)
         { InstrumentKind::directwave, "DirectWave", "", own, false }, // (round 190hz: FL's new DirectWave, 128 empty programs)
@@ -389,8 +390,6 @@ std::optional<ChannelDef> withPreset (const ChannelDef& current, const std::stri
 
 bool available (const InstrumentEngine& e, const FlAccess& access)
 {
-    if (e.kind == InstrumentKind::boobass)
-        return ! booBassDll (access).empty();
     // an engine with a LYNX preset bank starts from it without FL (round 168n)
     return e.needs == Needs::nothing || banks::hasBank (e.kind) || ! defaultPresetPath (e.presetFolder, true, access).empty();
 }
@@ -414,6 +413,12 @@ constexpr FlData flDataList[] = {
     { InstrumentKind::minisynth, "Plugins\\Fruity\\Generators\\Minisynth\\oscdata.dat", &miniSynthDataUsable },
     { InstrumentKind::bassdrum, "Plugins\\Fruity\\Generators\\BassDrum", &bassDrumDataUsable },
     { InstrumentKind::gms, "Plugins\\Fruity\\Generators\\GMS\\Synth Waves", &gmsDataUsable },
+    { InstrumentKind::boobass, "Plugins\\Fruity\\Generators\\BooBass\\BooBass_Eng_x64.dll", &booBassDllUsable },
+    { InstrumentKind::slayer, "Plugins\\Fruity\\Generators\\FL Slayer\\Slayer_Engine.dll", &slayerDllUsable },
+    { InstrumentKind::drumsynth, "Plugins\\Fruity\\Generators\\Fruity DrumSynth Live\\drumsynth_eng_x64.dll", &drumSynthDllUsable },
+    { InstrumentKind::toxic, "Plugins\\Fruity\\Generators\\Toxic Biohazard\\Toxic Biohazard_x64.dll", &toxicDllUsable },
+    { InstrumentKind::kepler, "Plugins\\Fruity\\Generators\\Kepler\\engine_x64.dll", [] (const std::string& p) { return keplerDllUsable (p) && ! keplerExoDllUsable (p); } },
+    { InstrumentKind::keplerExo, "Plugins\\Fruity\\Generators\\Kepler Exo\\engine_x64.dll", &keplerExoDllUsable },
     { InstrumentKind::sawer, "Plugins\\Fruity\\Generators\\Sawer\\data.saw", [] (const std::string& path) { return ! sawerReadTable (path).empty(); } },
 };
 
@@ -431,6 +436,8 @@ DataSource dataSource (const ChannelDef& channel)
     const auto* data = flDataOf (channel.instrument);
     if (data == nullptr || transistorBassIsFlm (channel) || miniSynthIsFlm (channel) || gmsIsFlm (channel)) // (FL Studio Mobile's builds of the engines have their own rules)
         return DataSource::notNeeded;
+    if ((channel.instrument == InstrumentKind::toxic || channel.instrument == InstrumentKind::drumsynth) && channel.samplePath.empty())
+        return DataSource::notNeeded; // (the drawn wave and the sine only: LYNX's bank before round 190rh)
     if (nativedata::isOwn (channel.samplePath))
         return DataSource::own;
     if (! channel.samplePath.empty() && data->usable (channel.samplePath))
@@ -484,13 +491,7 @@ std::vector<FlDataLine> flDataReport (const FlAccess& access)
 
 std::string needsText (InstrumentKind kind)
 {
-    switch (kind)
-    {
-        case InstrumentKind::boobass: case InstrumentKind::slayer: return TR_NOOP ("{0} (needs FL Studio 2025 or 2026 for its samples)");
-        case InstrumentKind::kepler: case InstrumentKind::keplerExo: return TR_NOOP ("{0} (needs FL Studio 2026 for its tables)");
-        case InstrumentKind::flkeys: return TR_NOOP ("{0} (needs FL Studio for its samples)");
-        default: return {};
-    }
+    return kind == InstrumentKind::flkeys ? TR_NOOP ("{0} (needs FL Studio for its samples)") : "";
 }
 
 std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& access)
@@ -502,12 +503,10 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
     if (kind == InstrumentKind::boobass)
     {
         const auto dll = booBassDll (access);
-        if (dll.empty() || ! booBassDllUsable (dll))
-            return std::nullopt;
         ChannelDef def;
         def.name = engine->name;
         def.instrument = kind;
-        def.samplePath = dll;
+        def.samplePath = ! dll.empty() && booBassDllUsable (dll) ? dll : nativedata::ownPath (kind); // (round 190rh)
         // FL's new BooBass is its Plugin database state (Generators\Misc\BooBass.fst: version 1, the three knobs at
         // 0x7fff; round 169l)
         def.modelParams = { 32767.0f, 32767.0f, 32767.0f };
@@ -526,7 +525,11 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
 
     // without FL: the first preset of LYNX's own bank (round 168n)
     if (auto def = banks::defaultChannel (kind, engine->name))
+    {
+        if (def->samplePath.empty() && (kind == InstrumentKind::toxic || kind == InstrumentKind::drumsynth)) // (round 190rh: their waves are LYNX's own)
+            def->samplePath = nativedata::ownPath (kind);
         return def;
+    }
 
     if (engine->needs != Needs::nothing)
         return std::nullopt;

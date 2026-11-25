@@ -1,5 +1,6 @@
 #include "core/DrumSynthLive.h"
 #include "core/DrumParamRanges.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 
 #include <algorithm>
@@ -54,7 +55,35 @@ constexpr std::uint32_t waveTable[18][3] = {
     { 0x3cc0d000, 0x40958000, 0x00010000 }, { 0x40958000, 0x444ec000, 0x00010000 }, { 0x444ec000, 0x47936000, 0x00010000 },
 };
 
-std::unique_ptr<Waves> loadWaves (const std::string& path)
+// LYNX's own waves in the resource's places (core/NativeData.h; the engine's table says where each starts, ends and loops)
+std::unique_ptr<Waves> ownWaves()
+{
+    auto w = std::make_unique<Waves>();
+    w->samples.assign ((waveTable[17][1] >> 12) + 2, 0);
+    for (int k = 0; k < 18; ++k)
+    {
+        const auto from = (std::size_t) (waveTable[k][0] >> 12), to = (std::size_t) (waveTable[k][1] >> 12);
+        const auto made = nativedata::drumSynthWave (k, (int) (to - from + 1));
+        for (std::size_t i = 0; i < made.size() && from + i < w->samples.size(); ++i)
+            w->samples[from + i] = (std::int16_t) std::lround (std::clamp (made[i], -1.0f, 1.0f) * 32767.0f);
+    }
+    return w;
+}
+
+std::unique_ptr<Waves> loadFlWaves (const std::string& path);
+// what a channel plays: FL's waves; LYNX's own when its path says so or FL's are not on this computer (round 190rh); none
+// without a path (as before)
+std::unique_ptr<Waves> loadWaves (const std::string& saved)
+{
+    if (saved.empty())
+        return nullptr;
+    if (! nativedata::isOwn (saved))
+        if (auto fl = loadFlWaves (nativedata::locate (saved)))
+            return fl;
+    return ownWaves();
+}
+
+std::unique_ptr<Waves> loadFlWaves (const std::string& path)
 {
     if (path.empty())
         return nullptr;
@@ -822,5 +851,5 @@ std::optional<std::vector<float>> drumSynthLiveParams (const std::vector<std::ui
 }
 
 std::unique_ptr<Instrument> makeDrumSynthInstrument() { return std::make_unique<DrumSynthInstrument>(); }
-bool drumSynthDllUsable (const std::string& path) { return loadWaves (path) != nullptr; }
+bool drumSynthDllUsable (const std::string& path) { return ! nativedata::isOwn (path) && loadFlWaves (nativedata::locate (path)) != nullptr; }
 } // namespace lynx

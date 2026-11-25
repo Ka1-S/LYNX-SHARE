@@ -16,6 +16,7 @@
 //                                     set gets the next number, old projects keep theirs
 // Nothing rewrites the choice on load or save; "Use FL Studio's data" / "Use LYNX's data" in the channel window do.
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -71,9 +72,36 @@ std::vector<float> drumNoise (const std::string& name);
 // noise; else steady white noise, two seconds that loop)
 std::vector<float> noiseLayer (const std::string& name);
 
+// Kepler: a triangle LFO (one cycle, −1…1, rising from 0) and white noise as 16-bit samples
+std::vector<float> triangleCycle (int points);
+std::vector<std::int16_t> whiteNoise16 (int points);
+
+// Toxic Biohazard's built-in waves 2…32: amplitude of harmonic h (1…128) of LYNX's own wave `wave`
+float toxicHarmonic (int wave, int harmonic);
+
+// DrumSynth Live's wave `wave` (0…17) as `points` samples at 22.05 kHz: metal, cowbell, hats, cymbals, noises, clicks
+std::vector<float> drumSynthWave (int wave, int points);
+
+// BooBass: the six zones of its multisample, an electric bass string computed as a plucked string's partials (the pluck's
+// comb, a high partial decaying faster): `attack` at 16 kHz ending on a whole cycle, `loop` one cycle of 2048 points that
+// carries on from it, `semitone` the zone's root above C0
+struct BassZone
+{
+    int semitone = 0;
+    std::vector<float> attack, loop;
+};
+std::vector<BassZone> bassString();
+
+// FL Slayer: a pick's push on a string, 29 of them by index (noise bursts of different length, colour and hardness), as
+// 16-bit samples; the twelve chords of the chord modes as semitones above the engine's lowest note (six strings, −1
+// ends a chord): the open position's root–fifth–octave–third shape moved along the neck; and the note lengths of the two glide modes
+std::vector<std::int16_t> guitarPick (int index);
+std::vector<int> guitarChord (int root);
+std::vector<float> glideLengths (bool dynamic);
+
 // GMS: one cycle (1024 points) of the wave of that name (core/NativeWavesGms.cpp); an unknown name is a saw
 std::vector<float> gmsWave (const std::string& name);
 
 // the level of each set: 1 = the textbook shape's own; placed so that rendered audio is as loud as the plugin's
-constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507, bassDrumLevel = 0.856, gmsLevel = 1.0;
+constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507, bassDrumLevel = 0.856, gmsLevel = 1.0, keplerNoiseLevel = 1.32, bassStringLevel = 1.17;
 } // namespace lynx::nativedata

@@ -180,6 +180,157 @@ std::vector<float> drumNoise (const std::string& name)
     return out;
 }
 
+std::vector<float> drumSynthWave (int wave, int points)
+{
+    constexpr double rate = 22050.0;
+    std::vector<double> x ((std::size_t) std::max (points, 1));
+    std::uint32_t seed = 0x9e3779b9u + 77u * (std::uint32_t) wave;
+    const auto white = [&seed] {
+        seed = seed * 1664525u + 1013904223u;
+        return (double) (std::int32_t) seed / 2147483648.0;
+    };
+    const auto square = [] (double p) { return p - std::floor (p) < 0.5 ? 1.0 : -1.0; };
+    // the TR-808 cymbal circuit's six oscillators and its cowbell's two (service notes; Werner et al., ICMC 2014)
+    constexpr double metal[6] = { 205.3, 304.4, 369.6, 522.7, 540.0, 800.0 };
+    double low = 0.0;
+    for (std::size_t i = 0; i < x.size(); ++i)
+    {
+        const auto t = (double) i / rate;
+        double v = 0.0;
+        if (wave == 0 || wave == 2 || wave == 5 || wave == 6)
+        {
+            const auto shift = wave == 0 ? 1.0 : wave == 2 ? 1.5 : wave == 5 ? 2.1 : 1.8;
+            for (const auto f : metal)
+                v += square (t * f * shift * (1.0 + 0.03 * wave)) / 6.0;
+            v = (wave == 5 ? 0.4 : 0.8) * v + (wave == 5 ? 0.6 : 0.2) * white();
+        }
+        else if (wave == 1)
+            v = 0.5 * square (t * 540.0) + 0.5 * square (t * 800.0);
+        else if (wave == 3 || wave == 4)
+        {
+            const auto n = white();
+            low += 0.5 * (n - low);
+            v = (n - low) * std::exp (-t / (wave == 3 ? 0.06 : 0.5));
+        }
+        else
+        {
+            const auto n = white();
+            const auto a = 0.1 + 0.07 * (wave - 7);
+            low += a * (n - low);
+            v = (wave % 3 == 0 ? low * 2.0 : wave % 3 == 1 ? n - low : n) * std::exp (-t / (0.03 + 0.03 * (wave - 7)));
+        }
+        x[i] = v;
+    }
+    double top = 1.0e-9;
+    for (const auto v : x)
+        top = std::max (top, std::fabs (v));
+    std::vector<float> out (x.size());
+    for (std::size_t i = 0; i < x.size(); ++i)
+        out[i] = (float) (0.8 * x[i] / top);
+    return out;
+}
+
+std::vector<BassZone> bassString()
+{
+    constexpr double rate = 16000.0, pluckAt = 0.17;
+    std::vector<BassZone> zones;
+    for (const int semitone : { 11, 16, 23, 28, 35, 40 })
+    {
+        BassZone z;
+        z.semitone = semitone;
+        const auto hz = 16.351597831287414 * std::pow (2.0, semitone / 12.0);
+        const auto cycles = std::floor (0.7 * hz);
+        const auto n = (int) std::lround (cycles * rate / hz);
+        const auto top = std::min (40, (int) (0.45 * rate / hz));
+        const auto partial = [&] (int h, double t) { // amplitude now: from the pluck to what keeps sounding
+            const auto pluck = std::sin (pi * h * pluckAt) / h, rest = std::sin (pi * h * pluckAt) / ((double) h * h) * std::exp (-h / 9.0);
+            return rest + (pluck - rest) * std::exp (-t * (4.0 + 1.6 * h));
+        };
+        z.attack.resize ((std::size_t) n + 1);
+        for (int i = 0; i <= n; ++i)
+        {
+            const auto t = (double) i / rate;
+            double v = 0.0;
+            for (int h = 1; h <= top; ++h)
+                v += partial (h, t) * std::sin (2.0 * pi * h * cycles * i / n);
+            z.attack[(std::size_t) i] = (float) (bassStringLevel * v * (1.0 - std::exp (-t / 0.0015)));
+        }
+        z.loop.resize (2048);
+        for (int i = 0; i < 2048; ++i)
+        {
+            double v = 0.0;
+            for (int h = 1; h <= top; ++h)
+                v += partial (h, 0.7) * std::sin (2.0 * pi * h * i / 2048.0);
+            z.loop[(std::size_t) i] = (float) (bassStringLevel * v);
+        }
+        zones.push_back (std::move (z));
+    }
+    return zones;
+}
+
+std::vector<std::int16_t> guitarPick (int index)
+{
+    // a burst of noise through two one-pole low-passes: harder picks are shorter and brighter
+    const auto hardness = (double) (index % 7) / 6.0, length = 0.012 + 0.010 * (double) (index / 7);
+    const auto n = (int) (44100.0 * length * 2.5);
+    std::vector<double> x ((std::size_t) n);
+    std::uint32_t seed = 0x51ed27u + 991u * (std::uint32_t) index;
+    double a = 0.0, b = 0.0, top = 1.0e-9;
+    for (int i = 0; i < n; ++i)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        const auto c = 0.12 + 0.7 * hardness;
+        a += c * ((double) (std::int32_t) seed / 2147483648.0 - a);
+        b += c * (a - b);
+        const auto t = (double) i / 44100.0;
+        x[(std::size_t) i] = b * std::exp (-t / length) * (1.0 - std::exp (-t / 0.0004));
+        top = std::max (top, std::fabs (x[(std::size_t) i]));
+    }
+    std::vector<std::int16_t> out;
+    for (const auto v : x)
+        out.push_back ((std::int16_t) std::lround (v / top * 24000.0));
+    return out;
+}
+
+std::vector<int> guitarChord (int root)
+{
+    std::vector<int> c;
+    for (const int interval : { 0, 7, 12, 16, 19, 24 })
+        c.push_back (root + interval);
+    return c;
+}
+
+std::vector<float> glideLengths (bool dynamic)
+{
+    // the engine counts twelfths of a beat: sixteenth … whole note; the dynamic mode's table is a speed
+    if (dynamic)
+        return { 8.0f, 4.0f, 2.5f, 2.0f, 1.3f, 1.0f, 0.5f };
+    return { 3.0f, 6.0f, 9.0f, 12.0f, 18.0f, 24.0f, 48.0f };
+}
+
+std::vector<float> triangleCycle (int points)
+{
+    std::vector<float> out ((std::size_t) points);
+    for (int i = 0; i < points; ++i)
+    {
+        const auto p = (double) i / points;
+        out[(std::size_t) i] = (float) (p < 0.25 ? 4.0 * p : p < 0.75 ? 2.0 - 4.0 * p : 4.0 * p - 4.0);
+    }
+    return out;
+}
+
+std::vector<std::int16_t> whiteNoise16 (int points)
+{
+    std::vector<std::int16_t> out ((std::size_t) points);
+    std::uint32_t seed = 0x13579bdu;
+    for (auto& v : out)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        v = (std::int16_t) std::lround ((double) (std::int32_t) seed / 2147483648.0 * 32767.0 * 0.35 * keplerNoiseLevel);
+    }
+    return out;
+}
+
 std::vector<float> noiseLayer (const std::string& name)
 {
     std::string n;
