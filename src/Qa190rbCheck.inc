@@ -153,5 +153,139 @@
                 offline.dispatchPendingMessages();
             }
         }
+        // ---- crash reports 52879e1b / a49ceeeb (0.1.29, Windows): DetailView::DeviceChain::paintBody named an effect
+        //      card's knobs with effectInfo(kind).params[knob] while the card was a step behind the song (the slot's
+        //      effect just replaced by a hosted plugin, which has no plain parameters)
+        {
+            const juce::ScopedValueSetter<bool> detailShown (DetailView::shownSetting, true), devices (DetailView::devicesPage, true);
+            AudioEngine offline (false);
+            MainComponent ui (offline, false);
+            ui.setSize (1600, 1000);
+            ui.setVisible (true);
+            ui.setClipLaunchWorkflow (true);
+            ui.showPanelsForSnapshot ({ workspace::Panel::playlist });
+            ui.setClipGridView (PlaylistArea::GridView::song);
+            offline.editSong ([] (Song& s) {
+                s.channels.resize (1);
+                s.channels[0].name = "Keys";
+                s.channels[0].instrument = InstrumentKind::synth;
+                s.channels[0].mixerTrack = 2;
+                if (s.mixer.size() < 4)
+                    s.mixer.resize (4);
+                s.mixer[2].name = "Keys";
+                s.mixer[2].effects = { makeEffectSlot (EffectKind::filter) };
+                s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+                s.playlistTracks[0].name = "Keys";
+                s.playlistTracks[0].mode = PlaylistTrackMode::instrument;
+                s.playlistTracks[0].channel = 0;
+            }, false);
+            offline.dispatchPendingMessages();
+            ui.resized();
+            auto* detail = ui.getDetailViewForSnapshot();
+            check ("Device View: the chain shows the instrument and its effect", detail != nullptr && (detail->showSelection (0, 0), offline.dispatchPendingMessages(), detail->cardCountForCheck() >= 2));
+            if (detail != nullptr)
+            {
+                offline.editSong ([] (Song& s) {
+                    EffectSlot fx;
+                    fx.kind = EffectKind::plugin;
+                    fx.plugin.id = "lynx-qa190rb-check-plugin";
+                    fx.plugin.name = "QA plugin";
+                    s.mixer[2].effects = { fx };
+                });
+                // painted before any message lays the cards out again
+                juce::Image image (juce::Image::ARGB, juce::jmax (1, detail->getWidth()), juce::jmax (1, detail->getHeight()), true);
+                {
+                    juce::Graphics g (image);
+                    detail->paintEntireComponent (g, false);
+                }
+                offline.dispatchPendingMessages();
+                check ("Device View: an effect card paints after its slot became a plugin", detail->cardCountForCheck() >= 2);
+                // (UI monkey seed 104, ASan: the chain's context panel named a channel the song no longer has)
+                offline.editSong ([] (Song& s) { removeChannels (s, { 0 }); });
+                {
+                    juce::Graphics g (image);
+                    detail->paintEntireComponent (g, false);
+                }
+                offline.dispatchPendingMessages();
+                check ("Device View: the chain paints right after its channel was deleted", offline.getSong().channels.empty());
+            }
+        }
+        // ---- UI monkey test, seed 101 (sanitizer build): heap-use-after-free in the Device View. A custom card (a Rack)
+        //      asked for a new layout from inside its own resize; the layout replaced that very card (its channel's kind
+        //      had changed) and deleted it under its running code. Replaced cards are deleted on the next message now
+        {
+            struct QaCard final : public DetailCard
+            {
+                QaCard*& last;
+                bool& deletedInside;
+                bool inside = false;
+                QaCard (QaCard*& l, bool& d) : last (l), deletedInside (d) { last = this; }
+                ~QaCard() override
+                {
+                    deletedInside = deletedInside || inside;
+                    if (last == this)
+                        last = nullptr;
+                }
+                int preferredWidth (int) const override { return 140; }
+                void poke()
+                {
+                    inside = true;
+                    if (onPreferredWidthChanged)
+                        onPreferredWidthChanged(); // (as a Rack card does when its rack view resizes)
+                    inside = false;
+                }
+            };
+            QaCard* lastCard = nullptr;
+            bool deletedInside = false;
+            auto savedFactory = DetailView::instrumentCardFactory;
+            {
+                const juce::ScopedValueSetter<bool> detailShown (DetailView::shownSetting, true), devices (DetailView::devicesPage, true);
+                AudioEngine offline (false);
+                MainComponent ui (offline, false);
+                ui.setSize (1600, 1000);
+                ui.setVisible (true);
+                ui.setClipLaunchWorkflow (true);
+                ui.showPanelsForSnapshot ({ workspace::Panel::playlist });
+                ui.setClipGridView (PlaylistArea::GridView::song);
+                offline.editSong ([] (Song& s) {
+                    s.channels.resize (1);
+                    s.channels[0].name = "Keys";
+                    s.channels[0].instrument = InstrumentKind::synth;
+                    s.channels[0].mixerTrack = 2;
+                    if (s.mixer.size() < 4)
+                        s.mixer.resize (4);
+                    s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+                    s.playlistTracks[0].mode = PlaylistTrackMode::instrument;
+                    s.playlistTracks[0].channel = 0;
+                }, false);
+                offline.dispatchPendingMessages();
+                ui.resized();
+                // (set here: the window installs the racks' factories as it is made; a kind change makes the card)
+                savedFactory = DetailView::instrumentCardFactory;
+                DetailView::instrumentCardFactory = [&lastCard, &deletedInside] (AudioEngine&, int, const ChannelDef&) {
+                    return std::make_unique<QaCard> (lastCard, deletedInside);
+                };
+                offline.editSong ([] (Song& s) { s.channels[0].instrument = InstrumentKind::kick; }, false);
+                offline.dispatchPendingMessages();
+                auto* detail = ui.getDetailViewForSnapshot();
+                if (detail != nullptr)
+                {
+                    detail->showSelection (0, 0);
+                    offline.dispatchPendingMessages();
+                    detail->resized();
+                }
+                auto* card = lastCard;
+                check ("Device View: a custom instrument card is made", detail != nullptr && card != nullptr);
+                if (card != nullptr)
+                {
+                    // the channel's kind changes, then the card asks for a layout from its own code
+                    offline.editSong ([] (Song& s) { s.channels[0].instrument = InstrumentKind::sampler; }, false);
+                    card->poke();
+                    check ("Device View: a card replaced while it asked for the layout is not deleted under its own code", ! deletedInside);
+                }
+            }
+            DetailView::instrumentCardFactory = savedFactory;
+        }
+
         return result;
     }
