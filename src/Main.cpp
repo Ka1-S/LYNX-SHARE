@@ -9702,7 +9702,7 @@ private:
 
             const char* const lines[] = { "This release holds 10 effect slots", "{0} note(s) with ratchets become their strikes",
                                           "{0} note(s) with a Condition", "Automation of a channel's Pitch knob does nothing",
-                                          "Automation of 3x Osc's parameters does nothing", "Effector's newer Kilohearts laws",
+                                          "Automation of 3x Osc's parameters does nothing", "Effector's newer Kilohearts laws (the Comb Filter",
                                           "Effector's Kilohearts Flanger and Dual Delay laws",
                                           "Slide notes move only the pitch on these channels", // (round 190qo, revision 5)
                                           "SoundFont channels play low velocities much quieter", "BooBass plays every note at full level",

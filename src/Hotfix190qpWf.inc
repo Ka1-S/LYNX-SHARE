@@ -87,7 +87,10 @@
             {
                 const auto& c = engine.getSong().playlist[(std::size_t) drawn];
                 const auto& p = engine.getSong().patterns[(std::size_t) c.pattern];
-                expect ("track-only: the clip is the instrument's empty pattern", c.kind == ClipKind::pattern && p.notes.empty() && p.name == "Lead",
+                // (rollup 0.1.32 step 2: since round 190qu the Track-only pencil draws a NEW empty clip of the instrument,
+                // "Lead · clip 1", instead of the instrument's own pattern)
+                expect ("track-only: the clip is an empty clip of the instrument", c.kind == ClipKind::pattern && p.notes.empty()
+                            && juce::String::fromUTF8 (p.name.c_str()).startsWith ("Lead"),
                         juce::String::fromUTF8 (p.name.c_str()));
                 engine.setSelectedChannel (0);
                 doubleClick (at (track, 2.0));
