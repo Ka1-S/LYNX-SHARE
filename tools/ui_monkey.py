@@ -316,11 +316,19 @@ class Monkey:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
             rc = self.proc.poll()
+        elif status == "timeout" and not self.alive():
+            status, detail = "crash", "died before quitting (after the last action)"
         elif status == "timeout" and self.alive():
             # the app's own shutdown (engine, plugins, windows torn down in order) is part of the test
             self.log.write(json.dumps({"k": "quit", "n": self.count, "t": round(time.time() - self.t0, 2)}) + "\n")
             answer = self.call("app.quit", {"discard": True})
             terminated = not (isinstance(answer, dict) and answer.get("quitting"))
+            if terminated and isinstance(answer, dict) and "oserror" in answer:
+                try:
+                    self.proc.wait(10)  # (a crash closes the connection a moment before the process is gone)
+                    status, detail = "crash", "died while asked to quit"
+                except subprocess.TimeoutExpired:
+                    pass
             if terminated:
                 self.proc.terminate()  # (an older build without app.quit)
             try:
