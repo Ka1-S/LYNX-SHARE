@@ -232,6 +232,25 @@ int clonePattern (Song& song, int index)
     return index + 1;
 }
 
+int transposePatterns (Song& song, const std::vector<int>& patterns, const std::vector<int>& channels, int semitones)
+{
+    int changed = 0;
+    for (std::size_t p = 0; p < song.patterns.size(); ++p)
+    {
+        if (std::find (patterns.begin(), patterns.end(), (int) p) == patterns.end())
+            continue;
+        for (auto& n : song.patterns[p].notes)
+        {
+            if (! channels.empty() && std::find (channels.begin(), channels.end(), n.channel) == channels.end())
+                continue;
+            const auto key = std::clamp (n.key + std::clamp (semitones, -127, 127), 0, 127);
+            changed += key != n.key ? 1 : 0;
+            n.key = key;
+        }
+    }
+    return changed;
+}
+
 bool movePattern (Song& song, int index, int delta)
 {
     const auto other = index + (delta < 0 ? -1 : 1);

@@ -41,6 +41,11 @@ void showNameAndColourDialog (const juce::String& title, const juce::String& nam
 void showNameColourIconDialog (const juce::String& title, const juce::String& name, std::uint32_t colour, int icon,
                                std::function<void (const juce::String&, std::uint32_t, int)> onDone, bool focusIcons = false);
 
+// FL's "Transpose..." / "Transpose selected..." value box (round 190ri; FL's field starts empty, "Semitones" under it):
+// `onDone (semitones)` when the user confirms a number other than 0.
+void showTransposeDialog (std::function<void (int)> onDone);
+std::unique_ptr<juce::AlertWindow> makeTransposeDialog(); // (its window, also for --snapshot)
+
 // FL's "Gradient editor" (mixer "Gradient color...", REA_rodada177a §5): First and Last swatches with the blend over
 // `count` tracks, copy / swap buttons and LYNX's colour picker for the swatch being edited. Accept gives the two colours;
 // Cancel or Escape drops them.

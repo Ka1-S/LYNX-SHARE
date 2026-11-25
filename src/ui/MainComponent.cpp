@@ -5768,6 +5768,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Sort channels"), sort);
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
+            // FL: after Color / Mute / Unmute selected (round 190ri)
+            menu.addItem (tr ("Transpose selected..."), ! engine.getSelectedChannels().empty(), false, [this] { rack.transposeSelected(); });
             // FL 2026's next part (capture 190mf A4, fl-rack-options-menu.png): Zip selected Alt+Z, Unzip all Alt+U (round 190mk)
             menu.addSeparator();
             action (menu, "rack.zipSelected", tr ("Zip selected"), ! engine.getSelectedChannels().empty());
@@ -7596,6 +7598,14 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     menu.addItem (tr ("Rename and color...") + shortcutText ("pattern.rename"), [this, index] { showRenamePattern (index); });
     menu.addSubMenu (tr ("Color"), colours);
     menu.addSubMenu (tr ("Length"), lengths);
+    if (picked.empty())
+        picked = { index };
+    // FL's Patterns › Transpose... (PSPatTransposeMenu, round 190ri): every channel of the pattern; from the picker, every picked pattern
+    menu.addItem (tr ("Transpose..."), [this, picked] {
+        showTransposeDialog ([this, picked] (int semitones) {
+            engine.editSong ([picked, semitones] (Song& s) { transposePatterns (s, picked, {}, semitones); });
+        });
+    });
     menu.addItem (tr ("Insert an empty pattern before this one") + shortcutText ("pattern.insert"), [this] { insertPatternHere(); });
     menu.addItem (tr ("Clone") + shortcutText ("pattern.clone"), [this] { clonePatternNow(); });
     menu.addItem (tr ("Move up") + shortcutText ("pattern.moveUp"), index > 0, false, [this] { movePatternNow (-1); });
@@ -7603,8 +7613,6 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     menu.addItem (tr ("Split by channel"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); }); // (round 190qu: FL's name and result)
     // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
     // REA round 168e); opened from the picker, every picked pattern is rendered (round 169k)
-    if (picked.empty())
-        picked = { index };
     menu.addItem (tr ("Quick render as audio clip"), [this, picked] { renderPatternsAsAudioClips (engine, picked, 1); });
     menu.addItem (tr ("Render as audio clip..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 0); });
     menu.addItem (tr ("Render and replace..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 2); });

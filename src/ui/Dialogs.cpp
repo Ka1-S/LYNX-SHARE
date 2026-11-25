@@ -564,6 +564,31 @@ ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog)
     return w != nullptr ? w->iconPicker() : nullptr;
 }
 
+std::unique_ptr<juce::AlertWindow> makeTransposeDialog()
+{
+    auto window = std::make_unique<juce::AlertWindow> (tr ("Transpose"), juce::String(), juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("semitones", {}, tr ("Semitones"));
+    if (auto* editor = window->getTextEditor ("semitones"))
+        editor->setInputRestrictions (4, "+-0123456789");
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return window;
+}
+
+void showTransposeDialog (std::function<void (int)> onDone)
+{
+    auto* window = makeTransposeDialog().release();
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onDone] (int result) {
+                                 const auto semitones = window->getTextEditorContents ("semitones").trim().trimCharactersAtStart ("+").getIntValue();
+                                 if (result == 1 && semitones != 0)
+                                     onDone (semitones);
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+    if (auto* editor = window->getTextEditor ("semitones"))
+        editor->grabKeyboardFocus();
+}
+
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone)
 {

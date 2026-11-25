@@ -403,6 +403,19 @@ void ChannelRackComponent::moveSelectedToGroup (int group)
     repaint();
 }
 
+void ChannelRackComponent::transposeSelected()
+{
+    if (engine.getSelectedChannels().empty())
+        return;
+    showTransposeDialog ([safe = juce::Component::SafePointer<ChannelRackComponent> (this)] (int semitones) {
+        if (safe != nullptr)
+            safe->engine.editSong ([rows = safe->engine.getSelectedChannels(), semitones] (Song& s) {
+                if (! rows.empty())
+                    transposePatterns (s, { s.currentPattern }, rows, semitones);
+            });
+    });
+}
+
 void ChannelRackComponent::groupSelected()
 {
     // FL: Alt+G asks for the "Filter group name"; the selected channels move into the new group, which is shown
@@ -4339,6 +4352,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     }
     menu.addItem (tr ("Select unused channels"), [this] { selectUnused(); });
     menu.addItem (theme::mnemonic (tr ("Group selected..."), 'G') + "\tAlt+G", [this] { groupSelected(); });
+    menu.addItem (tr ("Transpose selected..."), [this] { transposeSelected(); }); // (round 190ri, FL's Channel rack menu item)
     return menu;
 }
 

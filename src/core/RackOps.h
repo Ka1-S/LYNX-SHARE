@@ -111,9 +111,15 @@ int splitPatternByChannel (Song& song, int index, bool keepPatternName = false);
 // Default name for a new pattern: "Pattern N" with the lowest N not in use.
 std::string newPatternName (const Song& song);
 
-// Copies pattern `index` (notes, length, colour) right after it, named "<name> #2" (or the next free
-// number), and selects it. Playlist clips keep pointing at the same patterns. Returns the new index.
+// Copies pattern `index` (notes, length, colour) right after it, named as FL names it (core/CopyName.h: "foo" ->
+// "foo #2" -> "foo #3"; "Pattern 1" -> "Pattern 2", the later default names moving down one), and selects it. Playlist clips keep pointing at the same patterns. Returns the new index.
 int clonePattern (Song& song, int index);
+
+// FL's "Transpose..." (Patterns menu and the Picker's pattern menu: every picked pattern, all channels) and "Transpose
+// selected..." (Channel rack menu: the selected channels in the current pattern): steps and piano roll notes move by
+// `semitones`, each note stopping at the first / last key (FL 2026, round 190ri: 129 + 2 and 131 + 2 -> 131, FL's last key;
+// LYNX's keys end at 127). `channels` empty = every channel. Returns how many notes changed.
+int transposePatterns (Song& song, const std::vector<int>& patterns, const std::vector<int>& channels, int semitones);
 
 // Swaps pattern `index` with its neighbour above (delta < 0) or below; clips and the current pattern
 // follow. Returns false at the ends.
