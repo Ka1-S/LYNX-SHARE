@@ -31,6 +31,8 @@ A second hotfix for 0.1.31.
   LYNX's own synth with an approximation of the sound; it opens that synth itself with the preset loaded and named after
   it, and Send to selected channel puts it into the selected channel's synth. The channel window's preset menus of Toxic
   Biohazard, GMS and Morphine list FL's presets (#288).
+- Fixed 12 crashes and memory errors found by sanitizer and UI stress testing, plus reported crashes (Browser, Device
+  View, Settings search, Tracker, Piano roll drag, Linux VST3, Simple drum machine…).
 - Changed: the LYNX extra "MIDI files dropped on the Playlist become pattern clips" is on by default (FL ignores a .mid
   dropped on its Playlist, so no FL gesture changes; Settings › LYNX extras turns it off) (#287).
 

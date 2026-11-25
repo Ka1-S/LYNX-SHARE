@@ -363,7 +363,7 @@
 #    juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: the plugin's .ttl that JUCE's LV2 manifest helper writes
 #    names its licence, `doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>` (LYNX's plugins are AGPL-3.0-or-later,
 #    LICENSE). JUCE wrote none, and lv2lint warned on every LV2 plugin of the pack ("no license specified").#
-# fix 190rb. Linux/BSD only (round 190rb, the 0.1.32 quality release), juce_events/native/juce_Messaging_linux.cpp:
+# 52. Linux/BSD only ("fix 190rb" in round qa_190rb's branch; round 190rb, the 0.1.32 quality release, in 0.1.31.2), juce_events/native/juce_Messaging_linux.cpp:
 #    the event loop gathers the file-descriptor callbacks that are ready, then calls them one after the other. One of
 #    them can unregister another's (the X11 events close a plugin's editor; the last VST3 editor takes JUCE's VST3 run
 #    loop with it, whose destructor unregisters its descriptors; a CLAP plugin's descriptors go with the plugin), and the
@@ -859,9 +859,9 @@ function(lynx_patch_juce_file file)
             "            peer->addVBlankListener (this);|NL|"
             "            peer->addVBlankListener (this);|NL|           #if JUCE_WINDOWS|NL|            lynxVBlankListenerAdded (*peer); // LYNX patch (round 190gv): the window's vertical blanks start again|NL|           #endif|NL|")
     elseif(file MATCHES "juce_Messaging_linux.cpp$")
-        lynx_juce_fix("unregistered descriptor callbacks are not called (fix 190rb)" "LYNX patch (fix 190rb)"
+        lynx_juce_fix("unregistered descriptor callbacks are not called (fix 52)" "LYNX patch (fix 52)"
             "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|            (*fn)();|NL||NL|        return ! callbackStorage.empty();|NL|    }"
-            "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|        {|NL|            // LYNX patch (fix 190rb): an earlier callback of this round may have unregistered this one, and its owner may|NL|            // be gone (a VST3 plugin's run loop, deleted with the plugin's last editor): only a callback still|NL|            // registered is called|NL|            if (! lynxStillRegistered (fn))|NL|                continue;|NL||NL|            (*fn)();|NL|        }|NL||NL|        return ! callbackStorage.empty();|NL|    }|NL||NL|    bool lynxStillRegistered (const std::shared_ptr<std::function<void()>>& fn) const|NL|    {|NL|        const ScopedLock sl (lock);|NL||NL|        for (const auto& registered : callbacks)|NL|            if (registered.second == fn)|NL|                return true;|NL||NL|        return false;|NL|    }")
+            "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|        {|NL|            // LYNX patch (fix 52): an earlier callback of this round may have unregistered this one, and its owner may|NL|            // be gone (a VST3 plugin's run loop, deleted with the plugin's last editor): only a callback still|NL|            // registered is called|NL|            if (! lynxStillRegistered (fn))|NL|                continue;|NL||NL|            (*fn)();|NL|        }|NL||NL|        return ! callbackStorage.empty();|NL|    }|NL||NL|    bool lynxStillRegistered (const std::shared_ptr<std::function<void()>>& fn) const|NL|    {|NL|        const ScopedLock sl (lock);|NL||NL|        for (const auto& registered : callbacks)|NL|            if (registered.second == fn)|NL|                return true;|NL||NL|        return false;|NL|    }")
     elseif(file MATCHES "juce_Direct2DHwndContext_windows.cpp$")
         lynx_juce_fix("Direct2D present pacing: declarations" "LYNX patch (round 190gv, fix 33): JUCE 8.0.4 paced"
             "namespace juce|NL|{|NL||NL|struct Direct2DHwndContext::HwndPimpl : public Direct2DGraphicsContext::Pimpl|NL|{"

@@ -443,7 +443,7 @@
         // ---- crash reports 0a4071b9 / 83a7f664 (0.1.31.1, Linux): JUCE's event loop gathers the descriptor callbacks that
         //      are ready and calls them in turn; when one of them unregistered another (the X11 events closing a plugin's
         //      last VST3 editor take JUCE's VST3 run loop with it), the gathered copy still ran on its freed owner. JUCE
-        //      fix 190rb (cmake/LynxPatchJuce.cmake): a callback no longer registered is skipped
+        //      fix 52 (cmake/LynxPatchJuce.cmake): a callback no longer registered is skipped
         {
             int first[2] = { -1, -1 }, second[2] = { -1, -1 };
             if (::pipe (first) == 0 && ::pipe (second) == 0)
