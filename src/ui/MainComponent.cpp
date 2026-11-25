@@ -240,6 +240,11 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
       mixer (e),
       browser (e)
 {
+    // round 190rh: FL was found late (a slow drive) or a mounted drive brought it
+    flStudioChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] {
+        if (safe != nullptr)
+            safe->browser.reloadUserFolders();
+    };
     if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
     // round 190nc (DL-95): Live's Macro Mappings list takes the Browser's place while a rack maps (Live's look)
@@ -1235,6 +1240,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    flStudioChanged = nullptr;
     ui::removeNoticeHost (this); // (round 190qx)
     howto::onWindowShown = nullptr;
     juce::Desktop::getInstance().removeGlobalMouseListener (&touchWatcher); // (round 190pm)

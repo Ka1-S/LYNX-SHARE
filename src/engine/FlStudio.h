@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <juce_core/juce_core.h>
 
 #include "core/FlPluginDb.h"
@@ -28,7 +30,16 @@ struct FlStudioInstall
 // LYNX_FL_INSTALL first, then Settings › Files › FL Studio folder, then the registry (HKCU/HKLM
 // Software\Image-Line\Shared\Paths, ...\Plugins\FL Studio), then the usual folders. A variable or setting whose folder
 // is not there (a drive that is not mounted) is passed over, not forgotten.
-FlStudioInstall findFlStudio();
+//
+// The places are looked at by a worker, so a hung or slow drive (a network mount, a disk spinning up) never holds the
+// window: a caller waits at most `waitMs` and then goes on without FL; the answer is used when it comes (flStudioChanged).
+// Asked again, the last answer comes at once and is refreshed in the background. An import, whose result depends on FL's
+// files, waits importWaitMs.
+constexpr int flStudioWaitMs = 800, flStudioImportWaitMs = 15000;
+FlStudioInstall findFlStudio (int waitMs = flStudioWaitMs);
+// Set by the main window: called on the message thread when the installation changed after the fact (a late answer, a
+// drive mounted meanwhile); flStudioAccess() is already the new one.
+inline std::function<void()> flStudioChanged;
 
 // Settings › Files › FL Studio folder (round 190rh): the saved folder ("" = none), in <settings>/fl-studio-folder.txt.
 // setFlFolderSetting saves it ({} clears it) and makes flStudioAccess() find the installation again.

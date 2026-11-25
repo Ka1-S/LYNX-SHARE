@@ -20,6 +20,8 @@ constexpr OwnSet ownSets[] = {
     { InstrumentKind::minisynth, "minisynth", 1 },
     { InstrumentKind::sawer, "sawer", 1 },
     { InstrumentKind::bassdrum, "bassdrum", 1 },
+    { InstrumentKind::gms, "gms", 1 },
+    { InstrumentKind::morphine, "morphine", 1 },
 };
 
 const OwnSet* setOf (InstrumentKind kind) noexcept
@@ -146,6 +148,13 @@ std::string factoryData()
 {
     const std::lock_guard<std::mutex> g (rootLock());
     return rootFolder();
+}
+
+bool isFlFile (const std::string& path)
+{
+    auto plain = lower (path);
+    std::replace (plain.begin(), plain.end(), '\\', '/');
+    return plain.find ("/plugins/fruity/") != std::string::npos;
 }
 
 std::string locate (const std::string& path)

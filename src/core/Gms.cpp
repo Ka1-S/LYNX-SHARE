@@ -1,4 +1,5 @@
 #include "core/Gms.h"
+#include "core/NativeData.h"
 #include "core/GmsMobile.h"
 #include "core/MidiControls.h" // round 190dw item 4
 #include "core/HostSlide.h"
@@ -254,6 +255,29 @@ std::shared_ptr<const Tables> waveTables (const std::string& dir, const std::str
     auto T = x.empty() ? zeroTables() : buildTables (x);
     const std::lock_guard<std::mutex> lock (mutex);
     return cache.emplace (path, T).first->second;
+}
+
+// LYNX's own waves (core/NativeData.h), built once per name
+std::shared_ptr<const Tables> ownWaveTables (const std::string& name)
+{
+    static std::mutex mutex;
+    static std::map<std::string, std::shared_ptr<const Tables>> cache;
+    if (name.empty())
+        return zeroTables();
+    const std::lock_guard<std::mutex> lock (mutex);
+    auto& t = cache[name];
+    if (t == nullptr)
+        t = buildTables (nativedata::gmsWave (name));
+    return t;
+}
+
+// FL's folder of waves for a saved path; "" = LYNX's own waves (asked for, or FL's are not on this computer: round 190rh)
+std::string wavesFolder (const std::string& saved)
+{
+    if (saved.empty() || nativedata::isOwn (saved))
+        return {};
+    const auto folder = nativedata::locate (saved);
+    return readFileBytes (folder + "/Saw.wav").empty() ? std::string() : folder;
 }
 
 // FUN_1800f0ed2…: 65 536 (g, k) pairs, independent of the sample rate
@@ -2233,8 +2257,9 @@ public:
         else if (auto p = parseState (state))
         {
             s->P = p->P;
+            const auto folder = wavesFolder (wavesDir);
             for (int k = 0; k < 3; ++k)
-                s->tabs[k] = waveTables (wavesDir, p->waves[(std::size_t) k]);
+                s->tabs[k] = folder.empty() && ! wavesDir.empty() ? ownWaveTables (p->waves[(std::size_t) k]) : waveTables (folder, p->waves[(std::size_t) k]);
         }
         else
             for (auto& t : s->tabs)
@@ -2447,6 +2472,8 @@ private:
 } // namespace
 
 bool gmsStateUsable (const std::vector<std::uint8_t>& state) { return parseState (state).has_value(); }
+
+bool gmsDataUsable (const std::string& path) { return ! wavesFolder (path).empty(); }
 
 std::vector<std::string> gmsWaveNames (const std::vector<std::uint8_t>& state)
 {

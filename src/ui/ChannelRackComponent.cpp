@@ -4353,7 +4353,7 @@ juce::String flEngineName (const natives::InstrumentEngine& e)
     if (! natives::available (e, flStudioAccess()))
     {
         if (const auto why = natives::needsText (e.kind); ! why.empty()) // (round 190rh: what is missing, not only that it is)
-            return tr (juce::String::fromUTF8 (why.c_str()), { name });
+            return tr (why.c_str(), { name });
         return tr ("{0} (requires FL Studio)", { name });
     }
     return e.beta ? tr ("{0} (beta)", { name }) : name;

@@ -137,12 +137,12 @@ void adoptCapturedRemoteDevices (Song& model, RackState& published, Song&& captu
 using IONode = juce::AudioProcessorGraph::AudioGraphIOProcessor;
 
 // The FL Studio installation (registry, else the usual folders) to resolve %FLStudio...%.
-FlPathRoots findFlStudioRoots()
+FlPathRoots findFlStudioRoots (int waitMs)
 {
     FlPathRoots roots;
-    const auto fl = findFlStudio();
+    const auto fl = waitMs < 0 ? findFlStudio() : findFlStudio (waitMs);
 
-    if (fl.installDir.isDirectory())
+    if (fl.installDir != juce::File()) // (findFlStudio looked: the drive is not asked again here)
     {
         roots.factoryData = fl.installDir.getFullPathName().toStdString();
         roots.data = fl.installDir.getChildFile ("Data").getFullPathName().toStdString();
@@ -4814,7 +4814,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         loadtrace::add ("parse", loadtrace::msSince (started));
 
         FlpImportOptions options;
-        options.roots = findFlStudioRoots();
+        options.roots = findFlStudioRoots (flStudioImportWaitMs); // (round 190rh: the result depends on FL's files, so a slow drive is waited for)
         options.projectFolder = file.getParentDirectory().getFullPathName().toStdString();
         options.flmResourceRoots = flmResourceFolders(); // round 190fn (O1): FL Studio Mobile Rack generators in an .flp
         // samples on a drive that is not there (unplugged external drive, dead network share): one probe per root

@@ -1,4 +1,5 @@
 #include "core/Morphine.h"
+#include "core/NativeData.h"
 #include "core/EngineParams.h"
 #include "core/HostSlide.h"
 
@@ -391,6 +392,38 @@ struct NoiseSample
     int ch = 1, len = 0, ls = 0, le = 0;
     double sr = 44100.0;
 };
+
+// LYNX's own noise (core/NativeData.h) for the name a state asks for
+std::shared_ptr<const NoiseSample> ownNoise (const std::string& name)
+{
+    static std::mutex mutex;
+    static std::map<std::string, std::shared_ptr<const NoiseSample>> cache;
+    const std::lock_guard<std::mutex> lock (mutex);
+    auto& made = cache[name];
+    if (made == nullptr)
+    {
+        auto s = std::make_shared<NoiseSample>();
+        s->data[0] = nativedata::noiseLayer (name);
+        s->len = (int) s->data[0].size();
+        s->data[0].resize (s->data[0].size() + 4, 0.0f);
+        s->le = s->len;
+        made = s;
+    }
+    return made;
+}
+
+// the noise a channel plays: FL's file; LYNX's own when its path says so or FL's is not on this computer (round 190rh)
+std::shared_ptr<const NoiseSample> loadNoise (std::string path);
+std::shared_ptr<const NoiseSample> noiseFor (const std::string& path, const std::string& name)
+{
+    if (path.empty() || name.empty())
+        return nullptr;
+    if (nativedata::isOwn (path))
+        return ownNoise (name);
+    if (auto fl = loadNoise (nativedata::locate (path)))
+        return fl;
+    return nativedata::isFlFile (path) ? ownNoise (name) : nullptr; // (a file of the user's own that is gone: no noise, as before)
+}
 
 std::shared_ptr<const NoiseSample> loadNoise (std::string path)
 {
@@ -2218,7 +2251,7 @@ public:
             {
                 s->patch = std::make_unique<Patch> (std::move (*p));
                 if (! s->patch->noise.empty())
-                    s->noise = loadNoise (noisePath);
+                    s->noise = noiseFor (noisePath, s->patch->noise);
             }
             s->build (preparedRate.load(), tempo.load());
             delete incoming.exchange (s.release());

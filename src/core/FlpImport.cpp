@@ -1962,6 +1962,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = folder;
                     adoptedFromPlugin = true;
                 }
+                else if (gmsStateUsable (c.pluginState) && ! gmsDataUsable (folder)) // (round 190rh; with FL, a state of the user's own waves: as before)
+                    playOwnData (InstrumentKind::gms, "GMS: FL's oscillator waves");
                 else if (synthFromGms (c.pluginState, song.bpm, fromPlugin, pluginGain))
                     adopt();
             }
@@ -2264,8 +2266,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                                                          options.roots);
                         if (! path.empty() && options.fileExists && options.fileExists (path))
                             def.samplePath = path;
-                        else if (options.report != nullptr)
-                            ++options.report->partialEffects["Morphine noise sample (not found)"];
+                        else
+                        {
+                            if (options.roots.factoryData.empty()) // (round 190rh: no FL here: LYNX's own noise)
+                                def.samplePath = nativedata::ownPath (InstrumentKind::morphine);
+                            if (options.report != nullptr)
+                                ++options.report->partialEffects["Morphine noise sample (not found)"];
+                        }
                     }
                 }
                 else if (synthFromMorphine (c.pluginState, fromPlugin, pluginGain))

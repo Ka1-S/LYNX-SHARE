@@ -5,6 +5,12 @@
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
 
+#include <chrono>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <thread>
+
 namespace lynx
 {
 namespace
@@ -105,8 +111,14 @@ juce::StringArray detectFlFolders()
     return out;
 }
 
-FlStudioInstall findFlStudio()
+namespace
 {
+// looks at the disk and the registry: may take as long as the slowest drive
+FlStudioInstall probeFlStudio()
+{
+    // test hook (round 190rh): a drive that answers late
+    if (const auto slow = juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_SLOW_FL_MS", {}).getIntValue(); slow > 0)
+        juce::Thread::sleep (slow);
     FlStudioInstall fl;
     // test hook (round 169g): LYNX_NO_FL=1 = a computer without FL Studio, even where it is installed (0 / empty = FL
     // as found; round 169g2)
@@ -175,6 +187,100 @@ FlStudioInstall findFlStudio()
                 fl.vstFolders.addIfNotAlreadyThere (folder.getFullPathName(), true);
 
     return fl;
+}
+
+// what the answer depends on besides the disk: another value = another question
+juce::String flQuestion()
+{
+    juce::StringArray q;
+    for (const auto* name : { "LYNX_NO_FL", "LYNX_FL_INSTALL", "LYNX_FL_USER_DATA", "WINEPREFIX" })
+        q.add (juce::SystemStats::getEnvironmentVariable (name, {}));
+    q.add (flFolderSetting()); // (LYNX's own settings folder)
+    return q.joinIntoString ("\n");
+}
+
+bool same (const FlStudioInstall& a, const FlStudioInstall& b)
+{
+    return a.installDir == b.installDir && a.userData == b.userData && a.sharedData == b.sharedData && a.vstFolders == b.vstFolders && a.source == b.source;
+}
+
+struct FlFinder
+{
+    std::mutex lock;
+    std::condition_variable done;
+    juce::String question;       // of `answer` / of the worker that is looking
+    FlStudioInstall answer;
+    bool known = false, looking = false, waitedOut = false;
+    int turn = 0;                // the newest worker's (an older one that comes back late is ignored)
+    juce::uint32 answeredMs = 0;
+};
+
+// Shared by the workers: one that hangs on a dead drive may outlive everything else.
+std::shared_ptr<FlFinder> flFinder()
+{
+    static const auto f = std::make_shared<FlFinder>();
+    return f;
+}
+
+// (f.lock held)
+void startLooking (const std::shared_ptr<FlFinder>& f)
+{
+    f->looking = true;
+    const auto turn = ++f->turn;
+    std::thread ([f, turn] {
+        const auto found = probeFlStudio();
+        bool changed = false;
+        {
+            const std::lock_guard<std::mutex> g (f->lock);
+            if (turn != f->turn)
+                return;
+            changed = f->waitedOut || (f->known && ! same (f->answer, found));
+            f->answer = found;
+            f->known = true;
+            f->looking = f->waitedOut = false;
+            f->answeredMs = juce::Time::getMillisecondCounter();
+        }
+        f->done.notify_all();
+        if (changed)
+            juce::MessageManager::callAsync ([] {
+                refreshFlStudioAccess();
+                if (flStudioChanged)
+                    flStudioChanged();
+            });
+    }).detach();
+}
+} // namespace
+
+FlStudioInstall findFlStudio (int waitMs)
+{
+    const auto f = flFinder();
+    const auto question = flQuestion();
+    std::unique_lock<std::mutex> g (f->lock);
+    if (question != f->question)
+    {
+        f->question = question;
+        f->known = f->waitedOut = false;
+        f->answer = {};
+        startLooking (f);
+        f->done.notify_all(); // (whoever waits for the old question)
+    }
+    if (f->known)
+    {
+        if (! f->looking && juce::Time::getMillisecondCounter() - f->answeredMs > 5000)
+            startLooking (f); // (the next caller gets what it finds)
+        return f->answer;
+    }
+    // nobody knows yet: wait, but only the first time round (a drive that did not answer is not waited for again)
+    if (f->waitedOut && waitMs <= flStudioWaitMs)
+        return {};
+    const auto turn = f->turn;
+    if (! f->done.wait_for (g, std::chrono::milliseconds (waitMs), [&f, turn] { return f->known || f->turn != turn; }) || ! f->known)
+    {
+        if (f->turn == turn)
+            f->waitedOut = true;
+        return {};
+    }
+    return f->answer;
 }
 
 FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files)

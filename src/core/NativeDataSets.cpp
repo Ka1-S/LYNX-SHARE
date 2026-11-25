@@ -180,6 +180,28 @@ std::vector<float> drumNoise (const std::string& name)
     return out;
 }
 
+std::vector<float> noiseLayer (const std::string& name)
+{
+    std::string n;
+    for (const auto c : name)
+        n.push_back ((char) std::tolower ((unsigned char) c));
+    for (const auto* word : { "hit", "click", "clap", "pop", "pluck", "metal", "bell", "conga", "castanet", "drop" })
+        if (n.find (word) != std::string::npos)
+            return drumNoise (name);
+    const auto brown = n.find ("brown") != std::string::npos || n.find ("low") != std::string::npos;
+    std::vector<float> out (88200);
+    std::uint32_t seed = 0x2468aceu;
+    double low = 0.0;
+    for (auto& v : out)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        const auto white = (double) (std::int32_t) seed / 2147483648.0;
+        low += 0.02 * (white - low);
+        v = (float) (brown ? 5.0 * low : 0.5 * white);
+    }
+    return out;
+}
+
 std::vector<float> sawCycle()
 {
     static const auto cycle = makeSawCycle();

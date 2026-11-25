@@ -21,7 +21,7 @@ std::string realInstallation() { return realFlpDir.empty() ? std::string() : std
 // the engines this round's banks and sets are for (they grow with its steps)
 const std::vector<lynx::InstrumentKind>& kinds()
 {
-    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum };
+    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum, lynx::InstrumentKind::gms, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::ogun, lynx::InstrumentKind::morphine };
     return list;
 }
 
@@ -157,7 +157,7 @@ TEST (noflnatives190rh_banks_play_without_fl)
             if (! (level > 2.0e-3 && top < 2.0))
                 std::printf ("  %s / %s: rms %g peak %g\n", engine->name, bank[(std::size_t) i].name.c_str(), level, top);
             // the data set is in the channel where the engine has one, and the sound is the same every time
-            CHECK (c->samplePath == nativedata::ownPath (kind));
+            CHECK (c->samplePath == nativedata::ownPath (kind) || (kind == InstrumentKind::morphine && c->samplePath.empty())); // (Morphine: the presets with noise)
             CHECK (noflnatives190rh::render (*c) == a);
         }
         // ... also with FL Studio on the computer: the project's choice, never the computer's
@@ -166,11 +166,11 @@ TEST (noflnatives190rh_banks_play_without_fl)
             const auto without = noflnatives190rh::render (*made);
             noflnatives190rh::Installation here (fl);
             CHECK (noflnatives190rh::render (*made) == without);
-            if (nativedata::hasOwnSet (kind))
+            if (nativedata::hasOwnSet (kind) && kind != InstrumentKind::morphine)
                 CHECK (natives::dataSource (*made) == natives::DataSource::own);
         }
         // a preset picked on a channel that plays FL's data keeps FL's data
-        if (nativedata::hasOwnSet (kind))
+        if (nativedata::hasOwnSet (kind) && kind != InstrumentKind::morphine)
         {
             auto withFl = blank;
             withFl.samplePath = "C:\\FL\\Plugins\\Fruity\\Generators\\x.dll";
@@ -185,12 +185,12 @@ TEST (noflnatives190rh_missing_fl_data)
     using namespace lynx;
     for (const auto kind : noflnatives190rh::kinds())
     {
-        if (! nativedata::hasOwnSet (kind))
+        if (! nativedata::hasOwnSet (kind) || kind == InstrumentKind::morphine)
             continue;
         noflnatives190rh::Installation none ("");
         auto c = *natives::makeChannel (kind, {});
         const auto own = noflnatives190rh::render (c);
-        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : kind == InstrumentKind::bassdrum ? "BassDrum" : "Transistor Bass\\engine_x64.dll";
+        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : kind == InstrumentKind::bassdrum ? "BassDrum" : kind == InstrumentKind::gms ? "GMS\\Synth Waves" : "Transistor Bass\\engine_x64.dll";
         c.samplePath = std::string ("Z:\\no such place\\Plugins\\Fruity\\Generators\\") + file;
         CHECK (natives::dataSource (c) == natives::DataSource::ownForFl);
         CHECK (noflnatives190rh::render (c) == own);
@@ -316,4 +316,41 @@ TEST (noflnatives190rh_fl_folder)
     mode (fl25 / "data", 0755), mode (fl25, 0755), mode (maker, 0755);
    #endif
     fs::remove_all (root, ec);
+}
+
+// the FL effects whose settings live in their state: made without FL, they change or pass a signal, never silence or garbage
+TEST (noflnatives190rh_effects_without_fl)
+{
+    using namespace lynx;
+    for (const auto& e : natives::effectEngines())
+    {
+        const auto slot = natives::makeSlot (e.kind, {});
+        CHECK (e.needs == natives::Needs::nothing && slot.has_value() && slot->kind == e.kind);
+        if (! slot)
+            continue;
+        auto fx = makeEffect (*slot);
+        fx->prepare (48000.0);
+        double in = 0.0, out = 0.0;
+        bool finite = true;
+        for (int b = 0; b < 94; ++b)
+        {
+            std::vector<float> l (512), r (512);
+            for (int i = 0; i < 512; ++i)
+            {
+                const auto t = (b * 512 + i) / 48000.0;
+                l[(std::size_t) i] = r[(std::size_t) i] = (float) (0.25 * std::sin (2.0 * M_PI * 220.0 * t) + 0.05 * std::sin (2.0 * M_PI * 3100.0 * t));
+                in += 2.0 * l[(std::size_t) i] * l[(std::size_t) i];
+            }
+            fx->process (l.data(), r.data(), 512, slot->params, 120.0);
+            for (int i = 0; i < 512; ++i)
+            {
+                finite = finite && std::isfinite (l[(std::size_t) i]) && std::isfinite (r[(std::size_t) i]);
+                out += (double) l[(std::size_t) i] * l[(std::size_t) i] + (double) r[(std::size_t) i] * r[(std::size_t) i];
+            }
+        }
+        const auto change = 10.0 * std::log10 (out / in);
+        CHECK (finite && change < 12.0 && (change > -12.0 || e.kind == EffectKind::vocodex)); // (Vocodex: its modulator is another track's)
+        if (! (finite && change < 12.0 && (change > -12.0 || e.kind == EffectKind::vocodex)))
+            std::printf ("  %s: %g dB\n", e.presetFolder, change);
+    }
 }

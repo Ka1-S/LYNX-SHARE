@@ -317,6 +317,12 @@ add_library(lynx_core STATIC
     src/core/MiniSynthBank.cpp
     src/core/SawerBank.cpp
     src/core/BassDrumBank.cpp
+    src/core/NativeWavesGms.cpp
+    src/core/GmsBank.cpp
+    src/core/SytrusBank.cpp
+    src/core/OgunBank.cpp
+    src/core/MorphineBank.cpp
+    src/core/NativeSlots.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
     src/core/GranulizerBank.cpp

@@ -10,6 +10,8 @@
 #include "core/FlEffects.h"
 #include "core/FlSamplers.h"
 #include "core/Fpc.h"
+#include "core/Gms.h"
+#include "core/GmsMobile.h"
 #include "core/GrossBeat.h"
 #include "core/HardcoreFx.h"
 #include "core/Harmless.h"
@@ -21,6 +23,7 @@
 #include "core/MiniSynth.h"
 #include "core/MixSuite.h"
 #include "core/NativeData.h"
+#include "core/NativeSlots.h"
 #include "core/PhysicalModels.h"
 #include "core/Sawer.h"
 #include "core/Slayer.h"
@@ -134,12 +137,12 @@ const std::vector<InstrumentEngine>& instrumentEngines()
     // (core/NativeData.h) needs nothing; with FL installed it still starts from FL's preset.
     static const std::vector<InstrumentEngine> list = {
         { InstrumentKind::threeosc, "3x Osc", "3x Osc", own, false },
-        { InstrumentKind::sytrus, "Sytrus", "Sytrus", fl, false },
+        { InstrumentKind::sytrus, "Sytrus", "Sytrus", own, false },
         { InstrumentKind::harmor, "Harmor", "Harmor", fl, true },
         { InstrumentKind::harmless, "Harmless", "Harmless", own, false },
-        { InstrumentKind::gms, "GMS", "GMS", fl, false },
-        { InstrumentKind::morphine, "Morphine", "Morphine", fl, false },
-        { InstrumentKind::ogun, "Ogun", "Ogun", fl, false },
+        { InstrumentKind::gms, "GMS", "GMS", own, false },
+        { InstrumentKind::morphine, "Morphine", "Morphine", own, false },
+        { InstrumentKind::ogun, "Ogun", "Ogun", own, false },
         { InstrumentKind::toxic, "Toxic Biohazard", "Toxic Biohazard", own, false },
         { InstrumentKind::poizone, "PoiZone", "PoiZone", own, false },
         { InstrumentKind::sakura, "Sakura", "Sakura", own, false },
@@ -177,13 +180,13 @@ const std::vector<InstrumentEngine>& instrumentEngines()
 const std::vector<EffectEngine>& effectEngines()
 {
     static const std::vector<EffectEngine> list = {
-        { EffectKind::maximus, "Maximus", fl, false },
-        { EffectKind::vocodex, "Vocodex", fl, false },
-        { EffectKind::equo, "EQUO", fl, false },
-        { EffectKind::distructor, "Distructor", fl, false },
-        { EffectKind::lovePhilter, "Fruity Love Philter", fl, false },
+        { EffectKind::maximus, "Maximus", own, false },
+        { EffectKind::vocodex, "Vocodex", own, false },
+        { EffectKind::equo, "EQUO", own, false },
+        { EffectKind::distructor, "Distructor", own, false },
+        { EffectKind::lovePhilter, "Fruity Love Philter", own, false },
         { EffectKind::grossBeat, "Gross Beat", own, false },
-        { EffectKind::convolver, "Fruity Convolver", fl, false },
+        { EffectKind::convolver, "Fruity Convolver", own, false },
         { EffectKind::flPitchShifter, "Pitch Shifter", own, false },
         { EffectKind::vintagePhaser, "Vintage Phaser", own, false },
         { EffectKind::squeeze, "Fruity Squeeze", own, false },
@@ -410,6 +413,7 @@ constexpr FlData flDataList[] = {
     { InstrumentKind::transistorbass, "Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", &transistorBassDllUsable },
     { InstrumentKind::minisynth, "Plugins\\Fruity\\Generators\\Minisynth\\oscdata.dat", &miniSynthDataUsable },
     { InstrumentKind::bassdrum, "Plugins\\Fruity\\Generators\\BassDrum", &bassDrumDataUsable },
+    { InstrumentKind::gms, "Plugins\\Fruity\\Generators\\GMS\\Synth Waves", &gmsDataUsable },
     { InstrumentKind::sawer, "Plugins\\Fruity\\Generators\\Sawer\\data.saw", [] (const std::string& path) { return ! sawerReadTable (path).empty(); } },
 };
 
@@ -425,7 +429,7 @@ const FlData* flDataOf (InstrumentKind kind) noexcept
 DataSource dataSource (const ChannelDef& channel)
 {
     const auto* data = flDataOf (channel.instrument);
-    if (data == nullptr || transistorBassIsFlm (channel) || miniSynthIsFlm (channel)) // (FL Studio Mobile's builds of the engines have their own rules)
+    if (data == nullptr || transistorBassIsFlm (channel) || miniSynthIsFlm (channel) || gmsIsFlm (channel)) // (FL Studio Mobile's builds of the engines have their own rules)
         return DataSource::notNeeded;
     if (nativedata::isOwn (channel.samplePath))
         return DataSource::own;
@@ -616,6 +620,8 @@ std::optional<EffectSlot> makeSlot (EffectKind kind, const FlAccess& access, dou
 
     if (engine->needs != Needs::nothing)
         return std::nullopt;
+    if (auto slot = nativeslots::make (kind)) // (round 190rh: a state of LYNX's own)
+        return slot;
     return makeEffectSlot (kind);
 }
 

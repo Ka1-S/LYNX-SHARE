@@ -66,7 +66,7 @@ class AudioLogger;
 // The Song is touched only by the UI thread; each edit publishes an immutable
 // snapshot (RackState) to the audio thread.
 // Folders of the most recent FL Studio installation (empty if none).
-FlPathRoots findFlStudioRoots();
+FlPathRoots findFlStudioRoots (int waitMs = -1); // (ms to wait for a slow drive; −1 = findFlStudio's own)
 // The user's FL installation as the native FL engines read it (round 142): its folders and this PC's file system
 const natives::FlAccess& flStudioAccess(); // (found once, and again after refreshFlStudioAccess)
 // Settings › Files › FL Studio folder changed: the next flStudioAccess() is the new installation. References taken before

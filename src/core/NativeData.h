@@ -41,6 +41,9 @@ int ownRevision (const std::string& path, InstrumentKind kind) noexcept;
 void setFactoryData (const std::string& folder);
 std::string factoryData();
 
+// true for a path that names a file of FL's plugins ("...\\Plugins\\Fruity\\..."), wherever FL is
+bool isFlFile (const std::string& path);
+
 // The file (or folder) to read for a channel's path: itself when it exists, else the same file of this computer's FL
 // installation (matched from "Plugins\Fruity\" on), else the path unchanged. Reserved paths come back unchanged.
 std::string locate (const std::string& path);
@@ -64,6 +67,13 @@ std::vector<float> sawCycle();
 std::vector<float> sineCycle (int points);
 std::vector<float> drumNoise (const std::string& name);
 
+// Morphine: the noise layer of that name, at 44.1 kHz (a word that says a hit or a click: drumNoise; "brown" or "low": brown
+// noise; else steady white noise, two seconds that loop)
+std::vector<float> noiseLayer (const std::string& name);
+
+// GMS: one cycle (1024 points) of the wave of that name (core/NativeWavesGms.cpp); an unknown name is a saw
+std::vector<float> gmsWave (const std::string& name);
+
 // the level of each set: 1 = the textbook shape's own; placed so that rendered audio is as loud as the plugin's
-constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507, bassDrumLevel = 0.856;
+constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507, bassDrumLevel = 0.856, gmsLevel = 1.0;
 } // namespace lynx::nativedata

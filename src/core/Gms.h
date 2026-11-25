@@ -37,6 +37,9 @@ bool gmsStateUsable (const std::vector<std::uint8_t>& state);
 // the state is unusable
 std::vector<std::string> gmsWaveNames (const std::vector<std::uint8_t>& state);
 
+// true when `path` is the folder of GMS' waves (here, or in this computer's FL installation: core/NativeData.h)
+bool gmsDataUsable (const std::string& path);
+
 // byte offset of parameter P[index] (0…211, float) inside the state, or −1 (used by the channel settings panel)
 int gmsParamOffset (const std::vector<std::uint8_t>& state, int index);
 
