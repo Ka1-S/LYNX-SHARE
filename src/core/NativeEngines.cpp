@@ -15,9 +15,11 @@
 #include "core/HarmlessFx.h"
 #include "core/LynxBanks.h"
 #include "core/MidiOut.h"
+#include "core/MiniSynth.h"
 #include "core/MixSuite.h"
 #include "core/NativeData.h"
 #include "core/PhysicalModels.h"
+#include "core/Sawer.h"
 #include "core/Slicex.h"
 #include "core/TransistorBass.h"
 #include "flp/Flp.h"
@@ -141,7 +143,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::transistorbass, "Transistor Bass", "Transistor Bass", own, false },
         { InstrumentKind::boobass, "BooBass", "", fl, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
         { InstrumentKind::simsynth, "SimSynth", "SimSynth", own, false },
-        { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", fl, false },
+        { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", own, false },
         { InstrumentKind::pocketSuperSaw, "Pocket SuperSaw", "", own, false }, // (FL Studio Mobile's SuperSaw: plays from its defaults)
         { InstrumentKind::tetra, "Tetra", "", own, false }, // (round 190hs: LYNX's own FM synth, plays from its defaults: one sine)
         { InstrumentKind::helix, "Helix", "", own, false }, // (round 190ja: LYNX's own wavetable synth, plays from its defaults)
@@ -401,6 +403,8 @@ struct FlData
 };
 constexpr FlData flDataList[] = {
     { InstrumentKind::transistorbass, "Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", &transistorBassDllUsable },
+    { InstrumentKind::minisynth, "Plugins\\Fruity\\Generators\\Minisynth\\oscdata.dat", &miniSynthDataUsable },
+    { InstrumentKind::sawer, "Plugins\\Fruity\\Generators\\Sawer\\data.saw", [] (const std::string& path) { return ! sawerReadTable (path).empty(); } },
 };
 
 const FlData* flDataOf (InstrumentKind kind) noexcept
@@ -415,7 +419,7 @@ const FlData* flDataOf (InstrumentKind kind) noexcept
 DataSource dataSource (const ChannelDef& channel)
 {
     const auto* data = flDataOf (channel.instrument);
-    if (data == nullptr || transistorBassIsFlm (channel)) // (FL Studio Mobile's build of the engine needs no file)
+    if (data == nullptr || transistorBassIsFlm (channel) || miniSynthIsFlm (channel)) // (FL Studio Mobile's builds of the engines have their own rules)
         return DataSource::notNeeded;
     if (nativedata::isOwn (channel.samplePath))
         return DataSource::own;

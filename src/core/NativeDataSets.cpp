@@ -3,7 +3,10 @@
 
 #include "core/NativeData.h"
 
+#include <algorithm>
 #include <cmath>
+#include <complex>
+#include <cstdint>
 
 namespace lynx::nativedata
 {
@@ -53,5 +56,63 @@ std::vector<std::vector<float>> bassPulseCycles (double rate, int count)
         out.push_back (std::move (cycle));
     }
     return out;
+}
+
+void softResetSaw (std::vector<float>& amplitude, std::vector<float>& phase)
+{
+    // x(p) = ½ − p − ½·e^(−p/τ), p = 0…1: its Fourier series in closed form. Ramp: Σ sin(2πhp)/(πh); the decay
+    // ½·e^(−p/τ): ½·(1 − e^(−1/τ))/(1/τ + i2πh)·2 as the complex amplitude of harmonic h
+    constexpr double pi = 3.141592653589793, tau = 0.05;
+    amplitude.assign (1024, 0.0f);
+    phase.assign (1024, 0.0f);
+    for (int h = 1; h <= 1024; ++h)
+    {
+        const std::complex<double> ramp (0.0, -1.0 / (pi * h)); // (sin = Re (−i·e^{ix}))
+        const auto decay = (1.0 - std::exp (-1.0 / tau)) / std::complex<double> (1.0 / tau, 2.0 * pi * h);
+        const auto c = ramp - decay;
+        amplitude[(std::size_t) h - 1] = (float) std::abs (c);
+        phase[(std::size_t) h - 1] = (float) std::arg (c);
+    }
+}
+
+namespace
+{
+std::vector<float> makeCoupledSaw()
+{
+    // harmonic h of a saw: 1/h, quarter-turn phase; the coupling's first-order high-pass (corner at the fundamental) and
+    // a constant turn of 0.3 rad. Scaled to an RMS of 0.28 (the level the engine's drive expects)
+    constexpr double pi = 3.141592653589793;
+    constexpr int n = 8192, harmonics = 2048;
+    std::vector<double> x ((std::size_t) n, 0.0);
+    std::vector<double> sine ((std::size_t) n);
+    for (int i = 0; i < n; ++i)
+        sine[(std::size_t) i] = std::sin (2.0 * pi * i / n);
+    for (int h = 1; h <= harmonics; ++h)
+    {
+        const auto fade = 0.5 + 0.5 * std::cos (pi * h / (harmonics + 1));
+        const auto a = fade / h * (h / std::sqrt ((double) h * h + 1.0));
+        const auto ph = -0.5 * pi - 0.3 - std::atan (1.0 / h);
+        const auto c = a * std::cos (ph), s = a * std::sin (ph); // a·cos (hx + ph)
+        for (int i = 0; i < n; ++i)
+        {
+            const auto k = (std::size_t) ((std::int64_t) h * i & (n - 1));
+            x[(std::size_t) i] += c * sine[(k + n / 4) & (n - 1)] - s * sine[k];
+        }
+    }
+    double e = 0.0;
+    for (const auto v : x)
+        e += v * v;
+    const auto g = 0.28 / std::sqrt (e / n);
+    std::vector<float> out ((std::size_t) n);
+    for (int i = 0; i < n; ++i)
+        out[(std::size_t) i] = (float) (x[(std::size_t) i] * g);
+    return out;
+}
+} // namespace
+
+std::vector<float> coupledSawCycle()
+{
+    static const auto cycle = makeCoupledSaw();
+    return cycle;
 }
 } // namespace lynx::nativedata

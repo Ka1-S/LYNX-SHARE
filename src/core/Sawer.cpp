@@ -6,6 +6,7 @@
 // DLL's, so contraction stays off. Clean-room: behaviour described in our own words; no Image-Line code.
 
 #include "core/Sawer.h"
+#include "core/NativeData.h"
 #include "core/ModelParams.h"
 #include "core/HostSlide.h"
 
@@ -2521,6 +2522,8 @@ public:
         {
             tablePath = channel.samplePath;
             table = tablePath.empty() ? std::vector<float> {} : sawerReadTable (tablePath);
+            if (table.empty() && ! tablePath.empty()) // LYNX's own cycle: asked for, or FL's is not on this computer (round 190rh)
+                table = nativedata::coupledSawCycle();
         }
         loadedState = channel.pluginState;
         loadedPoly = mp;
@@ -2796,8 +2799,11 @@ bool sawerSetValue (ChannelDef& c, const EngineParam& p, float raw)
 Table sawerModelTable() { return { &sawerParams(), &sawerValue, &sawerSetValue }; }
 } // namespace modelparams
 
-std::vector<float> sawerReadTable (const std::string& path)
+std::vector<float> sawerReadTable (const std::string& saved)
 {
+    if (nativedata::isOwn (saved))
+        return {};
+    const auto path = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     std::ifstream in (path, std::ios::binary);
     if (! in)
     {

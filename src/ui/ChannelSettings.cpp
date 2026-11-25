@@ -566,8 +566,7 @@ public:
         fruityDance = def.instrument == InstrumentKind::fruitydance;
         pocketSuperSaw = def.instrument == InstrumentKind::pocketSuperSaw; // round 190by
         // round 168q: the engines that run FL's own files say so when this computer lacks them
-        engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
-                          || (sawer && sawerReadTable (def.samplePath).empty());
+        engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath));
         dataSource = natives::dataSource (def); // round 190rh: LYNX's own data set in place of FL's says so too
         engineFilesMissing = engineFilesMissing || dataSource == natives::DataSource::missing || dataSource == natives::DataSource::ownForFl;
         sytrus = def.instrument == InstrumentKind::sytrus;

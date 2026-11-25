@@ -48,6 +48,9 @@ std::unique_ptr<Instrument> makeMiniSynthInstrument();
 // voice). A channel imported from a .flm asks for it with modelParams = { 1 } (saved with the project).
 bool miniSynthIsFlm (const ChannelDef& channel) noexcept;
 
+// true when `path` is an oscdata.dat the engine can read (here, or in this computer's FL installation: core/NativeData.h)
+bool miniSynthDataUsable (const std::string& path);
+
 namespace minisynth
 {
 // One note for the reference renderer (the verification harness drives the engine exactly like the Python model).

@@ -1,4 +1,5 @@
 #include "core/MiniSynth.h"
+#include "core/NativeData.h"
 #include "core/MidiControls.h" // round 190dw item 4
 #include "core/HostSlide.h"
 
@@ -147,8 +148,29 @@ std::shared_ptr<const Tables> buildTables (const std::vector<std::uint8_t>& byte
     }
     return T;
 }
-std::shared_ptr<const Tables> tablesFor (const std::string& path)
+// `bytes`' layout from amplitudes and phases
+std::vector<std::uint8_t> tableBytes (const std::vector<float>& amp, const std::vector<float>& phase)
 {
+    std::vector<std::uint8_t> b (8192);
+    std::memcpy (b.data(), amp.data(), 4096);
+    std::memcpy (b.data() + 4096, phase.data(), 4096);
+    return b;
+}
+// LYNX's own oscillator (core/NativeData.h)
+std::shared_ptr<const Tables> ownTables()
+{
+    static const auto t = [] {
+        std::vector<float> amp, phase;
+        nativedata::softResetSaw (amp, phase);
+        return buildTables (tableBytes (amp, phase));
+    }();
+    return t;
+}
+std::shared_ptr<const Tables> tablesFor (const std::string& saved)
+{
+    if (nativedata::isOwn (saved))
+        return ownTables();
+    const auto path = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     static std::mutex mutex;
     static std::map<std::string, std::shared_ptr<const Tables>> cache;
     if (path.empty())
@@ -158,7 +180,10 @@ std::shared_ptr<const Tables> tablesFor (const std::string& path)
         if (const auto it = cache.find (path); it != cache.end())
             return it->second;
     }
-    auto T = buildTables (readFileBytes (path));
+    const auto bytes = readFileBytes (path);
+    if (bytes.size() < 8192) // (FL's file is not on this computer: LYNX's own oscillator; not cached, it may come back)
+        return ownTables();
+    auto T = buildTables (bytes);
     const std::lock_guard<std::mutex> lock (mutex);
     return cache.emplace (path, T).first->second;
 }
@@ -1443,6 +1468,11 @@ private:
 } // namespace
 
 bool miniSynthStateUsable (const std::vector<std::uint8_t>& state) { return parseState (state).has_value(); }
+
+bool miniSynthDataUsable (const std::string& path)
+{
+    return ! path.empty() && ! nativedata::isOwn (path) && readFileBytes (nativedata::locate (path)).size() >= 8192;
+}
 
 bool miniSynthIsFlm (const ChannelDef& channel) noexcept
 {

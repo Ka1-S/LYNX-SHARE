@@ -1877,6 +1877,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = oscdata;
                     adoptedFromPlugin = true;
                 }
+                else if (miniSynthStateUsable (c.pluginState))
+                    playOwnData (InstrumentKind::minisynth, "MiniSynth: FL's oscillator table (oscdata.dat)");
                 else if (synthFromMiniSynth (c.pluginState, song.bpm, fromPlugin))
                     adopt();
             }
@@ -2143,6 +2145,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = saw;
                     adoptedFromPlugin = true;
                 }
+                else if (sawerStateUsable (c.pluginState))
+                    playOwnData (InstrumentKind::sawer, "Sawer: FL's oscillator cycle (data.saw)");
             }
             else if (name == "kepler")
             {

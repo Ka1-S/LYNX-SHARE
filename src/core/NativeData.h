@@ -52,4 +52,11 @@ std::string locate (const std::string& path);
 // transistor square as the literature describes the TB-303's (a saturated low side, a high side that sags through the
 // coupling capacitor, a duty cycle that narrows as the pitch rises), zero mean.
 std::vector<std::vector<float>> bassPulseCycles (double rate, int count);
+
+// MiniSynth's oscillator: 1024 cosine amplitudes and phases of a falling saw whose reset is not instant (the capacitor
+// recovers exponentially over a twentieth of the cycle), as an analogue ramp oscillator's
+void softResetSaw (std::vector<float>& amplitude, std::vector<float>& phase);
+
+// Sawer's oscillator: one cycle of 8192 points, an analogue saw through a coupling high-pass and a small phase turn
+std::vector<float> coupledSawCycle();
 } // namespace lynx::nativedata

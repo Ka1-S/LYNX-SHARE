@@ -232,7 +232,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | BeepMap engine | BeepMap | Exact | 9 preset/render-test states; only uncompressed 24/32-bit BMPs |
 | Drumaxx engine | Drumaxx | Exact | all 133 states on random notes; its pattern sequencer and separate outputs are not played |
 | Slayer engine † | FL Slayer | Exact | 64 presets and 340 random parameter sets; the engine's 5 ms control-grid phase depends on FL's history |
-| MiniSynth engine † | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB |
+| MiniSynth engine †‡ | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB; without FL its oscillator is LYNX SHARE's own (similar: levels within 1 dB, residual about −21 dB); 24 LYNX presets |
 | Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo's "Kepler-2" states run on the same port |
 | PoiZone engine | PoiZone | Near-exact | 384/385 presets bit-identical with the delay off; delay filters median −79 dB |
 | Transistor Bass engine †‡ | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; the "303 Pulse" cycles come from FL's `engine_x64.dll` (FL 2025 and 2026 builds); without FL the same sound except "303 Pulse", which uses LYNX SHARE's own cycles (similar); 24 LYNX presets |

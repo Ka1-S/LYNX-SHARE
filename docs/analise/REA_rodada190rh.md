@@ -36,3 +36,18 @@ third mixes the pulse with the saw and half cancels). None of FL's 128 factory p
 
 Bank: 24 presets (`core/TransistorBassBank.cpp`), two with a sequence that follows the played key.
 `transistorBassWriteState` gained the sequence argument (no sequence: the same bytes as before).
+
+## 3. MiniSynth — own oscillator, revision 1
+
+FL's `oscdata.dat` is 1024 amplitudes and phases of a falling saw. LYNX computes a falling saw whose reset is not instant:
+x(p) = ½ − p − ½·e^(−p/τ), its Fourier series in closed form. One parameter, τ = 0.05 cycle, placed by looking at the
+shape of FL's cycle (the rounded start); amplitude and phase are the textbook series, nothing is fitted per harmonic.
+Engine on FL's table vs LYNX's, the bank's 24 presets: level +0.06…+0.98 dB (median 0.4), residual −17…−23.5 dB.
+Bank: `core/MiniSynthBank.cpp`, on the .flms layout (REA_rodada41 §1.1).
+
+## 4. Sawer — own cycle, revision 1 (engine only; bank open)
+
+FL's `data.saw` is one 8192-point cycle. LYNX computes a saw's harmonics (1/h) through a first-order coupling high-pass at
+the fundamental and a constant 0.3 rad turn, RMS 0.28 as FL's. Not yet compared through the engine. The bank waits for the
+modulation block that follows the 96 parameters in a state (REA_rodada65 §3.1 does not give its layout): FL must be able to load
+what LYNX writes, so it is taken from the engine's loader, not from a saved preset.
