@@ -1,11 +1,9 @@
 {
-"u.0.1.31.1.t": "Correcciones para 0.1.31",
-"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 corrige lo que reportasteis en 0.1.31: la automatización de proyectos de FL en los controles, ventanas de plugins que dejaban de abrirse, la vista Device, exportar con una carpeta en el nombre del archivo, clips en pistas de instrumento, un cierre en la barra de pistas y la memoria al iniciar.",
-"u.0.1.31.1.f0": "Los clips de automatización de FL que mueven varios controles, o uno mediante una fórmula, mueven cada control en el mezclador, las ventanas de plugins y la vista Device; un control movido a mano muestra el valor que se oye (#253).",
-"u.0.1.31.1.f1": "Las ventanas acopladas de plugins y canales vuelven a abrirse donde estaban, en vez de alejarse de la ventana principal tras unos clics.",
-"u.0.1.31.1.f2": "Diseño Clip-launch: elegir una pista en el Arrangement muestra sus dispositivos, y los mandos de la vista Device siguen la automatización.",
-"u.0.1.31.1.f3": "Exportar audio con una carpeta en el nombre del archivo escribe allí sin volver a preguntar (#215); Colores e iconos automáticos aceptan más de una regla (#239); hacer clic derecho en la barra de pistas ya no cierra LYNX (#269).",
-"u.0.1.31.1.f4": "Modo solo pistas y diseño Simple: un doble clic en un clip vacío de una pista de instrumento abre sus notas.",
-"u.0.1.31.1.f5": "0.1.31 usaba ~7 MB más de memoria y más CPU justo después de iniciar.",
-"u.0.1.31.1.k0": "Los problemas de LYNX ASIO reportados en 0.1.31 aún no se han podido reproducir; los detalles ayudan (Ayuda › Informar de un problema...)."
+"u.0.1.31.2.t": "Más correcciones para 0.1.31",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corrige un cierre inesperado de la página de inicio, el teclado de escritura sobre plugins acoplados, los clips estirados que repetían su primer compás, las pistas de automatización creadas de proyectos de FL y dos problemas menores.",
+"u.0.1.31.2.f0": "Desplazar la lista \"Empezar un proyecto nuevo\" de la página de inicio ya no cierra LYNX en Windows.",
+"u.0.1.31.2.f1": "Sobre un plugin acoplado, el teclado de escritura vuelve a tocar primero cuando el botón de teclado de la ventana lo indica, como en una ventana separada.",
+"u.0.1.31.2.f2": "Con \"Los clips de patrón estirados repiten su patrón\" activado, las notas dibujadas, pegadas o movidas después del primer compás de un clip se oyen: el patrón crece para contenerlas.",
+"u.0.1.31.2.f3": "Playlist › \"Mover los clips de automatización a las pistas de sus pistas\" conserva los valores que tocaban los clips, también en proyectos grandes de FL.",
+"u.0.1.31.2.f4": "\"Gestionar atajos\" se abre con el cursor en su búsqueda en escritorios Linux que activan las ventanas tarde (#244); Opciones › Configuración del teclado de escritura a piano abre el menú Nota raíz / Octava / Disposición con cualquier tamaño de ventana (#270)."
 }

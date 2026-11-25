@@ -1,11 +1,9 @@
 {
-"u.0.1.31.1.t": "0.1.31 için düzeltmeler",
-"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1, 0.1.31'de bildirdiklerinizi düzeltir: kontrollerde FL projelerinin otomasyonu, açılmaz olan eklenti pencereleri, Device görünümü, dosya adında klasörle dışa aktarma, enstrüman izlerindeki klipler, ipucu çubuğunda bir çökme ve açılıştaki bellek.",
-"u.0.1.31.1.f0": "Birden çok kontrolü ya da bir formülle tek bir kontrolü süren FL otomasyon klipleri, mikserde, eklenti pencerelerinde ve Device görünümünde sürdükleri her kontrolü hareket ettirir; elle oynatılan bir kontrol duyulan değeri gösterir (#253).",
-"u.0.1.31.1.f1": "Yerleştirilmiş eklenti ve kanal pencereleri, birkaç tıklamadan sonra ana pencerenin dışına kaymak yerine yine bulundukları yerde açılır.",
-"u.0.1.31.1.f2": "Clip-launch düzeni: Arrangement'ta bir iz seçmek onun cihazlarını gösterir ve Device görünümünün düğmeleri otomasyonu izler.",
-"u.0.1.31.1.f3": "Dosya adında klasör olan ses dışa aktarımı tekrar sormadan oraya yazar (#215); Otomatik renkler ve simgeler birden fazla kural alır (#239); ipucu çubuğuna sağ tıklamak artık LYNX'i çökertmez (#269).",
-"u.0.1.31.1.f4": "Yalnızca iz modu ve Simple düzeni: bir enstrüman izindeki boş klibe çift tıklamak notalarını açar.",
-"u.0.1.31.1.f5": "0.1.31 açılıştan hemen sonra ~7 MB daha fazla bellek ve daha fazla CPU kullanıyordu.",
-"u.0.1.31.1.k0": "0.1.31'de bildirilen LYNX ASIO sorunları henüz yeniden üretilemedi; ayrıntılar yardımcı olur (Yardım › Sorun bildir...)."
+"u.0.1.31.2.t": "0.1.31 için daha fazla düzeltme",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmeyi, yerleştirilmiş eklentiler üzerindeki klavyeden piyanoyu, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini ve iki küçük sorunu düzeltiyor.",
+"u.0.1.31.2.f0": "Başlangıç sayfasındaki \"Yeni proje başlat\" listesini kaydırmak artık Windows'ta LYNX'i çökertmiyor.",
+"u.0.1.31.2.f1": "Yerleştirilmiş bir eklentinin üzerinde, pencerenin klavye düğmesi öyle diyorsa klavyeden piyano yine önce çalıyor, ayrık bir pencerede olduğu gibi.",
+"u.0.1.31.2.f2": "\"Uzatılmış pattern klipleri pattern'lerini döngüler\" açıkken bir klibin ilk ölçüsünden sonra çizilen, yapıştırılan veya taşınan notalar duyuluyor: pattern onları içerecek kadar uzuyor.",
+"u.0.1.31.2.f3": "Playlist › \"Otomasyon kliplerini parçalarının şeritlerine taşı\" kliplerin çaldığı değerleri büyük FL projelerinde de koruyor.",
+"u.0.1.31.2.f4": "\"Kısayolları yönet\" pencereleri geç etkinleştiren Linux masaüstlerinde imleç arama kutusunda açılıyor (#244); Seçenekler › Klavyeden piyano ayarları her pencere boyutunda Kök nota / Oktav / Düzen menüsünü açıyor (#270)."
 }
