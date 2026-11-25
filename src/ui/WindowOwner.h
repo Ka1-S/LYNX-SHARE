@@ -102,6 +102,15 @@ bool runSecondaryWindowKey (const juce::KeyPress& key);
 void setPluginViewPlainKeyHandler (std::function<bool (juce::Component& window)> allows, std::function<bool (const juce::KeyPress&)> first,
                                    std::function<bool (const juce::KeyPress&)> left);
 void listenForKeysPluginLeaves (juce::Component& pluginEditor);
+// Hotfix 0.1.31.2 (round 190ra; 10.net): a docked plugin frame (issue #116) hands the keys its plugin leaves unused to the
+// typing keyboard and the shortcuts as a plugin window of its own does (keepAboveMainWindow's key listener): docked, they
+// went to the shortcuts only, and the typing keyboard played nothing over a docked plugin.
+void forwardUnusedPluginKeys (juce::Component& window);
+// Tests (hotfix 0.1.31.2, round 190ra; Windows, elsewhere false / ""): the plugin's own native view inside `window`
+// (its deepest visible child window) takes the system focus and gets `vk` pressed and released as posted keyboard
+// messages (the path real keys take through the thread's hook); and the window the hook sees the focus in ("none").
+bool postKeyToPluginViewForTest (juce::Component& window, int vk);
+juce::String focusedPluginViewForTest();
 
 // Before a drag (a sample from the Browser...): JUCE finds the drop target in its own list of windows, where the main
 // window comes first after any click in it, while the windows kept above it (channel settings, a plugin...) are on top
