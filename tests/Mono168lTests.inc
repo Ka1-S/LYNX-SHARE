@@ -249,7 +249,7 @@ TEST (mono168l_every_engine_plays_mono_legato_and_porta)
     const auto print = std::getenv ("LYNX_MONO_AUDIT") != nullptr;
     // (the same engines whose pitch the autocorrelation can't read as issue14's audit; Plucked! reads its pitch only
     // when a voice starts, so FL can't glide it either)
-    const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Wave Traveller", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "FPC", "Sakura", "Ogun" };
+    const std::set<std::string> unreadable { "FL Slayer", "Fruity Granulizer", "Wave Traveller", "Drumaxx", "Fruit Kick", "BassDrum", "Drumpad", "FPC", "Sakura", "Ogun", "Autogun" };
     // (rollup 0.1.31: LYNX Model, a struck bar / tine model, follows neither slides nor the channel porta: the rack retriggers it, as Plucked!)
     const std::set<std::string> noSlide { "Plucked!", "LYNX Model" };
     // their sound follows the voice's own timeline (BeepMap scans its image left to right, a Transistor Bass preset runs

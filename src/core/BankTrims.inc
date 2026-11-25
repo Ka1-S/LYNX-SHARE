@@ -108,7 +108,7 @@
         { "Morphine", "Talking Lead", 2.8 },
         { "Morphine", "Fifth Lead", -2.1 },
         { "Morphine", "Round Bass", 4.9 },
-        { "Morphine", "Reed Bass", 22.3 },
+        { "Morphine", "Reed Bass", 17.0 },
         { "Morphine", "Driven Bass", -0.6 },
         { "Morphine", "Gong Cloud", -7.5 },
         { "Morphine", "Wind Tone", -16.2 },

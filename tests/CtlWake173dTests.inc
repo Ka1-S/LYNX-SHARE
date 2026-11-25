@@ -42,6 +42,9 @@ const std::vector<Allowed>& allowed()
         // never reach the engine), so the sources only MIDI would feed stay 0 in FL; the pitch wheel reaches them as the
         // channel's pitch (round 173d wheel slice), which a plugin's own bend range does not scale (FL render 2026-11-05,
         // allpitch2.flp with Sawer / PoiZone / GMS at their max bend range: bit-identical)
+        // Autogun (listed since round 190rh) is Ogun's engine on the same state and starts from LYNX's Ogun bank, which routes
+        // nothing to Mod X / Y and keeps filter, unison, chorus and delay off: Ogun's own audit covers these controls
+        { "Autogun", "*", "covered by Ogun (the same engine and state, REA_rodada57)" },
         { "GMS", "Pitch bend range", "fl-inert: scales the engine's MIDI pitch bend, which FL never sends a generator (REA_rodada164e; FL render at max range bit-identical)" },
         { "Sawer", "Bend range", "fl-inert: scales Sawer's MIDI pitch bend, which FL never sends a generator (REA_rodada164e; FL render at max range bit-identical)" },
         { "Morphine", "Bend range", "fl-inert: scales the engine's MIDI pitch bend, which FL never sends a generator (REA_rodada164e)" },

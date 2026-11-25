@@ -246,7 +246,7 @@ std::vector<Preset> harmorBank()
         make ("Soft Square", "Init", [odd] (Patch& p) { p.a.timbre (0, 64, odd, 0.0); volume (p.a, 0.002, 0.2, 1.0, 0.1); p.g[11] = 471; }),
         make ("Sub Weight", "Bass", [] (Patch& p) { p.a.timbre (0, 12, [] (int h) { return 1.0 / h; }, 0.0); p.a.p[5] = 600; volume (p.a, 0.003, 0.4, 0.8, 0.08); p.g[11] = 751; }, { "sub" }),
         make ("Filter Bass", "Bass", [] (Patch& p) { lowpass (p.a, 0.22, 0.35, 0.25, 0.0, 0.35, 0.15, 0.2); volume (p.a, 0.002, 0.5, 0.8, 0.08); p.g[11] = 793; }),
-        make ("Rubber Bass", "Bass", [odd] (Patch& p) { p.a.timbre (0, 64, odd, 0.0); lowpass (p.a, 0.18, 0.3, 0.5, 0.0, 0.18, 0.0, 0.1); volume (p.a, 0.002, 0.3, 0.7, 0.06); p.g[11] = 793; }, { "short" }),
+        make ("Rubber Bass", "Bass", [odd] (Patch& p) { p.a.timbre (0, 64, odd, 0.0); lowpass (p.a, 0.2, 0.3, 0.2, 0.0, 0.18, 0.0, 0.1); volume (p.a, 0.002, 0.3, 0.7, 0.06); p.g[11] = 793; }, { "short" }),
         make ("Wide Reese", "Bass", [] (Patch& p) { unison (p.a, 5, 120, 160); lowpass (p.a, 0.45, 0.0, 0.1, 0, 0, 0, 0); volume (p.a, 0.01, 0.3, 1.0, 0.15); p.a.p[13] = 400; p.g[11] = 773; }, { "detuned" }),
         make ("Formant Bass", "Bass", [] (Patch& p) { p.a.timbre (0, 24, [] (int h) { return 0.4 + 3.0 * bell (h, 6, 1.5) + 2.0 * bell (h, 14, 2); }, 0.0); volume (p.a, 0.003, 0.4, 0.8, 0.1); p.g[11] = 720; }),
         make ("Straight Lead", "Lead", [] (Patch& p) { unison (p.a, 3, 60); volume (p.a, 0.004, 0.3, 0.9, 0.12); p.a.p[45] = 60; delay (p); p.g[11] = 471; }),
@@ -265,7 +265,7 @@ std::vector<Preset> harmorBank()
         make ("Phased Pad", "Pad", [] (Patch& p) { p.a.p[76] = 800; p.a.p[78] = 4000; p.a.p[80] = 1500; unison (p.a, 4, 90, 170); volume (p.a, 0.5, 1.0, 1.0, 1.0); chorus (p); p.g[11] = 458; }, { "phaser" }),
         make ("Two Layers", "Pad", [odd] (Patch& p) { p.b.on = true; unison (p.a, 5, 100, 180); volume (p.a, 0.6, 1.0, 1.0, 1.0); p.b.timbre (0, 64, odd, 0.0); p.b.p[40] = 20000; volume (p.b, 1.2, 1.0, 0.8, 1.2); reverb (p, 400); p.g[11] = 581; }, { "part B" }),
         make ("Bent Metal", "FX", [] (Patch& p) { p.a.p[26] = 500; p.a.timbre (0, 40, [] (int h) { return h % 3 == 1 ? 1.0 : 0.2; }, 0.0); volume (p.a, 0.001, 2.5, 0.0, 2.0); reverb (p, 500); p.g[11] = 637; }, { "prism" }),
-        make ("Octave Cloud", "FX", [] (Patch& p) { p.a.combo[7] = 0; p.a.p[42] = 30000; p.a.timbre (0, 24, [] (int h) { return 0.3 * h; }, 0.0); p.a.p[13] = 600; unison (p.a, 4, 60, 180); volume (p.a, 1.0, 1.0, 1.0, 1.5); reverb (p, 500); p.g[11] = 595; }, { "octaves" }),
+        make ("Octave Cloud", "FX", [] (Patch& p) { p.a.combo[7] = 0; p.a.p[42] = 30000; p.a.timbre (0, 24, [] (int h) { return 0.3 * h; }, 0.0); p.a.p[13] = 600; unison (p.a, 4, 60, 180); volume (p.a, 0.2, 1.0, 1.0, 1.0); reverb (p, 500); p.g[11] = 595; }, { "octaves" }),
     };
 }
 } // namespace lynx::banks
