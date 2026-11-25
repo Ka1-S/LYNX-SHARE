@@ -3724,6 +3724,13 @@ public:
             return;
         }
 
+        // --nofl190rhshot <prefix> (round 190rh: Settings > Files > FL Studio folder): src/NoFl190rhCheck.inc
+        if (args.contains ("--nofl190rhshot"))
+        {
+            runNoFl190rhShot (args[args.indexOf ("--nofl190rhshot") + 1].unquoted());
+            return;
+        }
+
         // --optionsux190qxshot <prefix> (round 190qx: Settings reset / grouping / palette index, How-to guides, tips, notices)
         if (args.contains ("--optionsux190qxshot"))
         {

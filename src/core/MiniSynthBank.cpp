@@ -81,10 +81,10 @@ std::vector<Preset> miniSynthBank()
         make ("Plain Saw", "Keys", {}, { "saw" }),
         make ("Glass Keys", "Keys", { { oscKind, bell }, { oscMod, 0.35f }, { cutoff, 0.8f }, { aSus, 0.3f }, { aDec, 0.5f }, { aRel, 0.3f }, { chorusOn, 1.0f } }, { "bell" }),
         make ("Clav Stab", "Keys", { { oscKind, pulse }, { oscMod, 0.7f }, { cutoff, 0.45f }, { fAmount, 0.8f }, { fDec, 0.25f }, { fSus, 0.0f }, { aDec, 0.4f }, { aSus, 0.0f } }, { "pluck" }),
-        make ("Organ Drift", "Keys", { { oscKind, sqrSqr }, { oscMod, 0.5f }, { cutoff, 0.6f }, { aSus, 1.0f }, { phaserOn, 1.0f } }, { "organ" }),
+        make ("Organ Drift", "Keys", { { oscKind, sqrSqr }, { oscMod, 0.5f }, { cutoff, 0.6f }, { aSus, 0.45f }, { aDec, 0.15f }, { phaserOn, 1.0f } }, { "organ" }),
         make ("Big Super", "Lead", { { oscKind, superSaw }, { oscMod, 0.45f }, { cutoff, 0.9f }, { aRel, 0.25f }, { delayOn, 1.0f } }, { "supersaw" }),
         make ("Mono Cutter", "Lead", { { voices, lead }, { slide, 0.35f }, { oscKind, sawSaw }, { oscMod, 0.25f }, { cutoff, 0.7f }, { peak, 0.35f } }, { "mono" }),
-        make ("Square Whistle", "Lead", { { voices, lead }, { slide, 0.45f }, { oscKind, pulse }, { oscMod, 0.02f }, { cutoff, 0.55f }, { lfoDest, 0.5f }, { lfoAmount, 0.56f }, { delayOn, 1.0f } }, { "vibrato" }),
+        make ("Square Whistle", "Lead", { { voices, lead }, { slide, 0.45f }, { oscKind, pulse }, { oscMod, 0.4f }, { cutoff, 0.75f }, { lfoDest, 0.5f }, { lfoAmount, 0.56f }, { delayOn, 1.0f } }, { "vibrato" }),
         make ("Dirty Lead", "Lead", { { voices, mono }, { oscKind, sqrSaw }, { oscMod, 0.3f }, { distOn, 1.0f }, { overdrive, 0.5f }, { cutoff, 0.6f } }, { "distortion" }),
         make ("Sync Bite", "Lead", { { oscKind, spread }, { oscMod, 0.4f }, { peak, 0.5f }, { cutoff, 0.55f }, { fAmount, 0.75f }, { fDec, 0.4f }, { fSus, 0.2f } }, { "resonant" }),
         make ("Sub Saw", "Bass", { { voices, mono }, { transpose, 0.0f }, { cutoff, 0.4f }, { fAmount, 0.65f }, { fDec, 0.35f }, { fSus, 0.2f } }, { "bass" }),
@@ -100,7 +100,7 @@ std::vector<Preset> miniSynthBank()
         make ("Dry Pluck", "Pluck", { { cutoff, 0.35f }, { fAmount, 0.8f }, { fDec, 0.25f }, { fSus, 0.0f }, { aDec, 0.4f }, { aSus, 0.0f } }, { "short" }),
         make ("Hollow Pluck", "Pluck", { { oscKind, sqrSqr }, { oscMod, 0.2f }, { cutoff, 0.4f }, { fAmount, 0.75f }, { fDec, 0.3f }, { fSus, 0.0f }, { aDec, 0.45f }, { aSus, 0.0f }, { chorusOn, 1.0f } }, { "square" }),
         make ("Bit Toy", "FX", { { oscKind, pulse }, { oscMod, 0.3f }, { distOn, 1.0f }, { decimator, 0.6f }, { aSus, 0.5f } }, { "lofi" }),
-        make ("Wind", "FX", { { noise, 1.0f }, { cutoff, 0.5f }, { peak, 0.6f }, { lfoRate, 0.7f }, { lfoAmount, 0.7f }, { aAtk, 0.6f }, { aSus, 1.0f }, { aRel, 0.6f } }, { "noise" }),
+        make ("Wind", "FX", { { noise, 1.0f }, { cutoff, 0.72f }, { peak, 0.5f }, { lfoRate, 0.7f }, { lfoAmount, 0.7f }, { aAtk, 0.6f }, { aSus, 1.0f }, { aRel, 0.6f } }, { "noise" }),
         make ("Siren", "FX", { { voices, mono }, { lfoDest, 0.5f }, { lfoAmount, 0.85f }, { lfoRate, 0.45f }, { aSus, 1.0f }, { delayOn, 1.0f } }, { "lfo" }),
     };
 }

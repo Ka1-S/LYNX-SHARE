@@ -2,12 +2,14 @@
 // read for it. The state is "SSLF" + size + "1rwS" + the 96 parameters: the engine's loader (FUN_180034770) takes the
 // modulation-map block and the name that FL writes after them only when they are there, else it keeps its constructor's.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
 #include <initializer_list>
 #include <utility>
 
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 #include "core/Sawer.h"
@@ -69,6 +71,7 @@ Preset make (const char* name, const char* category, std::initializer_list<std::
         p[(std::size_t) i] = -1.0f; // (no destination)
     for (const auto& [i, v] : values)
         p[(std::size_t) i] = v;
+    p[level] = std::clamp (p[level] + (float) (trimDb ("Sawer", name) / 48.0), 0.0f, 1.0f); // (48 dB over its range)
     Preset out;
     out.name = name;
     out.category = category;

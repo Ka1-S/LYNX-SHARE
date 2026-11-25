@@ -143,6 +143,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::gms, "GMS", "GMS", own, false },
         { InstrumentKind::morphine, "Morphine", "Morphine", own, false },
         { InstrumentKind::ogun, "Ogun", "Ogun", own, false },
+        { InstrumentKind::autogun, "Autogun", "", own, false }, // (round 190rh: Ogun's engine and bank; FL's plugin database lists it too)
         { InstrumentKind::toxic, "Toxic Biohazard", "Toxic Biohazard", own, false },
         { InstrumentKind::poizone, "PoiZone", "PoiZone", own, false },
         { InstrumentKind::sakura, "Sakura", "Sakura", own, false },
@@ -527,7 +528,14 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
     if (auto def = banks::defaultChannel (kind, engine->name))
     {
         if (def->samplePath.empty() && (kind == InstrumentKind::toxic || kind == InstrumentKind::drumsynth)) // (round 190rh: their waves are LYNX's own)
-            def->samplePath = nativedata::ownPath (kind);
+        {
+            const auto fl = flDataPath (kind, access);
+            def->samplePath = fl.empty() ? nativedata::ownPath (kind) : fl;
+        }
+        if (kind == InstrumentKind::autogun) // its Magic Dust stage, where FL has it
+            if (const auto dust = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Autogun\\Data\\SG.dat", access.roots);
+                ! dust.empty() && access.fileExists && access.fileExists (dust))
+                def->samplePath = dust;
         return def;
     }
 

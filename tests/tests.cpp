@@ -15653,7 +15653,7 @@ TEST (slayer_host_levels_and_automation)
 
 TEST (slayer_and_fruity_dance_import)
 {
-    // FL Slayer plays on the exact engine when the installation's engine DLL is there (otherwise it stays unsupported);
+    // FL Slayer plays on the exact engine when the installation's engine DLL is there (otherwise on the engine with LYNX SHARE's own data);
     // Fruity Dance (a visual plugin) becomes a silent channel that keeps its state
     std::vector<std::uint8_t> slayer (4 + 28 * 4, 0), dance (40, 1);
     FlpBuilder b;
@@ -15671,7 +15671,8 @@ TEST (slayer_and_fruity_dance_import)
     CHECK (plain.channels.size() == 2u);
     if (plain.channels.size() == 2u)
     {
-        CHECK (plain.channels[0].instrument != lynx::InstrumentKind::slayer);
+        // (round 190rh: without FL's engine it plays on LYNX SHARE's own picks)
+        CHECK (plain.channels[0].instrument == lynx::InstrumentKind::slayer && plain.channels[0].samplePath == lynx::nativedata::ownPath (lynx::InstrumentKind::slayer));
         CHECK (plain.channels[1].instrument == lynx::InstrumentKind::fruitydance && plain.channels[1].pluginState == dance);
     }
     auto inst = lynx::makeInstrument (lynx::InstrumentKind::fruitydance);

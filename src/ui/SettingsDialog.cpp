@@ -675,12 +675,23 @@ public:
         show();
     }
 
-    static constexpr int height = 28 + 20 + 4 + 26 + 6 + 72;
+    // the heading, the note, the row of buttons and what the status says at that width (two lines kept for it)
+    int heightFor (int width) const
+    {
+        juce::AttributedString text;
+        text.append (status.getText(), status.getFont());
+        juce::TextLayout lines;
+        lines.createLayout (text, (float) juce::jmax (60, width - status.getBorderSize().getLeftAndRight()));
+        return 28 + 4 + 20 + 4 + 26 + 6 + juce::jmax (36, (int) std::ceil (lines.getHeight()) + status.getBorderSize().getTopAndBottom() + 4);
+    }
+    std::function<void()> onHeight; // the status has other text
+
 
     void resized() override
     {
         auto r = getLocalBounds();
         title.setBounds (r.removeFromTop (28));
+        r.removeFromTop (4);
         note.setBounds (r.removeFromTop (20));
         r.removeFromTop (4);
         auto row = r.removeFromTop (26);
@@ -756,6 +767,8 @@ private:
     {
         status.setText (text, juce::dontSendNotification);
         status.setTooltip (text);
+        if (onHeight)
+            onHeight();
     }
 
     // `extra`: a line for a change just made
@@ -979,6 +992,7 @@ public:
             }, persistent);
 
         flFolder = std::make_unique<FlFolderRow> (persistent, browserChanged); // round 190rh (issue #291)
+        flFolder->onHeight = [this] { resized(); };
         add (*flFolder);
 
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
@@ -1005,10 +1019,11 @@ protected:
     {
         constexpr int padX = 20, padY = 14, gap = 12;
         FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), jsfxFolders.get(), flmResources.get() };
-        const auto share = (getHeight() - 2 * padY - 5 * gap - FlFolderRow::height) / 5;
+        const auto flHeight = flFolder->heightFor (juce::jmax (0, width - 2 * padX));
+        const auto share = (getHeight() - 2 * padY - 5 * gap - flHeight) / 5;
         auto y = padY;
-        flFolder->setBounds (padX, y, juce::jmax (0, width - 2 * padX), FlFolderRow::height);
-        y += FlFolderRow::height + gap;
+        flFolder->setBounds (padX, y, juce::jmax (0, width - 2 * padX), flHeight);
+        y += flHeight + gap;
         for (auto* list : lists)
         {
             const auto h = juce::jmax (list->minimumHeight(), share);

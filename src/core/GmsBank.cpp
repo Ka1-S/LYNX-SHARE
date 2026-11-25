@@ -2,6 +2,7 @@
 // layout ("SSLF" + size + "Syn4": seven 512-byte path slots, three editor integers, 212 parameters, a 512-byte name); no FL
 // preset was read for it. The wave names are GMS' own, so FL's waves play on a channel that has them.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <utility>
 
 #include "core/Gms.h"
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 
@@ -105,6 +107,7 @@ Preset make (const char* name, const char* category, Waves waves, std::initializ
         p[(std::size_t) (117 + f.fx)] = f.x;
         p[(std::size_t) (127 + f.fx)] = f.y;
     }
+    p[level] = std::clamp (p[level] + (float) (trimDb ("GMS", name) / 80.0), 0.0f, 1.0f); // (80 dB over its range)
     Preset out;
     out.name = name;
     out.category = category;

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <functional>
 
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/Morphine.h"
 #include "core/NativeData.h"
@@ -26,6 +27,7 @@ struct Frame
 struct Generator
 {
     std::vector<Frame> frames;
+    double level = 1.0; // (core/BankTrims.h)
     int loopStart = 0, loopEnd = 0, loopMode = 0; // (time units; 0 none, 1 forward, 2 mirror, 3 ping-pong)
     float rate = 0.5f;
     int pwmMode = 0;
@@ -109,7 +111,7 @@ struct Morphine
                 e += std::max (0.0, f.amp (h)) * std::max (0.0, f.amp (h));
             loudest = std::max (loudest, std::sqrt (e));
         }
-        const auto gain = std::min (0.5 / loudest, 1.0 / 0.35);
+        const auto gain = g.level * std::min (0.5 / loudest, 1.0 / 0.35);
         for (const auto& f : g.frames)
             sp.i (f.duration), sp.f (1.0), sp.sized (partials (f, gain));
         Bytes opt;
@@ -203,6 +205,9 @@ Preset make (const char* name, const char* category, const std::function<void (M
 {
     Morphine m;
     design (m);
+    const auto trim = std::pow (10.0, trimDb ("Morphine", name) / 20.0);
+    for (auto& g : m.gen)
+        g.level *= trim;
     Preset p;
     p.name = name;
     p.category = category;
@@ -256,7 +261,7 @@ std::vector<Preset> morphineBank()
             m.gen[0].frames = { { 150, vowel (2, 6), {} }, { 150, vowel (3, 7), {} } };
             m.gen[0].loopEnd = 150, m.gen[0].loopMode = 3;
             m.noise = "LYNX Air", m.A[36] = 0.35f;
-            m.envelope (0.35f, 0.5f, 1.0f, 0.5f), m.reverb (0.75f);
+            m.envelope (0.22f, 0.5f, 1.0f, 0.35f), m.reverb (0.6f);
         }, { "voice", "noise" }),
         make ("Organ Full", "Keys", [] (Morphine& m) {
             m.gen[0].frames = { { 100, list ({ 1, 0.9, 0.7, 0.6, 0, 0.5, 0, 0.5, 0, 0, 0, 0.2, 0, 0, 0, 0.3 }), {} } };
@@ -287,7 +292,7 @@ std::vector<Preset> morphineBank()
         make ("Talking Lead", "Lead", [] (Morphine& m) { m.gen[0].frames = { { 20, vowel (2, 9), {} }, { 25, vowel (6, 12), {} }, { 60, vowel (3, 7), {} } }; m.gen[0].loopEnd = 45, m.gen[0].loopMode = 3; m.envelope (0.05f, 0.4f, 1.0f, 0.25f); }, { "voice" }),
         make ("Fifth Lead", "Lead", [] (Morphine& m) { m.gen[0].frames = { { 100, [] (int h) { return (h % 2 == 0 ? 1.0 / h : 0.0) + (h % 3 == 0 ? 0.8 / h : 0.0); }, {} } }; m.envelope (0.06f, 0.4f, 1.0f, 0.25f), m.chorus(); }, { "fifth" }),
         make ("Round Bass", "Bass", [] (Morphine& m) { m.gen[0].frames = { { 12, power (1.1, 14), {} }, { 60, power (2.0, 6), {} } }; m.A[5] = 0.25f; m.envelope (0.0f, 0.45f, 0.7f, 0.2f); }, { "soft" }),
-        make ("Reed Bass", "Bass", [] (Morphine& m) { m.gen[0].frames = { { 100, odd (1.1, 16), {} } }; m.gen[0].pwmMode = 2, m.gen[0].pwmRate = 0.15f; m.A[5] = 0.25f; m.envelope (0.0f, 0.4f, 0.9f, 0.2f); }, { "pwm" }),
+        make ("Reed Bass", "Bass", [] (Morphine& m) { m.gen[0].frames = { { 100, power (1.0, 24), {} } }; m.gen[0].pwmMode = 2, m.gen[0].pwmRate = 0.15f; m.A[5] = 0.25f; m.envelope (0.0f, 0.4f, 0.9f, 0.2f); }, { "pwm" }),
         make ("Driven Bass", "Bass", [] (Morphine& m) { m.gen[0].frames = { { 30, power (1.0, 24), {} }, { 60, power (1.4, 12), {} } }; m.A[5] = 0.25f, m.A[7] = 0.35f; m.envelope (0.0f, 0.4f, 0.8f, 0.2f); }, { "overdrive" }),
         make ("Gong Cloud", "FX", [] (Morphine& m) {
             m.gen[0].frames = { { 60, power (0.6, 40), inharmonic (0.02) }, { 300, power (1.0, 20), inharmonic (0.023) }, { 200, power (2.0), inharmonic (0.02) } };

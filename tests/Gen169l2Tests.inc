@@ -79,7 +79,12 @@ TEST (gen169l2_without_fl_the_lynx_bank_and_unreadable_entries_fall_through)
         const auto bank = banks::defaultChannel (kind, natives::instrumentEngine (kind)->name);
         CHECK (made.has_value() == bank.has_value());
         if (made && bank)
-            CHECK (gen169l2::sameSound (*made, *bank));
+        {
+            auto want = *bank;
+            if (kind == InstrumentKind::toxic) // (round 190rh: its waves 2…32 are LYNX SHARE's own there)
+                want.samplePath = nativedata::ownPath (kind);
+            CHECK (gen169l2::sameSound (*made, want));
+        }
     }
     if (realFlpDir.empty())
         return;

@@ -103,6 +103,8 @@ const std::vector<Gap>& knownGaps()
         { "Kepler Exo", "Mod * amount", "gap173d2-3" },
         { "Kepler Exo", "X offset", "gap173d2-3" },
         { "Kepler Exo", "Y offset", "gap173d2-3" },
+        // DrumSynth Live (listed since round 190rh) is a kit: one patch per key, and the audit plays one key
+        { "Fruity DrumSynth Live", "*", "190rh-drumsynth-kit" },
         // Braid (round 190ko): LYNX's second LFO 1 transformer starts on Bipolar (the default's neutral) and the audit moves
         // it to its two ends, None and Scrambler, which Braid passes through unchanged too (Scrambler is not modelled
         // yet); every type between moves the LFO (its macro wakes on Ramp up). Rollup 0.1.30 step 7 (round 190lc)

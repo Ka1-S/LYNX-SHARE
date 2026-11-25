@@ -9,6 +9,7 @@
 #include <functional>
 #include <string>
 
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/SytrusEngine.h"
 #include "core/ZlibPack.h"
@@ -255,6 +256,8 @@ Preset make (const char* name, const char* category, const std::function<void (S
 {
     Sytrus s;
     design (s);
+    // (the level knob's law: (3^(v / 128) - 1) / 2)
+    s.master = (int) std::lround (std::clamp (128.0 * std::log (((std::pow (3.0, s.master / 128.0) - 1.0) * std::pow (10.0, trimDb ("Sytrus", name) / 20.0)) + 1.0) / std::log (3.0), 1.0, 128.0));
     Preset p;
     p.name = name;
     p.category = category;
@@ -347,25 +350,25 @@ std::vector<Preset> sytrusBank()
         }, { "fm" }),
         make ("Saw Bass", "Bass", [bass] (Sytrus& s) {
             s.op[0] = voice (saw, 0.5f, bass), s.op[1] = voice (square, 0.25f, bass, 140);
-            s.filter[0] = lowPass (90, 60, 2, 90, { 0.001f, 0.2f, 0.2f, 0.1f });
+            s.filter[0] = lowPass (135, 60, 2, 90, { 0.001f, 0.2f, 0.2f, 0.1f });
             s.toFilter (0, 0), s.toFilter (1, 0, 180), s.out (6);
         }, { "saw" }),
         make ("Reese", "Bass", [bass] (Sytrus& s) {
             s.op[0] = voice (saw, 0.5f, bass), s.op[1] = voice (saw, 0.503f, bass);
             s.unison = 3, s.uniPitch = 50;
-            s.filter[0] = lowPass (110, 10);
-            s.toFilter (0, 0, 200), s.toFilter (1, 0, 200), s.out (6);
+            s.filter[0] = lowPass (165, 10);
+            s.toFilter (0, 0, 220), s.toFilter (1, 0, 220), s.out (6);
         }, { "detuned" }),
         make ("Wobble", "Bass", [bass] (Sytrus& s) {
             s.op[0] = voice (saw, 0.5f, bass);
-            s.filter[0] = lowPass (90, 80);
+            s.filter[0] = lowPass (150, 80);
             s.filter[0].lfoDepth = 0.25f, s.filter[0].lfoSpeed = 42000;
             s.toFilter (0, 0), s.out (6);
         }, { "lfo" }),
         make ("Wide Pad", "Pad", [pad] (Sytrus& s) {
             s.op[0] = voice (saw, 1.0f, pad), s.op[1] = voice (triangle, 0.5f, pad, 180);
             s.unison = 7, s.uniPitch = 45, s.uniPan = 110;
-            s.filter[0] = lowPass (120, 10, 2, 40, { 0.8f, 1.5f, 0.5f, 1.0f });
+            s.filter[0] = lowPass (170, 10, 2, 40, { 0.8f, 1.5f, 0.5f, 1.0f });
             s.toFilter (0, 0, 190), s.toFilter (1, 0, 190), s.out (6, 220), s.fx (6, 200), s.reverb = true, s.reverbDecay = 50;
         }, { "slow" }),
         make ("Choral Sines", "Pad", [pad] (Sytrus& s) {

@@ -2,12 +2,15 @@
 // ("Kepler-1": REA_rodada46 §1.1; "Kepler-2": REA_rodada167d §1, the layouts core/Kepler.cpp reads); no FL preset was read for
 // them. The LFO curve and the noise are FL's on a channel that has them, else LYNX's (core/NativeData.h).
 
+#include <cmath>
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <initializer_list>
 #include <utility>
 
 #include "core/Kepler.h"
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 
@@ -60,6 +63,7 @@ Preset make (const char* name, const char* category, Values values, std::vector<
     p[octave] = 0.5f, p[volume] = 0.55f;
     for (const auto& [i, v] : values)
         p[(std::size_t) i] = v;
+    p[volume] = std::clamp (p[volume] * (float) std::pow (10.0, trimDb ("Kepler", name) / 20.0), 0.0f, 1.0f);
     Preset out;
     out.name = name;
     out.category = category;

@@ -78,7 +78,7 @@ TEST (kepler_exo_state_layout)
 TEST (kepler_exo_imports_from_fl_projects)
 {
     // FL's plugin "Kepler Exo" saves the "Kepler-2" state; with the user's Kepler Exo engine DLL it becomes the engine
-    // channel, a Kepler-1 state under that name or a missing DLL does not
+    // channel; a missing DLL makes it one with LYNX SHARE's own tables (round 190rh); a Kepler-1 state under that name does not
     const auto st = keplerExoTestState (std::vector<float> (0x97, 0.25f));
     auto import = [] (const std::string& plugin, const std::vector<std::uint8_t>& state, const std::string& factory) {
         flp::Project p;
@@ -93,7 +93,8 @@ TEST (kepler_exo_imports_from_fl_projects)
         return lynx::importFlp (p, options);
     };
     const auto none = import ("Kepler Exo", st, "/nonexistent-fl");
-    CHECK (none.channels.size() == 1 && none.channels[0].instrument != lynx::InstrumentKind::keplerExo);
+    CHECK (none.channels.size() == 1 && none.channels[0].instrument == lynx::InstrumentKind::keplerExo
+           && lynx::nativedata::isOwn (none.channels[0].samplePath));
     const auto dll = keplerExoDll();
     if (dll.empty() || ! lynx::keplerExoDllUsable (dll))
         return;

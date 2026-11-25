@@ -1,10 +1,13 @@
 // LYNX's own Ogun bank (round 190rh). Designed for LYNX and written from the documented layout of the plugin's state
 // (REA_rodada37 §1.3); no FL preset was read for it. Ogun reads no data of FL's: the engine is the same with and without FL.
 
+#include <cmath>
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <functional>
 
+#include "core/BankTrims.h"
 #include "core/LynxBanks.h"
 #include "core/Ogun.h"
 #include "core/ZlibPack.h"
@@ -136,6 +139,8 @@ Preset make (const char* name, const char* category, const std::function<void (O
 {
     Ogun o;
     design (o);
+    // (the level knob's law: (3^(v / 128) - 1) / 2)
+    o.P[0] = (int) std::lround (std::clamp (128.0 * std::log (((std::pow (3.0, o.P[0] / 128.0) - 1.0) * std::pow (10.0, trimDb ("Ogun", name) / 20.0)) + 1.0) / std::log (3.0), 1.0, 128.0));
     Preset p;
     p.name = name;
     p.category = category;
@@ -178,5 +183,18 @@ std::vector<Preset> ogunBank()
         make ("Rail Drone", "FX", [] (Ogun& o) { o.P[1] = -12; o.seeds (64, 4096, 500), o.times (1000, 10000, 8000), o.unison (9, 120), o.P[52] = 14; o.reverb (100); }, { "long" }),
         make ("Ghost Metal", "FX", [] (Ogun& o) { o.seeds (27, 72, 900), o.times (1000, 9000, 7000), o.unison (5, 200), o.volumeOn = true, o.volume = { 1.5f, 2.0f, 0.6f, 2.0f }, o.delay = true; o.reverb (100); }, { "slow" }),
     };
+}
+
+// Autogun is Ogun's engine on the same state (REA_rodada57), at a quarter of its level: the same sounds, the level knob up
+std::vector<Preset> autogunBank()
+{
+    auto bank = ogunBank();
+    for (auto& p : bank)
+        p.apply = [ogun = p.apply] (ChannelDef& c) {
+            const auto path = c.samplePath; // (FL's SG.dat: the Magic Dust stage)
+            ogun (c);
+            c.samplePath = path;
+        };
+    return bank;
 }
 } // namespace lynx::banks

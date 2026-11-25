@@ -92,3 +92,21 @@
             return done ("ERROR a folder that is gone was used, or forgotten");
         return done ("OK");
     }
+
+    // --nofl190rhshot <prefix>: Settings › Files with the real FL Studio folder row (the profile's setting, this computer's
+    // disk), at 100 % and 150 %, once the folder has been read
+    void runNoFl190rhShot (const juce::String& prefix)
+    {
+        using namespace lynx;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        auto engine = std::make_shared<AudioEngine> (false);
+        std::shared_ptr<juce::Component> panel (makeSettingsPanel (*engine, SettingsPage::files, true, {}).release());
+        panel->setSize (720, 700);
+        settingsShowPageForSnapshot (*panel, SettingsPage::files);
+        savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.0f), prefix + "-reading.png");
+        juce::Timer::callAfterDelay (juce::SystemStats::getEnvironmentVariable ("LYNX_SHOT_WAIT_MS", "6000").getIntValue(), [engine, panel, prefix] {
+            savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.0f), prefix + ".png");
+            savePng (panel->createComponentSnapshot (panel->getLocalBounds(), true, 1.5f), prefix + "@150.png");
+            quit();
+        });
+    }

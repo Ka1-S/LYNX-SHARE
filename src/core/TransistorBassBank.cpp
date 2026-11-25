@@ -83,7 +83,7 @@ std::vector<Preset> transistorBassBank()
         make ("Wall of Rat", "Driven", extended, { { cutoff, 0.5f }, { resonance, 0.6f }, { envMod, 0.5f }, { distOn, 1.0f }, { drive, 0.50f }, { distTone, 0.45f }, { distVolume, 1.00f } }, { "distortion", "hard" }),
         make ("Fuzz Square", "Driven", tb303, { { waveform, 0.0f }, { cutoff, 0.5f }, { resonance, 0.55f }, { distOn, 1.0f }, { drive, 0.40f }, { distVolume, 0.75f } }, { "distortion", "square" }),
         make ("Screamer Echo", "Driven", extended, { { tuning, 1.0f }, { cutoff, 0.45f }, { resonance, 0.85f }, { envMod, 0.6f }, { distOn, 1.0f }, { drive, 0.40f }, { distVolume, 1.00f }, { delayOn, 1.0f }, { delayFeedback, 0.5f } }, { "lead", "delay" }),
-        make ("Round Bass", "Bass", extended, { { cutoff, 0.28f }, { resonance, 0.1f }, { envMod, 0.3f }, { decay, 0.5f }, { accent, 0.3f } }, { "soft" }),
+        make ("Round Bass", "Bass", extended, { { volume, 1.0f }, { cutoff, 0.36f }, { resonance, 0.1f }, { envMod, 0.3f }, { decay, 0.5f }, { accent, 0.3f } }, { "soft" }),
         make ("Deep Square", "Bass", extended, { { waveform, 0.0f }, { cutoff, 0.25f }, { resonance, 0.15f }, { envMod, 0.2f }, { decay, 0.6f } }, { "sub" }),
         make ("Pluck Bass", "Bass", extended, { { cutoff, 0.22f }, { resonance, 0.3f }, { envMod, 0.6f }, { decay, 0.18f }, { minDecay, 0.2f } }, { "short" }),
         make ("Half Saw", "Bass", extended, { { waveform, 0.5f }, { cutoff, 0.42f }, { resonance, 0.25f }, { envMod, 0.35f } }, { "mixed" }),

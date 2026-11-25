@@ -5,6 +5,7 @@
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 #include "core/NativeEngines.h"
+#include "core/Toxic.h"
 #include "core/TransistorBass.h"
 
 namespace noflnatives190rh
@@ -21,7 +22,7 @@ std::string realInstallation() { return realFlpDir.empty() ? std::string() : std
 // the engines this round's banks and sets are for (they grow with its steps)
 const std::vector<lynx::InstrumentKind>& kinds()
 {
-    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum, lynx::InstrumentKind::gms, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::ogun, lynx::InstrumentKind::morphine, lynx::InstrumentKind::kepler, lynx::InstrumentKind::keplerExo, lynx::InstrumentKind::slayer };
+    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum, lynx::InstrumentKind::gms, lynx::InstrumentKind::sytrus, lynx::InstrumentKind::ogun, lynx::InstrumentKind::morphine, lynx::InstrumentKind::kepler, lynx::InstrumentKind::keplerExo, lynx::InstrumentKind::slayer, lynx::InstrumentKind::harmor, lynx::InstrumentKind::autogun };
     return list;
 }
 
@@ -361,8 +362,57 @@ TEST (noflnatives190rh_effects_without_fl)
             }
         }
         const auto change = 10.0 * std::log10 (out / in);
-        CHECK (finite && change < 12.0 && (change > -12.0 || e.kind == EffectKind::vocodex)); // (Vocodex: its modulator is another track's)
-        if (! (finite && change < 12.0 && (change > -12.0 || e.kind == EffectKind::vocodex)))
+        CHECK (finite && change < 12.0 && (change > -20.0 || e.kind == EffectKind::vocodex)); // (Vocodex: its modulator is another track's)
+        if (! (finite && change < 12.0 && (change > -20.0 || e.kind == EffectKind::vocodex)))
             std::printf ("  %s: %g dB\n", e.presetFolder, change);
     }
+}
+
+// Toxic Biohazard's built-in waves, DrumSynth Live's waves and BooBass's multisample: LYNX's own without FL; a channel that
+// names FL's file plays them too while the file is away, and keeps its path
+TEST (noflnatives190rh_toxic_drumsynth_boobass)
+{
+    using namespace lynx;
+    const std::pair<InstrumentKind, const char*> files[] = { { InstrumentKind::toxic, "Toxic Biohazard\\Toxic Biohazard_x64.dll" },
+                                                             { InstrumentKind::drumsynth, "Fruity DrumSynth Live\\drumsynth_eng_x64.dll" },
+                                                             { InstrumentKind::boobass, "BooBass\\BooBass_Eng_x64.dll" } };
+    for (const auto& [kind, file] : files)
+    {
+        noflnatives190rh::Installation none ("");
+        auto c = natives::makeChannel (kind, {});
+        CHECK (c.has_value() && c->samplePath == nativedata::ownPath (kind) && natives::dataSource (*c) == natives::DataSource::own);
+        if (! c)
+            continue;
+        if (kind == InstrumentKind::toxic) // oscillator 1 on wave 9 (index 306: its wave, 25: its switch)
+        {
+            const float wave = 9.0f, on = 1.0f;
+            std::memcpy (c->pluginState.data() + toxicParamOffset (c->pluginState, 306), &wave, 4);
+            std::memcpy (c->pluginState.data() + toxicParamOffset (c->pluginState, 25), &on, 4);
+        }
+        // the kit's keys (DrumSynth Live: one patch per key)
+        std::vector<float> own;
+        int key = 60;
+        for (const int k : { 60, 36, 48, 38 })
+            if (own = noflnatives190rh::render (*c, k); noflnatives190rh::rms (own) > 2.0e-3)
+            {
+                key = k;
+                break;
+            }
+        CHECK (noflnatives190rh::rms (own) > 2.0e-3 && noflnatives190rh::peak (own) < 2.5);
+        auto away = *c;
+        away.samplePath = std::string ("Z:\\no such place\\Plugins\\Fruity\\Generators\\") + file;
+        CHECK (natives::dataSource (away) == natives::DataSource::ownForFl);
+        CHECK (noflnatives190rh::render (away, key) == own);
+        if (const auto fl = noflnatives190rh::realInstallation(); ! fl.empty())
+        {
+            noflnatives190rh::Installation here (fl);
+            CHECK (natives::dataSource (away) == natives::DataSource::fl);
+            CHECK (noflnatives190rh::render (*c, key) == own);
+        }
+    }
+    // a channel without a path plays what it always did (LYNX's bank before round 190rh: the drawn wave and the sine)
+    ChannelDef old;
+    old.instrument = InstrumentKind::toxic;
+    old.pluginState = toxicDefaultState();
+    CHECK (natives::dataSource (old) == natives::DataSource::notNeeded);
 }

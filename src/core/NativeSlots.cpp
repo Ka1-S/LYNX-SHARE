@@ -222,7 +222,9 @@ std::vector<std::uint8_t> convolverState()
 std::vector<std::uint8_t> distructorState()
 {
     distructor::State s;
-    s.modules = { distructor::defaultModule (distructor::ModuleType::distortion), distructor::defaultModule (distructor::ModuleType::filter) };
+    using distructor::ModuleType;
+    s.modules = { distructor::defaultModule (ModuleType::distortion), distructor::defaultModule (ModuleType::filter),
+                  distructor::defaultModule (ModuleType::chorus), distructor::defaultModule (ModuleType::ampCab) };
     return distructor::serialize (s);
 }
 } // namespace
