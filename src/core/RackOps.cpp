@@ -496,6 +496,30 @@ std::int64_t lengthWithStep (std::int64_t lengthTicks, int step, std::int64_t ti
     return (end + barTicks - 1) / barTicks * barTicks;
 }
 
+std::int64_t notesEnd (const Pattern& pattern) noexcept
+{
+    std::int64_t end = 0;
+    for (const auto* list : { &pattern.notes, &pattern.autoNotes })
+        for (const auto& n : *list)
+            end = std::max (end, n.start + std::max<std::int64_t> (n.length, 1));
+    return end;
+}
+
+bool growSetLengthToNotes (Pattern& pattern, std::int64_t endBefore, std::int64_t barTicks) noexcept
+{
+    if (pattern.lengthTicks <= 0 || barTicks <= 0)
+        return false;
+    const auto end = notesEnd (pattern);
+    // (a track clip, LYNX's own, grows on any edit: a clip made with 0.1.31 / 0.1.31.1 whose notes already went past its
+    // bar plays them after the next edit there; other patterns only when the edit itself took the notes further)
+    if (end <= pattern.lengthTicks || (end <= endBefore && ! pattern.trackClip))
+        return false;
+    if (std::any_of (pattern.markers.begin(), pattern.markers.end(), [] (const Marker& m) { return m.action == Marker::patternLength; }))
+        return false;
+    pattern.lengthTicks = (end + barTicks - 1) / barTicks * barTicks;
+    return true;
+}
+
 void setStepRhythm (Pattern& pattern, int channel, const std::vector<bool>& rhythm, int steps)
 {
     const auto end = (std::int64_t) steps * ticksPerStep;
