@@ -378,6 +378,10 @@
 #       message thread paints) the entry could be freed in between: evicted, or the cache emptied by a font change. The
 #       copy, which every caller made anyway, is made while the lock is held. One 0.1.30 Windows report (inside the
 #       cache's tree on the OpenGL thread, seconds after "visualizer GPU: start").
+#    b) Linux (and wherever LV2 is hosted), juce_audio_processors/format_types/juce_LV2PluginFormat.cpp: a UI (or plugin)
+#       that lists an extension in its .ttl but whose extension_data() gives NULL for it (DrumGizmo's UI, ui:resize) had
+#       the extension's struct read through the null pointer: six 0.1.29 / 0.1.30 reports ("making the editor of
+#       DrumGizmo"). Such an extension counts as absent now. tools/testplugin/lynx_test_lv2ui.c.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -869,6 +873,13 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("vertical blanks only while needed: attachment joins" "LYNX patch (round 190gv): the window's vertical blanks start"
             "            peer->addVBlankListener (this);|NL|"
             "            peer->addVBlankListener (this);|NL|           #if JUCE_WINDOWS|NL|            lynxVBlankListenerAdded (*peer); // LYNX patch (round 190gv): the window's vertical blanks start again|NL|           #endif|NL|")
+    elseif(file MATCHES "juce_LV2PluginFormat.cpp$")
+        lynx_juce_fix("LV2 UI extension a UI lists but does not give (fix 54b)" "LYNX patch (fix 54b): a UI that lists"
+            "        if (auto* lv2Descriptor = get())|NL|            if (auto* extension = lv2Descriptor->extension_data)|NL|                return OptionalExtension<Extension> (readUnaligned<Extension> (extension (uid)));"
+            "        if (auto* lv2Descriptor = get())|NL|            if (auto* extension = lv2Descriptor->extension_data)|NL|                if (const auto* data = extension (uid)) // LYNX patch (fix 54b): a UI that lists an extension may still give none|NL|                    return OptionalExtension<Extension> (readUnaligned<Extension> (data));")
+        lynx_juce_fix("LV2 plugin extension a plugin lists but does not give (fix 54b)" "LYNX patch (fix 54b): a plugin that lists"
+            "        return OptionalExtension<Extension> { readUnaligned<Extension> (lilv_instance_get_extension_data (instance.get(), uri.getTyped())) };"
+            "        // LYNX patch (fix 54b): a plugin that lists an extension may still give none (its struct is not read from null)|NL|        const auto* data = lilv_instance_get_extension_data (instance.get(), uri.getTyped());|NL|        return data != nullptr ? OptionalExtension<Extension> { readUnaligned<Extension> (data) } : OptionalExtension<Extension> {};")
     elseif(file MATCHES "juce_Messaging_linux.cpp$")
         lynx_juce_fix("unregistered descriptor callbacks are not called (fix 190rb)" "LYNX patch (fix 190rb)"
             "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|            (*fn)();|NL||NL|        return ! callbackStorage.empty();|NL|    }"
@@ -942,6 +953,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_linux.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_LV2PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)

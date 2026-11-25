@@ -1,0 +1,31 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+
+# LYNX's LV2 UI test plugin (round 190rf, tools/testplugin/lynx_test_lv2ui.c): its UI names the resize and idle
+# extensions but gives NULL for them, as DrumGizmo 0.9.20's does
+<urn:lynx:test-lv2ui#ui>
+    a ui:X11UI ;
+    lv2:extensionData ui:resize ;
+    lv2:extensionData ui:idleInterface ;
+    lv2:optionalFeature ui:parent ;
+    ui:binary <lynx_test_lv2ui.so> .
+
+<urn:lynx:test-lv2ui>
+    a lv2:Plugin , lv2:UtilityPlugin ;
+    lv2:binary <lynx_test_lv2ui.so> ;
+    doap:name "LYNX Test LV2 UI" ;
+    lv2:optionalFeature lv2:hardRTCapable ;
+    ui:ui <urn:lynx:test-lv2ui#ui> ;
+    lv2:port [
+        a lv2:AudioPort , lv2:InputPort ;
+        lv2:index 0 ;
+        lv2:symbol "in" ;
+        lv2:name "In"
+    ] , [
+        a lv2:AudioPort , lv2:OutputPort ;
+        lv2:index 1 ;
+        lv2:symbol "out" ;
+        lv2:name "Out"
+    ] .

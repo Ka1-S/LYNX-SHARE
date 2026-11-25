@@ -12310,7 +12310,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
             {
                 chosen = type;
                 break;
@@ -12655,7 +12656,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
             {
                 chosen = type;
                 break;
