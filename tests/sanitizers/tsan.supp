@@ -19,3 +19,11 @@ called_from_lib:libEGL.so
 called_from_lib:libgallium
 called_from_lib:libLLVM
 called_from_lib:libcurl.so
+# libXext's and libdbus' own locks (not instrumented: TSan sees an unlock without its lock)
+mutex:libXext.so
+mutex:libdbus-1.so
+mutex:lynx::rt::promotePending
+# JUCE 8.0.4: MessageManager::Lock taken on the message thread keeps its entry lock to its end and is destroyed with it
+# held (harmless with pthreads: the lock dies with its only user)
+mutex:juce::MessageManager::Lock
+mutex:juce::XWindowSystem::initialiseXDisplay
