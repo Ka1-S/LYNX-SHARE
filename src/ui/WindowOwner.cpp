@@ -1106,6 +1106,15 @@ bool postKeyToPluginViewForTest (juce::Component& window, int vk)
    #endif
 }
 
+bool systemFocusInPluginView()
+{
+   #if JUCE_WINDOWS
+    return windowOfFocusedPluginView() != nullptr;
+   #else
+    return false;
+   #endif
+}
+
 juce::String focusedPluginViewForTest()
 {
    #if JUCE_WINDOWS

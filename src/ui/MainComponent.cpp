@@ -2475,6 +2475,10 @@ void MainComponent::releaseTypingLaunches (bool all)
             ++it;
 }
 
+// ui/WindowOwner.cpp (round 190ra): the system's keyboard focus is in a hosted plugin's own view in a plugin window, docked
+// or detached (Windows; false elsewhere)
+bool systemFocusInPluginView();
+
 bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
 {
     // Issue #179: while a modal dialog is open (Rename pattern, Export, a question...) LYNX is blocked as FL is: the keys the
@@ -2482,8 +2486,12 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // every press (FL's dialog takes the key and nothing happens).
     if (modalDialogOpen())
         return false;
-    // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
-    const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
+    // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions. Hotfix 0.1.31.2
+    // (round 190ra; 10.net): a key a docked plugin left unused comes here (a detached one's goes to keyFromPluginView), and
+    // JUCE may still hold a text field of the main window as focused (the Browser's search, a name box) while the system's
+    // focus is in the plugin: that is the plugin's key, not typing into the field; the typing keyboard went silent.
+    const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr
+                                && ! systemFocusInPluginView();
     const auto chord = chordFromKeyPress (key);
     // issue #117: the typing piano plays from Sytrus's window (any LYNX window) too; its release is polled (timer)
     if (keys::KeyMap::secondaryWindowPlaysNote (typingKey (key).taken, typingIntoText))
