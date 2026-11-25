@@ -1,5 +1,6 @@
 #include "ui/QuickPick.h"
 
+#include "core/PluginPicks.h" // (round 190qi's Recent list: the extra's switch)
 #include "core/Rack.h"
 
 #include <algorithm>
