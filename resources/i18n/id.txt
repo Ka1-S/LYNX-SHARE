@@ -13075,3 +13075,4 @@ countries: id
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "File .mid yang diklik di Browser (atau Space / Putar) memainkan notnya di channel terpilih dengan tempo proyek, hingga 30 dtk. Mati, seperti di FL Studio: tidak ada yang diputar. Satu-satunya sakelarnya ada di sini."
 "Tab completes the Browser's search" = "Tab melengkapi pencarian Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Saat kamu mengetik di pencarian Browser, sisa tag (#word) atau nama folder tampil abu-abu setelah teks, dan Tab menerimanya. Mati: tidak ada yang dilengkapi. Satu-satunya sakelarnya ada di sini."
+"Every LYNX extra at its default" = "Setiap ekstra LYNX pada bawaannya"

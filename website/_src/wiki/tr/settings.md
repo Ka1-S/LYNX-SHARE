@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![Settings penceresinin General sayfası, üstte sayfa sekmeleri](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ Ayarlar penceresinin sekiz sayfası vardır: Audio, MIDI, General, Theme, Files,
 | `Varsayılan şablon`, `Başlangıç projesi` | `Dosya › Yeni` ile açılan şablon ve başlangıçta açılan şey: `Boş proje`, `Varsayılan şablon` veya `Son kullanılan proje`. `Dosya › Şablon olarak kaydet...` kendi şablonlarınızı ekler |
 | `Live setlerinin oturum klipleri` | İçe aktarılan bir Live setinin session kliplerinin gideceği yer: klip gridi veya aranjmandan sonra Playlist |
 | `Dil`, `Arayüz yazı tipi` | Bir sonraki açılışta uygulanır |
-| `Arayüz boyutu`, `Menü yoğunluğu` | Tüm arayüzün ölçeği ve kompakt ya da rahat menüler |
+| `Arayüz boyutu`, `Menü aralığı` | Tüm arayüzün ölçeği ve kompakt ya da rahat menüler |
 | `Dalga formları` | Temiz (klibin rengi) ya da spektral renkler; isteğe bağlı olarak stereo kanallar ayrı |
 | `Nota adları`, `Siyah tuşlar` | İngilizce, Germen veya solfej adları; diyez veya bemolle |
 | `Plugin stili` | Dahili plugin pencerelerinin görünümü: otomatik ya da her plugin için tek bir stil |
@@ -80,7 +80,7 @@ Ayarlar penceresinin sekiz sayfası vardır: Audio, MIDI, General, Theme, Files,
 |---|---|
 | Tema kutusu | Bir preset seçer. `İçe aktar...` ve `Dışa aktar...` `.lynxtheme` dosyalarını okur ve yazar, `Preset kaydet...` geçerli temayı saklar, `Varsayılan` sıfırlar |
 | `Vurgu rengi`, `Arka plan`, `Çalışma alanı` | Bir temanın üç rengi. Çalışma alanı rengi arka planı kendiliğinden izleyebilir |
-| Çalışma alanı görüntüsü | Pencerelerin arkasında bir PNG, JPEG veya GIF; `Görüntü sığdırma`, `Görüntü opaklığı` ve `Karart` ile |
+| Çalışma alanı görüntüsü | Pencerelerin arkasında bir PNG, JPEG veya GIF; `Görüntü sığdırma`, `Görüntü opaklığı` ve `Görüntüyü karart` ile |
 | Açılış sesi | 30 saniye veya daha kısa kendi sesiniz ya da LYNX SHARE'in kendi sesi |
 
 ## Dosyalar
@@ -95,7 +95,7 @@ Ayarlar penceresinin sekiz sayfası vardır: Audio, MIDI, General, Theme, Files,
 
 ## LYNX extras
 
-`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek yerde. Yalnızca görünümü değiştirenler varsayılan olarak açık, diğerleri kapalıdır. **FL ile aynı** tüm ekstraları kapatır, **Önerilen** her birini varsayılanına döndürür. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır.
+`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek yerde. Yalnızca görünümü değiştirenler varsayılan olarak açıktır; birkaç küçük ek de öyle: Playlist'e bırakılan MIDI dosyaları pattern klipleri olur, Son kullanılanlar listesi ve plugin listelerinde plugin başına tek satır, ayrıca Browser'da MIDI önizlemesi ve Tab ile tamamlama. Diğerleri kapalıdır. **FL ile aynı** tüm ekstraları kapatır, **Önerilen** her birini varsayılanına döndürür. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır.
 
 | Ayar | Ne yapar |
 |---|---|

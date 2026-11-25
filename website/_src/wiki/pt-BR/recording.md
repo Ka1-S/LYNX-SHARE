@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![A janela Gravação pergunta o que gravar: áudio, notas e automação, tudo, ou áudio no editor de áudio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ As opções estão em `Opções › Gravação` e no menu de clique direito do b
 
 `Baixa latência durante a gravação` fica no menu do botão direito do botão de gravar e no menu do insert do Mixer, em `Gravação em disco`. Vem desligado por padrão. Enquanto um insert com entrada está armado, ou o monitoramento dele está em `Ligado`, os efeitos que acrescentam latência no caminho até o Master são ignorados. Isso muda só o que você ouve: um insert mantém todos os seus efeitos quando o take é captado depois deles, por exemplo com `Pós-efeitos`. Os efeitos voltam quando o insert é desarmado.
 
-`Compensação de latência` está no mesmo menu `Gravação em disco` e vem ligado por padrão, como no FL Studio. Ele move cada take para trás pelo tempo de ida e volta do dispositivo de áudio, pelo valor `Ajuste fino (amostras)` das configurações de áudio e pela compensação de atraso dos plugins. Desligue para manter os takes onde foram gravados.
+`Alinhar as gravações com a latência do áudio` (FL Studio: Latency compensation) está no mesmo menu `Gravação em disco` e vem ligado por padrão, como no FL Studio. Ele move cada take para trás pelo tempo de ida e volta do dispositivo de áudio, pelo valor `Ajuste fino (amostras)` das configurações de áudio e pela compensação de atraso dos plugins. Desligue para manter os takes onde foram gravados.
 
 `Ferramentas › Cancelar gravação` descarta o que a passada de gravação atual escreveu (notas, automação e takes de áudio) e desliga a gravação. A reprodução continua e os inserts armados continuam armados.
 

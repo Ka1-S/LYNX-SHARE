@@ -13075,3 +13075,4 @@ countries: kr
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "브라우저에서 클릭한 .mid 파일(또는 Space / 재생)을 선택한 채널에서 프로젝트 템포로 최대 30초 동안 재생합니다. 끔(FL Studio와 같음): 아무것도 재생되지 않습니다. 전환은 여기에서만 할 수 있습니다."
 "Tab completes the Browser's search" = "Tab으로 브라우저 검색 자동 완성"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "브라우저 검색창에 입력하는 동안 태그(#word)나 폴더 이름의 나머지가 글자 뒤에 회색으로 표시되고, Tab으로 확정합니다. 끔: 아무것도 완성되지 않습니다. 전환은 여기에서만 할 수 있습니다."
+"Every LYNX extra at its default" = "모든 LYNX 추가 기능을 기본값으로"

@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![A página General da janela Configurações, com as abas de página ao longo do topo](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 | `Modelo padrão`, `Projeto ao iniciar` | O template que abre com `Arquivo › Novo`, e o que abre na inicialização: `Projeto vazio`, `Modelo padrão` ou `Último projeto usado`. `Arquivo › Salvar como modelo...` adiciona os seus |
 | `Clipes de sessão de sets do Live` | Para onde vão os clipes de sessão de um set do Live importado: a grade de clipes, ou a Playlist depois do arranjo |
 | `Idioma`, `Fonte da interface` | Valem na próxima inicialização |
-| `Tamanho da interface`, `Densidade dos menus` | Escala da interface inteira, e menus compactos ou confortáveis |
+| `Tamanho da interface`, `Espaçamento dos menus` | Escala da interface inteira, e menus compactos ou confortáveis |
 | `Formas de onda` | Limpas (a cor do clipe) ou em cores espectrais, opcionalmente com os canais estéreo separados |
 | `Nomes das notas`, `Teclas pretas` | Nomes em inglês, germânicos ou em solfejo, com sustenidos ou bemóis |
 | `Estilo dos plugins` | O visual das janelas de plugins embutidos: automático, ou um só estilo para todos os plugins |
@@ -80,7 +80,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 |---|---|
 | Caixa de tema | Escolhe um preset. `Importar...` e `Exportar...` leem e gravam arquivos `.lynxtheme`, `Salvar preset...` guarda o tema atual, `Padrão` o restaura |
 | `Cor de destaque`, `Fundo`, `Área de trabalho` | As três cores de um tema. A cor da área de trabalho pode seguir o fundo automaticamente |
-| Imagem da área de trabalho | Um PNG, JPEG ou GIF atrás das janelas, com `Ajuste da imagem`, `Opacidade da imagem` e `Escurecer` |
+| Imagem da área de trabalho | Um PNG, JPEG ou GIF atrás das janelas, com `Ajuste da imagem`, `Opacidade da imagem` e `Escurecer a imagem` |
 | Som de abertura | Um som seu de 30 segundos ou menos, ou o próprio do LYNX SHARE |
 
 ## Arquivos
@@ -95,7 +95,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 
 ## LYNX extras
 
-`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. As que só mudam o visual vêm ligadas por padrão, as demais vêm desligadas. **Igual ao FL** desliga todos os extras, **Recomendado** devolve cada um ao seu padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita.
+`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. As que só mudam o visual vêm ligadas por padrão, assim como algumas pequenas adições: arquivos MIDI soltos na Playlist viram clipes de pattern, a lista Recentes e uma linha por plugin nas listas de plugins, e a prévia de MIDI e a conclusão com Tab no Browser. As demais vêm desligadas. **Igual ao FL** desliga todos os extras, **Recomendado** devolve cada um ao seu padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita.
 
 | Configuração | O que faz |
 |---|---|

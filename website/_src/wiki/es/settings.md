@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![La página General de la ventana Configuración, con las pestañas de página arriba](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 | `Plantilla predeterminada`, `Proyecto al iniciar` | La plantilla que se abre con `Archivo › Nuevo`, y lo que se abre al iniciar: `Proyecto vacío`, `Plantilla predeterminada` o `Último proyecto usado`. `Archivo › Guardar como plantilla...` añade las tuyas |
 | `Clips de sesión de sets de Live` | Adónde van los clips de Session de un set de Live importado: la cuadrícula de clips, o la Playlist tras el arreglo |
 | `Idioma`, `Fuente de la interfaz` | Se aplican en el siguiente arranque |
-| `Tamaño de la interfaz`, `Densidad del menú` | Escala de toda la interfaz, y menús compactos o cómodos |
+| `Tamaño de la interfaz`, `Espaciado de los menús` | Escala de toda la interfaz, y menús compactos o cómodos |
 | `Formas de onda` | Limpias (el color del clip) o colores espectrales, opcionalmente con los canales estéreo por separado |
 | `Nombres de notas`, `Teclas negras` | Nombres ingleses, germánicos o de solfeo, con sostenidos o bemoles |
 | `Estilo de plugins` | El aspecto de las ventanas de los plugins integrados: automático, o un estilo para todos los plugins |
@@ -80,7 +80,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 |---|---|
 | Caja de tema | Elige un preset. `Importar...` y `Exportar...` leen y escriben archivos `.lynxtheme`, `Guardar preset...` guarda el tema actual, `Predeterminado` lo restablece |
 | `Color de acento`, `Fondo`, `Espacio de trabajo` | Los tres colores de un tema. El color del espacio de trabajo puede seguir al fondo automáticamente |
-| Imagen del espacio de trabajo | Un PNG, JPEG o GIF detrás de las ventanas, con `Ajuste de imagen`, `Opacidad de la imagen` y `Atenuar` |
+| Imagen del espacio de trabajo | Un PNG, JPEG o GIF detrás de las ventanas, con `Ajuste de imagen`, `Opacidad de la imagen` y `Oscurecer la imagen` |
 | Sonido de inicio | Un sonido tuyo de 30 segundos o menos, o el propio de LYNX SHARE |
 
 ## Archivos
@@ -95,7 +95,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 
 ## LYNX extras
 
-`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Las que solo cambian el aspecto están activadas por defecto y el resto desactivadas. **Igual que FL** desactiva todos los extras, **Recomendado** devuelve cada uno a su valor por defecto. Cada interruptor es el mismo ajuste que está en el menú o la página que nombra su línea.
+`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Las que solo cambian el aspecto están activadas por defecto, igual que unas pocas pequeñas incorporaciones: los archivos MIDI soltados en la Playlist se convierten en clips de pattern, la lista Recientes y una fila por plugin en las listas de plugins, y la vista previa MIDI y la completación con Tab en el Browser. El resto está desactivado. **Igual que FL** desactiva todos los extras, **Recomendado** devuelve cada uno a su valor por defecto. Cada interruptor es el mismo ajuste que está en el menú o la página que nombra su línea.
 
 | Ajuste | Qué hace |
 |---|---|

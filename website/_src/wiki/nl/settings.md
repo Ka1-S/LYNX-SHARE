@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 | `Standaardsjabloon`, `Project bij het starten` | De template die opent met `Bestand › Nieuw`, en wat opent bij het opstarten: `Leeg project`, `Standaardsjabloon` of `Laatst gebruikt project`. Met `Bestand › Opslaan als sjabloon...` voeg je je eigen toe |
 | `Sessieclips uit Live-sets` | Waar de sessieclips van een geïmporteerde Live-set heen gaan: het clipraster, of de Playlist na het arrangement |
 | `Taal`, `Lettertype van de interface` | Toegepast bij de volgende start |
-| `Interfacegrootte`, `Menudichtheid` | Schaal van de hele interface, en compacte of ruime menu's |
+| `Interfacegrootte`, `Menuruimte` | Schaal van de hele interface, en compacte of ruime menu's |
 | `Golfvormen` | Schoon (de kleur van de clip) of spectrale kleuren, eventueel met gescheiden stereokanalen |
 | `Nootnamen`, `Zwarte toetsen` | Engelse, Germaanse of solfège-namen, met kruisen of mollen |
 | `Pluginstijl` | Het uiterlijk van de ingebouwde pluginvensters: automatisch, of één stijl voor elke plugin |
@@ -80,7 +80,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 |---|---|
 | Themavak | Kiest een preset. `Importeren...` en `Exporteren...` lezen en schrijven `.lynxtheme`-bestanden, `Preset opslaan...` bewaart het huidige thema, `Standaard` zet het terug |
 | `Accentkleur`, `Achtergrond`, `Werkruimte` | De drie kleuren van een thema. De kleur van de werkruimte kan automatisch de achtergrond volgen |
-| Werkruimteafbeelding | Een PNG, JPEG of GIF achter de vensters, met `Afbeeldingsschaal`, `Dekking afbeelding` en `Dimmen` |
+| Werkruimteafbeelding | Een PNG, JPEG of GIF achter de vensters, met `Afbeeldingsschaal`, `Dekking afbeelding` en `Afbeelding donkerder` |
 | Opstartgeluid | Je eigen geluid van 30 seconden of korter, of dat van LYNX SHARE zelf |
 
 ## Bestanden
@@ -95,7 +95,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 
 ## LYNX extras
 
-`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. De extra's die alleen het uiterlijk veranderen staan standaard aan, de rest staat uit. **Als FL** zet elk extra uit, **Aanbevolen** zet ze allemaal terug op hun standaard. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
+`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. De extra's die alleen het uiterlijk veranderen staan standaard aan, net als een paar kleine toevoegingen: MIDI-bestanden die op de Playlist vallen worden patternclips, de lijst Recent en één rij per plugin in de pluginlijsten, en de MIDI-voorvertoning en de Tab-aanvulling in de Browser. De rest staat uit. **Als FL** zet elk extra uit, **Aanbevolen** zet ze allemaal terug op hun standaard. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
 
 | Instelling | Wat het doet |
 |---|---|

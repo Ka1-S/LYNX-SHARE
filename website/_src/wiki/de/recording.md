@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![Das Aufnahmefenster fragt, was aufgenommen werden soll: Audio, Noten und Automation, alles, oder Audio in den Audio-Editor](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Die Optionen stehen unter `Optionen › Aufnahme` und im Rechtsklick-Menü des A
 
 `Niedrige Latenz bei der Aufnahme` steht im Rechtsklick-Menü des Aufnahme-Buttons und im Insert-Menü des Mixers unter `Aufnahme auf Festplatte`. Standardmäßig ist es aus. Solange ein Insert mit einem Eingang scharf geschaltet ist oder sein Monitoring auf `An` steht, werden die Effekte umgangen, die auf seinem Weg zum Master Latenz hinzufügen. Das ändert nur, was du hörst: Ein Insert behält alle seine Effekte, wenn die Aufnahme hinter ihnen abgegriffen wird, zum Beispiel mit `Nach den Effekten`. Die Effekte kommen zurück, wenn das Insert nicht mehr scharf ist.
 
-`Latenzausgleich` steht im selben Menü `Aufnahme auf Festplatte` und ist standardmäßig an, wie in FL Studio. Es verschiebt jeden Take um die Rundlaufzeit des Audiogeräts zurück, um den Wert `Feinabstimmung (Samples)` der Audio-Einstellungen und um den Latenzausgleich der Plugins. Schalte es aus, damit die Takes dort bleiben, wo sie aufgenommen wurden.
+`Aufnahmen an die Audiolatenz angleichen` (FL Studio: Latency compensation) steht im selben Menü `Aufnahme auf Festplatte` und ist standardmäßig an, wie in FL Studio. Es verschiebt jeden Take um die Rundlaufzeit des Audiogeräts zurück, um den Wert `Feinabstimmung (Samples)` der Audio-Einstellungen und um den Latenzausgleich der Plugins. Schalte es aus, damit die Takes dort bleiben, wo sie aufgenommen wurden.
 
 `Tools › Aufnahme abbrechen` verwirft, was der aktuelle Aufnahmedurchgang geschrieben hat (seine Noten, Automation und Audio-Takes), und schaltet die Aufnahme aus. Die Wiedergabe läuft weiter, und die scharf geschalteten Inserts bleiben scharf.
 

@@ -92,7 +92,7 @@ Mixer groups fold with their chevron (or `Alt`+click for all groups). A VCA fade
 
 Each insert has a record-arm button. With an insert armed, Rec and Play record its audio input into a Playlist clip. `Shift+R` arms the selected insert and starts recording in one step. See [Recording](/wiki/recording/).
 
-When you pick an external input for an insert that also records other audio, LYNX SHARE asks whether to switch it to `External input only`, so the take holds the input alone. `Mixer › Disk recording › Latency compensation` in the insert menu is on by default. Turned off, recorded takes are placed with no latency compensation at all.
+When you pick an external input for an insert that also records other audio, LYNX SHARE asks whether to switch it to `External input only`, so the take holds the input alone. `Mixer › Disk recording › Line up recordings with the audio latency` in the insert menu is on by default. Turned off, recorded takes are placed with no latency compensation at all.
 
 ## Keys
 

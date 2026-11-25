@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![A parte de baixo do Gerenciador de plugins, com a nota de que cada arquivo de plugin é examinado em um processo separado](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ As pastas padrão são examinadas, mais as que você adicionar:
 
 ## Janelas de plugin acopladas e destacadas
 
-O editor de um plugin abre dentro da janela principal, como os outros painéis. `Destacada` no menu da janela do plugin dá a esse plugin uma janela própria, e `Fixar no topo` no mesmo menu mantém uma janela destacada acima das outras janelas do LYNX SHARE.
+O editor de um plugin abre dentro da janela principal, como os outros painéis. `Destacada` no menu da janela do plugin dá a esse plugin uma janela própria, e `Sempre no topo` no mesmo menu mantém uma janela destacada acima das outras janelas do LYNX SHARE.
 
 `Destacar todos os plugins novos` em `Opções › Configurações gerais...` abre destacado todo plugin que você adiciona. `Ferramentas › Alternar todos os editores de plugins para` define `Encaixada` ou `Destacada` para todos os plugins do projeto.
 

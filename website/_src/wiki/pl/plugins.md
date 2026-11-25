@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![Dolna część Menedżera pluginów z uwagą, że każdy plik pluginu jest badany w osobnym procesie](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Skanowane są foldery standardowe oraz te, które dodasz:
 
 ## Pluginy zadokowane i odłączone
 
-Edytor pluginu otwiera się w głównym oknie, tak jak inne panele. `Odłączony` w menu okna pluginu daje temu pluginowi własne okno, a `Przypnij na wierzchu` w tym samym menu trzyma odłączone okno nad innymi oknami LYNX SHARE.
+Edytor pluginu otwiera się w głównym oknie, tak jak inne panele. `Odłączony` w menu okna pluginu daje temu pluginowi własne okno, a `Zawsze na wierzchu` w tym samym menu trzyma odłączone okno nad innymi oknami LYNX SHARE.
 
 `Odłączaj wszystkie nowe wtyczki` w `Opcje › Ustawienia ogólne...` otwiera każdy dodany plugin jako odłączony. `Narzędzia › Przełącz wszystkie edytory pluginów na` ustawia `Zadokowany` lub `Odłączony` dla wszystkich pluginów projektu.
 

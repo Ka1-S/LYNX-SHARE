@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![Okno Nagrywanie pyta, co nagrywać: audio, nuty i automatykę, wszystko albo audio do edytora audio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Opcje są w `Opcje › Nagrywanie` i w menu prawego przycisku przycisku nagrywan
 
 `Niska latencja podczas nagrywania` jest w menu prawego przycisku myszy przy przycisku nagrywania i w menu inserta Mixera w sekcji `Nagrywanie na dysk`. Domyślnie jest wyłączone. Gdy insert z wejściem jest uzbrojony albo jego monitoring ma wartość `Wł.`, efekty dodające latencję na drodze do Master są omijane. Zmienia to tylko to, co słyszysz: insert zachowuje wszystkie swoje efekty, gdy ujęcie jest pobierane po nich, na przykład przez `Po efektach`. Efekty wracają, gdy insert przestaje być uzbrojony.
 
-`Kompensacja opóźnienia` jest w tym samym menu `Nagrywanie na dysk` i jest domyślnie włączone, jak w FL Studio. Przesuwa każde ujęcie wstecz o czas podróży w obie strony urządzenia audio, wartość `Precyzyjna korekta (próbki)` z ustawień audio i kompensację opóźnienia pluginów. Wyłącz je, aby zachować ujęcia tam, gdzie zostały nagrane.
+`Wyrównuj nagrania do opóźnienia audio` (FL Studio: Latency compensation) jest w tym samym menu `Nagrywanie na dysk` i jest domyślnie włączone, jak w FL Studio. Przesuwa każde ujęcie wstecz o czas podróży w obie strony urządzenia audio, wartość `Precyzyjna korekta (próbki)` z ustawień audio i kompensację opóźnienia pluginów. Wyłącz je, aby zachować ujęcia tam, gdzie zostały nagrane.
 
 `Narzędzia › Anuluj nagrywanie` wyrzuca to, co zapisał bieżący przebieg nagrywania (jego nuty, automatykę i ujęcia audio) i wyłącza nagrywanie. Odtwarzanie trwa dalej, a uzbrojone inserty zostają uzbrojone.
 

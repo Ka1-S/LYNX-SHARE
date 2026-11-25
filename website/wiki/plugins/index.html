@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4a1c1908";
+window.LYNX_LANG=lang;window.LYNX_V="79c724ec";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4a1c1908">
+<link rel="stylesheet" href="/assets/site.css?v=79c724ec">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -104,7 +104,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The standard folders are scanned, plus the ones you add:</p>
 <ul><li>Windows: <code>Common Files\VST3</code>, <code>Common Files\CLAP</code>, <code>Common Files\VST2</code>, <code>VSTPlugins</code> and <code>Steinberg\VSTPlugins</code> under Program Files, and the folders FL Studio uses if it is installed.</li><li>macOS: <code>VST3</code>, <code>Components</code> and <code>CLAP</code> in <code>~/Library/Audio/Plug-Ins</code> and <code>/Library/Audio/Plug-Ins</code>.</li><li>Linux: <code>~/.vst3</code>, <code>~/.clap</code>, <code>~/.lv2</code>, <code>~/.vst</code> and the same folders under <code>/usr/lib</code> and <code>/usr/local/lib</code>.</li></ul>
 <h2 id="docked-and-detached-plugin-windows">Docked and detached plugin windows</h2>
-<p>A plugin's editor opens inside the main window, like the other panels. <code>Detached</code> in the plugin window's menu gives that plugin a window of its own, and <code>Pin on top</code> in the same menu keeps a detached window above LYNX SHARE's other windows.</p>
+<p>A plugin's editor opens inside the main window, like the other panels. <code>Detached</code> in the plugin window's menu gives that plugin a window of its own, and <code>Always on top</code> in the same menu keeps a detached window above LYNX SHARE's other windows.</p>
 <p><code>Detach all new plugins</code> in <code>Options › General settings...</code> opens every plugin you add detached. <code>Tools › Switch all plugin editors to</code> sets <code>Attached</code> or <code>Detached</code> for all plugins of the project.</p>
 <h2 id="run-plugins-in-a-separate-process">Run plugins in a separate process</h2>
 <p>By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take the program down. As an option, each plugin runs in its own process.</p>
@@ -151,8 +151,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4a1c1908" defer></script>
-<script src="/assets/wiki.js?v=4a1c1908" defer></script>
-<script src="/assets/motion.js?v=4a1c1908" defer></script>
+<script src="/assets/site.js?v=79c724ec" defer></script>
+<script src="/assets/wiki.js?v=79c724ec" defer></script>
+<script src="/assets/motion.js?v=79c724ec" defer></script>
 </body>
 </html>

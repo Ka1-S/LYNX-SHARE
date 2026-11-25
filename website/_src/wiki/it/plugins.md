@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![La parte bassa della Gestione plugin, con la nota che ogni file di plugin viene esaminato in un processo separato](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Vengono scansionate le cartelle standard, più quelle che aggiungi:
 
 ## Finestre dei plugin agganciate e separate
 
-L'editor di un plugin si apre dentro la finestra principale, come gli altri pannelli. `Separato` nel menu della finestra del plugin dà a quel plugin una finestra propria, e `Fissa in primo piano` nello stesso menu tiene una finestra separata sopra le altre finestre di LYNX SHARE.
+L'editor di un plugin si apre dentro la finestra principale, come gli altri pannelli. `Separato` nel menu della finestra del plugin dà a quel plugin una finestra propria, e `Sempre in primo piano` nello stesso menu tiene una finestra separata sopra le altre finestre di LYNX SHARE.
 
 `Separa tutti i nuovi plugin` in `Opzioni › Impostazioni generali...` apre separato ogni plugin che aggiungi. `Strumenti › Passa tutti gli editor dei plugin a` imposta `Agganciato` o `Separato` per tutti i plugin del progetto.
 

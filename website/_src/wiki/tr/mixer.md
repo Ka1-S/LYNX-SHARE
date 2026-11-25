@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Mixer grupları, ok işaretleriyle katlanır (tümü için `Alt`+tıklama). Bir 
 
 Her insert'in bir kayda hazırlama düğmesi vardır. Bir insert kayda hazırken Rec ve Play, ses girişini bir Playlist klibine kaydeder. `Shift+R` seçili insert'i kayda hazırlar ve kaydı tek adımda başlatır. Bkz. [Kayıt](/wiki/recording/).
 
-Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYNX SHARE onu `Yalnızca harici giriş` olarak değiştirmek isteyip istemediğinizi sorar; böylece kayıtta yalnızca giriş bulunur. Insert menüsündeki `Mixer › Diske kayıt › Gecikme telafisi` varsayılan olarak açıktır. Kapatılırsa kaydedilen kayıtlar hiçbir gecikme telafisi uygulanmadan yerleştirilir.
+Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYNX SHARE onu `Yalnızca harici giriş` olarak değiştirmek isteyip istemediğinizi sorar; böylece kayıtta yalnızca giriş bulunur. Insert menüsündeki `Mixer › Diske kayıt › Kayıtları ses gecikmesine göre hizala` varsayılan olarak açıktır. Kapatılırsa kaydedilen kayıtlar hiçbir gecikme telafisi uygulanmadan yerleştirilir.
 
 ## Tuşlar
 

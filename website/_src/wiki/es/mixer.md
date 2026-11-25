@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Los grupos del mixer se pliegan con su chevron (o `Alt`+clic para todos los grup
 
 Cada insert tiene un botón de armado de grabación. Con un insert armado, Rec y Play graban su entrada de audio en un clip de la Playlist. `Shift+R` arma el insert seleccionado y empieza a grabar en un solo paso. Mira [Grabación](/wiki/recording/).
 
-Cuando eliges una entrada externa para un insert que también graba otro audio, LYNX SHARE pregunta si quieres cambiarlo a `Solo entrada externa`, para que la toma contenga solo la entrada. `Mixer › Grabación en disco › Compensación de latencia` en el menú del insert está activado por defecto. Si se desactiva, las tomas grabadas se colocan sin ninguna compensación de latencia.
+Cuando eliges una entrada externa para un insert que también graba otro audio, LYNX SHARE pregunta si quieres cambiarlo a `Solo entrada externa`, para que la toma contenga solo la entrada. `Mixer › Grabación en disco › Alinear las grabaciones con la latencia de audio` en el menú del insert está activado por defecto. Si se desactiva, las tomas grabadas se colocan sin ninguna compensación de latencia.
 
 ## Teclas
 

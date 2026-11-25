@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![Het venster Opname vraagt wat er opgenomen moet worden: audio, noten en automatisering, alles, of audio in de audio-editor](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ De opties staan in `Opties › Opname` en in het rechtsklikmenu van de opnamekno
 
 `Lage latentie tijdens opnemen` staat in het rechtsklikmenu van de opnameknop en in het insertmenu van de Mixer onder `Opnemen naar schijf`. Het staat standaard uit. Zolang een insert met een ingang is scherpgesteld, of zijn monitoring `Aan` staat, worden de effecten die latentie toevoegen op zijn weg naar de Master gebypasst. Dit verandert alleen wat je hoort: een insert houdt al zijn effecten als de take erachter wordt afgetapt, bijvoorbeeld met `Na de effecten`. De effecten komen terug als de insert niet meer is scherpgesteld.
 
-`Latentiecompensatie` zit in hetzelfde menu `Opnemen naar schijf` en staat standaard aan, zoals in FL Studio. Het verschuift elke take terug met de round trip van het audioapparaat, de waarde `Fijnafstelling (samples)` van de audio-instellingen en de vertragingscompensatie van de plugins. Zet het uit om de takes te houden waar ze zijn opgenomen.
+`Opnames uitlijnen op de audiolatentie` (FL Studio: Latency compensation) zit in hetzelfde menu `Opnemen naar schijf` en staat standaard aan, zoals in FL Studio. Het verschuift elke take terug met de round trip van het audioapparaat, de waarde `Fijnafstelling (samples)` van de audio-instellingen en de vertragingscompensatie van de plugins. Zet het uit om de takes te houden waar ze zijn opgenomen.
 
 `Extra › Opname annuleren` gooit weg wat de huidige opnamedoorgang schreef (de noten, automatisering en audiotakes) en zet opnemen uit. Het afspelen gaat door en de scherpgestelde inserts blijven scherpgesteld.
 

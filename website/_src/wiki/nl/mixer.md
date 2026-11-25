@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Mixergroepen vouw je in met hun pijltje (of `Alt`+klik voor alle groepen). Een V
 
 Elke insert heeft een opname-armknop. Met een gearmde insert nemen Rec en Play zijn audio-ingang op in een Playlist-clip. `Shift+R` armt de geselecteerde insert en start de opname in één stap. Zie [Opnemen](/wiki/recording/).
 
-Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt, vraagt LYNX SHARE of hij moet omschakelen naar `Alleen externe ingang`, zodat de take alleen de ingang bevat. `Mixer › Opnemen naar schijf › Latentiecompensatie` in het insertmenu staat standaard aan. Wanneer het uit staat, worden opgenomen takes zonder enige latentiecompensatie geplaatst.
+Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt, vraagt LYNX SHARE of hij moet omschakelen naar `Alleen externe ingang`, zodat de take alleen de ingang bevat. `Mixer › Opnemen naar schijf › Opnames uitlijnen op de audiolatentie` in het insertmenu staat standaard aan. Wanneer het uit staat, worden opgenomen takes zonder enige latentiecompensatie geplaatst.
 
 ## Toetsen
 

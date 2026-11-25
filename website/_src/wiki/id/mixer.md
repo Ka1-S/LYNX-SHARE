@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Grup Mixer dilipat dengan chevron-nya (atau `Alt`+klik untuk semua grup). Fader 
 
 Setiap insert punya tombol siaga rekam. Dengan insert yang disiagakan, Rec dan Play merekam input audionya ke clip Playlist. `Shift+R` menyiagakan insert terpilih dan memulai rekaman dalam satu langkah. Lihat [Merekam](/wiki/recording/).
 
-Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYNX SHARE bertanya apakah akan mengalihkannya ke `Hanya input eksternal`, sehingga take hanya berisi input itu. `Mixer › Perekaman ke disk › Kompensasi latensi` di menu insert menyala secara bawaan. Jika dimatikan, take yang direkam ditempatkan tanpa kompensasi latensi sama sekali.
+Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYNX SHARE bertanya apakah akan mengalihkannya ke `Hanya input eksternal`, sehingga take hanya berisi input itu. `Mixer › Perekaman ke disk › Selaraskan rekaman dengan latensi audio` di menu insert menyala secara bawaan. Jika dimatikan, take yang direkam ditempatkan tanpa kompensasi latensi sama sekali.
 
 ## Tombol
 

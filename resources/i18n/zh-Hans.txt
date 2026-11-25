@@ -13075,3 +13075,4 @@ countries: cn sg
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "在浏览器中点击的 .mid 文件（或按空格 / 播放）会在选中的通道上按工程速度播放其音符，最长 30 秒。关闭（与 FL Studio 相同）：不播放任何内容。唯一的开关在这里。"
 "Tab completes the Browser's search" = "Tab 补全浏览器搜索"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "在浏览器搜索中输入时，标签（#word）或文件夹名称的其余部分会以灰色显示在文字后面，按 Tab 即可接受。关闭：不补全任何内容。唯一的开关在这里。"
+"Every LYNX extra at its default" = "每个 LYNX 附加功能恢复默认"

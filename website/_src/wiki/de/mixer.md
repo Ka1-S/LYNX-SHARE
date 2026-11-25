@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![Der Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Mixer-Gruppen klappst du mit ihrem Pfeil ein (oder mit `Alt`+Klick alle Gruppen)
 
 Jedes Insert hat einen Button zum Scharfschalten der Aufnahme. Ist ein Insert scharf, nehmen Rec und Wiedergabe seinen Audioeingang in einen Playlist-Clip auf. `Shift+R` schaltet das gewählte Insert scharf und startet die Aufnahme in einem Schritt. Siehe [Aufnahme](/wiki/recording/).
 
-Wählst du für einen Insert einen externen Eingang, der auch anderes Audio aufnimmt, fragt LYNX SHARE, ob er auf `Nur externer Eingang` umgeschaltet werden soll, damit die Aufnahme nur den Eingang enthält. `Mixer › Aufnahme auf Festplatte › Latenzausgleich` im Insert-Menü ist standardmäßig an. Ausgeschaltet, werden aufgenommene Takes ganz ohne Latenzausgleich platziert.
+Wählst du für einen Insert einen externen Eingang, der auch anderes Audio aufnimmt, fragt LYNX SHARE, ob er auf `Nur externer Eingang` umgeschaltet werden soll, damit die Aufnahme nur den Eingang enthält. `Mixer › Aufnahme auf Festplatte › Aufnahmen an die Audiolatenz angleichen` im Insert-Menü ist standardmäßig an. Ausgeschaltet, werden aufgenommene Takes ganz ohne Latenzausgleich platziert.
 
 ## Tasten
 

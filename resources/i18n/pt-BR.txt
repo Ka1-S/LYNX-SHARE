@@ -13228,3 +13228,4 @@ countries: br
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "Um arquivo .mid clicado no Browser (ou Espaço / Tocar) toca suas notas no canal selecionado no tempo do projeto, até 30 s. Desligado, como no FL Studio: nada toca. O único botão para isso está aqui."
 "Tab completes the Browser's search" = "Tab completa a busca do Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Enquanto você digita na busca do Browser, o resto de uma tag (#word) ou de um nome de pasta aparece em cinza depois do texto, e Tab o aceita. Desligado: nada é completado. O único botão para isso está aqui."
+"Every LYNX extra at its default" = "Cada extra do LYNX no seu padrão"

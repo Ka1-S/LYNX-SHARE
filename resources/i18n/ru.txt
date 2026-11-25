@@ -13075,3 +13075,4 @@ countries: ru by kz
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "Файл .mid, по которому кликнули в Browser (или Пробел / Старт), играет свои ноты на выбранном канале в темпе проекта, до 30 с. Выключено, как в FL Studio: ничего не играет. Единственный переключатель здесь."
 "Tab completes the Browser's search" = "Tab дополняет поиск в Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Пока вы вводите текст в поиске Browser, остаток тега (#word) или имени папки показывается серым после текста, и Tab принимает его. Выключено: ничего не дополняется. Единственный переключатель здесь."
+"Every LYNX extra at its default" = "Каждое дополнение LYNX по умолчанию"
