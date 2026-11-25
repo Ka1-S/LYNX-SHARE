@@ -60,6 +60,49 @@ TEST (qa190rb_helix_clean_sample_voice_survives_a_sample_without_levels)
 }
 
 
+// Round 190rf: crash reports 0.1.30 Linux (seven, three users: wt::Engine::Impl::grainStep / sampleStepClean on the audio
+// thread) and Windows b230f196 (sampleStepClean): the engine's sample went to none (a preset without sample data applied,
+// HelixBank) while a voice played it. A voice decides "sample / grains / Clean" at its control steps, every 16 samples and
+// across render calls, so between two of them it read *sample through a null pointer. Renders of odd lengths keep a
+// control step open across the change; with the sample (plain, Clean) and with grains.
+TEST (qa190rf_helix_voice_survives_its_sample_going_away)
+{
+    namespace w = lynx::wt;
+    for (const int mode : { 0, 1, 2 }) // the sample read, the sample with Clean, round 3's grains
+    {
+        w::HelixUserData d;
+        d.sample = helix190mt::saw (225.0, 1.0);
+        auto s = helix190mt::patch();
+        s[(std::size_t) (w::ext2Base + w::ext2::sampleOn)] = mode < 2 ? 1.0 : 0.0;
+        s[(std::size_t) (w::ext2Base + w::ext2::sampleRoot)] = 57.0;
+        if (mode == 1)
+            helix190mt::x3 (s, w::ext3::sampleClean, 1.0);
+        if (mode == 2)
+        {
+            helix190mt::x3 (s, w::ext3::grainOn, 1.0);
+            helix190mt::x3 (s, w::ext3::grainDensity, 1.0);
+        }
+        const auto levels = w::sampleLevels (d.sample);
+        w::Engine e;
+        e.prepare (48000.0);
+        e.setSample (&d.sample);
+        e.setSampleLevels (levels.get());
+        e.setState (s.data());
+        std::vector<float> l (12000, 0.0f), r (12000, 0.0f);
+        e.note (57 + 19, 1.0f);
+        e.render (l.data(), r.data(), 2407, 120.0, -1.0); // (2407: the voice's control step is half done at the change)
+        e.setSample (nullptr);
+        e.setSampleLevels (nullptr);
+        e.render (l.data() + 2407, r.data() + 2407, 2401, 120.0, -1.0);
+        // a sample again (the next preset brings its own): the voice plays it
+        w::HelixUserData other;
+        other.sample = helix190mt::saw (300.0, 0.5);
+        e.setSample (&other.sample);
+        e.render (l.data() + 4808, r.data() + 4808, 7192, 120.0, -1.0);
+        CHECK (std::all_of (l.begin(), l.end(), [] (float v) { return std::isfinite (v) && std::fabs (v) < 4.0f; }));
+    }
+}
+
 // LeakSanitizer in the sanitizer suite (round 190rb; ctl170i3_every_control_changes_the_render): a Fruit Kick channel's
 // instrument never freed the engine it was playing (~300 KB each time a rack dropped or rebuilt the instrument: a project
 // opened or closed, the channel deleted). Measured here with glibc's heap counters; the sanitizer build's LSan reports it
