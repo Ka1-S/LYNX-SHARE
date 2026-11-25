@@ -355,6 +355,9 @@ class Monkey:
                   "layout": self.a.layout, "project": self.a.project, "sanitizer_reports": reports,
                   "seconds": round(time.time() - self.t0, 1)}
         (self.out / "result.json").write_text(json.dumps(result, indent=1))
+        if self.a.windows:  # (the run's caches, hundreds of MB on the system drive: the logs and crash files stay)
+            import shutil
+            shutil.rmtree(self.profile / "cache", ignore_errors=True)
         print(json.dumps(result))
         return 0 if status == "timeout" and not reports else 1  # (a quit that crashed or hung is a failure too)
 
