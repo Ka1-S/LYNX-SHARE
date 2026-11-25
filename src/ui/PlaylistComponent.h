@@ -95,6 +95,12 @@ public:
         std::optional<Clip> picked;
     };
     Brush brush;
+    // the tools paint this source from now on (round 190ri: FL after a mixer track render)
+    void paintSource (ClipKind kind, int index)
+    {
+        brush = { kind, index, {} };
+        repaint();
+    }
     int knownCurrentPattern = -1;
 
     explicit PlaylistComponent (AudioEngine& engine);

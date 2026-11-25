@@ -1,4 +1,5 @@
 #include "engine/Exporter.h"
+#include "core/ExportNaming.h"
 #include "core/AraRegions.h"
 #include "engine/AraHost.h"
 #include "core/MixerOps.h" // (round 190my: the Current track)
@@ -1232,12 +1233,17 @@ void addStemItems (StemPlan& plan, int set, const Song& from, const Options& o, 
 {
     const auto ext = extension (o.format);
     const auto baseName = base.getFileNameWithoutExtension().toStdString();
+    // (round 190ri: a "$track" name of two inserts called the same gets "_2"; one file would overwrite the other)
     auto file = [&] (int number, const std::string& name) {
-        return base.getSiblingFile (juce::String::fromUTF8 (stemFileName (baseName, number, name, ext).c_str()));
+        auto f = base.getSiblingFile (juce::String::fromUTF8 (stemFileName (baseName, number, name, ext).c_str()));
+        const auto used = [&plan] (const juce::File& x) { return std::any_of (plan.items.begin(), plan.items.end(), [&x] (const StemPlan::Item& i) { return i.file == x; }); };
+        for (int n = 2; used (f); ++n)
+            f = base.getSiblingFile (juce::String::fromUTF8 (stemFileName (baseName, number, name, "").c_str()) + "_" + juce::String (n) + ext);
+        return f;
     };
 
-    if (o.stemsIncludeMaster)
-        plan.items.push_back ({ prefix + juce::String ("Master"), base, set, 0, from, o });
+    if (o.stemsIncludeMaster) // (round 190ri: with "$track" in the name the full mix was called "...$track.wav")
+        plan.items.push_back ({ prefix + juce::String ("Master"), exportnaming::hasStemWildcard (baseName) ? file (0, "Master") : base, set, 0, from, o });
 
     if (o.stems == Stems::channels || o.stems == Stems::channelsDry)
         for (auto c : stemChannels (from, o.range))

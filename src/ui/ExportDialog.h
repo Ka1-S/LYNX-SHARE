@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/ExportOptions.h"
 #include "core/QuickRender.h"
 #include "engine/AudioEngine.h"
 
@@ -27,8 +28,10 @@ void showMasterDialog (AudioEngine& engine, const juce::File& suggestedFolder, c
 // `afterRender` (optional) runs on the message thread once the files are written, with the files (FL's "Auto-unarm",
 // round 166e; "Auto-create audio clip", round 167a). Inserts with a "Record to" file render to it, and when every one
 // has one there is no file dialog, as in FL (round 167a).
+// Round 190ri (FL 2026 live): it opens on WAV and writes to the recordings folder under FL's recording name, no file dialog.
+using TrackRenderDone = std::function<void (const std::vector<juce::File>&, const exportopts::Options&)>;
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
-                                const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender = {});
+                                const std::vector<int>& tracks, TrackRenderDone afterRender = {});
 
 // "Render to audio" (freeze): the insert becomes an audio clip on a new insert with the same
 // routing, and the original is muted. Runs on a background thread with progress. Round 190jx: rendered with the plugin
@@ -111,6 +114,9 @@ std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, 
 // export is caught where it would start) and returns "OK" or what failed; `shotPrefix` not empty: the window at 100 %
 // and 150 % (<prefix>-export-folder-name.png / @150).
 juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& folder, const juce::String& shotPrefix = {});
+// Round 190ri: the same for the mixer track render window (WAV whatever the last export was, the recordings folder, FL's
+// recording name, no file dialog, the plain Export window's folder left alone). "OK" or what failed.
+juce::String exportTracksWindowCheck (AudioEngine& engine, const juce::File& recordings, const juce::String& shotPrefix = {});
 // The render window of "Render as audio clip" (a pattern render: WAV, no file dialog; round 190gk's shot of FL's
 // Start button). Nothing renders.
 std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine);

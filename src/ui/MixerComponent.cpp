@@ -5,6 +5,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
+#include "engine/Mp3Format.h"
 #include "ui/MixerComponent.h"
 #include "ui/Notices.h" // round 190qx
 #include "ui/AraMenu.h"
@@ -4118,16 +4119,23 @@ bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file
 }
 
 // FL's "Auto-create audio clip" (round 167a [SHOT s28–s37]): the rendered files go on the Playlist, one undo step
-static void placeRenderedFiles (AudioEngine& engine, const std::vector<juce::File>& files)
+void placeRenderedTracks (AudioEngine& engine, const std::vector<juce::File>& files, const exportopts::Options& options)
 {
     std::vector<mixerops::RenderedFile> list;
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    registerAudioFormats (formats); // (round 190ri: MP3 too; with JUCE's basic formats an .mp3 render was never placed)
     for (const auto& f : files)
         if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f)); reader != nullptr)
             list.push_back ({ f.getFullPathName().toStdString(), (double) reader->lengthInSamples, reader->sampleRate });
-    if (! list.empty())
-        engine.editSong ([list] (Song& s) { mixerops::placeRenderedFiles (s, list); });
+    if (list.empty())
+        return;
+    // FL: a song render goes on the Playlist from where it was rendered; a pattern render is only a clip to place
+    const auto onPlaylist = options.range != exportopts::Range::pattern;
+    const auto& song = engine.getSong();
+    const auto start = options.range == exportopts::Range::selection && exportopts::hasSelection (song) ? song.loopStart : 0;
+    engine.editSong ([list, onPlaylist, start] (Song& s) { mixerops::placeRenderedFiles (s, list, onPlaylist, start); });
+    if (mixeroptions::pickAudioClip)
+        mixeroptions::pickAudioClip ((int) engine.getSong().channels.size() - 1);
 }
 
 std::unique_ptr<juce::AlertWindow> MixerStrips::makeInsertMultipleBox (bool adding)
@@ -4746,17 +4754,20 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         auto& eng = engine;
         disk.addItem (tr ("Render armed tracks to wave file(s)...") + "\tAlt+R", ! armed.empty(), false, [armed, &eng] {
             if (mixeroptions::renderTracks)
-                mixeroptions::renderTracks (armed, [armed, &eng] (const std::vector<juce::File>& files) {
+                mixeroptions::renderTracks (armed, [armed, &eng] (const std::vector<juce::File>& files, const exportopts::Options& options) {
                     if (eng.getRecordOptions().unarmAfterRender) // FL's "Auto-unarm" (round 166e)
                         for (auto t : armed)
                             eng.setInsertArmed (t, false);
                     if (eng.getRecordOptions().autoCreateClip) // FL's "Auto-create audio clip" (round 167a)
-                        placeRenderedFiles (eng, files);
+                        placeRenderedTracks (eng, files, options);
                 });
         });
-        disk.addItem (tr ("Render selected tracks to wave file(s)...") + "\tShift+Alt+R", ! targets.empty(), false, [targets] {
-            if (mixeroptions::renderTracks)
-                mixeroptions::renderTracks (targets, {});
+        disk.addItem (tr ("Render selected tracks to wave file(s)...") + "\tShift+Alt+R", ! targets.empty(), false, [targets, &eng] {
+            if (mixeroptions::renderTracks) // (FL creates the audio clips here too; the arm states stay: round 190ri)
+                mixeroptions::renderTracks (targets, [&eng] (const std::vector<juce::File>& files, const exportopts::Options& options) {
+                    if (eng.getRecordOptions().autoCreateClip)
+                        placeRenderedTracks (eng, files, options);
+                });
         });
         // FL's Disk recording "Options" (round 166e) and LYNX's own disarm after a take (issue #16)
         disk.addSectionHeader (tr ("Options"));
@@ -6392,7 +6403,8 @@ std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
 std::function<void (bool)> setShowStripInserts;
 std::function<void (bool)> setShowPeakValues, setShowCorrelation; // (rollup 0.1.32 step 2)
-std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
+std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&, const exportopts::Options&)>)> renderTracks;
+std::function<void (int)> pickAudioClip;
 std::function<void (std::vector<int>)> selectPlaylistTracks;
 
 namespace

@@ -338,11 +338,15 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             safe->playlist.selectTracks (tracks);
     };
     mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
-                                                                                             std::function<void (const std::vector<juce::File>&)> done) {
+                                                                                             std::function<void (const std::vector<juce::File>&, const exportopts::Options&)> done) {
         if (safe != nullptr)
             safe->mixer.selectTrack (0); // (round 190my: FL's render window selects the Master, see exportAudio)
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
+    };
+    mixeroptions::pickAudioClip = [safe = juce::Component::SafePointer<MainComponent> (this)] (int channel) {
+        if (safe != nullptr)
+            safe->playlist.paintSource (ClipKind::audio, channel);
     };
     // round 190np: LYNX_EMPTY_HINTS=1 shows the empty-state hints in an off-screen window too (--paintbench measures them)
     onboardingOn = ! persistent && juce::SystemStats::getEnvironmentVariable ("LYNX_EMPTY_HINTS", {}) == "1";

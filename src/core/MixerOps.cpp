@@ -2187,12 +2187,15 @@ void dockTracks (Song& song, const std::vector<int>& tracks, MixerDock dock)
             song.mixer[(std::size_t) t].dock = dock;
 }
 
-int firstTrackAfterUsed (const Song& song) noexcept
+int firstTrackFreeIn (const Song& song, std::int64_t start, std::int64_t end) noexcept
 {
-    int track = 0;
-    for (const auto& c : song.playlist)
-        track = std::max (track, c.track + 1);
-    return track;
+    for (int t = 0;; ++t)
+    {
+        if (t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].mode != PlaylistTrackMode::unassigned)
+            continue;
+        if (std::none_of (song.playlist.begin(), song.playlist.end(), [t, start, end] (const Clip& c) { return c.track == t && c.start < end && c.end() > start; }))
+            return t;
+    }
 }
 
 std::string insertDisplayName (const Song& song, int track)
@@ -2203,10 +2206,9 @@ std::string insertDisplayName (const Song& song, int track)
     return name.empty() ? "Insert " + std::to_string (track) : name;
 }
 
-int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
+int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files, bool onPlaylist, std::int64_t start)
 {
     int placed = 0;
-    auto track = firstTrackAfterUsed (song);
     for (const auto& f : files)
     {
         if (f.path.empty() || ! (f.frames > 0.0) || ! (f.sampleRate > 0.0))
@@ -2224,11 +2226,13 @@ int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
         Clip clip;
         clip.kind = ClipKind::audio;
         clip.channel = (int) song.channels.size() - 1;
-        clip.track = track++;
-        clip.start = 0;
+        clip.start = std::max<std::int64_t> (0, start);
         clip.length = std::max<std::int64_t> (1, clipops::fileTicks (song.channels.back(), f.frames, f.sampleRate, song.bpm));
-        song.playlist.push_back (clip);
         ++placed;
+        if (! onPlaylist)
+            continue;
+        clip.track = firstTrackFreeIn (song, clip.start, clip.end());
+        song.playlist.push_back (clip);
     }
     if (placed > 0 && song.autoCrossfades)
         clipops::updateCrossfades (song);
