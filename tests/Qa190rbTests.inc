@@ -24,3 +24,38 @@ TEST (qa190rb_voice_shifter_at_an_unusable_rate_does_not_divide_by_zero)
     CHECK (a.primeLength (1.0) == b.primeLength (1.0));
 }
 
+// crash report b230f196 (0.1.30, Windows): Helix's sample oscillator with Clean (wt::Engine sampleStepClean) on the audio
+// thread. A voice started with Clean keeps it, but a new sample reaches the engine without its band-limited levels until
+// the UI thread has made them (setSampleLevels (nullptr) meanwhile, HelixInstrument::take): the read dereferenced them
+TEST (qa190rb_helix_clean_sample_voice_survives_a_sample_without_levels)
+{
+    namespace w = lynx::wt;
+    w::HelixUserData d;
+    d.sample = helix190mt::saw (225.0, 1.0);
+    auto s = helix190mt::patch();
+    s[(std::size_t) (w::ext2Base + w::ext2::sampleOn)] = 1.0;
+    s[(std::size_t) (w::ext2Base + w::ext2::sampleRoot)] = 57.0;
+    helix190mt::x3 (s, w::ext3::sampleClean, 1.0);
+    const auto levels = w::sampleLevels (d.sample);
+    w::Engine e;
+    e.prepare (48000.0);
+    e.setSample (&d.sample);
+    e.setSampleLevels (levels.get());
+    e.setState (s.data());
+    std::vector<float> l (9600, 0.0f), r (9600, 0.0f);
+    e.note (57 + 19, 1.0f); // (well above the root: Clean reads a level)
+    e.render (l.data(), r.data(), 2400, 120.0, -1.0);
+    // a new sample arrives (another file loaded while the note sounds): no levels yet
+    w::HelixUserData other;
+    other.sample = helix190mt::saw (300.0, 0.5);
+    e.setSample (&other.sample);
+    e.setSampleLevels (nullptr);
+    e.render (l.data() + 2400, r.data() + 2400, 2400, 120.0, -1.0);
+    // its levels come a moment later
+    const auto otherLevels = w::sampleLevels (other.sample);
+    e.setSampleLevels (otherLevels.get());
+    e.render (l.data() + 4800, r.data() + 4800, 4800, 120.0, -1.0);
+    CHECK (std::all_of (l.begin(), l.end(), [] (float v) { return std::isfinite (v) && std::fabs (v) < 4.0f; }));
+    CHECK (std::any_of (l.begin() + 2400, l.begin() + 4800, [] (float v) { return v != 0.0f; })); // (the voice went on)
+}
+
