@@ -3187,6 +3187,7 @@ bool MainComponent::runAction (const std::string& id)
             closeChannelSettings();
             closeAllToolWindows();
             closeHelp();
+            actionSearch = nullptr; // (round 190ri: the Search palette stayed over the window)
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
