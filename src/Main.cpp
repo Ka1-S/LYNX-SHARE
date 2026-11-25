@@ -2806,6 +2806,22 @@ public:
             return;
         }
 
+        if (args.contains ("--windowopentime"))
+        {
+            // LYNX --windowopentime report.txt [plugin file ...] (round 190rd, perf 9): every built-in effect and instrument
+            // window opened as the Mixer / Channel rack open them, and each plugin file's editor in LYNX's plugin window,
+            // each twice (the first and the second open), timed from the call to its first frame painted (wall ms,
+            // message thread CPU ms, instructions on Linux)
+            const auto i = args.indexOf ("--windowopentime");
+            juce::StringArray plugins;
+            for (int k = i + 2; k < args.size() && ! args[k].startsWith ("--"); ++k)
+                plugins.add (args[k].unquoted());
+            runWindowOpenTime (args[i + 1].unquoted(), plugins);
+            setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
         if (args.contains ("--opentest"))
         {
             // LYNX.exe --opentest report.txt [--visible]: every built-in effect and instrument window opened as the mixer /
@@ -11772,6 +11788,149 @@ private:
 
     // --opentest (round 157a): see the command line. Runs on the message loop (the editors' timers, animations and
     // native windows are real); one step per timer tick.
+    // --windowopentime (round 190rd)
+    void runWindowOpenTime (const juce::String& reportPath, const juce::StringArray& pluginFiles)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine engine (false);
+        juce::String text;
+        text << "LYNX " << getApplicationVersion() << ", " << juce::SystemStats::getCpuModel() << "\n";
+        const lynx::platform::ThreadInstructions instructions;
+        struct Cost
+        {
+            double wall = 0.0, cpu = 0.0;
+            long long instr = -1;
+        };
+        // every window shown now (none of them existed before the open): painted once into a picture, as its first frame
+        const auto paintShown = [] (const std::set<juce::Component*>& before) {
+            auto& desktop = juce::Desktop::getInstance();
+            for (int k = desktop.getNumComponents(); --k >= 0;)
+                if (auto* c = desktop.getComponent (k); c != nullptr && c->isVisible() && before.count (c) == 0 && c->getWidth() > 0 && c->getHeight() > 0
+                                                        && c->getWidth() < 8000 && c->getHeight() < 8000)
+                {
+                    juce::Image image (juce::Image::ARGB, c->getWidth(), c->getHeight(), true);
+                    juce::Graphics g (image);
+                    c->paintEntireComponent (g, false);
+                }
+        };
+        const auto shown = [] {
+            std::set<juce::Component*> list;
+            auto& desktop = juce::Desktop::getInstance();
+            for (int k = 0; k < desktop.getNumComponents(); ++k)
+                list.insert (desktop.getComponent (k));
+            return list;
+        };
+        const auto timed = [&] (const std::function<void()>& open) {
+            const auto before = shown();
+            Cost cost;
+            const auto w0 = juce::Time::getMillisecondCounterHiRes();
+            const auto c0 = lynx::threadCpuSeconds();
+            const auto i0 = instructions.now();
+            open();
+            paintShown (before);
+            const auto i1 = instructions.now();
+            cost.wall = juce::Time::getMillisecondCounterHiRes() - w0;
+            cost.cpu = 1000.0 * (lynx::threadCpuSeconds() - c0);
+            cost.instr = i0 >= 0 && i1 >= i0 ? i1 - i0 : -1;
+            return cost;
+        };
+        std::vector<double> firsts, seconds;
+        const auto line = [&] (const juce::String& name, const Cost& a, const Cost& b) {
+            text << name << ": first " << juce::String (a.wall, 2) << " ms (cpu " << juce::String (a.cpu, 2) << ", instr " << juce::String ((juce::int64) a.instr)
+                 << "), second " << juce::String (b.wall, 2) << " ms (cpu " << juce::String (b.cpu, 2) << ", instr " << juce::String ((juce::int64) b.instr) << ")\n";
+            firsts.push_back (a.wall);
+            seconds.push_back (b.wall);
+            juce::File (reportPath).replaceWithText (text);
+        };
+        const auto songWith = [] (const lynx::EffectSlot& fx) {
+            auto song = lynx::Song::makeDefault();
+            song.mixer.resize (2);
+            song.mixer[0].name = "Master";
+            song.mixer[1].name = "Insert 1";
+            song.mixer[1].effects.assign (1, fx);
+            return song;
+        };
+        // LYNX_WINDOWOPENTIME_NATIVES=0: the plugin files' windows only (a profiler run of those)
+        const auto natives = juce::SystemStats::getEnvironmentVariable ("LYNX_WINDOWOPENTIME_NATIVES", "1") != "0";
+        for (int k = 0; natives && k <= (int) lynx::lastEffectKind; ++k)
+        {
+            const auto kind = (lynx::EffectKind) k;
+            if (! lynx::NativeEffectWindows::canOpen (kind) || kind == lynx::EffectKind::patcher)
+                continue;
+            engine.setSong (songWith (lynx::natives::newEffect (kind, lynx::flStudioAccess()).value_or (lynx::makeEffectSlot (kind))));
+            engine.dispatchPendingMessages();
+            Cost a, b;
+            for (auto* cost : { &a, &b })
+            {
+                *cost = timed ([&engine] { lynx::NativeEffectWindows::open (engine, 1, 0); });
+                lynx::NativeEffectWindows::closeAll();
+            }
+            line ("effect " + juce::String::fromUTF8 (lynx::effectInfo (kind).name), a, b);
+        }
+        for (int k = 0; natives && k <= (int) lynx::InstrumentKind::soundfont; ++k)
+        {
+            const auto kind = (lynx::InstrumentKind) k;
+            if (kind == lynx::InstrumentKind::plugin || kind == lynx::InstrumentKind::patcher)
+                continue;
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef def;
+            def.instrument = kind;
+            def.name = "Test";
+            const auto channel = lynx::natives::makeChannel (kind, lynx::flStudioAccess());
+            song.channels.push_back (channel ? *channel : def);
+            const auto index = (int) song.channels.size() - 1;
+            engine.setSong (std::move (song));
+            engine.dispatchPendingMessages();
+            Cost a, b;
+            for (auto* cost : { &a, &b })
+            {
+                *cost = timed ([&engine, index] { lynx::openChannelSettings (engine, index); });
+                lynx::closeChannelSettings();
+            }
+            line ("instrument " + juce::String (k), a, b);
+        }
+        // hosted plugins: each type in each file, in LYNX's plugin window (the wrapper header and the plugin's own editor)
+        lynx::PluginHost host (false);
+        for (const auto& file : pluginFiles)
+        {
+            host.addPluginFile (juce::File (file));
+            for (const auto& type : host.getKnownPlugins().getTypes())
+            {
+                if (juce::File (type.fileOrIdentifier).getFileName() != juce::File (file).getFileName())
+                    continue;
+                juce::String error;
+                const auto load0 = juce::Time::getMillisecondCounterHiRes();
+                auto instance = std::shared_ptr<juce::AudioPluginInstance> (lynx::createRightInstance (host.getFormats(), type, 48000.0, 512, error).release());
+                if (instance == nullptr || ! instance->hasEditor())
+                {
+                    text << "plugin " << type.name << ": not opened (" << (instance == nullptr ? error : juce::String ("no editor")) << ")\n";
+                    continue;
+                }
+                lynx::preparePlugin (*instance, 48000.0, 512);
+                text << "plugin " << type.name << ": instance " << juce::String (juce::Time::getMillisecondCounterHiRes() - load0, 1) << " ms\n";
+                Cost a, b;
+                for (auto* cost : { &a, &b })
+                {
+                    *cost = timed ([&instance] { lynx::PluginWindows::open (instance, *instance, instance->getName()); });
+                    lynx::PluginWindows::close (*instance);
+                }
+                line ("plugin " + type.name, a, b);
+            }
+        }
+        const auto sum = [] (const std::vector<double>& v) {
+            double total = 0.0;
+            for (const auto x : v)
+                total += x;
+            return total;
+        };
+        text << "windows " << (int) firsts.size() << ", first opens total " << juce::String (sum (firsts), 1) << " ms, second opens total "
+             << juce::String (sum (seconds), 1) << " ms\nresult=OK\n";
+        juce::File (reportPath).replaceWithText (text);
+        lynx::PluginWindows::closeAll();
+        lynx::NativeEffectWindows::closeAll();
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+    }
+
     void runOpenTest (const juce::String& reportPath, bool visible, std::function<void (bool)> done)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -29921,9 +30080,12 @@ private:
         auto measureAll = [&] (const juce::String& name) {
             if (! wanted (name))
                 return;
-            measure (name, 0);
-            measure (name, 1);
-            measure (name, 2);
+            // LYNX_PAINTBENCH_MODES="2" (round 190rd): only these frame kinds (0 whole, 1 cached, 2 playhead column), so a
+            // profiler run sees one kind alone
+            static const auto modes = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_MODES", "0,1,2");
+            for (int mode = 0; mode < 3; ++mode)
+                if (modes.containsChar ((juce::juce_wchar) ('0' + mode)))
+                    measure (name, mode);
             // the columns' pixels too (painted over the whole frame: culling must not change a pixel)
             ui.repaint();
             {
@@ -29937,6 +30099,14 @@ private:
                 }
             }
             text << name << ", columns over the whole frame: pixels " << pixelHash() << "\n";
+            // (round 190rd) LYNX_PAINTBENCH_PNG: that picture too, as <prefix>-<view>-columns.png
+            if (const auto png = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_PNG", {}); png.isNotEmpty())
+            {
+                const juce::File file (png + "-" + name.replaceCharacter (' ', '-') + "-columns.png");
+                file.deleteFile();
+                juce::FileOutputStream out (file);
+                juce::PNGImageFormat().writeImageToStream (image, out);
+            }
         };
         // LYNX_KEEP_LABELS=0|1 (round 190qe): Playlist ▸ View ▸ "Keep labels on screen" for the whole run (A/B of the labels' cost)
         if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_KEEP_LABELS", {}); keep.isNotEmpty())

@@ -277,16 +277,23 @@ double secondsForTicksCached (const Song& song, std::uint64_t stamp, std::int64_
         int mode = -1, pattern = -1;
         std::int64_t whole = 0; // ticks summed (whole 16ths)
         double seconds = 0.0;
+        // round 190rd (perf 9): the playlist's tempo clips only (tempomap::tempoClips; tempoAtIn over them is tempoAt):
+        // after an edit the sum starts again from 0, and each 16th's lookup walked every clip of the song (Thief: ~800
+        // 16ths x ~500 clips at each edit while it plays, the message thread's top function in --uiperf's edit steps)
+        const Song* song = nullptr;
+        std::vector<const Clip*> clips;
     };
     static Sum sum;
-    if (sum.stamp != stamp || sum.bpm != song.bpm || sum.mode != (int) song.mode || sum.pattern != song.currentPattern || ticks < sum.whole)
-        sum = { stamp, song.bpm, (int) song.mode, song.currentPattern, 0, 0.0 };
+    if (sum.stamp != stamp || sum.bpm != song.bpm || sum.mode != (int) song.mode || sum.pattern != song.currentPattern || ticks < sum.whole
+        || sum.song != &song)
+        sum = { stamp, song.bpm, (int) song.mode, song.currentPattern, 0, 0.0, &song, tempomap::tempoClips (song) };
+    const auto tempo = [&song] (double tick) { return tempomap::tempoAtIn (song, sum.clips, tick); };
     constexpr std::int64_t step = ticksPerStep;
     for (; sum.whole + step <= ticks; sum.whole += step)
-        sum.seconds += (double) step * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+        sum.seconds += (double) step * 60.0 / (std::max (1.0, tempo ((double) sum.whole)) * ppq);
     auto seconds = sum.seconds;
     if (const auto rest = ticks - sum.whole; rest > 0)
-        seconds += (double) rest * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+        seconds += (double) rest * 60.0 / (std::max (1.0, tempo ((double) sum.whole)) * ppq);
     return seconds;
 }
 } // namespace

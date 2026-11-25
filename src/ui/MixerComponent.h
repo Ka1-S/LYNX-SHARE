@@ -559,10 +559,11 @@ private:
     std::map<int, InputMonitor> monitorBefore; // (round 190qh) the mode each insert had before "Input monitoring on"
     juce::Rectangle<int> peakValueArea (int track) const;
     juce::Rectangle<int> correlationArea (int track) const;
-    // `overPicture`: drawn over the cached picture, which holds the box already (rollup 0.1.32 step 2: no second fill)
-    void paintPeakValue (juce::Graphics& g, int track, bool overPicture = false) const;
-    void paintCorrelation (juce::Graphics& g, int track, bool overPicture = false) const;
-    void advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, bool showing);
+    // (round 190rd: drawn into the cached picture as well; nothing of them is drawn over it each frame)
+    void paintPeakValue (juce::Graphics& g, int track) const;
+    void paintCorrelation (juce::Graphics& g, int track) const;
+    bool advanceExtras (float elapsedMs, bool showing);
+    float extrasSinceMs = 1.0e9f; // (round 190rd: time since the extras' last turn; the first frame is one)
     std::vector<float> inputLevels;       // per track: input level (decaying)
     // round 190lr (DF-60): the waveform view's history, one row per 1/70 s: waveRing[row * meters + meter] (meter = track
     // * 2 + side), the newest row at waveHead; each meter's rows since its last sound (no repaint once all have scrolled out)

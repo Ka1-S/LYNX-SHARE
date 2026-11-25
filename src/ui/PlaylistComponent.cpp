@@ -3863,8 +3863,14 @@ precompute::PlayedSpan drawnSpan (SampleLibrary& samples, const ChannelDef& chan
             && e.loops == s.useLoopPoints && e.loopStart == s.loopStart && e.loopEnd == s.loopEnd && e.flChannel == s.flChannel
             && e.precompute == s.precompute && ! e.summary.expired() && e.summary.lock() == summary)
             return e.span;
-    const auto data = samples.load (path);
-    const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+    // round 190rd (perf 9: a 200-450 ms paint after an edit or a project open): a channel without a precomputed effect has
+    // its span from the summary's length (the file's); only one with one decodes the file here (nothing holds it)
+    auto span = precompute::playedSpanOfLength ((std::int64_t) summary->frames, s, whole).value_or (precompute::PlayedSpan { -1, -1 });
+    if (span.first < 0)
+    {
+        const auto data = samples.load (path);
+        span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+    }
     std::erase_if (cache, [] (const Entry& e) { return e.summary.expired(); });
     if (cache.size() >= 256)
         cache.erase (cache.begin());
