@@ -167,3 +167,84 @@ TEST (sweep190re_gross_beat_automation_goes_back_to_fl)
     const auto second = importFlp (flp::parseProject (bytes), options);
     CHECK (grossBeatClips (second) == before);
 }
+
+// Discord 11-25 (sidthenugget): Track-only / Simple, a clip moved onto another instrument's track plays that track's
+// instrument. The Pattern layout keeps FL's way: the Playlist only asks in the two modes (clipsFollowTracks).
+TEST (sweep190re_moved_clips_take_the_tracks_instrument)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.channels.resize (3);
+    for (auto& c : song.channels)
+        c.instrument = InstrumentKind::synth;
+    song.playlistTracks.resize (4);
+    CHECK (trackmodes::makeInstrumentTrack (song, 0, 0) && trackmodes::makeInstrumentTrack (song, 1, 1) && trackmodes::makeInstrumentTrack (song, 2, 2));
+    Pattern riff;
+    riff.name = "Riff";
+    riff.notes = { { 0, ppq, 0, 60 }, { ppq, ppq, 0, 64 } };
+    riff.channelLoops = { { 0, ChannelLoop::nextBar } };
+    PatternEvents volume, plugin;
+    volume.target = { AutomationTargetKind::channelVolume, 0, 0, 0 };
+    plugin.target = { AutomationTargetKind::channelParam, 0, 0, 5 };
+    riff.events = { volume, plugin };
+    auto both = riff;
+    both.name = "Both";
+    both.notes[1].channel = 2;
+    auto empty = Pattern {};
+    const auto clip = [] (int pattern, int track) {
+        Clip c;
+        c.pattern = pattern;
+        c.track = track;
+        c.length = 4 * ppq;
+        return c;
+    };
+    const auto base = [&] (std::vector<Clip> clips) {
+        auto s = song;
+        s.patterns = { riff, both, empty };
+        s.playlist = std::move (clips);
+        return s;
+    };
+    const auto all = [] (const Song& s, int pattern, int channel) {
+        const auto& n = s.patterns[(std::size_t) pattern].notes;
+        return std::all_of (n.begin(), n.end(), [channel] (const Note& x) { return x.channel == channel; });
+    };
+    { // the only clip of its pattern: the pattern itself follows, with its loop and volume lane; the plug-in's lane stays
+        auto s = base ({ clip (0, 1) });
+        CHECK (trackonly::followTracks (s, { 0 }) == 1 && s.patterns.size() == 3 && all (s, 0, 1) && s.patterns[0].name == "Riff");
+        CHECK (s.patterns[0].channelLoops[0].channel == 1 && s.patterns[0].events[0].target.index == 1 && s.patterns[0].events[1].target.index == 0);
+        CHECK (s.patterns[0].notes[1].key == 64 && s.patterns[0].notes[1].start == ppq);
+        CHECK (trackonly::followTracks (s, { 0 }) == 0); // (nothing left to do)
+    }
+    { // two moved clips of one pattern, one stays: the moved ones share a copy
+        auto s = base ({ clip (0, 0), clip (0, 1), clip (0, 1) });
+        CHECK (trackonly::followTracks (s, { 1, 2 }) == 2 && s.patterns.size() == 4);
+        CHECK (s.playlist[0].pattern == 0 && all (s, 0, 0) && s.playlist[1].pattern == 3 && s.playlist[2].pattern == 3 && all (s, 3, 1));
+        CHECK (s.patterns[3].name == "Riff #2");
+    }
+    { // two destinations
+        auto s = base ({ clip (0, 1), clip (0, 2) });
+        CHECK (trackonly::followTracks (s, { 0, 1 }) == 2 && all (s, s.playlist[0].pattern, 1) && all (s, s.playlist[1].pattern, 2));
+        CHECK (s.playlist[0].pattern != s.playlist[1].pattern);
+    }
+    { // several instruments in the pattern, no notes, a plain track, the clip grid's clip of the same pattern
+        auto s = base ({ clip (1, 1), clip (2, 1), clip (0, 3) });
+        const auto before = s;
+        CHECK (trackonly::followTracks (s, { 0, 1, 2 }) == 0 && s.patterns == before.patterns && s.playlist == before.playlist);
+        s = base ({ clip (0, 1) });
+        launcher::setClip (s, 0, 0, clip (0, 0));
+        CHECK (trackonly::followTracks (s, { 0 }) == 1 && all (s, 0, 0) && s.playlist[0].pattern == 3 && all (s, 3, 1));
+    }
+    const auto layout = layoutstyle::current();
+    const auto trackOnly = trackonly::enabled();
+    layoutstyle::setCurrent (layoutstyle::Style::pattern);
+    trackonly::setEnabled (false);
+    CHECK (! trackonly::clipsFollowTracks()); // (FL)
+    trackonly::setEnabled (true);
+    CHECK (trackonly::clipsFollowTracks());
+    layoutstyle::setCurrent (layoutstyle::Style::clipLaunch);
+    CHECK (! trackonly::clipsFollowTracks());
+    layoutstyle::setCurrent (layoutstyle::Style::simple);
+    CHECK (trackonly::clipsFollowTracks());
+    layoutstyle::setCurrent (layout);
+    trackonly::setEnabled (trackOnly);
+}
