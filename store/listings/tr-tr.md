@@ -49,6 +49,8 @@ LYNX SHARE alfa aşamasındadır: bazı pürüzler olabilir, lütfen sorunları 
 
 ## What's new
 
+LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmeyi, yerleştirilmiş eklentiler üzerindeki klavyeden piyanoyu, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini FL'nin reddettiği dışa aktarılmış .flp dosyalarını, Browser'daki FL synth preset'lerini ve birkaç küçük sorunu düzeltiyor.
+
 LYNX SHARE 0.1.31.1, 0.1.31'de bildirdiklerinizi düzeltir: kontrollerde FL projelerinin otomasyonu, açılmaz olan eklenti pencereleri, Device görünümü, dosya adında klasörle dışa aktarma, enstrüman izlerindeki klipler, ipucu çubuğunda bir çökme ve açılıştaki bellek.
 
 LYNX SHARE 0.1.31: tracker modüllerini (.mod, .xm, .s3m, .it) de açan yerleşik bir Tracker; marimba, vibrafon,

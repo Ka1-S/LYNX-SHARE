@@ -1,4 +1,12 @@
 {
+"u.0.1.31.2.t": "0.1.31 için daha fazla düzeltme",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmeyi, yerleştirilmiş eklentiler üzerindeki klavyeden piyanoyu, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini FL'nin reddettiği dışa aktarılmış .flp dosyalarını, Browser'daki FL synth preset'lerini ve birkaç küçük sorunu düzeltiyor.",
+"u.0.1.31.2.f0": "Başlangıç sayfasındaki \"Yeni proje başlat\" listesini kaydırmak artık Windows'ta LYNX'i çökertmiyor.",
+"u.0.1.31.2.f1": "Yerleştirilmiş bir eklentinin üzerinde, pencerenin klavye düğmesi öyle diyorsa klavyeden piyano yine önce çalıyor, ayrık bir pencerede olduğu gibi.",
+"u.0.1.31.2.f2": "\"Uzatılmış pattern klipleri pattern'lerini döngüler\" açıkken bir klibin ilk ölçüsünden sonra çizilen, yapıştırılan veya taşınan notalar duyuluyor: pattern onları içerecek kadar uzuyor.",
+"u.0.1.31.2.f3": "Playlist › \"Otomasyon kliplerini parçalarının şeritlerine taşı\" kliplerin çaldığı değerleri büyük FL projelerinde de koruyor.",
+"u.0.1.31.2.f4": "\"Kısayolları yönet\" pencereleri geç etkinleştiren Linux masaüstlerinde imleç arama kutusunda açılıyor (#244); Seçenekler › Klavyeden piyano ayarları her pencere boyutunda Kök nota / Oktav / Düzen menüsünü açıyor (#270).",
+"u.0.1.31.2.f5": "FL Studio'ya dışa aktarma, bu bilgisayarda olmayan bir proje veri klasörünü yazmıyor (FL 2026 \"Invalid project data folder\" hatasında duruyordu); Browser'da tıklanan yerleşik bir synth'in FL preset'i o synth'i preset ile açıyor (#288); Playlist'e bırakılan MIDI dosyaları varsayılan olarak pattern klibine dönüşüyor (#287).",
 "u.0.1.31.1.t": "0.1.31 için düzeltmeler",
 "u.0.1.31.1.s": "LYNX SHARE 0.1.31.1, 0.1.31'de bildirdiklerinizi düzeltir: kontrollerde FL projelerinin otomasyonu, açılmaz olan eklenti pencereleri, Device görünümü, dosya adında klasörle dışa aktarma, enstrüman izlerindeki klipler, ipucu çubuğunda bir çökme ve açılıştaki bellek.",
 "u.0.1.31.1.f0": "Birden çok kontrolü ya da bir formülle tek bir kontrolü süren FL otomasyon klipleri, mikserde, eklenti pencerelerinde ve Device görünümünde sürdükleri her kontrolü hareket ettirir; elle oynatılan bir kontrol duyulan değeri gösterir (#253).",

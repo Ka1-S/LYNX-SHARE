@@ -5,6 +5,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
 #include "core/ZoomAnchor.h"
+#include "core/RackOps.h"
 #include "core/MuteKeys.h"
 #include "core/RulerGestures.h" // round 190nq (#227)
 #include "ui/ChordHelper.h"
@@ -1492,7 +1493,15 @@ void PianoRollComponent::editNotes (const std::function<void (Pattern&)>& edit, 
 {
     if (refuseFrozenEdit())
         return;
-    engine.editSong ([&edit] (Song& s) { edit (currentPattern (s)); }, undoable);
+    // hotfix 0.1.31.2 (round 190ra; sidthenugget): notes drawn, pasted, moved or stretched past a set length take the
+    // length with them, in whole bars (core/RackOps.h growSetLengthToNotes; a track clip starts one bar long, and its
+    // stretched clip looped that bar with the new notes unheard)
+    engine.editSong ([&edit] (Song& s) {
+        auto& p = currentPattern (s);
+        const auto endBefore = notesEnd (p);
+        edit (p);
+        growSetLengthToNotes (p, endBefore, s.barTicks());
+    }, undoable);
     knownNoteCount = currentPattern (engine.getSong()).notes.size();
 }
 
@@ -6857,7 +6866,13 @@ void PianoRollComponent::importMidi (const midiimport::ParsedMidi& midi, const j
         std::vector<int> added;
         std::string err;
         const auto channel = safe->engine.getSelectedChannel();
-        safe->engine.editSong ([&] (Song& s) { added = midiimport::importIntoChannel (s, channel, midi, o, err); });
+        safe->engine.editSong ([&] (Song& s) {
+            const auto pattern = s.currentPattern;
+            const auto endBefore = pattern >= 0 && pattern < (int) s.patterns.size() ? notesEnd (s.patterns[(std::size_t) pattern]) : 0;
+            added = midiimport::importIntoChannel (s, channel, midi, o, err);
+            if (pattern >= 0 && pattern < (int) s.patterns.size()) // (round 190ra: a set length takes the imported notes too)
+                growSetLengthToNotes (s.patterns[(std::size_t) pattern], endBefore, s.barTicks());
+        });
         if (added.empty())
         {
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "MIDI", juce::String::fromUTF8 (err.c_str()));

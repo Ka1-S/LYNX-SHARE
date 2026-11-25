@@ -187,6 +187,19 @@ void setStepRhythm (Pattern& pattern, int channel, const std::vector<bool>& rhyt
 // (0) follows the notes by itself and stays 0.
 std::int64_t lengthWithStep (std::int64_t lengthTicks, int step, std::int64_t ticksPerStep, std::int64_t barTicks) noexcept;
 
+// Hotfix 0.1.31.2 (round 190ra; sidthenugget, Discord): the same rule for notes. Where the notes of `pattern` end: the
+// latest note end (a note counts at least one tick), automation clip notes too; 0 without notes.
+std::int64_t notesEnd (const Pattern& pattern) noexcept;
+// An edit (the Piano roll's: a drawn, pasted, moved or stretched note) left the notes ending at `pattern`'s notesEnd()
+// where they ended at `endBefore`: when that took them past a set length (lengthTicks > 0), the length grows to whole
+// bars of `barTicks` that hold them, as a step past it does (lengthWithStep). An automatic length (0) already follows
+// the notes and stays 0; a length FL set with its "Pattern length" marker stays (FL's own); notes already past the length
+// before the edit, and not taken further, leave it alone, except in a track clip (LYNX's own: any edit grows it, so a
+// clip made with 0.1.31 / 0.1.31.1 whose notes already went past its bar is mended by the next edit). A track clip (round 190ne) starts with a set length of one bar:
+// with "Stretched pattern clips loop their pattern" on, its clip looped that bar and every note drawn after it went
+// unheard. True when the length grew.
+bool growSetLengthToNotes (Pattern& pattern, std::int64_t endBefore, std::int64_t barTicks) noexcept;
+
 // Moves every note of `channel` by `delta` steps, wrapping inside the first `steps` steps.
 void rotateSteps (Pattern& pattern, int channel, int delta, int steps);
 

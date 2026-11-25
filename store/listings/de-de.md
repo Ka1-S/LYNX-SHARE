@@ -49,7 +49,7 @@ LYNX SHARE befindet sich im Alpha-Stadium: Rechne mit Ecken und Kanten und melde
 
 ## What's new
 
-LYNX SHARE 0.1.31.1 behebt, was ihr zu 0.1.31 gemeldet habt: Automation von FL-Projekten auf den Reglern, Plugin-Fenster, die sich nicht mehr öffneten, die Device-Ansicht, Export mit einem Ordner im Dateinamen, Clips auf Instrumentenspuren, einen Absturz in der Hinweisleiste und den Speicher beim Start.
+LYNX SHARE 0.1.31.2 behebt einen Absturz der Startseite, die Schreibtastatur über angedockten Plugins, gedehnte Clips, die ihren ersten Takt wiederholten, aus FL-Projekten erstellte Automationsspuren exportierte .flp-Dateien, die FL ablehnte, Presets der FL-Synths im Browser und einige kleinere Probleme.
 
 LYNX SHARE 0.1.31: ein eingebauter Tracker, der auch Tracker-Module (.mod, .xm, .s3m, .it) öffnet; LYNX Model,
 physikalische Modelle von Marimba, Vibraphon, Xylophon, Glockenspiel, Röhrenglocken und Kalimba; JSFX-Effekt- und

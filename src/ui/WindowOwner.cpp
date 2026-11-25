@@ -879,8 +879,10 @@ int juceKeyCodeOf (WPARAM vk)
 
 // The window holding the focus when it is in a hosted plugin's view inside one of LYNX's secondary windows (not the
 // main window); nullptr otherwise
-juce::Component* windowOfFocusedPluginView()
+juce::Component* windowOfFocusedPluginView (bool* throughHostingWindow = nullptr)
 {
+    if (throughHostingWindow != nullptr)
+        *throughHostingWindow = false;
     const auto focus = GetFocus();
     if (focus == nullptr)
         return nullptr;
@@ -900,8 +902,29 @@ juce::Component* windowOfFocusedPluginView()
         return nullptr; // (not a LYNX window)
     if (window == main)
         return nullptr;
+    const auto isPluginWindow = [] (const juce::Component& c) { return (bool) c.getProperties().getWithDefault ("lynxPluginWindow", false); };
+    // Hotfix 0.1.31.2 (round 190ra): JUCE hosts a VST / VST3 view in a window of its own (the hosting component's
+    // "Inner", a native child of the plugin window: LYNX's first window up from the plugin's view). The plugin window is
+    // the nearest one above it that is a plugin window; a key a plugin window's option gives to the host first goes there.
+    // Before, the hosting window stopped the search, so "LYNX first" never took a key from a VST / VST3 view.
+    if (GetAncestor (root, GA_ROOT) != root && ! isPluginWindow (*window))
+    {
+        juce::Component* above = nullptr;
+        for (auto h = GetAncestor (root, GA_PARENT); h != nullptr && h != GetDesktopWindow() && above == nullptr; h = GetAncestor (h, GA_PARENT))
+            for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+                if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getNativeHandle() == (void*) h)
+                    above = &peer->getComponent();
+        if (above != nullptr && above != main && isPluginWindow (*above))
+        {
+            if (throughHostingWindow != nullptr)
+                *throughHostingWindow = true;
+            wchar_t cls[64] = {};
+            GetClassNameW (focus, cls, 63);
+            return juce::String (cls).containsIgnoreCase ("edit") ? nullptr : above;
+        }
+    }
     // a native child panel (the Channel rack, issue #116) is LYNX's own, not a plugin's view
-    if (GetAncestor (root, GA_ROOT) != root && ! (bool) window->getProperties().getWithDefault ("lynxPluginWindow", false))
+    if (GetAncestor (root, GA_ROOT) != root && ! isPluginWindow (*window))
         return nullptr;
     if (focus != root)
     {
@@ -976,11 +999,14 @@ std::bitset<256> takenAsPlainKey;
 
 bool hostTakesKey (WPARAM vk)
 {
-    auto* window = windowOfFocusedPluginView();
+    bool hosted = false;
+    auto* window = windowOfFocusedPluginView (&hosted);
     if (window == nullptr || vk >= 256)
         return false;
     takenAsPlainKey[vk] = hostTakesPlainKey (vk, *window);
-    return takenAsPlainKey[vk] || hostTakesShortcut (vk);
+    // (round 190ra: in a view JUCE hosts, only the plain keys the window's option gives to the host; shortcuts keep going
+    // to the plugin first, as in 0.1.31.1, and come back to LYNX when it leaves them unused)
+    return takenAsPlainKey[vk] || (! hosted && hostTakesShortcut (vk));
 }
 
 void hostKeyRepeats (WPARAM vk)
@@ -1054,6 +1080,51 @@ void setPluginViewPlainKeyHandler (std::function<bool (juce::Component&)> allows
     plainKeyLeftHandler = std::move (left);
 }
 
+bool postKeyToPluginViewForTest (juce::Component& window, int vk)
+{
+   #if JUCE_WINDOWS
+    auto view = static_cast<HWND> (window.getWindowHandle());
+    if (view == nullptr)
+        return false;
+    for (auto child = GetWindow (view, GW_CHILD); child != nullptr;)
+    {
+        while (child != nullptr && ! IsWindowVisible (child))
+            child = GetWindow (child, GW_HWNDNEXT);
+        if (child == nullptr)
+            break;
+        view = child;
+        child = GetWindow (child, GW_CHILD);
+    }
+    SetFocus (view);
+    const auto scan = (LPARAM) (MapVirtualKeyW ((UINT) vk, MAPVK_VK_TO_VSC) << 16);
+    PostMessageW (view, WM_KEYDOWN, (WPARAM) vk, 1 | scan);
+    PostMessageW (view, WM_KEYUP, (WPARAM) vk, 1 | scan | (1u << 30) | (1u << 31));
+    return true;
+   #else
+    juce::ignoreUnused (window, vk);
+    return false;
+   #endif
+}
+
+bool systemFocusInPluginView()
+{
+   #if JUCE_WINDOWS
+    return windowOfFocusedPluginView() != nullptr;
+   #else
+    return false;
+   #endif
+}
+
+juce::String focusedPluginViewForTest()
+{
+   #if JUCE_WINDOWS
+    auto* w = windowOfFocusedPluginView();
+    return w == nullptr ? juce::String ("none") : w->getName() + " [" + juce::String (typeid (*w).name()) + "]";
+   #else
+    return {};
+   #endif
+}
+
 void listenForKeysPluginLeaves (juce::Component& pluginEditor)
 {
     static PluginLeftKeys listener;
@@ -1112,6 +1183,11 @@ void linkedWindowFocused (juce::Component& window)
         return;
     listener.last = &window;
     linkedFocusHandler ((int) window.getProperties()["lynxLinkChannel"], (int) window.getProperties()["lynxLinkInsert"]);
+}
+
+void forwardUnusedPluginKeys (juce::Component& window)
+{
+    window.addKeyListener (&keyForwarder()); // (JUCE adds it once)
 }
 
 void keepAboveMainWindow (juce::Component& window)

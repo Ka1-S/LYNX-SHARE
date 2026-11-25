@@ -259,6 +259,70 @@ std::optional<ChannelDef> channelFromPresetFile (InstrumentKind kind, const std:
     return engine != nullptr ? channelFromPreset (kind, *engine, path, access) : std::nullopt;
 }
 
+std::optional<InstrumentKind> presetKind (const std::string& path, const FlAccess& access)
+{
+    if (endsWith (path, ".tbio"))
+        return InstrumentKind::toxic;
+    if (endsWith (path, ".gmsynth"))
+        return InstrumentKind::gms;
+    if (endsWith (path, ".mrp"))
+        return InstrumentKind::morphine;
+    if (! endsWith (path, ".fst"))
+        return std::nullopt;
+    const auto bytes = readPreset (path, access);
+    if (bytes.empty())
+        return std::nullopt;
+    try
+    {
+        auto project = flp::parseProject (bytes, true);
+        if (project.channels.empty() || project.channels.front().pluginName.empty())
+            return std::nullopt;
+        // imported as channelFromPreset does (the import's own table of FL's generators decides the engine)
+        auto& c = project.channels.front();
+        if (c.type == flp::ChannelType::unknown)
+            c.type = flp::ChannelType::instrument;
+        c.mixerTrack = -1;
+        const auto song = importFlp (project, importOptions (access));
+        if (song.channels.empty())
+            return std::nullopt;
+        const auto kind = song.channels.front().instrument;
+        if (kind == InstrumentKind::midiOut || instrumentEngine (kind) != nullptr)
+            return kind;
+    }
+    catch (const flp::Error&)
+    {
+    }
+    return std::nullopt;
+}
+
+std::optional<ChannelDef> channelFromAnyPreset (const std::string& path, const std::string& presetName, const FlAccess& access)
+{
+    const auto kind = presetKind (path, access);
+    if (! kind)
+        return std::nullopt;
+    ChannelDef blank;
+    blank.instrument = *kind;
+    if (const auto* engine = instrumentEngine (*kind))
+        blank.name = engine->name;
+    // FL's wrapper loads the preset into a new instance: the plugin's state from the file, the channel's defaults
+    auto def = withPreset (blank, path, presetName, access);
+    if (! def || def->instrument != *kind)
+        return std::nullopt;
+    def->mixerTrack = 0;
+    return def;
+}
+
+std::string presetExtensionOf (InstrumentKind kind)
+{
+    switch (kind)
+    {
+        case InstrumentKind::toxic: return ".tbio";
+        case InstrumentKind::gms: return ".gmsynth";
+        case InstrumentKind::morphine: return ".mrp";
+        default: return ".fst";
+    }
+}
+
 std::string presetFolderOf (InstrumentKind kind)
 {
     if (kind == InstrumentKind::midiOut)

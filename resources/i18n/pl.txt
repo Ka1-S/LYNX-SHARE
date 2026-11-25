@@ -12847,3 +12847,4 @@ countries: pl
 "This pattern plays one channel only: there is nothing to split." = "Ten pattern gra tylko jeden kanał: nie ma czego dzielić."
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "W tej wersji powiązania Peak Controller i Envelope Controller ustawiają swoje cele od początku, zanim kontroler wyśle wartość: {0}"
 "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Nowsze prawa Kilohearts w Effector (nadpróbkowana ścieżka kHs Ring Mod; zastępstwa kHs Formant Filter, kHs Delay i kHs Clipper) grają wcześniejsze prawo Ring Mod oraz własne Vowel, Delay i Distort Effectora: {0}"
+"Typing keyboard settings" = "Ustawienia klawiatury jako pianina"

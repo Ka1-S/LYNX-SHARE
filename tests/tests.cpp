@@ -18126,6 +18126,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Repeats190pmTests.inc" // round 190pm (0.1.32): Note Repeats and Conditions (research190oe P19)
 #include "MixerQol190qhTests.inc" // round 190qh (0.1.32 R5): Mixer QoL, FL's PDC rule for a switched-off slot (D2-MX9)
 #include "Hotfix190qpTests.inc" // round 190qp (0.1.31.1): imported FL volume / send / filter automation, linked clips shown
+#include "Hotfix190raTests.inc" // round 190ra (0.1.31.2): a set pattern length grows with the notes drawn past it
 #include "Issue269_190qmTests.inc" // round 190qm: issue #269, the hint bar's right-click crash
 #include "Hotfix190qpWfTests.inc" // round 190qp: 0.1.31.1 hotfix (track clips open their notes)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #274-#281 (markers delete, AppImage manager entries, zoom, rack meter...)
@@ -18135,3 +18136,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pr268_190qmTests.inc" // round 190qm: PR #268, a switched-off Playlist track (FL's greyed clips + the LYNX row veil)
 #include "Issues190qoTests.inc" // round 190qo: issues #270 (typing keyboard layouts), #271 (SoundFont slide velocity)
 #include "Discord1124_190quTests.inc" // round 190qu (0.1.32): Discord 11-24 (automation lanes, Split by channel, Track-only, Simple)
+#include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
+#include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself

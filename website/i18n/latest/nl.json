@@ -1,11 +1,10 @@
 {
-"u.0.1.31.1.t": "Oplossingen voor 0.1.31",
-"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 lost op wat jullie over 0.1.31 meldden: automatisering van FL-projecten op de regelaars, pluginvensters die niet meer opengingen, de Device-weergave, exporteren met een map in de bestandsnaam, clips op instrumentsporen, een crash in de hintbalk en het geheugen bij het opstarten.",
-"u.0.1.31.1.f0": "FL-automatiseringsclips die meerdere regelaars sturen, of één via een formule, bewegen elke regelaar in de mixer, de pluginvensters en de Device-weergave; een met de hand bewogen regelaar toont de waarde die je hoort (#253).",
-"u.0.1.31.1.f1": "Gedockte plugin- en kanaalvensters openen weer waar ze waren, in plaats van na een paar klikken uit het hoofdvenster te schuiven.",
-"u.0.1.31.1.f2": "Clip-launch-indeling: een spoor kiezen in het Arrangement toont zijn devices, en de knoppen van de Device-weergave volgen de automatisering.",
-"u.0.1.31.1.f3": "Audio exporteren met een map in de bestandsnaam schrijft daarheen zonder opnieuw te vragen (#215); Automatische kleuren en pictogrammen nemen meer dan één regel aan (#239); rechtsklikken op de hintbalk laat LYNX niet meer crashen (#269).",
-"u.0.1.31.1.f4": "Alleen-sporen-modus en Simple-indeling: dubbelklikken op een lege clip van een instrumentspoor opent de noten.",
-"u.0.1.31.1.f5": "0.1.31 gebruikte vlak na het opstarten ~7 MB meer geheugen en meer CPU.",
-"u.0.1.31.1.k0": "LYNX ASIO-problemen die bij 0.1.31 zijn gemeld, konden nog niet worden nagebootst; details helpen (Help › Een probleem melden...)."
+"u.0.1.31.2.t": "Meer reparaties voor 0.1.31",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 repareert een crash op de startpagina, het typtoetsenbord als piano boven gedockte plugins, uitgerekte clips die hun eerste maat herhaalden, automatiseringsbanen gemaakt van FL-projecten geëxporteerde .flp-bestanden die FL weigerde, presets van FL's eigen synths in de Browser en een paar kleinere problemen.",
+"u.0.1.31.2.f0": "Scrollen door de lijst \"Een nieuw project beginnen\" op de startpagina laat LYNX op Windows niet meer crashen.",
+"u.0.1.31.2.f1": "Boven een gedockte plugin speelt het typtoetsenbord als piano weer eerst wanneer de toetsenbordknop van het venster dat aangeeft, zoals in een los venster.",
+"u.0.1.31.2.f2": "Met \"Uitgerekte patternclips herhalen hun pattern\" aan zijn noten die na de eerste maat van een clip getekend, geplakt of verplaatst worden te horen: het pattern groeit mee.",
+"u.0.1.31.2.f3": "Playlist › \"Automatiseringsclips naar de banen van hun tracks verplaatsen\" houdt de waarden die de clips speelden, ook bij grote FL-projecten.",
+"u.0.1.31.2.f4": "\"Sneltoetsen beheren\" opent met de cursor in het zoekvak op Linux-desktops die vensters laat activeren (#244); Opties › Instellingen van het typtoetsenbord als piano opent het menu Grondtoon / Octaaf / Indeling bij elke venstergrootte (#270).",
+"u.0.1.31.2.f5": "Exporteren naar FL Studio laat een projectgegevensmap weg die niet op deze computer staat (FL 2026 stopte bij \"Invalid project data folder\"); een FL-preset van een ingebouwde synth die in de Browser wordt aangeklikt opent die synth met de preset (#288); MIDI-bestanden die op de Playlist worden gezet worden standaard patternclips (#287)."
 }

@@ -1,11 +1,10 @@
 {
-"u.0.1.31.1.t": "Korrekturen für 0.1.31",
-"u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 behebt, was ihr zu 0.1.31 gemeldet habt: Automation von FL-Projekten auf den Reglern, Plugin-Fenster, die sich nicht mehr öffneten, die Device-Ansicht, Export mit einem Ordner im Dateinamen, Clips auf Instrumentenspuren, einen Absturz in der Hinweisleiste und den Speicher beim Start.",
-"u.0.1.31.1.f0": "FL-Automationsclips, die mehrere Regler steuern oder einen über eine Formel, bewegen jeden gesteuerten Regler im Mixer, in den Plugin-Fenstern und in der Device-Ansicht; ein von Hand bewegter Regler zeigt den Wert, den du hörst (#253).",
-"u.0.1.31.1.f1": "Angedockte Plugin- und Kanalfenster öffnen sich wieder dort, wo sie waren, statt nach ein paar Klicks aus dem Hauptfenster zu wandern.",
-"u.0.1.31.1.f2": "Clip-Launch-Layout: Eine im Arrangement gewählte Spur zeigt ihre Geräte, und die Regler der Device-Ansicht folgen der Automation.",
-"u.0.1.31.1.f3": "Audio-Export mit einem Ordner im Dateinamen schreibt dorthin, ohne erneut zu fragen (#215); Automatische Farben und Icons nehmen mehr als eine Regel an (#239); ein Rechtsklick auf die Hinweisleiste lässt LYNX nicht mehr abstürzen (#269).",
-"u.0.1.31.1.f4": "Nur-Spuren-Modus und Simple-Layout: Ein Doppelklick auf einen leeren Clip einer Instrumentenspur öffnet seine Noten.",
-"u.0.1.31.1.f5": "0.1.31 brauchte direkt nach dem Start ~7 MB mehr Speicher und mehr CPU.",
-"u.0.1.31.1.k0": "Mit 0.1.31 gemeldete LYNX-ASIO-Probleme ließen sich noch nicht nachstellen; Details helfen (Hilfe › Problem melden...)."
+"u.0.1.31.2.t": "Weitere Korrekturen für 0.1.31",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 behebt einen Absturz der Startseite, die Schreibtastatur über angedockten Plugins, gedehnte Clips, die ihren ersten Takt wiederholten, aus FL-Projekten erstellte Automationsspuren exportierte .flp-Dateien, die FL ablehnte, Presets der FL-Synths im Browser und einige kleinere Probleme.",
+"u.0.1.31.2.f0": "Das Scrollen der Liste „Neues Projekt beginnen“ auf der Startseite lässt LYNX unter Windows nicht mehr abstürzen.",
+"u.0.1.31.2.f1": "Über einem angedockten Plugin spielt die Schreibtastatur wieder zuerst, wenn die Tastaturtaste des Fensters es sagt, wie in einem gelösten Fenster.",
+"u.0.1.31.2.f2": "Mit „Gedehnte Pattern-Clips wiederholen ihr Pattern“ werden Noten, die nach dem ersten Takt eines Clips gezeichnet, eingefügt oder verschoben werden, gehört: das Pattern wächst mit.",
+"u.0.1.31.2.f3": "Playlist › „Automationsclips in die Spuren ihrer Tracks verschieben“ behält die Werte, die die Clips spielten, auch bei großen FL-Projekten.",
+"u.0.1.31.2.f4": "„Tastenkürzel verwalten“ öffnet sich mit dem Cursor im Suchfeld auf Linux-Desktops, die Fenster verspätet aktivieren (#244); Optionen › Einstellungen: Tastatur als Klavier öffnet das Menü Grundton / Oktave / Layout bei jeder Fenstergröße (#270).",
+"u.0.1.31.2.f5": "Der Export nach FL Studio lässt einen Projektdatenordner weg, den es auf diesem Computer nicht gibt (FL 2026 stoppte bei „Invalid project data folder“); ein im Browser angeklicktes FL-Preset eines eingebauten Synths öffnet diesen Synth mit dem Preset (#288); auf die Playlist gezogene MIDI-Dateien werden standardmäßig zu Pattern-Clips (#287)."
 }

@@ -2010,6 +2010,7 @@ public:
         workspace.addDockedFrame (*this);
         if (! nativechild::attach (*this, workspace))
             workspace.addAndMakeVisible (*this); // (no native window: a plain child of the desktop)
+        forwardUnusedPluginKeys (*this); // (round 190ra: what the plugin leaves plays the typing keyboard, as detached; first)
         nativechild::forwardUnusedKeys (*this);
         // round 190ev (issue #152): a click in the plugin's own view (its native window, which JUCE never hears of)
         // brings the frame in front too, as a click on the frame does
@@ -2542,17 +2543,26 @@ std::optional<juce::PopupMenu> wrapperMenuForSnapshot (juce::AudioPluginInstance
     return std::nullopt;
 }
 
+// The wrapper (FL's header and settings page) of a plugin window: a window of its own (Detached) or a docked frame
+// (issue #116). Hotfix 0.1.31.2 (round 190ra; 10.net, Discord): this took only the Detached kind, so in a docked window
+// the typing keyboard never went first (the window's keyboard button off: "Allow the plugin to handle keystrokes before
+// the host does" unticked) and the plugin got every key: docked, the typing keyboard played nothing over a plugin.
+static WrappedEditor* wrappedEditorOf (juce::Component& window)
+{
+    if (auto* host = dynamic_cast<EditorHost*> (&window))
+        return dynamic_cast<WrappedEditor*> (host->contentForShot());
+    return nullptr;
+}
+
 bool letsHostProcessKeys (juce::Component& window)
 {
-    auto* w = dynamic_cast<PluginWindow*> (&window);
-    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    auto* wrapped = wrappedEditorOf (window);
     return wrapped != nullptr && wrapped->hostProcessesKeys();
 }
 
 bool saveSettingsPageShot (juce::Component& window, const juce::File& png)
 {
-    auto* w = dynamic_cast<PluginWindow*> (&window);
-    auto* wrapped = w != nullptr ? dynamic_cast<WrappedEditor*> (w->getContentComponent()) : nullptr;
+    auto* wrapped = wrappedEditorOf (window);
     if (wrapped == nullptr)
         return false;
     wrapped->refreshKeyboardPriority(); // (the window's timer may not have run since the change)

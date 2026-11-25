@@ -852,7 +852,8 @@ struct Converter
         out.performanceMode = song.performanceMode;
         out.panLaw = song.panTriangular ? 2 : 0;
         out.autoCrossfades = song.autoCrossfades;
-        out.dataFolder = song.dataFolder;
+        // (round 190rc: a data folder missing on this computer is left out, as FL's own projects without one are saved)
+        out.dataFolder = song.dataFolder.empty() || ! options.folderExists || options.folderExists (song.dataFolder) ? song.dataFolder : std::string();
         out.hasScaleHighlight = true;
         out.scaleHighlight = notetools::flMenuScaleIndex (song.scaleHighlight.scale); // (LYNX's index -> FL's)
         out.scaleRoot = song.scaleHighlight.root;

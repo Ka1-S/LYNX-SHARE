@@ -16,6 +16,37 @@ The short version of each release. The full notes, with measurements, known issu
   peak values and correlation bars, dimmed unselected and darkened switched-off Playlist tracks); extras you switched
   yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
 
+## 0.1.31.2 alpha — fixes
+
+A second hotfix for 0.1.31.
+
+- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX: drawn at a scale
+  that is not a whole number (a display at 125 % / 150 %, LYNX's zoom), a list can also draw the row under its last one,
+  and the template list read a template name past its end there (Discord).
+- Fixed: the typing keyboard played nothing over a docked plugin window (Discord). The keys a plugin leaves unused now
+  play the typing keyboard docked as well as detached; and with the window's keyboard button set to "LYNX first"
+  ("Allow the plugin to handle keystrokes before the host does" unticked) the typing keyboard takes its keys before a
+  VST / VST3 plugin, which never worked for those plugins, docked or detached.
+- Fixed: with "Stretched pattern clips loop their pattern" on, a clip drawn on an instrument track looped its first bar
+  for ever: notes drawn, pasted, moved or stretched past a pattern's set length are now heard, as the length grows to
+  whole bars that hold them, like a step past it already did; a clip saved that way is mended by the next edit in it
+  (Discord).
+- Fixed: Playlist › "Move automation clips into their tracks' lanes" put wrong values on the controls of big FL
+  projects; each lane now plays exactly what its clips played (FL's clip range and mapped controls, the value held
+  between clips, muted and overlapping clips) and stays within the engine's automation slots (Discord).
+- Fixed: "Manage shortcuts" and the other search windows opened without the caret in their search box on desktops that
+  activate a new window late (Linux, Wayland) (#244).
+- New: Options › *Typing keyboard settings* (and the same in the View menu): the typing keyboard button's right-click
+  menu (Root note, Octave, Layout), also for windows of 1280-1440 px whose toolbar has no room for that button (#270).
+- Fixed: Export to FL Studio wrote back the project data folder of an .flp made on another computer; FL 2026 stopped
+  such a project at "Invalid project data folder". A data folder that isn't on this computer is left out.
+- Fixed: an FL preset of a stock synth (Sytrus, Harmor, GMS, Toxic Biohazard, Morphine...) clicked in the Browser opened
+  LYNX's own synth with an approximation of the sound; it opens that synth itself with the preset loaded and named after
+  it, and Send to selected channel puts it into the selected channel's synth. The channel window's preset menus of Toxic
+  Biohazard, GMS and Morphine list FL's presets (#288).
+- Changed: the LYNX extra "MIDI files dropped on the Playlist become pattern clips" is on by default (FL ignores a .mid
+  dropped on its Playlist, so no FL gesture changes; Settings › LYNX extras turns it off) (#287).
+
 ## 0.1.31.1 alpha — fixes
 
 A hotfix for 0.1.31.

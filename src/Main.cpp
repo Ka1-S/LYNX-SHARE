@@ -1857,6 +1857,23 @@ public:
             return;
         }
 
+        if (args.contains ("--hotfix190ra"))
+        {
+            // LYNX --hotfix190ra <prefix> [--part name]... [--plugin file]... (hotfix 0.1.31.2, round 190ra): src/Hotfix190ra.inc;
+            // <prefix>-checks.txt, result=OK
+            const auto i = args.indexOf ("--hotfix190ra");
+            juce::StringArray parts, plugins;
+            for (int k = 0; k + 1 < args.size(); ++k)
+            {
+                if (args[k] == "--part")
+                    parts.add (args[k + 1].unquoted());
+                if (args[k] == "--plugin")
+                    plugins.add (args[k + 1].unquoted());
+            }
+            runHotfix190ra (args[i + 1].unquoted(), parts, plugins);
+            return;
+        }
+
         if (args.contains ("--hotfixui190qp"))
         {
             // LYNX --hotfixui190qp <prefix> [--plugin file]... (hotfix 0.1.31.1, round 190qp): the Clip-launch Arrangement's
@@ -9971,6 +9988,8 @@ private:
 
         // hotfix 0.1.31.1 (round 190qp): a docked window's place in the dock's coordinates (src/HotfixUi190qp.inc)
         const auto hotfixPlacesResult = hotfixPlaces190qpCheck();
+        // hotfix 0.1.31.2 (round 190ra): every list of the start page scrolled and painted (src/Hotfix190ra.inc)
+        const auto startPageScrollResult = startPageScroll190raCheck();
 
         // round 190pv (issue #258): a cloned channel's own automation clip drives its sound (src/Issue258Test.inc: the app's
         // engine, render-ahead off and on; Transistor Bass when FL Studio is here, LYNX Synth always)
@@ -11411,7 +11430,7 @@ private:
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
                         && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
-                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
+                        && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
                         && issues190qoResult == "OK" // (round 190qo)
                         && flparity190prResult == "OK"
@@ -11525,6 +11544,7 @@ private:
                << "headergear248=" << headerGearResult << "\n"
                << "pertab259=" << perTab259Result << "\n"
                << "slots260=" << slots260Result << "\n"
+               << "startpagescroll190ra=" << startPageScrollResult << "\n"
                << "simpleduck190ot=" << simpleDuck190otResult << "\n"
                << "tracks190pe=" << tracks190peResult << "\n"
                << "feel190qe=" << feel190qeResult << "\n"
@@ -21462,6 +21482,7 @@ private:
 #include "HeaderGearShot248.inc" // rollup 0.1.31 step 7 (PRs #248 / #256)
 #include "PerTabShot259.inc" // round 190pw (PR #259)
 #include "HotfixUi190qp.inc" // hotfix 0.1.31.1 (round 190qp)
+#include "Hotfix190ra.inc" // hotfix 0.1.31.2 (round 190ra)
 #include "TrackerShot190nw.inc" // round 190nw
 #include "IssuesShot190nq.inc" // round 190nq (issues #193, #225-#230)
 #include "Research190onShot.inc" // round 190on (research190oe P2, P8, P10)

@@ -22,6 +22,34 @@ public:
 
     void closeButtonPressed() override { closeSoon(); }
 
+    // #244 follow-up (hotfix 0.1.31.2, round 190ra; Linux COSMIC / Wayland): a window manager that activates the new window
+    // only after openToolWindow returned (XWayland under a Wayland compositor) left the caret out of the search box: the
+    // early requests found the window not focused yet, and on its activation JUCE gave the focus to the window itself
+    // (nothing inside had had it), so typing went nowhere. When the window itself gets the focus, or becomes the active
+    // window with nothing of it focused, the marked box takes it.
+    void focusGained (FocusChangeType) override { focusMarkedSoon(); }
+    void activeWindowStatusChanged() override
+    {
+        juce::DocumentWindow::activeWindowStatusChanged();
+        if (! isActiveWindow())
+            return;
+        auto* focused = juce::Component::getCurrentlyFocusedComponent();
+        if (focused == nullptr || focused == this || ! isParentOf (focused))
+            focusMarkedSoon();
+    }
+    void focusMarkedSoon()
+    {
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<ToolWindow> (this)] {
+            if (safe == nullptr || ! safe->isShowing())
+                return;
+            auto* focused = juce::Component::getCurrentlyFocusedComponent();
+            if (focused != nullptr && focused != safe.getComponent() && safe->isParentOf (focused))
+                return; // (something of the window has it: the user's choice)
+            if (auto* target = focusOnOpenTarget (*safe); target != nullptr && target->isShowing())
+                target->grabKeyboardFocus();
+        });
+    }
+
     bool keyPressed (const juce::KeyPress& k) override
     {
         if (k == juce::KeyPress::escapeKey && escclose::enabled()) // (issue #217: the switch keeps it open)
