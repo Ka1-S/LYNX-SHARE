@@ -275,6 +275,9 @@ private:
             auto area = juce::Rectangle<int> (0, 0, width, height).reduced (0, 3);
             paintRowBack (g, area, selected);
             area = area.reduced (12, 6);
+            // (JUCE may ask for a row past getNumRows(): nothing to draw there)
+            if (row < 0 || row >= getNumRows())
+                return;
             const auto& details = card->host.templateDetails;
             const auto name = row == 0 ? tr ("New project...") : card->host.templates[(std::size_t) row - 1];
             const auto detail = row == 0 ? tr ("Choose a template, the tempo and where to save")
@@ -293,10 +296,13 @@ private:
                 if (card->host.newProject)
                     card->host.newProject();
             }
-            else if (row - 1 < (int) card->host.templates.size() && card->host.newFromTemplate)
+            else if (row >= 1 && row - 1 < (int) card->host.templates.size() && card->host.newFromTemplate)
                 card->host.newFromTemplate (row - 1);
         }
-        juce::String getTooltipForRow (int row) override { return row == 0 ? juce::String() : tr ("Start a new project from this template"); }
+        juce::String getTooltipForRow (int row) override
+        {
+            return row >= 1 && row < getNumRows() ? tr ("Start a new project from this template") : juce::String();
+        }
     };
 
     bool keyPressed (const juce::KeyPress& key, juce::Component*) override { return handleKey (key); }
@@ -366,10 +372,10 @@ private:
     Host host;
     std::int64_t now = 0;
     std::vector<int> shown;
+    TemplateModel templateModel; // (before the lists: they go first, their model after them)
     CloseButton closeButton;
     juce::TextEditor search;
     juce::ListBox recentList, templateList;
-    TemplateModel templateModel;
     juce::ToggleButton atStart;
     juce::Rectangle<int> leftPanel, rightPanel, footerArea;
 };
