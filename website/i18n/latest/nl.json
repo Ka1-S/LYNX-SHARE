@@ -1,9 +1,10 @@
 {
 "u.0.1.31.2.t": "Meer reparaties voor 0.1.31",
-"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 repareert een crash op de startpagina, het typtoetsenbord als piano boven gedockte plugins, uitgerekte clips die hun eerste maat herhaalden, automatiseringsbanen gemaakt van FL-projecten en twee kleinere problemen.",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 repareert een crash op de startpagina, het typtoetsenbord als piano boven gedockte plugins, uitgerekte clips die hun eerste maat herhaalden, automatiseringsbanen gemaakt van FL-projecten geëxporteerde .flp-bestanden die FL weigerde, presets van FL's eigen synths in de Browser en een paar kleinere problemen.",
 "u.0.1.31.2.f0": "Scrollen door de lijst \"Een nieuw project beginnen\" op de startpagina laat LYNX op Windows niet meer crashen.",
 "u.0.1.31.2.f1": "Boven een gedockte plugin speelt het typtoetsenbord als piano weer eerst wanneer de toetsenbordknop van het venster dat aangeeft, zoals in een los venster.",
 "u.0.1.31.2.f2": "Met \"Uitgerekte patternclips herhalen hun pattern\" aan zijn noten die na de eerste maat van een clip getekend, geplakt of verplaatst worden te horen: het pattern groeit mee.",
 "u.0.1.31.2.f3": "Playlist › \"Automatiseringsclips naar de banen van hun tracks verplaatsen\" houdt de waarden die de clips speelden, ook bij grote FL-projecten.",
-"u.0.1.31.2.f4": "\"Sneltoetsen beheren\" opent met de cursor in het zoekvak op Linux-desktops die vensters laat activeren (#244); Opties › Instellingen van het typtoetsenbord als piano opent het menu Grondtoon / Octaaf / Indeling bij elke venstergrootte (#270)."
+"u.0.1.31.2.f4": "\"Sneltoetsen beheren\" opent met de cursor in het zoekvak op Linux-desktops die vensters laat activeren (#244); Opties › Instellingen van het typtoetsenbord als piano opent het menu Grondtoon / Octaaf / Indeling bij elke venstergrootte (#270).",
+"u.0.1.31.2.f5": "Exporteren naar FL Studio laat een projectgegevensmap weg die niet op deze computer staat (FL 2026 stopte bij \"Invalid project data folder\"); een FL-preset van een ingebouwde synth die in de Browser wordt aangeklikt opent die synth met de preset (#288); MIDI-bestanden die op de Playlist worden gezet worden standaard patternclips (#287)."
 }

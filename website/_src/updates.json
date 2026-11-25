@@ -5,7 +5,7 @@
     "date": "2026-11-25",
     "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31.2-alpha",
     "title": "More fixes for 0.1.31",
-    "summary": "LYNX SHARE 0.1.31.2 fixes a start page crash, the typing keyboard over docked plugins, stretched clips that looped their first bar, automation lanes made from FL projects and two smaller issues.",
+    "summary": "LYNX SHARE 0.1.31.2 fixes a start page crash, the typing keyboard over docked plugins, stretched clips that looped their first bar, automation lanes made from FL projects exported .flp files that FL refused, presets of FL's stock synths in the Browser and a few smaller issues.",
     "new": [],
     "better": [],
     "fixed": [
@@ -13,7 +13,8 @@
       "Over a docked plugin the typing keyboard plays first again when the window's keyboard button says so, as in a detached window.",
       "With \"Stretched pattern clips loop their pattern\" on, notes drawn, pasted or moved past a clip's first bar are heard: the pattern grows to hold them.",
       "Playlist › \"Move automation clips into their tracks' lanes\" keeps the values the clips played, also on big FL projects.",
-      "\"Manage shortcuts\" opens with the caret in its search box on Linux desktops that activate windows late (#244); Options › Typing keyboard settings opens the Root note / Octave / Layout menu on any window size (#270)."
+      "\"Manage shortcuts\" opens with the caret in its search box on Linux desktops that activate windows late (#244); Options › Typing keyboard settings opens the Root note / Octave / Layout menu on any window size (#270).",
+      "Export to FL Studio leaves out a project data folder that isn't on this computer (FL 2026 stopped at \"Invalid project data folder\"); an FL preset of a stock synth clicked in the Browser opens that synth with the preset (#288); MIDI files dropped on the Playlist become pattern clips by default (#287)."
     ],
     "known": []
   },

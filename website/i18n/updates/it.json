@@ -1,11 +1,12 @@
 {
 "u.0.1.31.2.t": "Altre correzioni per la 0.1.31",
-"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corregge un crash della pagina iniziale, la tastiera del PC come pianoforte sui plugin agganciati, le clip allungate che ripetevano la prima battuta, le corsie di automazione create da progetti FL e due problemi minori.",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corregge un crash della pagina iniziale, la tastiera del PC come pianoforte sui plugin agganciati, le clip allungate che ripetevano la prima battuta, le corsie di automazione create da progetti FL i .flp esportati che FL rifiutava, i preset dei synth di FL nel Browser e alcuni problemi minori.",
 "u.0.1.31.2.f0": "Scorrere l'elenco \"Inizia un nuovo progetto\" della pagina iniziale non fa più chiudere LYNX su Windows.",
 "u.0.1.31.2.f1": "Su un plugin agganciato la tastiera del PC come pianoforte torna a suonare per prima quando lo dice il pulsante tastiera della finestra, come in una finestra staccata.",
 "u.0.1.31.2.f2": "Con \"Le clip di pattern allungate ripetono il pattern\" attivo, le note disegnate, incollate o spostate dopo la prima battuta di una clip si sentono: il pattern si allunga per contenerle.",
 "u.0.1.31.2.f3": "Playlist › \"Sposta le clip di automazione nelle corsie delle loro tracce\" mantiene i valori che suonavano le clip, anche nei grandi progetti FL.",
 "u.0.1.31.2.f4": "\"Gestisci scorciatoie\" si apre con il cursore nella ricerca sui desktop Linux che attivano le finestre in ritardo (#244); Opzioni › Impostazioni della tastiera del PC come pianoforte apre il menu Nota fondamentale / Ottava / Layout con qualsiasi dimensione della finestra (#270).",
+"u.0.1.31.2.f5": "L'esportazione in FL Studio omette una cartella dati del progetto che non esiste su questo computer (FL 2026 si fermava su \"Invalid project data folder\"); un preset di FL di un synth nativo cliccato nel Browser apre quel synth con il preset (#288); i file MIDI trascinati sulla Playlist diventano clip di pattern per impostazione predefinita (#287).",
 "u.0.1.31.1.t": "Correzioni per la 0.1.31",
 "u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 corregge ciò che avete segnalato sulla 0.1.31: l'automazione dei progetti FL sui controlli, finestre dei plugin che non si aprivano più, la vista Device, l'esportazione con una cartella nel nome del file, i clip sulle tracce strumento, un crash nella barra dei suggerimenti e la memoria all'avvio.",
 "u.0.1.31.1.f0": "I clip di automazione di FL che muovono più controlli, o uno tramite una formula, muovono ogni controllo nel mixer, nelle finestre dei plugin e nella vista Device; un controllo mosso a mano mostra il valore che si sente (#253).",

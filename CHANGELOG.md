@@ -25,6 +25,14 @@ A second hotfix for 0.1.31.
   activate a new window late (Linux, Wayland) (#244).
 - New: Options › *Typing keyboard settings* (and the same in the View menu): the typing keyboard button's right-click
   menu (Root note, Octave, Layout), also for windows of 1280-1440 px whose toolbar has no room for that button (#270).
+- Fixed: Export to FL Studio wrote back the project data folder of an .flp made on another computer; FL 2026 stopped
+  such a project at "Invalid project data folder". A data folder that isn't on this computer is left out.
+- Fixed: an FL preset of a stock synth (Sytrus, Harmor, GMS, Toxic Biohazard, Morphine...) clicked in the Browser opened
+  LYNX's own synth with an approximation of the sound; it opens that synth itself with the preset loaded and named after
+  it, and Send to selected channel puts it into the selected channel's synth. The channel window's preset menus of Toxic
+  Biohazard, GMS and Morphine list FL's presets (#288).
+- Changed: the LYNX extra "MIDI files dropped on the Playlist become pattern clips" is on by default (FL ignores a .mid
+  dropped on its Playlist, so no FL gesture changes; Settings › LYNX extras turns it off) (#287).
 
 ## 0.1.31.1 alpha — fixes
 
