@@ -1,6 +1,7 @@
 #include "engine/AudioEngine.h"
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
+#include "core/History.h" // (keepProjectClock: round 190re)
 #include "core/AutoLook.h"
 #include "core/NewClipColours.h"
 #include "core/SessionMixer.h"
@@ -4286,6 +4287,7 @@ void AudioEngine::sessionStep (bool redo)
         to.push_back (std::move (step));
         from.pop_back();
         sessionAfterOpen = false;
+        keepProjectClock (next.info, song.info); // (round 190re)
         song = std::move (next);
         modified = true;
         lastUndoPress = {};
@@ -4359,10 +4361,12 @@ void AudioEngine::historyStep (bool redo)
         }
         // Moving song into a temporary may already change the live model even if push_back throws.
         movementMayHaveBegun = true;
+        const auto clock = song.info;
         if (remote) to.push_back (std::move (*inverse));
         else to.push_back ({ std::move (song), false });
         song = std::move (from.back().song);
         from.pop_back();
+        keepProjectClock (song.info, clock); // (round 190re: undo no longer turns the working time back)
         comp::setAudition (song, -1); // an old history state must not resume a comp audition
         modified = true;
         levelsPending = false;
