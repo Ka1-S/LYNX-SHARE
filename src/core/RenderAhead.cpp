@@ -216,7 +216,7 @@ void RenderAhead::prepare (double rate, int maxBlockSize)
     flagPool.assign ((std::size_t) maxEntries * RackRenderer::SplitBlock::maxChunks * RackRenderer::Split::maxSlots, 0);
     scratchL.assign ((std::size_t) maxBlock, 0.0f);
     scratchR.assign ((std::size_t) maxBlock, 0.0f);
-    entryCount = 0;
+    entryCount.store (0, std::memory_order_relaxed);
     readIndex.store (0);
     writeIndex.store (0);
 }
@@ -637,11 +637,12 @@ bool RenderAhead::engage (const RackState& state, const Block& b) noexcept
     if (! computePartition (state, b, *next))
         return false;
     stride = b.model->deviceBlock;
-    entryCount = std::min (maxEntries, poolSamples / std::max (1, stride));
-    if (entryCount < 2 || stride > maxBlock)
+    const auto rings = std::min (maxEntries, poolSamples / std::max (1, stride));
+    entryCount.store (rings, std::memory_order_relaxed);
+    if (rings < 2 || stride > maxBlock)
         return false;
-    targetFill = std::clamp ((windowSamples + stride - 1) / stride, 1, entryCount - 1);
-    for (int e = 0; e < entryCount; ++e)
+    targetFill.store (std::clamp ((windowSamples + stride - 1) / stride, 1, rings - 1), std::memory_order_relaxed);
+    for (int e = 0; e < rings; ++e)
     {
         auto& block = entries[(std::size_t) e]->block;
         block.audio = audioPool.data() + (std::size_t) e * RackRenderer::Split::maxSlots * 2 * (std::size_t) stride;
@@ -691,7 +692,7 @@ bool RenderAhead::engage (const RackState& state, const Block& b) noexcept
     counters.aheadChannels.store (current->aheadChannelCount, std::memory_order_relaxed);
     counters.aheadTracks.store (current->aheadTrackCount, std::memory_order_relaxed);
     counters.boundary.store (current->liveSplit.slots, std::memory_order_relaxed);
-    counters.window.store (targetFill * stride, std::memory_order_relaxed);
+    counters.window.store (targetFill.load (std::memory_order_relaxed) * stride, std::memory_order_relaxed);
     return true;
 }
 
@@ -760,8 +761,8 @@ bool RenderAhead::producing() const noexcept
         || halted.load (std::memory_order_acquire))
         return false;
     const auto fill = writeIndex.load (std::memory_order_relaxed) - readIndex.load (std::memory_order_acquire);
-    const auto target = tweakHoldSamples.load (std::memory_order_relaxed) > 0 ? 1 : targetFill;
-    return fill < target && fill < entryCount - 1;
+    const auto target = tweakHoldSamples.load (std::memory_order_relaxed) > 0 ? 1 : targetFill.load (std::memory_order_relaxed);
+    return fill < target && fill < entryCount.load (std::memory_order_relaxed) - 1;
 }
 
 void RenderAhead::wakeThread() noexcept
@@ -803,7 +804,7 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         }
         const auto w = writeIndex.load (std::memory_order_relaxed);
         const auto fill = w - readIndex.load (std::memory_order_acquire);
-        auto& entry = *entries[(std::size_t) (w % entryCount)];
+        auto& entry = *entries[(std::size_t) (w % entryCount.load (std::memory_order_relaxed))];
         const auto sb = planSubBlock (model, nextPosition, nextDone, transportTps (ahead->currentBpm(), model.sampleRate));
         // (serial while the window is comfortable: no hand-off cost; the workers when it runs thin)
         // (macOS: the workers may sit in the device's Audio Workgroup, round 190gt; render-ahead is not deadline work and
@@ -814,10 +815,10 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
        #else
         // (the workers when the window runs thin, or for good while one thread can't keep up — a serial block now and
         // then, with the window comfortable, measures that again)
-        const auto heavy = serialLoad >= serialLimit && ! (jobsSinceSerial >= 256 && fill >= targetFill / 2);
+        const auto heavy = serialLoad >= serialLimit && ! (jobsSinceSerial >= 256 && fill >= targetFill.load (std::memory_order_relaxed) / 2);
         // round 190px: while the UI starves ("Safe overloads"), the workers only when the ring is about to run dry
         const auto starving = uiGuard != nullptr && uiClock != nullptr && uiGuard->uiStarving (uiClock());
-        const auto useWorkers = pool != nullptr && (starving ? fill < 2 : (fill < std::max (1, targetFill / 3) || heavy));
+        const auto useWorkers = pool != nullptr && (starving ? fill < 2 : (fill < std::max (1, targetFill.load (std::memory_order_relaxed) / 3) || heavy));
        #endif
         const auto jobStart = ProcessTimes::now();
         const auto jobCpu = WorkerPool::threadCpuNs();
@@ -838,7 +839,7 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         nextPosition = sb.next;
         nextDone = nextDone + sb.samples >= model.deviceBlock ? 0 : nextDone + sb.samples;
         modelStop.store (sb.last, std::memory_order_release);
-        if (useWorkers && (fill + 1 >= targetFill || sb.last))
+        if (useWorkers && (fill + 1 >= targetFill.load (std::memory_order_relaxed) || sb.last))
             pool->park(); // (the window is full: the workers sleep instead of spinning)
         writeIndex.store (w + 1, std::memory_order_release);
         owner.store (0, std::memory_order_release);
@@ -1326,7 +1327,7 @@ void RenderAhead::processBlock (SnapshotExchange<RackState>& exchange, const Blo
         const auto w = writeIndex.load (std::memory_order_acquire);
         if (r != w)
         {
-            auto& front = *entries[(std::size_t) (r % entryCount)];
+            auto& front = *entries[(std::size_t) (r % entryCount.load (std::memory_order_relaxed))];
             if (front.playing == b.playing && front.start == b.startTick && front.samples == b.samples)
             {
                 entry = &front;
@@ -1394,7 +1395,7 @@ void RenderAhead::processBlock (SnapshotExchange<RackState>& exchange, const Blo
             aheadState = s;
             aheadAck.store (s, std::memory_order_release);
         }
-        auto& slot = *entries[(std::size_t) (writeIndex.load (std::memory_order_relaxed) % entryCount)];
+        auto& slot = *entries[(std::size_t) (writeIndex.load (std::memory_order_relaxed) % entryCount.load (std::memory_order_relaxed))];
         jobBlock = b; // (the transport options as they are now: a user's jump chases in both parts)
         renderJob (slot, *aheadState, b.startTick, b.samples, b.playing, pool != nullptr);
         entry = &slot;
@@ -1466,7 +1467,7 @@ void RenderAhead::processBlock (SnapshotExchange<RackState>& exchange, const Blo
         running.store (true, std::memory_order_release);
     // the thread refills the ring from half the window: at small buffers one wake-up every few blocks, not one per block
     const auto fill = writeIndex.load (std::memory_order_relaxed) - readIndex.load (std::memory_order_relaxed);
-    const auto target = tweakHoldSamples.load (std::memory_order_relaxed) > 0 ? 1 : targetFill;
+    const auto target = tweakHoldSamples.load (std::memory_order_relaxed) > 0 ? 1 : targetFill.load (std::memory_order_relaxed);
     if (claimed || fill <= target / 2)
         wakeThread();
 }

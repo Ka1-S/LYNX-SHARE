@@ -2840,10 +2840,12 @@ void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, dou
     if (preset == nullptr)
     {
         engine.reset();
+        latency.store (0, std::memory_order_relaxed);
         return;
     }
     engine = std::make_unique<Maximus>();
     engine->prepare (std::move (preset), sampleRate, mixParameter, engineRev);
+    latency.store (engine->latency(), std::memory_order_relaxed);
 }
 
 void MaximusProcessor::process (float* left, float* right, int n) noexcept
@@ -2858,15 +2860,17 @@ void MaximusProcessor::process (float* left, float* right, int n) noexcept
         const auto len = std::min (Rack::maxBlock, n - done);
         engine->process (left + done, right + done, len);
     }
+    latency.store (engine->latency(), std::memory_order_relaxed);
 }
 
 void MaximusProcessor::reset() noexcept
 {
     if (engine != nullptr)
         engine->reset();
+    latency.store (engine != nullptr ? engine->latency() : 0, std::memory_order_relaxed);
 }
 
-int MaximusProcessor::latencySamples() const noexcept { return engine != nullptr ? engine->latency() : 0; }
+int MaximusProcessor::latencySamples() const noexcept { return latency.load (std::memory_order_relaxed); }
 
 float MaximusProcessor::bandPeak (int band, bool out) const noexcept
 {

@@ -1189,6 +1189,8 @@ public:
         l2Window = std::clamp (l2BoxALength + l2BoxBLength - 1, 1, (int) l2Delay[0].size());
         l2Attack = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowAttackS * sr));
         l2Release = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowReleaseS * sr));
+        shownLookahead.store (lookahead, std::memory_order_relaxed);
+        shownWindow.store (l2Window, std::memory_order_relaxed);
         reset();
     }
 
@@ -1207,7 +1209,7 @@ public:
         resetL2();
     }
 
-    int latencySamples() const noexcept override { return l2Active.load (std::memory_order_relaxed) ? l2Window : lookahead; }
+    int latencySamples() const noexcept override { return (l2Active.load (std::memory_order_relaxed) ? shownWindow : shownLookahead).load (std::memory_order_relaxed); }
     int tailSamples() const noexcept override { return tail; }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
@@ -1434,6 +1436,7 @@ private:
 
     double sampleRate = 44100.0;
     int lookahead = 64, position = 0;
+    std::atomic<int> shownLookahead { 64 }, shownWindow { 64 }; // latencySamples, any thread (round 190rf: prepare runs on the audio thread after a rate change)
     float attack = 0.1f, gain = 1.0f;
     std::array<std::vector<float>, 2> delay;
     std::vector<float> maxValues;      // monotonic (decreasing) queue for the sliding maximum

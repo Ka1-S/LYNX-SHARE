@@ -337,7 +337,8 @@ private:
     std::vector<std::unique_ptr<Entry>> entries;
     std::vector<float> audioPool;
     std::vector<std::uint8_t> flagPool;
-    int entryCount = 0, targetFill = 0, stride = 0;
+    std::atomic<int> entryCount { 0 }, targetFill { 0 }; // (round 190rf, ThreadSanitizer: producing() may still ask while engage() sets them)
+    int stride = 0;
     std::atomic<int> writeIndex { 0 }, readIndex { 0 };
     int windowSamples = 0;
     double sampleRate = 44100.0;
