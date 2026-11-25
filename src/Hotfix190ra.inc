@@ -236,7 +236,8 @@
             list.setRowHeight (50);
             list.setBounds (0, 0, 428, 447);
             list.updateContent();
-            juce::Image image (juce::Image::ARGB, juce::roundToInt (440 * scale), juce::roundToInt (460 * scale), true);
+            // (JUCE's software renderer, as Linux / macOS draw and as LYNX's own CPU rendering draws on Windows)
+            juce::Image image (juce::Image::ARGB, juce::roundToInt (440 * scale), juce::roundToInt (460 * scale), true, juce::SoftwareImageType());
             auto& bar = list.getVerticalScrollBar();
             for (double y = 0.0; y <= bar.getRangeLimit().getEnd(); y += 1.0)
             {
@@ -366,12 +367,62 @@
         });
 
         if (wants ("pastend"))
+        {
             st->steps.push_back ([st] {
                 juce::String past;
                 const auto n = rowsPastTheEnd190ra (past);
-                st->note ("rows past the end a plain list was asked to paint, by scale: " + past + "(total " + juce::String (n) + ")");
+                st->note ("rows past the end a plain list was asked to paint off screen (software renderer), by scale: " + past + "(total " + juce::String (n) + ")");
                 st->check ("the start page with many rows, scrolled and painted at every position", startPageScroll190raCheck().startsWith ("OK"));
             });
+            // the same list on the shown window (Windows: Direct2D unless LYNX's CPU rendering is chosen), at LYNX's zoom
+            // 100 / 125 / 150 % (the window's scale as a display at that scale gives it)
+            struct PastModel final : juce::ListBoxModel
+            {
+                int past = 0;
+                int getNumRows() override { return 38; }
+                void paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool) override
+                {
+                    past += row >= 38 ? 1 : 0;
+                    g.setColour (row % 2 == 0 ? juce::Colours::grey : juce::Colours::darkgrey);
+                    g.fillRect (0, 0, w, h);
+                }
+            };
+            auto model = std::make_shared<PastModel>();
+            auto list = std::make_shared<std::unique_ptr<juce::ListBox>>();
+            for (const float scale : { 1.0f, 1.25f, 1.5f })
+                st->steps.push_back ([st, model, list, scale] {
+                    juce::Desktop::getInstance().setGlobalScaleFactor (scale);
+                    if (*list == nullptr)
+                    {
+                        *list = std::make_unique<juce::ListBox> ("past190ra", model.get());
+                        (*list)->setRowHeight (50);
+                        st->ui->addAndMakeVisible (**list);
+                        (*list)->setBounds (40, 120, 428, 447);
+                        (*list)->toFront (false);
+                        (*list)->updateContent();
+                    }
+                    model->past = 0;
+                    auto& bar = (*list)->getVerticalScrollBar();
+                    for (double y = 0.0; y <= bar.getRangeLimit().getEnd(); y += 1.0)
+                    {
+                        bar.setCurrentRangeStart (y);
+                        bar.handleUpdateNowIfNeeded();
+                        (*list)->repaint();
+                        if (auto* peer = (*list)->getPeer())
+                            peer->performAnyPendingRepaintsNow();
+                    }
+                    st->note ("on the shown window at " + juce::String (scale, 2) + ": rows past the end painted " + juce::String (model->past));
+                });
+            st->steps.push_back ([st, list] {
+                juce::Desktop::getInstance().setGlobalScaleFactor (1.0f);
+                if (*list != nullptr)
+                {
+                    (*list)->setModel (nullptr);
+                    st->ui->removeChildComponent (list->get());
+                    list->reset();
+                }
+            });
+        }
 
         if (wants ("startpage"))
         {
