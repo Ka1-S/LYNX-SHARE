@@ -1506,6 +1506,15 @@ void PianoRollComponent::editNotes (const std::function<void (Pattern&)>& edit, 
     knownNoteCount = currentPattern (engine.getSong()).notes.size();
 }
 
+bool PianoRollComponent::dragNotesValid() const
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    if (dragNote < 0 || dragNote >= (int) notes.size() || dragIndices.size() != dragOriginals.size()
+        || std::find (dragIndices.begin(), dragIndices.end(), dragNote) == dragIndices.end())
+        return false;
+    return std::all_of (dragIndices.begin(), dragIndices.end(), [&notes] (int i) { return i >= 0 && i < (int) notes.size(); });
+}
+
 void PianoRollComponent::sortNotes()
 {
     auto tracked = selection;
@@ -3520,6 +3529,16 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
         const juce::MouseEvent& event;
         ~PostAfter() { roll.postDragHint (event); }
     } postAfter { *this, e };
+
+    // Round 190rb (UI monkey test, release build seed 59: "double free or corruption" after an undo during a drag): a drag
+    // of notes holds their indices from the press, and a change of the song under it (Ctrl+Z while the button is down,
+    // an undo from the API, another project) can leave them past the pattern's end; the edits below wrote there. Such a
+    // drag ends where it is.
+    if ((drag == Drag::move || drag == Drag::resize || drag == Drag::resizeLeft) && ! dragNotesValid())
+    {
+        drag = Drag::none;
+        return;
+    }
 
     switch (drag)
     {
