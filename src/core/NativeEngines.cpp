@@ -138,7 +138,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
     static const std::vector<InstrumentEngine> list = {
         { InstrumentKind::threeosc, "3x Osc", "3x Osc", own, false },
         { InstrumentKind::sytrus, "Sytrus", "Sytrus", own, false },
-        { InstrumentKind::harmor, "Harmor", "Harmor", fl, true },
+        { InstrumentKind::harmor, "Harmor", "Harmor", own, true },
         { InstrumentKind::harmless, "Harmless", "Harmless", own, false },
         { InstrumentKind::gms, "GMS", "GMS", own, false },
         { InstrumentKind::morphine, "Morphine", "Morphine", own, false },

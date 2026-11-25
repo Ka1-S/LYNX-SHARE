@@ -325,6 +325,7 @@ add_library(lynx_core STATIC
     src/core/NativeSlots.cpp
     src/core/KeplerBank.cpp
     src/core/SlayerBank.cpp
+    src/core/HarmorBank.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
     src/core/GranulizerBank.cpp

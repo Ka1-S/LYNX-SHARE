@@ -234,7 +234,7 @@ std::vector<BassZone> bassString()
 {
     constexpr double rate = 16000.0, pluckAt = 0.17;
     std::vector<BassZone> zones;
-    for (const int semitone : { 11, 16, 23, 28, 35, 40 })
+    for (const int semitone : { 16, 21, 26, 31, 36, 41 }) // E1 A1 D2 G2 and two more fourths: a bass guitar's tuning
     {
         BassZone z;
         z.semitone = semitone;

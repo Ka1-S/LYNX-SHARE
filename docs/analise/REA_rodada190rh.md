@@ -82,3 +82,51 @@ Werner, J. Abel, J. Smith, "The TR-808 Cymbal: a Physically-Informed, Circuit-Be
 a 1 kHz band under three bursts 10 ms apart ("LYNX Clap", the analogue clap circuits' principle). No constant was taken from FL's
 table or samples. (The round's analysis had looked at both; the choice of a sine and of the noises is the textbook one.) A state made with FL's noises plays the one its name suggests (metal, clap, crunch / bit),
 else the hiss. Bank: 20 presets (`core/BassDrumBank.cpp`). Differences from FL: the body is close (a sine), noise layers differ.
+
+## 6. GMS — 29 waves, revision 1
+
+`core/NativeWavesGms.cpp`. The file names a preset may ask for are part of the state layout (REA_rodada12); the shapes under
+those names are LYNX's: plain waves from their Fourier series, and formants, organ registrations, FM pairs and combs from
+formulas. Levels are set by rendered audio. FL's `.wav` folder is used whenever it is there.
+
+## 7. Sytrus, Ogun, Morphine
+
+Sytrus and Ogun need no FL data: only a bank was missing. Morphine's engine needs FL's noise table for its noise section only;
+LYNX's is a 16-bit white noise from a linear congruential generator, used when the channel's path says so or FL's file is not
+on this computer. All three banks are written from the documented parameter layouts by name, never from an FL preset file.
+
+## 8. Kepler, Kepler Exo — revision 1
+
+Three tables only: the LFO cycle (a triangle), the noise (the 16-bit generator of section 7, level from rendered audio) and the
+band-limited impulse rows, which the engine already computed (a 16th-order Butterworth response). Everything else is the engine's own code. FL's power tables are loaded only from known builds; once FL's engine has been
+loaded in a process, LYNX's own output can differ in the last bits (the tests allow 1e-4).
+
+## 9. Toxic Biohazard, Fruity DrumSynth Live — revision 1
+
+Toxic's waves 2…32 are families of additive spectra (plain waves, duller saws, organ stops, vowels, bells, combs, rough), all
+scaled to one loudness, the mean level from rendered audio. DrumSynth's eighteen waves are the published TR-808 oscillator
+frequencies (Werner, Abel, Smith, ICMC 2014), their cowbell pair, and filtered noises; the engine's own table still says where
+each one starts and loops.
+
+## 10. BooBass, FL Slayer — revision 1
+
+BooBass: six zones tuned in fourths from E1 (a bass guitar's strings and two more), each a plucked string's partials (position comb, faster decay of high partials), the attack ending on a
+whole cycle that the loop carries on. Level from rendered audio.
+FL Slayer: picks are short filtered noise bursts; the chord modes use a root, fifth, octave, third, fifth, octave shape along the
+neck; the glide lengths are note values. Owner decision D4.
+
+## 11. Effects
+
+Maximus, EQUO, Vocodex, Love Philter, Convolver and Distructor start from states written by `core/NativeSlots.cpp` from the
+documented layouts when FL's default preset is not there. Convolver's embedded room is generated noise under an exponential decay.
+
+## 12. FL's data in builds LYNX has not seen
+
+Where a table lies together in one block, `core/DataLocator.h` looks for that block by a hash of its first 32 bytes and accepts it only
+with the right length and SHA-256: Kepler, Toxic, Slayer. BooBass is found by its six zone roots and read by the same relative
+places with every size checked. DrumSynth is checked by its resource. No FL byte is stored in LYNX; only the hashes are.
+
+## 13. FL Studio's folder (#291)
+
+Settings > Files > FL Studio folder. `LYNX_FL_INSTALL` wins over it. The folder is looked at on a worker thread; a caller on the
+message thread waits at most 0.8 s (a project import 15 s), then goes on with what was found last, and the rest follows when the disk answers.
