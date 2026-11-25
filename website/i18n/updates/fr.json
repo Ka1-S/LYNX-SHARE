@@ -1,7 +1,7 @@
 {
 "u.0.1.31.2.t": "Encore des corrections pour 0.1.31",
 "u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corrige un plantage de la page d'accueil, le clavier de saisie au-dessus des plugins ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.",
-"u.0.1.31.2.f0": "Faire défiler la liste « Commencer un nouveau projet » de la page d'accueil ne fait plus planter LYNX sous Windows.",
+"u.0.1.31.2.f0": "Faire défiler la liste « Commencer un nouveau projet » de la page d'accueil pouvait lire au-delà de la fin de la liste, cause probable d'un plantage signalé sous Windows ; ce n'est plus le cas.",
 "u.0.1.31.2.f1": "Au-dessus d'un plugin ancré, le clavier de saisie joue de nouveau en premier quand le bouton clavier de la fenêtre le demande, comme dans une fenêtre détachée.",
 "u.0.1.31.2.f2": "Avec « Les clips de pattern étirés bouclent leur pattern » activé, les notes dessinées, collées ou déplacées après la première mesure d'un clip s'entendent : le pattern s'allonge pour les contenir.",
 "u.0.1.31.2.f3": "Playlist › « Déplacer les clips d'automation dans les pistes de leurs pistes » garde les valeurs que jouaient les clips, aussi sur de gros projets FL.",

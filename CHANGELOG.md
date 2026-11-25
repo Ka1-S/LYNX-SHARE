@@ -7,13 +7,12 @@ The short version of each release. The full notes, with measurements, known issu
 
 A second hotfix for 0.1.31.
 
-- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX: drawn at a scale
-  that is not a whole number (a display at 125 % / 150 %, LYNX's zoom), a list can also draw the row under its last one,
-  and the template list read a template name past its end there (Discord).
-- Fixed: the typing keyboard played nothing over a docked plugin window (Discord). The keys a plugin leaves unused now
-  play the typing keyboard docked as well as detached; and with the window's keyboard button set to "LYNX first"
-  ("Allow the plugin to handle keystrokes before the host does" unticked) the typing keyboard takes its keys before a
-  VST / VST3 plugin, which never worked for those plugins, docked or detached.
+- Fixed: the start page's "Start a new project" list could read a template name past the end of its list while it was
+  scrolled, at display scales that are not a whole number. It is the likely cause of a crash reported on Windows, which
+  could not be reproduced here (Discord).
+- Fixed: with a plugin window's keyboard button on "LYNX first" ("Allow the plugin to handle keystrokes before the host
+  does" unticked), the typing keyboard never took its keys before a docked VST3 plugin. It does now, docked and detached
+  (Discord: the typing keyboard silent over a docked plugin).
 - Fixed: with "Stretched pattern clips loop their pattern" on, a clip drawn on an instrument track looped its first bar
   for ever: notes drawn, pasted, moved or stretched past a pattern's set length are now heard, as the length grows to
   whole bars that hold them, like a step past it already did; a clip saved that way is mended by the next edit in it
