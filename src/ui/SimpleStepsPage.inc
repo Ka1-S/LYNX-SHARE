@@ -45,6 +45,32 @@ public:
         repaint();
     }
 
+    // Round 190rb (crash report 00d9f624, 0.1.31.1 Linux: a step's tooltip read song.channels[rows[...]]): the song can
+    // change under the page (a project opened, a sound deleted, an undo) a moment before update() runs, and `rows` /
+    // `pattern` then name channels and patterns the song no longer has. Each event and paint reads them again first in
+    // that case (the layout follows on the next message); true when they were still good.
+    bool revalidate()
+    {
+        const auto& song = engine.getSong();
+        const auto good = pattern < (int) song.patterns.size()
+                          && std::all_of (rows.begin(), rows.end(), [&song] (int ch) { return ch >= 0 && ch < (int) song.channels.size(); });
+        if (good)
+            return true;
+        rows = simplesteps::kitRows (song, track);
+        pattern = simplesteps::letterPattern (song, track, letter);
+        if (pattern < 0 && letter != 0)
+            pattern = simplesteps::letterPattern (song, track, letter = 0);
+        steps = pattern >= 0 ? simplesteps::stepCount (song, pattern) : 16;
+        paintRow = velocityRow = velocityStep = -1;
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<StepsPage> (this)] {
+            if (safe != nullptr)
+                safe->update();
+        });
+        return false;
+    }
+    void hoverForCheck (juce::Point<int> p) { mouseMove (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), p.toFloat(), {}, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, this, this, juce::Time::getCurrentTime(), p.toFloat(), juce::Time::getCurrentTime(), 0, false)); }
+    juce::Rectangle<int> cellForCheck (int row, int step) const { return cellBounds (row, step); }
+
     // the main window's 30 Hz tick, only while the page shows (SimpleDock::tickInputMeter)
     void watchPlayback()
     {
@@ -118,6 +144,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        revalidate();
         const auto& song = engine.getSong();
         const auto colourOfTrack = trackColour();
         // ---- the top row
@@ -336,6 +363,7 @@ public:
 
     void mouseMove (const juce::MouseEvent& e) override
     {
+        revalidate();
         setHover (e.getPosition());
         // round 190np: the row-name column's tooltip: the whole name and its typing key
         const auto p = e.getPosition();
@@ -349,6 +377,7 @@ public:
 
     void mouseDown (const juce::MouseEvent& e) override
     {
+        revalidate();
         const auto p = e.getPosition();
         paintRow = -1;
         if (lengthBox.contains (p))
@@ -408,6 +437,7 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        revalidate();
         if (draggingSwing)
             return setSwing (swingAt (e.x));
         if (velocityRow >= 0)
@@ -597,7 +627,7 @@ private:
         else if (part == Part::add)
             setTooltip (tr ("Put this pattern on the track at the song position"));
         else if (part == Part::cell && index / maxSteps < (int) rows.size())
-            setTooltip (juce::String::fromUTF8 (engine.getSong().channels[(std::size_t) rows[(std::size_t) (index / maxSteps)]].name.c_str()));
+            setTooltip (rowName (rows[(std::size_t) (index / maxSteps)]));
         else
             setTooltip ({});
     }
