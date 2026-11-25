@@ -97,20 +97,19 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 | Kilohearts kHs Haas | **Stereo Shaper** | native LYNX SHARE engine · auto-opens | Stereo matrix: how much of each input side reaches left and right, the delay and phase between the channels, width from mono to wide. |
 | Kilohearts kHs Filter | **Facet EQ** | native LYNX SHARE engine · auto-opens | Precision 8-band EQ: bells, shelves, notches and cuts up to 96 dB/oct that keep their analog shape up to Nyquist, zero latency. |
 | Kilohearts kHs 3-Band EQ | **Facet EQ** | native LYNX SHARE engine · auto-opens | Precision 8-band EQ: bells, shelves, notches and cuts up to 96 dB/oct that keep their analog shape up to Nyquist, zero latency. |
-| Kilohearts kHs Formant Filter | **Facet EQ** | native LYNX SHARE engine · auto-opens | Precision 8-band EQ: bells, shelves, notches and cuts up to 96 dB/oct that keep their analog shape up to Nyquist, zero latency. |
 | Kilohearts kHs Gate | **Sentry Gate** | native LYNX SHARE engine · auto-opens | Gate and expander with Classic, Clean, Vocal, Guitar and Upward styles, hold, knee, look-ahead and side-chain filters. |
 | Kilohearts kHs Transient Shaper | **Strike Shaper** | native LYNX SHARE engine · auto-opens | Level-independent transient designer: Attack ±15 dB and Sustain ±24 dB from two envelopes, no threshold, plus output, parallel mix, soft-clip guard and a detector high-pass. |
-| Kilohearts kHs Delay | **Echoform** | native LYNX SHARE engine · auto-opens | Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %. |
 | Kilohearts kHs Gain | **Utility** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Channel Mixer | **Utility** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Stereo | **Utility** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
+| Kilohearts kHs Formant Filter | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Ladder Filter | **Filter** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Nonlinear Filter | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Compressor | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Compactor | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Dynamics | **Compressor** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Limiter | **Limiter** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
-| Kilohearts kHs Clipper | **Fruity Soft Clipper** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
+| Kilohearts kHs Clipper | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Distortion | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts Faturator | **Distortion** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Bitcrush | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
@@ -121,6 +120,7 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 | Kilohearts kHs Phaser | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Flanger | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Reverb | **Reeverb 2** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
+| Kilohearts kHs Delay | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Dual Delay | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Tape Stop | **Pocket Tape Stop** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Kilohearts kHs Comb Filter | **Effector** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
