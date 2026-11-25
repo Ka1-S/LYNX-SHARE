@@ -119,3 +119,16 @@ TEST (sweep190rj_no_empty_song_tip_while_recording)
     const auto line = main.rfind ("if (onboardingOn", at);
     CHECK (line != std::string::npos && main.substr (line, at - line).find ("! engine.isRecording()") != std::string::npos);
 }
+
+// PipeWire: a device's channels were listed in the order of the registry's object ids. A 16-channel source whose
+// ports were announced out of order recorded In 1 = AUX8, In 2 = AUX9, In 3 = AUX0... (seen with a pw-loopback
+// source). The channels are listed in the node's own port order (port.id).
+TEST (sweep190rj_pipewire_channels_in_port_order)
+{
+    const auto pw = i18ntest::readFile ("src/engine/PipeWireDevice.cpp");
+    const auto at = pw.find ("std::vector<std::string> channelsOf (std::uint32_t node, bool sinkInputs) const");
+    CHECK (at != std::string::npos);
+    const auto body = pw.substr (at, pw.find ("\n    }\n", at) - at);
+    CHECK (body.find ("found.emplace_back (p.index, id, p.channel);") != std::string::npos);
+    CHECK (pw.find ("lookup (props, \"port.id\")") != std::string::npos);
+}
