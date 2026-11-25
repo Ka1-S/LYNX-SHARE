@@ -130,3 +130,17 @@ places with every size checked. DrumSynth is checked by its resource. No FL byte
 
 Settings > Files > FL Studio folder. `LYNX_FL_INSTALL` wins over it. The folder is looked at on a worker thread; a caller on the
 message thread waits at most 0.8 s (a project import 15 s), then goes on with what was found last, and the rest follows when the disk answers.
+
+## 14. Harmor, Autogun, the .flp export, FL 2026's own check
+
+- Harmor: a state written from REA_rodada11 §4.1 / REA_rodada34 §1 / REA_rodada75 §1.1 (part A on, part B present and off, the modules in their
+  natural order, 43 articulators, 26 shaping curves, an empty image object with its three plane counts, the global block). FL 2026 refused it at
+  first ("Something went wrong ... loading the plugin (Harmor) state"): the three plane counts were missing.
+- Autogun: Ogun's state (REA_rodada57) and Ogun's bank, 12 dB louder as far as the level knob goes.
+- Kepler Exo: FL keeps the "Kepler-2" engine state in a wrapper (1, 1, size, 0, the state, 68 bytes; REA_rodada167d §1). A state without it
+  crashed the plugin in FL 2026. The bank writes the wrapper with 68 zero bytes (their meaning was not decoded; FL loads and plays it), and the
+  .flp export leaves out a Kepler Exo state without the wrapper (FL starts its default; the report says so).
+- BassDrum and Morphine name their noise by file; LYNX's own noises are taken out of the state on .flp export (FL would ask for a missing file).
+- Check: FL64 /R renders every bank preset in FL 2026 (one project per engine) and LYNX renders the same .flp on FL's data; per preset level
+  differences over 3 dB were explained by free-running phases (LYNX's own spread over 24 starting points) or the preset was dropped
+  (FL-LOAD-TABLE.md in the round folder).
