@@ -132,3 +132,37 @@ TEST (qa190rb_fruit_kick_instrument_frees_its_engine)
     CHECK (grown < 1024 * 1024); // (the leak was ~12 MB for 40 instruments)
 }
 #endif
+
+// Round 190rf (ThreadSanitizer: WorkerPool's `target` read after the round could have ended): a worker switched out
+// between its last count and its wake took the flag of the caller's next wait, and parallelFor returned with indices
+// still running. The pool holds its workers up there; every round must be complete when it returns.
+TEST (qa190rf_worker_pool_never_returns_before_its_round_is_done)
+{
+    lynx::WorkerPool pool (3);
+    pool.setStallForTest (120);
+    std::atomic<int> finished { 0 }, outside { 0 };
+    std::atomic<bool> open { false };
+    int early = 0;
+    for (int r = 0; r < 6000; ++r)
+    {
+        finished.store (0);
+        open.store (true);
+        auto fn = [&, r] (int i) {
+            if (! open.load())
+                outside.fetch_add (1);
+            const auto until = std::chrono::steady_clock::now() + std::chrono::microseconds (i == 0 ? 5 : (r & 3) == 3 ? 120 : 3);
+            while (std::chrono::steady_clock::now() < until) {}
+            finished.fetch_add (1);
+        };
+        pool.parallelFor (4, fn);
+        if (finished.load() != 4)
+        {
+            ++early;
+            while (finished.load() != 4) // (the lambda must outlive its indices)
+                std::this_thread::yield();
+        }
+        open.store (false);
+    }
+    CHECK (early == 0);
+    CHECK (outside.load() == 0);
+}

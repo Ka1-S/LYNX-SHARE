@@ -82,7 +82,7 @@ public:
 
     // The caller's block is finished (no more parallelFor until the next audio callback): spinning workers go to
     // sleep now instead of polling until spinMicros runs out. Wait-free; the next parallelFor wakes them as usual.
-    void park() noexcept { parkedGeneration.store (generation, std::memory_order_release); }
+    void park() noexcept { parkedGeneration.store (generation.load (std::memory_order_relaxed), std::memory_order_release); }
 
     // How long a worker keeps polling for new work after finishing before it sleeps (microseconds). REA round 116
     // measured 250 → 60 on Windows (FL Studio ASIO, 256 samples, Thief / Exoplanet playing): process CPU 106/114 % →
@@ -174,6 +174,10 @@ public:
     std::uint64_t indicesRunByWorkers() const noexcept { return byWorkers.load (std::memory_order_relaxed); }
     std::uint64_t wakeUps() const noexcept { return wokenUp.load (std::memory_order_relaxed); }
 
+    // Tests (round 190rf): a worker waits this long between its last count of a round and the rest of the round's end
+    // (a thread switched out there by the system)
+    void setStallForTest (int micros) noexcept { testStallMicros.store (micros, std::memory_order_relaxed); }
+
 private:
     using Call = void (*) (void*, int);
     using ReadyFn = bool (*) (void*);
@@ -206,6 +210,7 @@ private:
     std::atomic<bool> quit { false };
     alignas (64) std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
     std::atomic<int> wakeLimit { -1 };            // round 190kr: setWakeLimit
+    std::atomic<int> testStallMicros { 0 };       // round 190rf: setStallForTest
     // the generation (see `ticket`) of the last parallelFor before park(); while the ticket still carries it,
     // the pool is parked and a worker without work sleeps instead of spinning
     std::atomic<std::uint64_t> parkedGeneration { ~std::uint64_t (0) };
@@ -219,12 +224,14 @@ private:
     alignas (64) std::atomic<std::uint64_t> ticket { 0 };
     alignas (64) std::atomic<int> done { 0 };
     // Round 190gq (REA 190hb: FL's caller never spins): the caller spins callerSpinMicros for the last index, then sleeps
-    // on `finished`; the index that completes the round wakes it (callerWaiting: one wake per wait, never a stale one)
+    // on `finished`; the index that completes the round wakes it (callerWaiting: one wake per wait; a held-up worker's
+    // late one is possible and only makes the caller look again, round 190rf)
     std::atomic<bool> callerWaiting { false };
     int target = 0; // the round's count (written before the ticket)
     std::unique_ptr<OsSemaphore> finished = std::make_unique<OsSemaphore>();
     static constexpr int callerSpinMicros = 20;
-    alignas (64) std::uint64_t generation = 0; // caller thread only
+    // counted up by the round's caller; park() may come from the other of render-ahead's two callers (round 190rf, TSan)
+    alignas (64) std::atomic<std::uint64_t> generation { 0 };
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
     // round toolchain190gt's thread refresh: read by every worker loop, written once per request: a line of its own
     // (rollup 0.1.28, with 190gq's layout)
