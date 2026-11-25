@@ -764,6 +764,7 @@ private:
     void showTypingPianoMenu();
     int reloadTypingLayouts (const std::string& keep); // issue #270: the user's .scr layouts read again
     static juce::File typingLayoutsFolder();
+    bool typingLayoutsRead = false; // (the .scr folders were read; false: the next typing keyboard menu reads them)
     juce::PopupMenu buildTypingPianoMenu(); // (what showTypingPianoMenu shows; also the Options / View menus' submenu)
     // the metronome volume knob in a callout under the metronome button
     void showMetronomeVolume();

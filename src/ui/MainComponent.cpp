@@ -6908,11 +6908,13 @@ int MainComponent::reloadTypingLayouts (const std::string& keep)
         }
     }
     keys::typingpiano::setUserLayouts (files);
+    typingLayoutsRead = true;
     return keys::typingpiano::layoutIndex (keep);
 }
 
 void MainComponent::showTypingPianoMenu()
 {
+    typingLayoutsRead = false; // (issue #270: a layout file added since the last time is listed)
     buildTypingPianoMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
 }
 
@@ -6925,7 +6927,10 @@ juce::PopupMenu MainComponent::buildTypingPianoMenu()
     // window of 1280-1440 px, whose record panel has no room for the button (round 170e3), still reaches it.)
     // Round 190qo (issue #270): after FL's layouts, the .scr files of FL's folder and LYNX's (as FL lists its folder's files),
     // then LYNX's chord layouts for FL's other seven-note scales, and a way to the folder for your own files.
-    typingLayout = reloadTypingLayouts (keys::typingpiano::layoutName (typingLayout));
+    // (rollup 0.1.32 step 3: the folders are read when the button's menu opens, or once for the Options / View submenus: the
+    // palette builds every menu of the bar each time it opens, and reading FL's folder there took up to 1.8 s)
+    if (! typingLayoutsRead)
+        typingLayout = reloadTypingLayouts (keys::typingpiano::layoutName (typingLayout));
     static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Root note"));
@@ -6974,7 +6979,8 @@ juce::PopupMenu MainComponent::buildTypingPianoMenu()
     menu.addSeparator();
     const auto lynxTicked = keys::typingpiano::layoutSource (typingLayout) == Source::lynx;
     menu.addSubMenu (tr ("More scales with chords (LYNX)"), lynxLayouts, true, juce::Image(), lynxTicked);
-    menu.addItem (tr ("Open the folder for your own layouts..."), [] {
+    menu.addItem (tr ("Open the folder for your own layouts..."), [this] {
+        typingLayoutsRead = false; // (files are about to be added: the next menu reads the folders again)
         const auto folder = typingLayoutsFolder();
         folder.createDirectory();
         folder.startAsProcess();
