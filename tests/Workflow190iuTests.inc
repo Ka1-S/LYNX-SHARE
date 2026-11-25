@@ -83,7 +83,11 @@ TEST (workflow190iu_temporary_tool_hold_tap_repeat_and_mouse)
 TEST (workflow190iu_midi_drop_on_the_playlist_pattern_layout)
 {
     using namespace lynx;
-    CHECK (! mididrop::playlistDrop() && mididrop::playlistTakes (true) && ! mididrop::playlistTakes (false));
+    // (on by default since 0.1.31.2, #287; off, only the Live-style arrangement takes them)
+    CHECK (mididrop::playlistDrop() && mididrop::playlistTakes (true) && mididrop::playlistTakes (false));
+    mididrop::setPlaylistDrop (false);
+    CHECK (mididrop::playlistTakes (true) && ! mididrop::playlistTakes (false));
+    mididrop::setPlaylistDrop (true);
     // an unassigned track: one pattern named after the file, a new channel per MIDI track, the clip at the drop
     {
         auto s = Song::makeDefault();

@@ -36,9 +36,11 @@
 
 namespace lynx::mididrop
 {
+// (on by default since 0.1.31.2, the owner's choice on #287: FL ignores a .mid dropped on its Playlist, so no FL gesture
+// changes; Settings › LYNX extras turns it off)
 inline std::atomic<bool>& playlistDropFlag() noexcept
 {
-    static std::atomic<bool> on { false };
+    static std::atomic<bool> on { true };
     return on;
 }
 inline bool playlistDrop() noexcept { return playlistDropFlag().load (std::memory_order_relaxed); }
