@@ -13076,3 +13076,7 @@ countries: tr
 "Tab completes the Browser's search" = "Tab, Browser aramasını tamamlar"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Browser aramasına yazarken bir etiketin (#word) veya klasör adının geri kalanı metnin ardında gri görünür ve Tab onu kabul eder. Kapalı: hiçbir şey tamamlanmaz. Tek anahtarı burada."
 "Every LYNX extra at its default" = "Her LYNX ekstrası varsayılanında"
+"Transpose..." = "Transpoze et..."
+"Transpose selected..." = "Seçilenleri transpoze et..."
+"Save sample selection" = "Örnek seçimini kaydet"
+"Right-click a menu item to choose it and keep the menu open" = "Menü öğesine sağ tıklayınca öğe seçilir ve menü açık kalır"

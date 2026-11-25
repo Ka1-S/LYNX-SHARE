@@ -182,7 +182,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | G8 | Tempo: drag to change; fine digits; right-click for type-in, tap tempo, nudge, presets, half speed, automation | [DOC][tb] |
 | G9 | **Global snap** in the toolbar, used by every editor whose own snap is set to "Main"; it also sets record quantise; Backspace toggles it; Alt while dragging bypasses snap | [DOC][tb-snap] [DOC][sc] |
 | G10 | Right-click on snap sets the default note length | [DOC][tb-snap] |
-| G11 | Pattern selector: +/− (numpad) next/previous, numpad 1–9 picks a pattern, right-click lists all; F4 next empty pattern; F2 rename/colour; Alt+C clone; Shift+Ctrl+Ins insert; Del delete; "split by channel" | [DOC][tb] [DOC][pat-menu] [DOC][sc] |
+| G11 | Pattern selector: +/− (numpad) next/previous, numpad 1–9 picks a pattern, right-click lists all; F4 next empty pattern; F2 rename/colour; Shift+Ctrl+C clone; Shift+Ctrl+Ins insert; Del delete; "split by channel" | [DOC][tb] [DOC][pat-menu] [DOC][sc] |
 | G12 | Hint bar: hover description + live value + capability icons | [DOC][tb] |
 | G13 | Undo/redo with a clickable history list; maximum levels; knob tweaks optionally undoable | [DOC][edit] [DOC][envgen] |
 | G14 | Ctrl+N saves a *new version* (MyProj_2…), not a new project; Ctrl+S/Ctrl+Shift+S save/save-as; Ctrl+R export WAV; Alt+0..9 recent files | [DOC][sc] [DOC][file] |
@@ -579,7 +579,7 @@ may keep it. All key bindings should live in one remappable table (see P1-14).
 Status: items 1, 4, 5, 6, 7, 8, 14 and 15 were built on `feature/wf-shell`; items 2, 3, 9–13 on `feature/wf-editors` (merged into
 `feature/wf-shell`). Remaining gaps inside the shell items: no right-click on Stop (remember seek time), tempo nudge or
 temporary half speed; no channel zip/unzip. Closed on `feature/wf-p2`: detached windows snap, F8 opens the quick-add
-palette, numpad 1–9 picks patterns, patterns move up/down (Shift+Ctrl+Up/Down) and clone (Alt+C), channels sort and
+palette, numpad 1–9 picks patterns, patterns move up/down (Shift+Ctrl+Up/Down) and clone (Ctrl+Shift+C), channels sort and
 select-unused, ripple editing and Shift+drag time-selection move/copy.
 
 1. **Workspace desktop (G1, G3, G4, G5, G17).** Replace the tab bar with a *workspace*: Playlist, Channel

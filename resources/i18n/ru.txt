@@ -13076,3 +13076,7 @@ countries: ru by kz
 "Tab completes the Browser's search" = "Tab дополняет поиск в Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Пока вы вводите текст в поиске Browser, остаток тега (#word) или имени папки показывается серым после текста, и Tab принимает его. Выключено: ничего не дополняется. Единственный переключатель здесь."
 "Every LYNX extra at its default" = "Каждое дополнение LYNX по умолчанию"
+"Transpose..." = "Транспонировать..."
+"Transpose selected..." = "Транспонировать выбранные..."
+"Save sample selection" = "Сохранить выделение сэмпла"
+"Right-click a menu item to choose it and keep the menu open" = "Щёлкните пункт меню правой кнопкой, чтобы выбрать его и оставить меню открытым"

@@ -18141,4 +18141,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
 #include "TrialMark190qtTests.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)
 #include "Backlog190rcTests.inc" // round 190rc (0.1.32): #285 split at the song position, #286 the project folder, ghosts in Track-only / Simple
+#include "Community190riTests.inc" // round 190ri (0.1.32): clone names, transpose, rendered mixer tracks, imported data folders
 #include "Sweep190reTests.inc" // round 190re (0.1.32 regression sweep): the defects it found and fixed

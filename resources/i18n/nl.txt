@@ -13076,3 +13076,7 @@ countries: nl be
 "Tab completes the Browser's search" = "Tab vult de zoekopdracht van de Browser aan"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Terwijl je in de zoekbalk van de Browser typt, verschijnt de rest van een tag (#word) of mapnaam grijs na de tekst, en Tab neemt die over. Uit: er wordt niets aangevuld. De enige schakelaar ervoor is hier."
 "Every LYNX extra at its default" = "Elke LYNX-extra op de standaardwaarde"
+"Transpose..." = "Transponeren..."
+"Transpose selected..." = "Selectie transponeren..."
+"Save sample selection" = "Sampleselectie opslaan"
+"Right-click a menu item to choose it and keep the menu open" = "Rechtsklik op een menu-item om het te kiezen en het menu open te houden"

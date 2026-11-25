@@ -13076,3 +13076,7 @@ countries: cn sg
 "Tab completes the Browser's search" = "Tab 补全浏览器搜索"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "在浏览器搜索中输入时，标签（#word）或文件夹名称的其余部分会以灰色显示在文字后面，按 Tab 即可接受。关闭：不补全任何内容。唯一的开关在这里。"
 "Every LYNX extra at its default" = "每个 LYNX 附加功能恢复默认"
+"Transpose..." = "移调..."
+"Transpose selected..." = "移调所选..."
+"Save sample selection" = "保存采样选区"
+"Right-click a menu item to choose it and keep the menu open" = "右键点击菜单项可选中它并保持菜单打开"

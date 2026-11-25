@@ -13229,3 +13229,7 @@ countries: br
 "Tab completes the Browser's search" = "Tab completa a busca do Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Enquanto você digita na busca do Browser, o resto de uma tag (#word) ou de um nome de pasta aparece em cinza depois do texto, e Tab o aceita. Desligado: nada é completado. O único botão para isso está aqui."
 "Every LYNX extra at its default" = "Cada extra do LYNX no seu padrão"
+"Transpose..." = "Transpor..."
+"Transpose selected..." = "Transpor selecionados..."
+"Save sample selection" = "Salvar a seleção da amostra"
+"Right-click a menu item to choose it and keep the menu open" = "Clique com o botão direito em um item do menu para escolhê-lo e manter o menu aberto"
