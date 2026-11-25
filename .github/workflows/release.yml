@@ -415,6 +415,20 @@ jobs:
       - name: Package
         run: ./scripts/package-linux.sh build/LYNX_artefacts/Release/LYNX "$LABEL" dist Demo.lynx
 
+      # round 190rb: the package strips LYNX, so a Linux crash file's LYNX+offset frames had no names (the 0.1.29-0.1.31
+      # reports could not be mapped). The symbol table of this same build, kept apart: `addr2line -f -C -e
+      # LYNX-linux-x86_64.debug 0x<offset>` names a frame (the offsets are the same in the stripped package)
+      - name: Keep the symbols
+        run: objcopy --only-keep-debug build/LYNX_artefacts/Release/LYNX LYNX-linux-x86_64.debug
+
+      - name: Upload symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-symbols-linux-x86_64
+          path: LYNX-linux-x86_64.debug
+          retention-days: 90
+          if-no-files-found: warn
+
       # The catalog runs the AppImage offline for ~11 s and expects a window: start it without network (when the
       # container allows a network namespace), check that it is still running and shows a top-level window.
       - name: AppImage starts offline and shows its window
