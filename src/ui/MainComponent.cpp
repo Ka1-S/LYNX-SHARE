@@ -6455,9 +6455,16 @@ juce::PopupMenu MainComponent::makeMetronomeMenu()
 
 void MainComponent::showTypingPianoMenu()
 {
+    buildTypingPianoMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
+}
+
+juce::PopupMenu MainComponent::buildTypingPianoMenu()
+{
     // FL 2026's right-click on the typing keyboard button (KbToMIDIPopup, measured round 168t2): Root note C..B,
     // Octave 2..6 (where the Z row starts), Options › Reset, Layout (FL's .scr names and order, core/KeyMap.h).
     // FL's Reset (KbToMIDIResetClick 0x121ac70) releases the held notes and puts Root note C, Octave 4 and Layout Piano back.
+    // (Hotfix 0.1.31.2, round 190ra: also a submenu of the Options and View menus' "Typing keyboard to piano", where a
+    // window of 1280-1440 px, whose record panel has no room for the button (round 170e3), still reaches it.)
     static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Root note"));
@@ -6483,7 +6490,7 @@ void MainComponent::showTypingPianoMenu()
             typingLayout = l;
             saveUiSettings();
         });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&typingPianoButton));
+    return menu;
 }
 
 void MainComponent::dumpScoreLog (int minutes)
@@ -11447,6 +11454,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         if (compact)
             rare.addSeparator();
         rare.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
+        rare.addSubMenu (tr ("Typing keyboard settings"), buildTypingPianoMenu()); // (round 190ra: its button's right-click menu)
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
         if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
             menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
@@ -11511,6 +11519,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         // FL's Options menu, "Switches" section (TFruityLoopsMainForm DFM: KBToMIDIMenu = OptionsTypingKbToPianoAction,
         // "Typing keyboard to piano", Ctrl+T, checkable, right before Metronome; round 168t, issue #34)
         menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
+        // LYNX (hotfix 0.1.31.2, round 190ra; #270): the typing keyboard button's right-click menu (Root note, Octave,
+        // Layout) here too: a window of 1280-1440 px has no room for the button, and a right-click on this item only
+        // toggles it
+        menu.addSubMenu (tr ("Typing keyboard settings"), buildTypingPianoMenu());
         menu.addItem (tr ("Metronome") + shortcutText ("transport.metronome"), true, engine.getTransport().metronome.load(), [this] {
             metronomeButton.setToggleState (! metronomeButton.getToggleState(), juce::sendNotification);
         });

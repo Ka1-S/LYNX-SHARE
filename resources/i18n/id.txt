@@ -12658,3 +12658,4 @@ countries: id
 "MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below" = "Klip MIDI: [LMB] klik atau seret untuk menggambar satu di trek ini  [2xLMB] pada klip: edit notnya di bawah"
 "Move this rule up (the first matching rule wins)" = "Pindahkan aturan ini ke atas (aturan pertama yang cocok yang berlaku)"
 "Move this rule down" = "Pindahkan aturan ini ke bawah"
+"Typing keyboard settings" = "Pengaturan keyboard ketik ke piano"
