@@ -1,6 +1,7 @@
 // Round 190rh (QUEUE-0.1.33 item 78): FL's native engines without FL Studio installed (core/NativeData.h) — LYNX's own
 // data sets, the presets of the new banks, which set a channel plays and that it never changes by itself.
 
+#include "core/FlInstall.h"
 #include "core/LynxBanks.h"
 #include "core/NativeData.h"
 #include "core/NativeEngines.h"
@@ -229,4 +230,90 @@ TEST (noflnatives190rh_flp_import_without_fl)
     for (const auto& [line, n] : report.notReproduced)
         said = said || line.find ("Transistor Bass") != std::string::npos;
     CHECK (said && report.unsupported.empty());
+}
+
+// Settings › Files › FL Studio folder (issue #291): what a folder is, on drives mounted with odd names and permissions
+TEST (noflnatives190rh_fl_folder)
+{
+    using namespace lynx;
+    namespace fs = std::filesystem;
+    using flinstall::Status;
+    const auto root = fs::temp_directory_path() / ("lynx-flfolder-" + processTempTag());
+    fs::create_directories (root);
+    const auto maker = root / "windows" / "program files" / "IMAGE-LINE"; // (a mount that shows other capitals)
+    const auto fl25 = maker / "FL Studio 2025", fl26 = maker / "FL Studio 2026";
+    fs::create_directories (fl25 / "data");
+    fs::create_directories (fl25 / "PLUGINS" / "fruity");
+    std::ofstream (fl25 / "data" / "x.txt") << "x";
+    const auto is = [] (const fs::path& p, const fs::path& install) {
+        const auto c = flinstall::check (p.string());
+        return c.status == Status::ok && fs::equivalent (c.folder, install);
+    };
+    // the folder, its program, one inside, "Image-Line", the drive; a trailing slash
+    CHECK (is (fl25, fl25) && is (fl25 / "data", fl25) && is (fl25 / "PLUGINS" / "fruity", fl25) && is (maker, fl25) && is (root / "windows", fl25));
+    CHECK (flinstall::check (fl25.string() + "/").status == Status::ok);
+    std::ofstream (fl25 / "FL64.exe") << "not a program";
+    CHECK (is (fl25 / "FL64.exe", fl25) && flinstall::check (fl25.string()).version.empty());
+    // two installations: the user chooses
+    fs::create_directories (fl26 / "Data");
+    fs::create_directories (fl26 / "Plugins" / "Fruity");
+    const auto two = flinstall::check (maker.string());
+    CHECK (two.status == Status::several && two.candidates.size() == 2 && two.folder.empty());
+    CHECK (is (fl26, fl26));
+    // found on mounted drives (/media/<user>/<drive> too), nothing outside Program Files
+    const auto media = root / "media" / "me";
+    fs::create_directories (media / "Drive" / "Program Files" / "Image-Line" / "FL Studio 21" / "Data");
+    fs::create_directories (media / "Drive" / "Program Files" / "Image-Line" / "FL Studio 21" / "Plugins" / "Fruity");
+    CHECK (flinstall::onMountedDrives ({ root.string() }).size() == 2);
+    CHECK (flinstall::onMountedDrives ({ (root / "media").string() }).size() == 1);
+    CHECK (flinstall::onMountedDrives ({ (root / "nothing").string() }).empty());
+    // not an installation
+    fs::create_directories (root / "Documents" / "Presets");
+    fs::create_directories (root / "Documents" / "Settings");
+    CHECK (flinstall::check ((root / "Documents").string()).status == Status::userData);
+    CHECK (flinstall::check ((root / "media" / "me").string()).status == Status::notFl);
+    CHECK (flinstall::check ((root / "gone").string()).status == Status::missing && flinstall::check ("").status == Status::missing);
+    // the program's version, as Windows' resource holds it
+    std::vector<unsigned char> exe (64, 0);
+    const unsigned char info[] = { 0xBD, 0x04, 0xEF, 0xFE, 0, 0, 1, 0, 1, 0, 26, 0, 0x16, 0x16, 7, 0 };
+    std::copy (std::begin (info), std::end (info), exe.begin() + 16);
+    CHECK (flinstall::versionOf (exe) == "26.1.7.5654" && flinstall::versionOf ({}).empty());
+
+   #if ! defined(_WIN32)
+    const auto mode = [] (const fs::path& p, int bits) {
+        std::error_code ec;
+        fs::permissions (p, (fs::perms) bits, ec);
+        return ! ec;
+    };
+    // a read-only drive: an installation like any other, and the check writes nothing
+    mode (fl25 / "data", 0555), mode (fl25, 0555);
+    const auto before = fs::last_write_time (fl25);
+    CHECK (is (fl25, fl25) && fs::last_write_time (fl25) == before);
+    mode (fl25, 0755);
+    // (root reads everything: permissions say nothing there)
+    mode (fl25 / "data", 0);
+    std::error_code ec;
+    fs::directory_iterator probe (fl25 / "data", ec);
+    if (ec)
+    {
+        const auto partly = flinstall::check (fl25.string());
+        CHECK (partly.status == Status::ok && partly.missing == "Data"); // its Data can't be listed
+        mode (fl25 / "data", 0755);
+        for (const auto bits : { 0, 0111, 0444 }) // nothing; no listing; a listing of names nobody may look at
+        {
+            mode (fl25, bits);
+            CHECK (flinstall::check (fl25.string()).status == Status::notReadable);
+            mode (fl25, 0755);
+        }
+        mode (fl25, 0);
+        CHECK (flinstall::check ((fl25 / "data").string()).status == Status::notReadable);
+        mode (fl25, 0755);
+        mode (maker, 0); // (a folder on the way)
+        CHECK (flinstall::check (fl25.string()).status == Status::notReadable);
+        CHECK (flinstall::onMountedDrives ({ root.string() }).empty());
+        mode (maker, 0755);
+    }
+    mode (fl25 / "data", 0755), mode (fl25, 0755), mode (maker, 0755);
+   #endif
+    fs::remove_all (root, ec);
 }

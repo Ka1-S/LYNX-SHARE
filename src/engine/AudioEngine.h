@@ -68,7 +68,10 @@ class AudioLogger;
 // Folders of the most recent FL Studio installation (empty if none).
 FlPathRoots findFlStudioRoots();
 // The user's FL installation as the native FL engines read it (round 142): its folders and this PC's file system
-const natives::FlAccess& flStudioAccess(); // (found once per session)
+const natives::FlAccess& flStudioAccess(); // (found once, and again after refreshFlStudioAccess)
+// Settings › Files › FL Studio folder changed: the next flStudioAccess() is the new installation. References taken before
+// stay valid (and keep the old one).
+void refreshFlStudioAccess();
 
 // Start-up trace hook (round 165i): Main's LYNX_TRACE_STARTUP log receives the engine's own steps (null: off)
 inline void (*startupMark) (const char* step) = nullptr;

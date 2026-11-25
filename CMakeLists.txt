@@ -310,6 +310,7 @@ add_library(lynx_core STATIC
     src/core/HelixBank.cpp
     src/core/LynxModelBank.cpp
     src/core/ModelParams.cpp
+    src/core/FlInstall.cpp
     src/core/NativeData.cpp
     src/core/NativeDataSets.cpp
     src/core/TransistorBassBank.cpp

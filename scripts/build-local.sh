@@ -131,7 +131,7 @@ CORE="$CORE src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaContr
 CORE="$CORE src/core/LinkFormula.cpp"
 CORE="$CORE src/core/VoiceShift.cpp"
 # FL engines usable in native projects (round 142, issue #5)
-CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/TransistorBassBank.cpp src/core/MiniSynthBank.cpp src/core/SawerBank.cpp src/core/BassDrumBank.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp"
+CORE="$CORE src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/FlInstall.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/TransistorBassBank.cpp src/core/MiniSynthBank.cpp src/core/SawerBank.cpp src/core/BassDrumBank.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp"
 # FL's Layer channel and the round 164 controllers
 CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/core/VoltageController.cpp"
 # crash / freeze reports: consent, anonymiser, report JSON, GitHub issue URL (round 159)

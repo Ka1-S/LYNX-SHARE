@@ -114,6 +114,14 @@ enum class DataSource
 DataSource dataSource (const ChannelDef& channel);
 // The file (or folder) of this computer's FL installation the engine would read, when it is there and usable; "" otherwise
 std::string flDataPath (InstrumentKind kind, const FlAccess& fl);
+// Settings › Files › FL Studio folder: the engines that read data of FL's, and whether an installation has data this LYNX can
+// read for them (engine DLLs are checked as the engines check them: a build LYNX does not know counts as not readable)
+struct FlDataLine
+{
+    const char* name;
+    bool there = false, readable = false;
+};
+std::vector<FlDataLine> flDataReport (const FlAccess& fl);
 // Why an engine is not available here, for the menus ("needs FL Studio 2025 or 2026 for its samples"): English, "" when
 // it is available or the reason is only "FL Studio"
 std::string needsText (InstrumentKind kind);

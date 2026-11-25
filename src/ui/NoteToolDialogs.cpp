@@ -48,11 +48,7 @@ juce::String stepsText (double steps)
 
 // --- the user's FL Studio data (score templates, chord presets), read only -----------------------
 
-const FlStudioInstall& flInstall()
-{
-    static const FlStudioInstall fl = findFlStudio();
-    return fl;
-}
+FlStudioInstall flInstall() { return findFlStudio(); } // (round 190rh: Settings can change it)
 
 juce::File flData (const juce::String& relative)
 {

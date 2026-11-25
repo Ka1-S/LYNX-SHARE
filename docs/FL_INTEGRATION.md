@@ -55,4 +55,11 @@ project (the file name, then with its last folders: `Samples\kick.wav`). The rep
 Read-only: no FL file or registry key is written. Encrypted content (FLEX packs, licensed data) is never opened;
 the plugin database holds no licensed content. No Image-Line file is committed (tests use synthetic fixtures).
 Test hook: `LYNX_FL_USER_DATA=<folder>` makes LYNX SHARE read a synthetic user data folder instead of FL's (used to check the database path end to end).
+**Choosing the installation** (issue #291): Settings › Files › *FL Studio folder* (Browse, Detect, Clear) for an installation
+LYNX SHARE does not find itself, e.g. a Windows drive mounted on Linux. The folder may be the installation, one inside it, or the
+`Image-Line` folder; the page says what was found (version, which engines have data) or why a folder can't be used. Order:
+`LYNX_FL_INSTALL` (a variable for one run), the setting, FL's registry key, the usual folders. A variable or setting whose folder
+is not there is passed over and kept. New instruments, presets and the Browser use a change at once; instruments of the open
+project follow when it is opened again and the metronome's sounds after a restart. LYNX SHARE only reads there.
+
 Test hook: `LYNX_NO_FL=1` makes LYNX SHARE behave as on a computer without FL Studio (no installation, no user data), even where FL is installed; `0` or unset keeps the FL found.

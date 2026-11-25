@@ -14,6 +14,8 @@
 #include "core/HardcoreFx.h"
 #include "core/Harmless.h"
 #include "core/HarmlessFx.h"
+#include "core/DrumSynthLive.h"
+#include "core/Kepler.h"
 #include "core/LynxBanks.h"
 #include "core/MidiOut.h"
 #include "core/MiniSynth.h"
@@ -21,7 +23,9 @@
 #include "core/NativeData.h"
 #include "core/PhysicalModels.h"
 #include "core/Sawer.h"
+#include "core/Slayer.h"
 #include "core/Slicex.h"
+#include "core/Toxic.h"
 #include "core/TransistorBass.h"
 #include "flp/Flp.h"
 
@@ -437,6 +441,41 @@ std::string flDataPath (InstrumentKind kind, const FlAccess& access)
         return {};
     const auto path = resolveFlPath (std::string ("%FLStudioFactoryData%\\") + data->path, access.roots);
     return ! path.empty() && data->usable (path) ? path : std::string();
+}
+
+std::vector<FlDataLine> flDataReport (const FlAccess& access)
+{
+    struct Row
+    {
+        const char* name;
+        const char* path; // a file under the installation
+        bool (*usable) (const std::string&); // null: its being there is enough
+    };
+    static const Row rows[] = {
+        { "Transistor Bass", "Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", &transistorBassDllUsable },
+        { "Kepler", "Plugins\\Fruity\\Generators\\Kepler\\engine_x64.dll", [] (const std::string& p) { return keplerDllUsable (p) && ! keplerExoDllUsable (p); } },
+        { "Kepler Exo", "Plugins\\Fruity\\Generators\\Kepler Exo\\engine_x64.dll", &keplerExoDllUsable },
+        { "FL Slayer", "Plugins\\Fruity\\Generators\\FL Slayer\\Slayer_Engine.dll", &slayerDllUsable },
+        { "BooBass", "Plugins\\Fruity\\Generators\\BooBass\\BooBass_Eng_x64.dll", &booBassDllUsable },
+        { "Fruity DrumSynth Live", "Plugins\\Fruity\\Generators\\Fruity DrumSynth Live\\drumsynth_eng_x64.dll", &drumSynthDllUsable },
+        { "Toxic Biohazard", "Plugins\\Fruity\\Generators\\Toxic Biohazard\\Toxic Biohazard_x64.dll", &toxicDllUsable },
+        { "MiniSynth", "Plugins\\Fruity\\Generators\\Minisynth\\oscdata.dat", &miniSynthDataUsable },
+        { "Sawer", "Plugins\\Fruity\\Generators\\Sawer\\data.saw", [] (const std::string& p) { return ! sawerReadTable (p).empty(); } },
+        { "BassDrum", "Plugins\\Fruity\\Generators\\BassDrum\\sounddata", nullptr },
+        { "GMS", "Plugins\\Fruity\\Generators\\GMS\\Synth Waves\\Saw.wav", nullptr },
+        { "FL Keys", "Plugins\\Fruity\\Generators\\FL Keys\\Wavtables\\default.wti", nullptr },
+    };
+    std::vector<FlDataLine> out;
+    for (const auto& r : rows)
+    {
+        FlDataLine line { r.name };
+        const auto path = resolveFlPath (std::string ("%FLStudioFactoryData%\\") + r.path, access.roots);
+        line.there = ! path.empty() && access.fileExists && access.fileExists (path);
+        if (line.there) // (a file this user may not read is there and not readable)
+            line.readable = r.usable != nullptr ? r.usable (path) : access.readFile && ! access.readFile (path).empty();
+        out.push_back (line);
+    }
+    return out;
 }
 
 std::string needsText (InstrumentKind kind)

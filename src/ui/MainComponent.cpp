@@ -6892,7 +6892,7 @@ juce::File MainComponent::typingLayoutsFolder()
 int MainComponent::reloadTypingLayouts (const std::string& keep)
 {
     std::vector<keys::typingpiano::UserLayout> files;
-    static const auto flFolder = findFlStudio().installDir.getChildFile ("System").getChildFile ("Config").getChildFile ("Typing to piano");
+    const auto flFolder = findFlStudio().installDir.getChildFile ("System").getChildFile ("Config").getChildFile ("Typing to piano");
     for (const auto& folder : { flFolder, typingLayoutsFolder() })
     {
         if (folder == juce::File() || ! folder.isDirectory())

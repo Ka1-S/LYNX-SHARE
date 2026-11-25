@@ -1,5 +1,10 @@
 #include "engine/FlStudio.h"
 
+#include "core/FlInstall.h"
+#include "core/FlpImport.h"
+#include "engine/AudioEngine.h"
+#include "platform/Paths.h"
+
 namespace lynx
 {
 namespace
@@ -55,6 +60,51 @@ juce::File existingFolder (const juce::String& path)
 }
 } // namespace
 
+namespace
+{
+// Data next to the installation's program (its name ignoring case: a Windows drive mounted on Linux)
+bool hasData (const juce::File& install)
+{
+    if (install == juce::File())
+        return false;
+    if (install.getChildFile ("Data").isDirectory())
+        return true;
+   #if JUCE_WINDOWS
+    return false;
+   #else
+    return juce::File (juce::String::fromUTF8 (existingPathIgnoringCase (install.getChildFile ("Data").getFullPathName().toStdString()).c_str())).isDirectory();
+   #endif
+}
+
+juce::File settingFile() { return platform::settingsFile ("fl-studio-folder.txt"); }
+} // namespace
+
+juce::String flFolderSetting() { return settingFile().loadFileAsString().trim(); }
+
+bool setFlFolderSetting (const juce::File& folder)
+{
+    const auto file = settingFile();
+    const auto saved = folder == juce::File() ? (! file.existsAsFile() || file.deleteFile())
+                                              : (file.getParentDirectory().createDirectory().wasOk() && file.replaceWithText (folder.getFullPathName()));
+    refreshFlStudioAccess();
+    return saved;
+}
+
+juce::String flFolderVariable() { return juce::SystemStats::getEnvironmentVariable ("LYNX_FL_INSTALL", {}).trim(); }
+
+juce::StringArray detectFlFolders()
+{
+    juce::StringArray out;
+    if (const auto folder = existingFolder (registryValue ("Software\\Image-Line\\Shared\\Paths\\Install path")); hasData (folder))
+        out.add (folder.getFullPathName());
+    for (const auto& dir : flStudioCandidates())
+        if (hasData (dir))
+            out.addIfNotAlreadyThere (dir.getFullPathName());
+    for (const auto& dir : flinstall::onMountedDrives())
+        out.addIfNotAlreadyThere (juce::String::fromUTF8 (dir.c_str()));
+    return out;
+}
+
 FlStudioInstall findFlStudio()
 {
     FlStudioInstall fl;
@@ -65,15 +115,26 @@ FlStudioInstall findFlStudio()
 
     // installation: where FL says it is, else the newest "FL Studio*" under Program Files\Image-Line
     // LYNX_FL_INSTALL=<folder> points at an installation anywhere (another Wine prefix, a copy, tests)
-    fl.installDir = existingFolder (juce::SystemStats::getEnvironmentVariable ("LYNX_FL_INSTALL", {}));
-    if (! fl.installDir.getChildFile ("Data").isDirectory())
+    fl.installDir = existingFolder (flFolderVariable());
+    fl.source = FlStudioInstall::Source::variable;
+    if (! hasData (fl.installDir)) // Settings › Files › FL Studio folder (round 190rh, issue #291)
+    {
+        fl.installDir = existingFolder (flFolderSetting());
+        fl.source = FlStudioInstall::Source::setting;
+    }
+    if (! hasData (fl.installDir))
+    {
         fl.installDir = existingFolder (registryValue ("Software\\Image-Line\\Shared\\Paths\\Install path"));
-    if (! fl.installDir.getChildFile ("Data").isDirectory())
+        fl.source = FlStudioInstall::Source::detected;
+    }
+    if (! hasData (fl.installDir))
     {
         fl.installDir = juce::File();
         for (const auto& dir : flStudioCandidates())
-            if (dir.getChildFile ("Data").isDirectory() && dir.getFileName() > fl.installDir.getFileName())
+            if (hasData (dir) && dir.getFileName() > fl.installDir.getFileName())
                 fl.installDir = dir;
+        if (fl.installDir == juce::File())
+            fl.source = FlStudioInstall::Source::none;
     }
 
     // test hook: LYNX_FL_USER_DATA=<folder> stands in for FL's user data folder (synthetic plugin databases)

@@ -3941,7 +3941,7 @@ juce::Array<juce::File> folders()
 {
     // FL's browser folder 0x3f8 (REA round 167q, FUN_009db5b0): "Presets\Mixer presets" of the user data folder and
     // "Data\Patches\Mixer presets" of the installation
-    static const auto fl = findFlStudio();
+    const auto fl = findFlStudio();
     juce::Array<juce::File> out;
     if (fl.userData.isDirectory())
         out.add (fl.userData.getChildFile ("Presets").getChildFile ("Mixer presets"));

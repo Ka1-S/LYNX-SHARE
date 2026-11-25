@@ -10124,7 +10124,9 @@ private:
         // round 190qt (owner's option A): a project from an FL trial save goes back to FL as one (src/TrialMark190qtCheck.inc)
         // round 190rh: the FL natives without FL Studio (src/NoFl190rhCheck.inc)
         juce::String nofl190rhLog;
-        const auto nofl190rhResult = noFl190rhCheck (nofl190rhLog);
+        auto nofl190rhResult = noFl190rhCheck (nofl190rhLog);
+        if (nofl190rhResult == "OK")
+            nofl190rhResult = flFolder190rhCheck (nofl190rhLog);
         juce::String trialmark190qtLog;
         const auto trialmark190qtResult = trialMark190qtCheck (trialmark190qtLog);
 

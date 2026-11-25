@@ -1171,7 +1171,7 @@ private:
     {
         if (flPath.empty())
             return {};
-        static const auto roots = findFlStudioRoots();
+        const auto& roots = flStudioAccess().roots;
         auto path = resolveFlPath (flPath, roots);
         path = existingPathIgnoringCase (path);
         return juce::File::isAbsolutePath (juce::String::fromUTF8 (path.c_str())) && juce::File (juce::String::fromUTF8 (path.c_str())).existsAsFile()
@@ -1472,7 +1472,7 @@ private:
     // ============================================================================================ files
     juce::File homeFolder() const
     {
-        static const auto roots = findFlStudioRoots();
+        const auto& roots = flStudioAccess().roots;
         const juce::File packs (juce::String::fromUTF8 (resolveFlPath ("%FLStudioFactoryData%\\Data\\Patches\\Packs", roots).c_str()));
         if (juce::File::isAbsolutePath (packs.getFullPathName()) && packs.isDirectory())
             return packs;

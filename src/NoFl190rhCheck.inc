@@ -50,3 +50,45 @@
                 return "ERROR a shared project lost a channel's data set";
         return "OK";
     }
+
+    // Settings › Files › FL Studio folder (issue #291): the setting is used, LYNX_FL_INSTALL wins over it, a folder that is
+    // gone is passed over and kept. Only on a profile of the test's own.
+    static juce::String flFolder190rhCheck (juce::String& log)
+    {
+        using namespace lynx;
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_DIR", {}).isEmpty())
+        {
+            log << "skipped (no LYNX_PROFILE_DIR)\n";
+            return "OK";
+        }
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_NO_FL", {}).isNotEmpty())
+        {
+            log << "skipped (LYNX_NO_FL)\n";
+            return "OK";
+        }
+        const auto before = flFolderSetting();
+        const auto install = juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("lynx-flfolder190rh", {}, false);
+        install.getChildFile ("Data").createDirectory();
+        install.getChildFile ("Plugins/Fruity").createDirectory();
+        const auto done = [&] (const juce::String& result) {
+            setFlFolderSetting (before.isNotEmpty() ? juce::File (before) : juce::File());
+            install.deleteRecursively();
+            return result;
+        };
+        if (! setFlFolderSetting (install) || flFolderSetting() != install.getFullPathName())
+            return done ("ERROR the FL Studio folder was not saved");
+        const auto found = findFlStudio();
+        if (juce::File::isAbsolutePath (flFolderVariable()) && juce::File (flFolderVariable()).getChildFile ("Data").isDirectory())
+        {
+            log << "LYNX_FL_INSTALL is set: it must win\n";
+            if (found.source != FlStudioInstall::Source::variable || found.installDir != juce::File (flFolderVariable()))
+                return done ("ERROR the setting won over LYNX_FL_INSTALL");
+        }
+        else if (found.source != FlStudioInstall::Source::setting || found.installDir != install
+                 || flStudioAccess().roots.factoryData != install.getFullPathName().toStdString() || nativedata::factoryData() != flStudioAccess().roots.factoryData)
+            return done ("ERROR the FL Studio folder was not used without a restart");
+        install.deleteRecursively();
+        if (findFlStudio().installDir == install || flFolderSetting() != install.getFullPathName())
+            return done ("ERROR a folder that is gone was used, or forgotten");
+        return done ("OK");
+    }

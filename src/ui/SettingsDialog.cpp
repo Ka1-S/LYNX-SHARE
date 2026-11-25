@@ -1,3 +1,6 @@
+#include "core/FlInstall.h"
+#include "core/NativeEngines.h"
+#include "engine/FlStudio.h"
 #include "ui/SettingsDialog.h"
 #include "ui/PlaylistComponent.h"
 #include "core/Comping.h"
@@ -646,6 +649,239 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
+// Round 190rh (issue #291): which FL Studio installation LYNX reads, for a Windows drive mounted on Linux (or any place
+// LYNX does not look). Checked off the message thread: a drive may be slow or gone.
+class FlFolderRow final : public juce::Component
+{
+public:
+    FlFolderRow (bool isPersistent, std::function<void()> changed) : persistent (isPersistent), onChanged (std::move (changed))
+    {
+        styleNote (note, tr ("LYNX SHARE reads FL Studio's presets and engine data from this installation and never writes there."));
+        styleNote (status, {});
+        for (auto* l : { &note, &status })
+            addAndMakeVisible (*l);
+        addAndMakeVisible (title);
+        path.setReadOnly (true);
+        styleEditor (path);
+        path.setTextToShowWhenEmpty (tr ("(found automatically)"), theme::colour::textDisabled);
+        addAndMakeVisible (path);
+        for (auto* b : { &browse, &detect, &clear })
+            addAndMakeVisible (*b);
+        detect.setTooltip (tr ("Looks in the usual places and on mounted Windows drives"));
+        browse.onClick = [this] { choose(); };
+        detect.onClick = [this] { find(); };
+        clear.onClick = [this] { save ({}); };
+        note.getProperties().set ("lynxSearchText", "FL Studio folder installation path Linux mount Wine Image-Line");
+        show();
+    }
+
+    static constexpr int height = 28 + 20 + 4 + 26 + 6 + 72;
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        title.setBounds (r.removeFromTop (28));
+        note.setBounds (r.removeFromTop (20));
+        r.removeFromTop (4);
+        auto row = r.removeFromTop (26);
+        clear.setBounds (row.removeFromRight (90));
+        row.removeFromRight (6);
+        detect.setBounds (row.removeFromRight (100));
+        row.removeFromRight (6);
+        browse.setBounds (row.removeFromRight (110));
+        row.removeFromRight (6);
+        path.setBounds (row);
+        r.removeFromTop (6);
+        status.setBounds (r);
+    }
+
+private:
+    static juce::String u8s (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
+
+    // the installation in use: read on any thread, said on the message thread
+    struct Found
+    {
+        FlStudioInstall fl;
+        juce::String variable, setting;
+        flinstall::Check saved, inUse;
+        std::vector<natives::FlDataLine> data;
+    };
+    static Found look()
+    {
+        Found f;
+        f.fl = findFlStudio();
+        f.variable = flFolderVariable();
+        f.setting = flFolderSetting();
+        if (f.setting.isNotEmpty() && f.fl.source != FlStudioInstall::Source::setting)
+            f.saved = flinstall::check (f.setting.toStdString());
+        if (f.fl.installDir.isDirectory())
+        {
+            f.inUse = flinstall::check (f.fl.installDir.getFullPathName().toStdString());
+            f.data = natives::flDataReport (flStudioAccess());
+        }
+        return f;
+    }
+    static juce::String describe (const Found& f)
+    {
+        juce::StringArray lines;
+        const auto byVariable = f.variable.isNotEmpty() && f.fl.source == FlStudioInstall::Source::variable;
+        if (byVariable)
+            lines.add (tr ("The LYNX_FL_INSTALL variable is set and wins over this setting: {0}", { f.variable }));
+        else if (f.variable.isNotEmpty())
+            lines.add (tr ("The LYNX_FL_INSTALL variable names a folder that is not there or is no FL Studio installation: {0}", { f.variable }));
+        if (f.setting.isNotEmpty() && f.fl.source != FlStudioInstall::Source::setting && ! byVariable)
+            lines.add (f.saved.status == flinstall::Status::notReadable
+                           ? tr ("LYNX SHARE may not read the saved folder: check the drive's mount options and permissions. It is kept.")
+                           : tr ("The saved folder is not there now, or is no FL Studio installation. It is kept and used again when the drive is mounted."));
+        if (! f.fl.installDir.isDirectory())
+        {
+            lines.add (tr ("No FL Studio installation was found. The engines play LYNX SHARE's own data sets."));
+            return lines.joinIntoString ("\n");
+        }
+        const auto where = f.fl.installDir.getFullPathName();
+        lines.add (f.inUse.version.empty() ? tr ("FL Studio found: {0}", { where }) : tr ("FL Studio {0} found: {1}", { u8s (f.inUse.version), where }));
+        if (! f.inUse.missing.empty())
+            lines.add (tr ("Its {0} folder is missing or can't be read, so presets or engine data are missing.", { u8s (f.inUse.missing) }));
+        juce::StringArray yes, no;
+        for (const auto& line : f.data)
+            (line.readable ? yes : no).add (line.name);
+        if (! yes.isEmpty())
+            lines.add (tr ("Engine data found for: {0}", { yes.joinIntoString (", ") }));
+        if (! no.isEmpty())
+            lines.add (tr ("Not found, not readable or from another FL version: {0}", { no.joinIntoString (", ") }));
+        return lines.joinIntoString ("\n");
+    }
+
+    void setStatus (const juce::String& text)
+    {
+        status.setText (text, juce::dontSendNotification);
+        status.setTooltip (text);
+    }
+
+    // `extra`: a line for a change just made
+    void show (const juce::String& extra = {})
+    {
+        if (! persistent) // (pictures: no disk)
+        {
+            path.setText ("/mnt/windows/Program Files/Image-Line/FL Studio 2026", false);
+            setStatus (tr ("FL Studio {0} found: {1}", { "26.1", path.getText() }) + "\n" + tr ("Engine data found for: {0}", { "Transistor Bass, Kepler, MiniSynth, Sawer" }));
+            return;
+        }
+        path.setText (flFolderSetting(), false);
+        clear.setEnabled (path.getText().isNotEmpty());
+        run ([] { return look(); }, [extra] (FlFolderRow& row, const Found& f) {
+            row.setStatus (describe (f) + (extra.isEmpty() ? juce::String() : "\n" + extra));
+        });
+    }
+
+    template <typename Work, typename Done>
+    void run (Work work, Done done)
+    {
+        setStatus (tr ("Reading the folder..."));
+        const auto turn = ++turns;
+        juce::Thread::launch ([work, done, turn, safe = juce::Component::SafePointer<FlFolderRow> (this)] {
+            auto result = work();
+            juce::MessageManager::callAsync ([done, turn, safe, result] {
+                if (safe != nullptr && safe->turns == turn) // (a newer check is running)
+                    done (*safe, result);
+            });
+        });
+    }
+
+    void save (const juce::File& folder)
+    {
+        if (! persistent)
+            return;
+        if (! setFlFolderSetting (folder))
+        {
+            setStatus (tr ("The setting could not be saved."));
+            return;
+        }
+        if (onChanged)
+            onChanged();
+        show (tr ("New instruments, presets and the Browser use it now. The open project's instruments follow when it is opened again, the metronome after a restart."));
+    }
+
+    void take (const juce::String& folder)
+    {
+        run ([folder] { return flinstall::check (folder.toStdString()); }, [folder] (FlFolderRow& row, const flinstall::Check& c) {
+            switch (c.status)
+            {
+                case flinstall::Status::ok: row.save (juce::File (u8s (c.folder))); return;
+                case flinstall::Status::several:
+                {
+                    juce::StringArray found;
+                    for (const auto& f : c.candidates)
+                        found.add (u8s (f));
+                    row.offer (found);
+                    return;
+                }
+                case flinstall::Status::notReadable:
+                    row.setStatus (tr ("LYNX SHARE may not read this folder: {0}. Check the drive's mount options and permissions. Nothing was changed.", { folder }));
+                    return;
+                case flinstall::Status::userData:
+                    row.setStatus (tr ("This is FL Studio's user data folder, not the installation. Choose the folder that holds FL64.exe and Data. Nothing was changed."));
+                    return;
+                case flinstall::Status::missing:
+                case flinstall::Status::notFl:
+                    row.setStatus (tr ("This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed.", { folder }));
+                    return;
+            }
+        });
+    }
+
+    void offer (const juce::StringArray& found)
+    {
+        setStatus ({});
+        juce::PopupMenu menu;
+        menu.addSectionHeader (tr ("More than one FL Studio: choose one"));
+        for (const auto& f : found)
+            menu.addItem (f, [safe = juce::Component::SafePointer<FlFolderRow> (this), f] {
+                if (safe != nullptr)
+                    safe->save (juce::File (f));
+            });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&detect),
+                            [safe = juce::Component::SafePointer<FlFolderRow> (this)] (int chosen) {
+                                if (safe != nullptr && chosen == 0)
+                                    safe->show();
+                            });
+    }
+
+    void find()
+    {
+        if (! persistent)
+            return;
+        run ([] { return detectFlFolders(); }, [] (FlFolderRow& row, const juce::StringArray& found) {
+            if (found.isEmpty())
+                row.setStatus (tr ("No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else."));
+            else if (found.size() == 1)
+                row.save (juce::File (found[0]));
+            else
+                row.offer (found);
+        });
+    }
+
+    void choose()
+    {
+        const auto now = flFolderSetting();
+        chooser = lynx::ui::makeFileChooser (tr ("FL Studio folder"), now.isNotEmpty() && juce::File (now).isDirectory() ? juce::File (now) : juce::File::getSpecialLocation (juce::File::userHomeDirectory));
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                                 [safe = juce::Component::SafePointer<FlFolderRow> (this)] (const juce::FileChooser& c) {
+                                     if (safe != nullptr && c.getResult() != juce::File())
+                                         safe->take (c.getResult().getFullPathName());
+                                 });
+    }
+
+    const bool persistent;
+    std::function<void()> onChanged;
+    int turns = 0;
+    SectionTitle title { tr ("FL Studio folder") };
+    juce::Label note, status;
+    juce::TextEditor path;
+    juce::TextButton browse { tr ("Browse...") }, detect { tr ("Detect") }, clear { tr ("Clear") };
+    std::unique_ptr<juce::FileChooser> chooser;
+};
+
 // (rollup 0.1.28: a ScrollingPage since round 190fn added the fourth list: at a short window every list keeps its
 // Add / Remove buttons and two rows, and the page scrolls)
 class FilesPage final : public ScrollingPage
@@ -742,6 +978,9 @@ public:
                 host.startBackgroundScanOfFiles (JsfxPluginFormat().searchPathsForPlugins (jsfx::roots(), true, false));
             }, persistent);
 
+        flFolder = std::make_unique<FlFolderRow> (persistent, browserChanged); // round 190rh (issue #291)
+        add (*flFolder);
+
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
@@ -760,14 +999,16 @@ public:
     }
 
 protected:
-    // The five lists share the window's height; none gets less than its heading, two rows and its buttons (below that
+    // FL's folder, then the five lists, which share the rest of the window's height; none gets less than its heading, two rows and its buttons (below that
     // the page scrolls)
     int layout (int width) override
     {
         constexpr int padX = 20, padY = 14, gap = 12;
         FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), jsfxFolders.get(), flmResources.get() };
-        const auto share = (getHeight() - 2 * padY - 4 * gap) / 5;
+        const auto share = (getHeight() - 2 * padY - 5 * gap - FlFolderRow::height) / 5;
         auto y = padY;
+        flFolder->setBounds (padX, y, juce::jmax (0, width - 2 * padX), FlFolderRow::height);
+        y += FlFolderRow::height + gap;
         for (auto* list : lists)
         {
             const auto h = juce::jmax (list->minimumHeight(), share);
@@ -779,6 +1020,7 @@ protected:
     int minimumWidth() const override { return 300; }
 
 private:
+    std::unique_ptr<FlFolderRow> flFolder;
     std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, jsfxFolders, flmResources;
 };
 

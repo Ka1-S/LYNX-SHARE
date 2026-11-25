@@ -146,6 +146,9 @@ FlPathRoots findFlStudioRoots()
     {
         roots.factoryData = fl.installDir.getFullPathName().toStdString();
         roots.data = fl.installDir.getChildFile ("Data").getFullPathName().toStdString();
+       #if ! JUCE_WINDOWS
+        roots.data = existingPathIgnoringCase (roots.data); // (a Windows drive mounted with other capitals)
+       #endif
     }
 
     if (fl.userData.isDirectory())
@@ -161,9 +164,11 @@ FlPathRoots findFlStudioRoots()
     return roots;
 }
 
-const natives::FlAccess& flStudioAccess()
+namespace
 {
-    static const natives::FlAccess cached = [] {
+natives::FlAccess makeFlAccess()
+{
+    return [] {
         natives::FlAccess access;
         access.roots = findFlStudioRoots();
         access.fileExists = [] (const std::string& path) { return platform::localFile (path).existsAsFile(); };
@@ -215,7 +220,47 @@ const natives::FlAccess& flStudioAccess()
         };
         return access;
     }();
-    return cached;
+}
+
+std::mutex& flAccessLock()
+{
+    static std::mutex m;
+    return m;
+}
+std::atomic<const natives::FlAccess*>& flAccessNow()
+{
+    static std::atomic<const natives::FlAccess*> p { nullptr };
+    return p;
+}
+// every installation of this session: references handed out stay valid
+std::vector<std::unique_ptr<const natives::FlAccess>>& flAccessKept()
+{
+    static std::vector<std::unique_ptr<const natives::FlAccess>> kept;
+    return kept;
+}
+void buildFlAccess()
+{
+    auto made = std::make_unique<const natives::FlAccess> (makeFlAccess());
+    nativedata::setFactoryData (made->roots.factoryData); // (round 190rh: FL's engine data files, wherever FL is)
+    flAccessNow().store (made.get(), std::memory_order_release);
+    flAccessKept().push_back (std::move (made));
+}
+} // namespace
+
+const natives::FlAccess& flStudioAccess()
+{
+    if (const auto* now = flAccessNow().load (std::memory_order_acquire))
+        return *now;
+    const std::lock_guard<std::mutex> g (flAccessLock());
+    if (flAccessNow().load (std::memory_order_acquire) == nullptr)
+        buildFlAccess();
+    return *flAccessNow().load (std::memory_order_acquire);
+}
+
+void refreshFlStudioAccess()
+{
+    const std::lock_guard<std::mutex> g (flAccessLock());
+    buildFlAccess();
 }
 
 // --- engine/PowerHints.h (rollup 0.1.28, REA round 190hb actions 3 and 4) -------------------------------------------
@@ -565,7 +610,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
 {
     // Harmor's resynthesis (round natives190kj): the sample a part names, found as FL finds it (path variables, then the
     // file re-rooted to this PC's FL folders) and decoded by the core (WAV, FL's Ogg-in-WAV, Ogg Vorbis, WavPack)
-    nativedata::setFactoryData (flStudioAccess().roots.factoryData); // (round 190rh: FL's engine data files, wherever FL is)
+    flStudioAccess(); // (round 190rh: found now, so FL's engine data is read from where FL is: core/NativeData.h)
     harmor::setSampleLoader ([] (const std::string& saved, harmor::SampleData& out) {
         const auto& fl = flStudioAccess();
         const auto path = locateFlSample (saved, fl.roots, {}, fl.fileExists);
