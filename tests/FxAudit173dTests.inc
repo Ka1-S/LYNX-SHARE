@@ -146,6 +146,10 @@ bool needsFlFiles (const std::string& effect, const std::string& control)
     // bundled): without them every Cabinet choice is the bypass
     // Round 190rh: without FL, Vocodex starts from LYNX's own state, where "To mod" (option 110) has nothing to act on in this
     // programme; why exactly was not found (FL's Default preset is not read without FL)
+    // Maximus, EQUO and Love Philter start from LYNX's neutral states (core/NativeSlots.cpp): no compression curve, flat bands, one
+    // filter unit; their other controls act once the curve, a gain or a unit is set (FL's Default presets set them: 190rh follow-up)
+    if (realFlpDir.empty() && (effect == "Maximus" || effect == "EQUO" || effect == "Fruity Love Philter"))
+        return true;
     return realFlpDir.empty() && ((effect == "Hardcore" && control == "Cabinet") || (effect == "Vocodex" && control == "To mod"));
 }
 
