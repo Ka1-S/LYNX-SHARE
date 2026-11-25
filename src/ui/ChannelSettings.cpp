@@ -6486,7 +6486,8 @@ private:
         {
             const auto folder = natives::presetFolderOf (kind);
             presets = folder.empty() ? std::vector<presetcycle::Preset>()
-                                     : presetcycle::listPresets (presetcycle::pluginPresetFolders (flStudioAccess().roots, true, folder));
+                                     : presetcycle::listPresets (presetcycle::pluginPresetFolders (flStudioAccess().roots, true, folder),
+                                                                 natives::presetExtensionOf (kind)); // (issue #288: .tbio, .gmsynth, .mrp too)
             // LYNX's own bank after FL's presets (round 168n): the only presets without FL Studio
             const auto& bank = banks::bankOf (kind);
             for (int i = 0; i < (int) bank.size(); ++i)

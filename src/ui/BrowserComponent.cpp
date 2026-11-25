@@ -6967,6 +6967,24 @@ void BrowserComponent::openFile (const juce::File& file)
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Preset"), message);
             return;
         }
+        // issue #288 (round 190rc): a preset of a generator LYNX plays natively (Sytrus, Harmor, 3x Osc, GMS...) opens that
+        // generator with the preset loaded, named after it, as FL's Browser does; it used to become LYNX's synth with an
+        // approximation of the sound ("it opens a 3x Osc")
+        if (auto native = natives::channelFromAnyPreset (file.getFullPathName().toStdString(), file.getFileNameWithoutExtension().toStdString(),
+                                                         flStudioAccess()))
+        {
+            if (onAddInstrument != nullptr)
+                onAddInstrument (std::move (*native));
+            else
+            {
+                engine.editSong ([&native] (Song& s) {
+                    native->mixerTrack = s.claimFreeInsert();
+                    s.channels.push_back (std::move (*native));
+                });
+                engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
+            }
+            return;
+        }
         juce::MemoryBlock data;
 
         if (! file.loadFileAsData (data))
@@ -7343,6 +7361,42 @@ void BrowserComponent::sendToSelected (const juce::File& file)
                       : genpresetui::isPresetFile (file) || file.hasFileExtension ("fst;gmsynth") ? Item::generatorPreset
                                                                                                     : Item::other;
     const auto focused = ! PluginWindows::openPlugins().empty();
+    // issue #288 (round 190rc): a preset of the selected channel's own generator goes into that channel (FL's "Send to
+    // selected channel or focused plugin", and Shift+Up / Down through a preset folder); another generator's preset
+    // still opens a new channel
+    if (item == Item::generatorPreset)
+    {
+        const auto channel = engine.getSelectedChannel();
+        const auto& song = engine.getSong();
+        if (channel >= 0 && channel < (int) song.channels.size())
+        {
+            const auto& current = song.channels[(std::size_t) channel];
+            if (genpresetui::isPresetFile (file))
+            {
+                if (const auto own = genpresetui::read (file); own && own->kind == current.instrument)
+                {
+                    juce::String error;
+                    if (! genpresetui::loadInto (engine, channel, file, error) && error.isNotEmpty())
+                        showNote (error);
+                    return;
+                }
+            }
+            else if (const auto path = file.getFullPathName().toStdString(); natives::presetKind (path, flStudioAccess()) == current.instrument)
+            {
+                if (auto loaded = natives::withPreset (current, path, file.getFileNameWithoutExtension().toStdString(), flStudioAccess()))
+                {
+                    const auto kind = current.instrument;
+                    engine.editSong ([channel, kind, c = std::move (*loaded)] (Song& s) {
+                        if (channel < (int) s.channels.size() && s.channels[(std::size_t) channel].instrument == kind)
+                            s.channels[(std::size_t) channel] = c;
+                    });
+                }
+                else
+                    showNote (tr ("This preset could not be read: {0}", { file.getFileNameWithoutExtension() }));
+                return;
+            }
+        }
+    }
     switch (decide (item, selectedChannelKind(), focused))
     {
         case Action::sampleIntoSelected:
