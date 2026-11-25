@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "core/ClipEnvelope.h"
+#include "core/CopyName.h"
 #include "core/EventEdit.h"
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
@@ -51,9 +52,7 @@ std::string freeName (const std::string& base, const std::function<bool (const s
 {
     if (! taken (base))
         return base;
-    for (int n = 2;; ++n)
-        if (auto name = base + " #" + std::to_string (n); ! taken (name))
-            return name;
+    return copyname::next (base, taken);
 }
 } // namespace
 

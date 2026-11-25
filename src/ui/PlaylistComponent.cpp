@@ -12332,7 +12332,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             engine.editSong ([index] (Song& s) {
                 auto& c = s.playlist[(std::size_t) index];
                 auto copy = s.automations[(std::size_t) c.automation];
-                copy.name += " #2";
+                copy.name = copyname::next (copy.name, [&s] (const std::string& name) {
+                    return std::any_of (s.automations.begin(), s.automations.end(), [&name] (const Automation& o) { return o.name == name; });
+                });
                 s.automations.push_back (std::move (copy));
                 c.automation = (int) s.automations.size() - 1;
             });

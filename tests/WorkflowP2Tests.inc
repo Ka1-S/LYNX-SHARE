@@ -245,6 +245,7 @@ TEST (p2_euclidean_and_fill)
 TEST (p2_pattern_clone_and_move)
 {
     auto song = lynx::Song::makeDefault();
+    song.patterns[0].name = "A";
     song.patterns.push_back ({});
     song.patterns[1].name = "B";
     lynx::Clip c0, c1;

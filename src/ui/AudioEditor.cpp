@@ -17,6 +17,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include "core/ClipEnvelope.h"
+#include "core/CopyName.h"
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
@@ -5858,7 +5859,9 @@ private:
         auto copy = doc.markers[(std::size_t) index];
         if (copy.name.empty())
             copy.name = (copy.isRegion() ? tr ("Region") : tr ("Marker")).toStdString();
-        copy.name += " #2";
+        copy.name = copyname::next (copy.name, [this] (const std::string& name) {
+            return std::any_of (doc.markers.begin(), doc.markers.end(), [&name] (const auto& m) { return m.name == name; });
+        });
         copy.keyNum = -1;
         if (! copy.isRegion()) // (a marker cloned "as region": to the next marker, else to the end)
         {

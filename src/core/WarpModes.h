@@ -13,6 +13,7 @@
 #include <array>
 #include <string>
 
+#include "core/CopyName.h"
 #include "core/Song.h"
 
 namespace lynx::warpmodes
@@ -101,16 +102,9 @@ inline int ownChannelForGridClip (Song& song, int track, int scene)
     if (clipsOfChannel (song, source) <= 1)
         return source;
     auto copy = song.channels[(std::size_t) source];
-    const auto base = copy.name;
-    for (int n = 2;; ++n)
-    {
-        const auto candidate = base + " #" + std::to_string (n);
-        if (std::none_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == candidate; }))
-        {
-            copy.name = candidate;
-            break;
-        }
-    }
+    copy.name = copyname::next (copy.name, [&song] (const std::string& name) {
+        return std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == name; });
+    });
     song.channels.push_back (std::move (copy));
     clip = gridAudioClip (song, track, scene); // (the push may not move clips, but stay safe)
     clip->channel = (int) song.channels.size() - 1;

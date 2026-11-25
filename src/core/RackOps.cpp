@@ -2,6 +2,7 @@
 #include "core/RackAutomation.h" // round 190oo (PAT-7)
 #include "core/TrackClips.h"
 
+#include "core/CopyName.h"
 #include "core/MidiControls.h"
 #include "core/PatternBlocks.h"
 
@@ -203,28 +204,28 @@ int splitPatternByChannel (Song& song, int index, bool keepPatternName)
     return (int) created.size();
 }
 
-namespace
-{
-std::string nextCopyName (const std::string& base, const std::function<bool (const std::string&)>& taken)
-{
-    for (int n = 2;; ++n)
-    {
-        const auto name = base + " #" + std::to_string (n);
-        if (! taken (name))
-            return name;
-    }
-}
-} // namespace
-
 int clonePattern (Song& song, int index)
 {
     if (index < 0 || index >= (int) song.patterns.size())
         return -1;
 
     auto copy = song.patterns[(std::size_t) index];
-    copy.name = nextCopyName (copy.name, [&song] (const std::string& name) {
+    const auto taken = [&song] (const std::string& name) {
         return std::any_of (song.patterns.begin(), song.patterns.end(), [&] (const Pattern& p) { return p.name == name; });
-    });
+    };
+    if (copyname::defaultPatternNumber (copy.name) == 0)
+        copy.name = copyname::next (copy.name, taken);
+    else if (copy.name == "Pattern " + std::to_string (index + 1)) // (FL: a pattern with no name shows its position, so the
+    {                                                              // copy is the next number and the ones below move down one)
+        for (auto i = song.patterns.size(); i-- > (std::size_t) index + 1;)
+            if (song.patterns[i].name == "Pattern " + std::to_string (i + 1) && ! taken ("Pattern " + std::to_string (i + 2)))
+                song.patterns[i].name = "Pattern " + std::to_string (i + 2);
+        copy.name = "Pattern " + std::to_string (index + 2);
+        if (taken (copy.name))
+            copy.name = newPatternName (song);
+    }
+    else
+        copy.name = newPatternName (song);
     shiftPatternClips (song, index + 1, 1);
     song.patterns.insert (song.patterns.begin() + index + 1, std::move (copy));
     song.currentPattern = index + 1;
@@ -843,7 +844,7 @@ int addChannelRouted (Song& song, ChannelDef channel, int insert)
             return std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == name; });
         };
         if (! channel.name.empty() && taken (channel.name))
-            channel.name = nextCopyName (channel.name, taken);
+            channel.name = copyname::next (channel.name, taken);
 
         auto& track = song.mixer[(std::size_t) insert].name;
         if (! channel.name.empty() && (track.empty() || track == (insert == 0 ? std::string ("Master") : "Insert " + std::to_string (insert))))
@@ -888,18 +889,9 @@ int cloneChannel (Song& song, int index)
 
     auto copy = song.channels[(std::size_t) index];
     copy.freeze = {}; // (round 190ay: the clone plays its own instrument; the frozen audio is the original's)
-    const auto base = copy.name;
-
-    for (int n = 2;; ++n)
-    {
-        const auto name = base + " #" + std::to_string (n);
-
-        if (std::none_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == name; }))
-        {
-            copy.name = name;
-            break;
-        }
-    }
+    copy.name = copyname::next (copy.name, [&song] (const std::string& name) {
+        return std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == name; });
+    });
 
     return insertChannel (song, index + 1, std::move (copy));
 }

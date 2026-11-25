@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "core/AudioEdit.h"
+#include "core/CopyName.h"
 #include "core/FlAutoSlicer.h"
 #include "core/Instruments.h"
 #include "core/Slicex.h"
@@ -3716,7 +3717,9 @@ private:
         auto from = identity (list.size());
         // (FL names it "<name> #2", keeps start, length and purpose; the key stays with the first)
         auto copy = list[(std::size_t) index];
-        copy.name = slicex::regionName (copy, index) + " #2";
+        copy.name = copyname::next (slicex::regionName (copy, index), [&list] (const std::string& name) {
+            return std::any_of (list.begin(), list.end(), [&name] (const auto& r) { return r.name == name; });
+        });
         copy.marker = false;
         copy.key = -1;
         list.insert (list.begin() + index + 1, copy);
