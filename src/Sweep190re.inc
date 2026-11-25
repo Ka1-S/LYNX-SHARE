@@ -227,7 +227,7 @@
                     { "effect slot", [] (const Song& s) { return s.mixer.size() > 1 && s.mixer[1].effects.size() < 8; },
                       [&offline] { offline.editSongStructural ([] (Song& s) { s.mixer[1].effects.push_back (makeEffectSlot (EffectKind::delay)); }); } },
                     { "pattern order", [] (const Song& s) { return s.patterns.size() > 1; },
-                      [&offline] { offline.editSongPatternOrder ([] (Song& s) { std::swap (s.patterns[0].name, s.patterns[1].name); }); } },
+                      [&offline] { offline.editSongPatternOrder ([] (Song& s) { std::swap (s.patterns[0].name, s.patterns[1].name); s.patterns[0].name += " *"; }); } },
                     { "tempo", [] (const Song&) { return true; }, [&offline] { offline.editSong ([] (Song& s) { s.bpm += 1.0; }); } },
                     { "channel name", [] (const Song& s) { return ! s.channels.empty(); },
                       [&offline] { offline.editSong ([] (Song& s) { s.channels[0].name += " 2"; }); } },
@@ -303,10 +303,10 @@
         juce::StringArray errors;
         { // 1
             AudioEngine e (false);
+            e.capturePluginStates(); // (what a save does first: the working time so far goes into the song; the clock starts)
             e.editSong ([] (Song& s) { s.bpm = 128.0; });
             juce::Thread::sleep (1100);
-            e.capturePluginStates(); // (what a save does first: the working time so far goes into the song)
-            juce::Thread::sleep (300);
+            e.capturePluginStates();
             e.editSong ([] (Song& s) { s.bpm = 129.0; });
             e.capturePluginStates();
             const auto before = e.getSong().info.workSeconds;
