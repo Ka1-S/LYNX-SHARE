@@ -203,7 +203,7 @@ TEST (rea167j_fl_pattern_keys)
     // FL Patterns menu: Clone Ctrl+Shift+C, Delete Ctrl+Shift+Del, Find first empty Shift+F4, no naming Ctrl+F4
     CHECK (map.find ({ 'C', ctrl | shift }, Context::global, false) == "pattern.clone");
     CHECK (map.find ({ 'C', ctrl | shift }, Context::playlist, false) == "pattern.clone");
-    CHECK (map.find ({ 'C', alt }, Context::playlist, false) == "pattern.clone"); // the old key stays
+    CHECK (map.find ({ 'C', alt }, Context::playlist, false).empty()); // (FL 2026: the Slice tool with the typing keyboard on, else nothing; round 190ri)
     CHECK (map.find ({ del, ctrl | shift }, Context::global, false) == "pattern.delete");
     CHECK (map.find ({ f4, shift }, Context::global, false) == "pattern.firstEmpty");
     CHECK (map.find ({ f4, ctrl }, Context::global, false) == "pattern.nextEmptyNoName");

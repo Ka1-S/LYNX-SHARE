@@ -170,7 +170,8 @@ TEST (issues190ll_203_scale_box_opens_its_menu_again)
     CHECK (box != std::string::npos);
     CHECK (header.find ("std::function<juce::PopupMenu()> onPopup;", box) != std::string::npos); // (the menu to open)
     CHECK (header.find ("onPopup().showMenuAsync", box) != std::string::npos);                   // (the box shows it)
-    CHECK (header.find ("[box] (int) { if (box != nullptr) box->hidePopup(); }", box) != std::string::npos); // (and closes it)
+    CHECK (header.find ("if (box == nullptr)\n                                             return;", box) != std::string::npos
+           && header.find ("box->hidePopup();", box) != std::string::npos); // (and closes it, on every result; round 190ri: a right-click opens it again)
     CHECK (readFile ("src/ui/PianoRollComponent.cpp")
                .find ("scaleBox.onPopup = [this] { return scaleHighlightMenu(); };") != std::string::npos);
 }
