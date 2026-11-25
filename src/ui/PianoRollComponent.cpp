@@ -17,6 +17,7 @@
 #include "core/PastePlace.h"
 #include "ui/WindowClipboard.h" // issue #232 stage 2 (round 190nz)
 #include "core/LayoutStyle.h"
+#include "core/TrackOnly.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
 
@@ -1845,6 +1846,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
             }
         }
+
+        // round 190rc (Discord 11-24, sidthenugget): in Track-only mode and the Simple layout a clip holds one instrument,
+        // so the ghosts are the other tracks' notes playing at the same time (drawn as FL's ghosts; not editable)
+        if (showGhosts && (trackonly::active() || layoutstyle::current() == layoutstyle::Style::simple))
+            for (const auto& n : polish::clipGhostNotes (song, song.currentPattern, channel, 2000, true))
+            {
+                if (! ghostShown (n.channel) || ! rows.shown (n.key))
+                    continue;
+                const auto r = noteRect (n.start, n.length, n.key);
+                if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight() || outside (r, 2.0f))
+                    continue;
+                g.setColour (textPrimary.withAlpha (0.14f));
+                g.fillRoundedRectangle (r, 2.0f);
+                g.setColour (textPrimary.withAlpha (0.22f));
+                g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
+            }
 
         for (const auto& n : pattern.notes)
         {

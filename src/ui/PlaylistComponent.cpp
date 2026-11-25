@@ -3276,7 +3276,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     const auto ink = muted ? colour::textDisabled
                                      : simpleHeaders && trackColour != 0 ? ui::simplelook::readableOn (juce::Colour (trackColour), plate, 3.0f)
                                                                          : colour::textSecondary.brighter (0.3f);
-                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size), ink);
+                    const auto iconBox = juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size);
+                    ui::drawTrackIcon (g, icon, iconBox, ink);
+                    if (simpleHeaders) // (round 190rc: a click there opens the instrument's window)
+                        simpleIconBoxes[t] = iconBox.getSmallestIntegerContainer();
                     textLeft += (int) size + (simpleHeaders ? 6 : 4);
                 }
                 if (live)
@@ -6560,6 +6563,16 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             }
             if (track >= paintedRows())
                 return;
+            // round 190rc (Discord 11-24, sidthenugget): a click on the track's instrument icon opens (or closes) the
+            // instrument's window, as BandLab's instrument icon opens its instrument
+            if (! flmods::popup (e.mods) && e.mods.isLeftButtonDown() && onToggleChannelWindow)
+                if (const auto it = simpleIconBoxes.find (track); it != simpleIconBoxes.end() && it->second.expanded (2).contains (e.getPosition()))
+                    if (const auto channel = simpleInstrumentChannel (track); channel >= 0)
+                    {
+                        selectTrack (track);
+                        onToggleChannelWindow (channel);
+                        return;
+                    }
         }
 
         if (! flmods::popup (e.mods)) // round 177b: the lanes' fold arrow and "+A"
@@ -8776,6 +8789,21 @@ void PlaylistComponent::splitSelectionForLive()
     sortClips();
 }
 
+int PlaylistComponent::splitAtPlayhead()
+{
+    const auto& song = engine.getSong();
+    const auto tick = (std::int64_t) std::llround (juce::jmax (0.0, playheadTick >= 0.0 ? playheadTick : engine.getTransport().positionTicks.load()));
+    const auto targets = splitat::clipsAt (song.playlist, selection, tick);
+    if (targets.empty())
+        return 0;
+    std::vector<int> pieces;
+    engine.editSong ([&targets, &pieces, tick] (Song& s) { pieces = splitat::split (s.playlist, targets, tick); });
+    setSelection ({});
+    setSelection (pieces);
+    sortClips();
+    return (int) targets.size();
+}
+
 void PlaylistComponent::cutWithKnife (juce::Point<int> from, juce::Point<int> to, bool snapOn)
 {
     const auto& playlist = engine.getSong().playlist;
@@ -9526,6 +9554,8 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
     m.addItem (tr ("Delete space") + "\tCtrl+Del", time, false, [this] { deleteTimeSelection(); });
     m.addItem (tr ("Trim selection") + key ("playlist.trimSpace"), time, false, [this] { runAction ("playlist.trimSpace"); });
+    // issue #285 (round 190rc, LYNX extra): the Slice tool's cut at the song position, in one step
+    m.addItem (tr ("Cut clips at the song position") + key ("playlist.splitAtPlayhead"), true, false, [this] { runAction ("playlist.splitAtPlayhead"); });
     // round 190cg: Live's time commands and loop switch on the same time selection [live-exe-strings.txt:1645342…1645365
     // sMenuTextCutTime / CopyTime / sMenuPasteTime / DuplicateTime; 1645321 sMenuActivateLoop; 1636009 sMenuTextCrop]
     m.addItem (tr ("Duplicate time") + key ("playlist.duplicateTime"), time, false, [this] { timeCommand (0); });
@@ -10241,6 +10271,24 @@ void PlaylistComponent::setSimpleHeaders (bool on)
     refreshTrackLayout(); // (round 190jq: no automation lanes in Simple)
     sectionsLaneChanged(); // (round 190ol: the lane's look and visibility follow the layout)
     chordLaneChanged();    // (round 190pf)
+}
+
+int PlaylistComponent::simpleInstrumentChannel (int track) const
+{
+    const auto& song = engine.getSong();
+    const auto kind = simpletracks::kindOf (song, track);
+    if (! kind || (*kind != simpletracks::Kind::instrument && *kind != simpletracks::Kind::drums && *kind != simpletracks::Kind::sampler))
+        return -1;
+    if (*kind != simpletracks::Kind::drums)
+    {
+        const auto c = song.playlistTracks[(std::size_t) track].channel;
+        return c >= 0 && c < (int) song.channels.size() ? c : -1;
+    }
+    const auto insert = simpletracks::insertOf (song, track);
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (song.channels[(std::size_t) c].mixerTrack == insert && song.channels[(std::size_t) c].instrument != InstrumentKind::audioClip)
+            return c;
+    return -1;
 }
 
 void PlaylistComponent::selectTrackChannel (int track)
@@ -13885,6 +13933,7 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.nudgeRight")) shiftSelectedClips (1, 0, true);
     else if (is ("playlist.sliceInsertSpace")) sliceInsertTimeSelection();
     else if (is ("playlist.trimSpace")) trimTimeSelection();
+    else if (is ("playlist.splitAtPlayhead")) splitAtPlayhead();
     else if (is ("playlist.loopSwitch")) setLoopSwitch (! engine.getSong().loopPlays());
     else if (is ("playlist.loopHalve") || is ("playlist.loopDouble"))
     {
@@ -15239,6 +15288,12 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
 
     if (h.header && h.addTrack) // round 190jc: the round "+" under the Simple tracks
         return { tr ("Add a track: voice, instrument, drums, sampler, guitar or bass, or import files"), {} };
+
+    // round 190rc: a Simple header's instrument icon opens the instrument's window
+    if (h.header && simpleHeaders && onToggleChannelWindow && h.track >= 0)
+        if (const auto it = simpleIconBoxes.find (h.track); it != simpleIconBoxes.end() && it->second.expanded (2).contains (p)
+                                                              && simpleInstrumentChannel (h.track) >= 0)
+            return { tr ("Instrument: [LMB] open or close its window"), {} };
 
     if (h.header && h.divider >= 0)
     {

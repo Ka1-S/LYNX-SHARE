@@ -13050,3 +13050,14 @@ countries: nl be
 "Always on top: keep this window above LYNX SHARE's other windows" = "Altijd bovenop: houdt dit venster boven de andere vensters van LYNX SHARE"
 "Always on top is not available for a plugin in a separate process" = "Altijd bovenop is niet beschikbaar voor een plugin in een apart proces"
 "Darken image" = "Afbeelding donkerder"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Clips knippen op de songpositie (de geselecteerde, anders alle clips daar)"
+"Cut clips at the song position" = "Clips knippen op de songpositie"
+"Open the project's folder in the file manager" = "Projectmap openen in bestandsbeheer"
+"Open the project's folder" = "Projectmap openen"
+"Save the project first: it has no folder yet" = "Sla het project eerst op: het heeft nog geen map"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI-bestand: [2xLMB] openen als project  sleep naar de Playlist (een clip), het Channel Rack of de Piano roll om het te importeren"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI-bestand: [2xLMB] openen als project  sleep naar het Channel Rack of de Piano roll om het te importeren (naar de Playlist: Playlist-menu › \"MIDI-bestanden die op de Playlist vallen worden patternclips\")"
+"This will reset the selected mixer track(s) and remove all plugins." = "Hiermee worden de geselecteerde mixertracks gereset en alle plug-ins verwijderd."
+"Instrument: [LMB] open or close its window" = "Instrument: [LMB] venster openen of sluiten"

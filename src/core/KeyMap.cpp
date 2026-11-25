@@ -164,6 +164,9 @@ std::vector<Action> makeActions()
         { "file.save", TR_NOOP ("Save project"), Context::global, { chord ('S', ctrl) } },
         { "file.saveAs", TR_NOOP ("Save project as"), Context::global, { chord ('S', ctrl | shift) } },
         { "file.saveNewVersion", TR_NOOP ("Save new version (Song_2, Song_3...)"), Context::global, { chord ('S', ctrl | alt) } },
+        // issue #286 (round 190rc, LYNX extra; FL's File menu has no such item): the saved project's folder in the file
+        // manager. No default key
+        { "file.openProjectFolder", TR_NOOP ("Open the project's folder in the file manager"), Context::global, {} },
         // FL's File › Recent projects: Alt+1 … Alt+0 open the ten most recent (FL manual, File menu; round 190ih)
         { "file.recent1", TR_NOOP ("Open recent project 1"), Context::global, { chord ('1', alt) } },
         { "file.recent2", TR_NOOP ("Open recent project 2"), Context::global, { chord ('2', alt) } },
@@ -471,6 +474,9 @@ std::vector<Action> makeActions()
         { "playlist.nudgeRight", TR_NOOP ("Nudge the selected clips right (fine step, no snap)"), Context::playlist, { chord (right, alt), chord (right, alt | shift) } },
         { "playlist.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::playlist, { chord (insert, ctrl | alt) } },
         { "playlist.trimSpace", TR_NOOP ("Trim selection (keep only the time selection)"), Context::playlist, {} },
+        // issue #285 (round 190rc, LYNX extra): FL slices with the Slice tool only (no command, no key); Live's Split is
+        // Ctrl+E in the Clip-launch layout. No default key, so FL's list stays as it is
+        { "playlist.splitAtPlayhead", TR_NOOP ("Cut clips at the song position (the selected ones, else every clip there)"), Context::playlist, {} },
         // round 190cg: Live's arrangement commands on the time selection (no default keys: FL's stay as they are)
         { "playlist.loopSwitch", TR_NOOP ("Loop the time selection on/off (the range stays)"), Context::playlist, {} },
         { "playlist.loopHalve", TR_NOOP ("Halve the time selection"), Context::playlist, {} },

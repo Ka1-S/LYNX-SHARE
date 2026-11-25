@@ -13050,3 +13050,14 @@ countries: jp
 "Always on top: keep this window above LYNX SHARE's other windows" = "常に手前に表示：このウィンドウを LYNX SHARE のほかのウィンドウより手前に保ちます"
 "Always on top is not available for a plugin in a separate process" = "別プロセスのプラグインでは「常に手前に表示」は使えません"
 "Darken image" = "画像を暗くする"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "ソング位置でクリップを分割（選択中のもの、なければそこにあるすべてのクリップ）"
+"Cut clips at the song position" = "ソング位置でクリップを分割"
+"Open the project's folder in the file manager" = "プロジェクトのフォルダーをファイルマネージャーで開く"
+"Open the project's folder" = "プロジェクトのフォルダーを開く"
+"Save the project first: it has no folder yet" = "先にプロジェクトを保存してください：まだフォルダーがありません"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI ファイル：[2xLMB] プロジェクトとして開く  Playlist（クリップ）、Channel Rack、Piano roll にドラッグして読み込み"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI ファイル：[2xLMB] プロジェクトとして開く  Channel Rack または Piano roll にドラッグして読み込み（Playlist へ：Playlist メニュー › \"プレイリストにドロップした MIDI ファイルをパターンクリップにする\"）"
+"This will reset the selected mixer track(s) and remove all plugins." = "選択したミキサートラックをリセットし、すべてのプラグインを削除します。"
+"Instrument: [LMB] open or close its window" = "インストゥルメント：[LMB] ウィンドウを開く／閉じる"

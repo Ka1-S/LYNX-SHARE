@@ -30,6 +30,7 @@
 #include "core/FactoryContent.h"
 #include "core/FactoryLoops.h" // (rollup 0.1.30 step 6: LYNX content in the Loop Browser)
 #include "core/LayoutStyle.h"
+#include "core/MidiDrop.h"
 #include "core/SoundLibrary.h"
 #include "core/SearchIndex.h"
 #include "core/SearchQuery.h"
@@ -191,7 +192,11 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("Sample: [LMB] preview  [2xLMB] new channel  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  "
                    "[Shift][Up] / [Shift][Down] swap through the files");
     if (f.hasFileExtension ("mid;midi"))
-        return tr ("MIDI file: [2xLMB] open it as a project");
+        // (issue #287, round 190rc: where else a MIDI file goes, as FL takes it, and the Playlist's LYNX extra)
+        return mididrop::playlistTakes (layoutstyle::current() == layoutstyle::Style::clipLaunch)
+                   ? tr ("MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it")
+                   : tr ("MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: "
+                         "Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")");
     if (f.hasFileExtension ("lynx;flp;als;flm"))
         return tr ("Project: [2xLMB] open it");
     if (f.hasFileExtension ("lynxtrack") || (f.hasFileExtension ("fst") && f.getFullPathName().containsIgnoreCase ("Mixer presets")))

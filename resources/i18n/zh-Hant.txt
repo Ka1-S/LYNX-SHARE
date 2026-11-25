@@ -13050,3 +13050,14 @@ countries: tw hk mo
 "Always on top: keep this window above LYNX SHARE's other windows" = "總在最前：讓此視窗保持在 LYNX SHARE 其他視窗之上"
 "Always on top is not available for a plugin in a separate process" = "獨立處理程序中的外掛無法使用「總在最前」"
 "Darken image" = "調暗圖像"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "在歌曲位置切割片段（選取的片段，否則為該處的所有片段）"
+"Cut clips at the song position" = "在歌曲位置切割片段"
+"Open the project's folder in the file manager" = "在檔案管理員中開啟專案資料夾"
+"Open the project's folder" = "開啟專案資料夾"
+"Save the project first: it has no folder yet" = "請先儲存專案：它還沒有資料夾"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI 檔案：[2xLMB] 以專案開啟  拖到 Playlist（片段）、Channel Rack 或 Piano roll 以匯入"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI 檔案：[2xLMB] 以專案開啟  拖到 Channel Rack 或 Piano roll 以匯入（拖到 Playlist：Playlist 選單 › \"拖放到播放清單的 MIDI 檔案變為樣式片段\"）"
+"This will reset the selected mixer track(s) and remove all plugins." = "這將重設所選的混音器軌道並移除所有外掛。"
+"Instrument: [LMB] open or close its window" = "樂器：[LMB] 開啟或關閉其視窗"

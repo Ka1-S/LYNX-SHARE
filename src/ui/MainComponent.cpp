@@ -1294,6 +1294,7 @@ MainComponent::~MainComponent()
     {
         playlist.onTrackEffects = nullptr;
         playlist.onSimpleTrackSelected = nullptr;
+        playlist.onToggleChannelWindow = nullptr;
         playlist.onSimpleFilesDropped = nullptr;
         playlist.onSimpleAddTrack = nullptr;
         playlist.onExportTrack = nullptr;
@@ -3251,6 +3252,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.save")) save (false);
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
+    else if (is ("file.openProjectFolder")) openProjectFolder();
     else if (id.rfind ("file.recent", 0) == 0) openRecent (std::atoi (id.c_str() + 11) - 1);
     else if (is ("file.export")) exportAudio();
     else if (is ("file.exportMaster")) showMasterDialog (engine, currentFile.getParentDirectory(), projectName);
@@ -5153,6 +5155,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
                 simpleWorkflow->trackSelected (track);
         };
+        playlist.onToggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); }; // (round 190rc)
         playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->dropFiles (files, tick);
@@ -7952,6 +7955,9 @@ void MainComponent::TempoDisplay::mouseDown (const juce::MouseEvent& e)
     dragOnDecimals = isOnDecimals (e.x);
     dragging = true;
     typed.clear();
+    // issue #283 (round 190rc): FL's tempo drag has no end at the screen's edge: the pointer hides while the button is
+    // held and comes back where it was pressed (JUCE's unbounded movement; the drag distance keeps counting)
+    e.source.enableUnboundedMouseMovement (true);
     // (round 190oa, DF-15: the keys come here while the button is held)
     focusBefore = juce::Component::getCurrentlyFocusedComponent();
     setWantsKeyboardFocus (true);
@@ -9289,6 +9295,20 @@ void MainComponent::keepOverwrittenCopy (const juce::File& file)
     const auto stem = projectStem (file.getFileNameWithoutExtension());
     if (file.copyFileTo (newBackupFile (folder, stem, safety::BackupKind::overwritten)))
         rotateBackups (stem);
+}
+
+bool MainComponent::openProjectFolder (bool open)
+{
+    const auto folder = currentFile.existsAsFile() ? currentFile.getParentDirectory() : juce::File();
+    if (! folder.isDirectory())
+    {
+        if (open)
+            ui::postHint ({ tr ("Save the project first: it has no folder yet"), {} }, 2500);
+        return false;
+    }
+    if (open)
+        folder.startAsProcess();
+    return true;
 }
 
 void MainComponent::saveNewVersion()
@@ -11855,6 +11875,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                  projectStem (projectName));
         });
         menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
+        // issue #286 (round 190rc, LYNX extra): the folder of the saved project (with Collect all, its samples too)
+        menu.addItem (tr ("Open the project's folder") + shortcutText ("file.openProjectFolder"), currentFile.existsAsFile(), false,
+                      [this] { openProjectFolder(); });
         menu.addSeparator();
         {
             // FL's File › Import (ImportMenu › ImportMIDIMenu → FileImportMIDIFileAction, REA round 143)

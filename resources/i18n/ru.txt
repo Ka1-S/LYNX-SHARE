@@ -13050,3 +13050,14 @@ countries: ru by kz
 "Always on top: keep this window above LYNX SHARE's other windows" = "Поверх всех окон: это окно остаётся поверх остальных окон LYNX SHARE"
 "Always on top is not available for a plugin in a separate process" = "«Поверх всех окон» недоступно для плагина в отдельном процессе"
 "Darken image" = "Затемнить изображение"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Разрезать клипы в позиции песни (выделенные, иначе все клипы в этом месте)"
+"Cut clips at the song position" = "Разрезать клипы в позиции песни"
+"Open the project's folder in the file manager" = "Открыть папку проекта в файловом менеджере"
+"Open the project's folder" = "Открыть папку проекта"
+"Save the project first: it has no folder yet" = "Сначала сохраните проект: у него ещё нет папки"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI-файл: [2xLMB] открыть как проект  перетащите на Playlist (клип), в Channel Rack или Piano roll, чтобы импортировать"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI-файл: [2xLMB] открыть как проект  перетащите в Channel Rack или Piano roll, чтобы импортировать (на Playlist: меню Playlist › \"MIDI-файлы, перетащенные в Playlist, становятся клипами паттернов\")"
+"This will reset the selected mixer track(s) and remove all plugins." = "Выбранные дорожки микшера будут сброшены, а все плагины удалены."
+"Instrument: [LMB] open or close its window" = "Инструмент: [LMB] открыть или закрыть его окно"

@@ -18139,3 +18139,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
 #include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
 #include "TrialMark190qtTests.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)
+#include "Backlog190rcTests.inc" // round 190rc (0.1.32): #285 split at the song position, #286 the project folder, ghosts in Track-only / Simple

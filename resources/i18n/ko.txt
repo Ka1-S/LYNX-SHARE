@@ -13050,3 +13050,14 @@ countries: kr
 "Always on top: keep this window above LYNX SHARE's other windows" = "항상 위에: 이 창을 LYNX SHARE의 다른 창보다 위에 유지합니다"
 "Always on top is not available for a plugin in a separate process" = "별도 프로세스의 플러그인에는 항상 위에을 사용할 수 없습니다"
 "Darken image" = "이미지 어둡게"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "곡 위치에서 클립 자르기(선택한 클립, 없으면 그 위치의 모든 클립)"
+"Cut clips at the song position" = "곡 위치에서 클립 자르기"
+"Open the project's folder in the file manager" = "파일 관리자에서 프로젝트 폴더 열기"
+"Open the project's folder" = "프로젝트 폴더 열기"
+"Save the project first: it has no folder yet" = "먼저 프로젝트를 저장하세요: 아직 폴더가 없습니다"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI 파일: [2xLMB] 프로젝트로 열기  Playlist(클립), Channel Rack 또는 Piano roll로 드래그해 가져오기"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI 파일: [2xLMB] 프로젝트로 열기  Channel Rack 또는 Piano roll로 드래그해 가져오기 (Playlist로: Playlist 메뉴 › \"플레이리스트에 놓은 MIDI 파일을 패턴 클립으로 만들기\")"
+"This will reset the selected mixer track(s) and remove all plugins." = "선택한 믹서 트랙을 초기화하고 모든 플러그인을 제거합니다."
+"Instrument: [LMB] open or close its window" = "악기: [LMB] 창 열기/닫기"

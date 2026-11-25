@@ -13050,3 +13050,14 @@ countries: tr
 "Always on top: keep this window above LYNX SHARE's other windows" = "Her zaman üstte: bu pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar"
 "Always on top is not available for a plugin in a separate process" = "Her zaman üstteme, ayrı bir işlemdeki plugin için kullanılamaz"
 "Darken image" = "Görüntüyü karart"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Klipleri şarkı konumunda kes (seçili olanları, yoksa oradaki tüm klipleri)"
+"Cut clips at the song position" = "Klipleri şarkı konumunda kes"
+"Open the project's folder in the file manager" = "Proje klasörünü dosya yöneticisinde aç"
+"Open the project's folder" = "Proje klasörünü aç"
+"Save the project first: it has no folder yet" = "Önce projeyi kaydedin: henüz bir klasörü yok"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI dosyası: [2xLMB] proje olarak aç  içe aktarmak için Playlist'e (bir klip), Channel Rack'e veya Piano roll'a sürükleyin"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI dosyası: [2xLMB] proje olarak aç  içe aktarmak için Channel Rack'e veya Piano roll'a sürükleyin (Playlist'e: Playlist menüsü › \"Playlist'e bırakılan MIDI dosyaları pattern klipleri olur\")"
+"This will reset the selected mixer track(s) and remove all plugins." = "Bu, seçili mikser kanallarını sıfırlayacak ve tüm eklentileri kaldıracak."
+"Instrument: [LMB] open or close its window" = "Enstrüman: [LMB] penceresini aç veya kapat"

@@ -155,10 +155,17 @@ TEST (rea143_mixer_track_menu_operations)
     s.setRoute (2, 3, true);
     s.setRoute (4, 3, true);
     s.setRoute (5, 2, true);
-    // "Reset selected track(s) to default": the controls, not the name or the routing
+    a.effects.resize (2);
+    a.effects[1].row = 4;
+    a.chainBlend = 0.5f;
+    a.colour = 0xffd03030;
+    a.slotRows = 14;
+    // "Reset selected track(s) to default": the controls, the effects (FL's Default.fst), the name and the colour
     mixerops::resetToDefault (s, { 2 });
     CHECK (a.volume == unityFader && a.pan == 0.0f && a.stereo == 0.0f && ! a.invertPhase && ! a.muted && a.eq == TrackEq {});
-    CHECK (a.name == "Drums" && s.routes (2, 3));
+    CHECK (a.effects.empty() && a.chainBlend == 1.0f);
+    // the name and colour too (FL 2026: "HI TOM" became "Insert 3", red the default colour), not the routing
+    CHECK (a.name.empty() && a.colour == 0 && a.slotRows == 0 && s.routes (2, 3));
     // the "Select" submenu's lists
     CHECK ((mixerops::destinationsOf (s, 2) == std::vector<int> { 0, 3 }));
     CHECK ((mixerops::sourcesOf (s, 3) == std::vector<int> { 2, 4 }));
@@ -170,7 +177,8 @@ TEST (rea143_mixer_track_menu_operations)
     s.mixer[5].masterLevel = 0.5f;
     mixerops::resetRouting (s, { 5, 0 });
     CHECK (s.mixer[5].sends.empty() && s.mixer[5].toMaster && s.mixer[5].masterLevel == 1.0f);
-    // "Insert multiple...": blank inserts at the place, the rest moves right
+    // "Insert multiple...": blank inserts at the place, the rest moves right (the reset above cleared insert 2's name)
+    s.mixer[2].name = "Drums";
     const auto before = s.mixer.size();
     CHECK (mixerops::insertTracks (s, 2, 3) == 3 && s.mixer.size() == before + 3 && s.mixer[5].name == "Drums");
 }

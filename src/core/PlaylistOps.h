@@ -3,6 +3,7 @@
 // Clip properties and arrangement management (FL's "Clip properties" and "Merge arrangement" windows, interpreted;
 // REA_rodada84). Plain edits on a Song, each run inside AudioEngine::editSong (one undo step). No JUCE.
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <string>
@@ -105,6 +106,46 @@ void rename (Song& song, int index, const std::string& name);
 // Duplicates arrangement `index` after itself (not selected); returns the new index.
 int duplicate (Song& song, int index);
 } // namespace lynx::arrangeops
+
+// Issue #285 (round 190rc, LYNX extra): "Cut clips at the song position" — what FL's Slice tool does at one point, as a
+// command. The selected clips that cross `tick` are cut there; with no selection (or none of the selected crossing it),
+// every clip that crosses it (as REAPER's split at the cursor). A clip that starts or ends at `tick` is not cut.
+namespace lynx::splitat
+{
+// The clip indices to cut (in order)
+inline std::vector<int> clipsAt (const std::vector<Clip>& clips, const std::vector<int>& selection, std::int64_t tick)
+{
+    const auto crosses = [&clips, tick] (int i) {
+        return i >= 0 && i < (int) clips.size() && tick > clips[(std::size_t) i].start && tick < clips[(std::size_t) i].end();
+    };
+    std::vector<int> out;
+    for (const auto i : selection)
+        if (crosses (i) && std::find (out.begin(), out.end(), i) == out.end())
+            out.push_back (i);
+    if (! out.empty())
+        return out;
+    for (int i = 0; i < (int) clips.size(); ++i)
+        if (crosses (i))
+            out.push_back (i);
+    return out;
+}
+
+// Cuts them (splitClip: the clip keeps its start, the rest is appended); returns both pieces of every cut clip
+inline std::vector<int> split (std::vector<Clip>& clips, const std::vector<int>& targets, std::int64_t tick)
+{
+    std::vector<int> pieces;
+    for (const auto i : targets)
+    {
+        if (i < 0 || i >= (int) clips.size() || tick <= clips[(std::size_t) i].start || tick >= clips[(std::size_t) i].end())
+            continue;
+        auto rest = splitClip (clips[(std::size_t) i], tick);
+        clips.push_back (std::move (rest));
+        pieces.push_back (i);
+        pieces.push_back ((int) clips.size() - 1);
+    }
+    return pieces;
+}
+} // namespace lynx::splitat
 
 // FL's Playlist track modes and "Consolidate track(s)" (REA round 146a).
 namespace lynx::trackmodes

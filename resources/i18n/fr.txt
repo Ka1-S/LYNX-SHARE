@@ -13050,3 +13050,14 @@ countries: fr be ch ca lu
 "Always on top: keep this window above LYNX SHARE's other windows" = "Toujours au premier plan : garde cette fenêtre au-dessus des autres fenêtres de LYNX SHARE"
 "Always on top is not available for a plugin in a separate process" = "« Toujours au premier plan » n'est pas disponible pour un plugin dans un processus séparé"
 "Darken image" = "Assombrir l'image"
+
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Couper les clips à la position du morceau (ceux sélectionnés, sinon tous les clips à cet endroit)"
+"Cut clips at the song position" = "Couper les clips à la position du morceau"
+"Open the project's folder in the file manager" = "Ouvrir le dossier du projet dans le gestionnaire de fichiers"
+"Open the project's folder" = "Ouvrir le dossier du projet"
+"Save the project first: it has no folder yet" = "Enregistrez d'abord le projet : il n'a pas encore de dossier"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "Fichier MIDI : [2xLMB] l'ouvrir comme projet  glissez-le sur la Playlist (un clip), le Channel Rack ou le Piano roll pour l'importer"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "Fichier MIDI : [2xLMB] l'ouvrir comme projet  glissez-le sur le Channel Rack ou le Piano roll pour l'importer (sur la Playlist : menu de la Playlist › \"Les fichiers MIDI déposés sur la Playlist deviennent des clips de pattern\")"
+"This will reset the selected mixer track(s) and remove all plugins." = "Cela réinitialisera la ou les pistes de mixage sélectionnées et retirera tous les plugins."
+"Instrument: [LMB] open or close its window" = "Instrument : [LMB] ouvrir ou fermer sa fenêtre"
