@@ -80,3 +80,53 @@ TEST (sweep190re_flp_export_report_names_each_left_out_slot)
     CHECK (has ("slot 4: ") && has ("(LYNX only)"));
     CHECK (! has ("Plugin (LYNX only)"));
 }
+
+// GarageBand / BandLab imports: an audio region's start into its file was split with floor, so the sub-tick rest went up to
+// 0.99, past the -0.5..0.5 a .lynx keeps: a saved and reopened project played the clip up to half a tick earlier (CC
+// Jingle.band: 0.9927 -> 0.5 after a reopen). Rounded now, as the FL and DAWproject imports do; the clip starts at the
+// same place in the file.
+TEST (sweep190re_band_and_blx_offsets_keep_the_lynx_fraction_range)
+{
+    using namespace lynx;
+    band::Project project;
+    project.bpm = 96.0;
+    project.sampleRate = 44100.0;
+    band::Track track;
+    track.name = "Voice";
+    track.audio = true;
+    band::Region region;
+    region.audio = true;
+    region.file = "Audio Recorder#01.aif";
+    region.start = 0;
+    region.trimSamples = 44137; // (just over a second: the rest is past half a tick)
+    region.lengthSamples = 44100;
+    track.regions.push_back (region);
+    project.tracks.push_back (track);
+    std::map<std::string, band190ic::Bytes> files;
+    files["/songs/Jingle.band/Media/Audio Recorder#01.aif"] = { 0 };
+    FlpImportReport report;
+    const auto song = importBand (project, band190ic::options (&report, &files));
+    const Clip* clip = nullptr;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::audio)
+            clip = &c;
+    CHECK (clip != nullptr);
+    if (clip != nullptr)
+    {
+        const auto ticks = 44137.0 / 44100.0 * (96.0 / 60.0 * ppq);
+        CHECK (clip->offsetFraction >= -0.5f && clip->offsetFraction <= 0.5f);
+        CHECK (std::abs ((double) clip->offset + (double) clip->offsetFraction - ticks) < 1e-3);
+    }
+    // the BandLab revision's voice take (0.4 s into its file = 640 ticks, a double that floor cut to 639 + 0.99...)
+    auto blxFiles = blx190jr::folder();
+    const auto blxSong = importBlxBytes (blx190jr::bytesOf (blx190jr::revision()), blx190jr::options (&report, &blxFiles), nullptr);
+    CHECK (blxSong.has_value());
+    if (blxSong)
+        for (const auto& c : blxSong->playlist)
+            if (c.kind == ClipKind::audio)
+                CHECK (c.offsetFraction >= -0.5f && c.offsetFraction <= 0.5f);
+    const auto band = i18ntest::readFile ("src/core/BandImport.cpp");
+    const auto blx = i18ntest::readFile ("src/core/BlxImport.cpp");
+    CHECK (band.find ("clip.offset = (std::int64_t) std::floor (offset);") == std::string::npos);
+    CHECK (blx.find ("clip.offset = (std::int64_t) std::floor (offset);") == std::string::npos);
+}

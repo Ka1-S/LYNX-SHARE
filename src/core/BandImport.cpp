@@ -339,7 +339,9 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
                 clip.track = made.track;
                 clip.start = region.start;
                 const auto offset = (double) region.trimSamples / sampleRate * secondsToTicks;
-                clip.offset = (std::int64_t) std::floor (offset);
+                // (round 190re: rounded, so the sub-tick rest is in -0.5..0.5 as a .lynx keeps it; floor left up to 0.99,
+                // which a saved and reopened project clamped to 0.5: the clip played up to half a tick earlier)
+                clip.offset = (std::int64_t) std::llround (offset);
                 clip.offsetFraction = (float) (offset - (double) clip.offset);
                 clip.length = std::max<std::int64_t> (1, std::llround ((double) region.lengthSamples / sampleRate * secondsToTicks));
                 song.playlist.push_back (clip);
