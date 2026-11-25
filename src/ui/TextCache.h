@@ -26,7 +26,10 @@ inline std::unordered_map<juce::String, juce::GlyphArrangement>& cache()
     return map;
 }
 
-inline const juce::GlyphArrangement& get (const juce::String& key, const std::function<void (juce::GlyphArrangement&)>& make)
+// (round 190rd: `make` a template parameter, no std::function: a lambda with its captures made one on the heap at every
+// call, cache hit or not — one allocation per text drawn)
+template <typename Make>
+inline const juce::GlyphArrangement& get (const juce::String& key, const Make& make)
 {
     auto& map = cache();
     if (const auto it = map.find (key); it != map.end())
@@ -94,8 +97,8 @@ inline std::unordered_multimap<std::uint64_t, Entry>& hashed()
     return map;
 }
 
-inline const juce::GlyphArrangement& getHashed (const Call& call, const juce::Font& font, const juce::String& text,
-                                                const std::function<void (juce::GlyphArrangement&)>& make)
+template <typename Make>
+inline const juce::GlyphArrangement& getHashed (const Call& call, const juce::Font& font, const juce::String& text, const Make& make)
 {
     const auto height = thousandths (font.getHeight()), scale = thousandths (font.getHorizontalScale());
     auto h = mixHash (mixHash (mixHash (1469598103934665603ull, (std::uint64_t) (unsigned char) call.kind), (std::uint64_t) call.width), (std::uint64_t) call.height);
