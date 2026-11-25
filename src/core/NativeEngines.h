@@ -75,9 +75,23 @@ std::string defaultPresetPath (const std::string& presetFolder, bool generator, 
 // of a channel window, round 167o).
 std::optional<ChannelDef> channelFromPresetFile (InstrumentKind kind, const std::string& path, const FlAccess& fl);
 
+// Issue #288 (round 190rc): the generator a preset file of FL's belongs to, whatever the folder it sits in: the plugin
+// an .fst names (event 0xC9: Sytrus, Harmor, 3x Osc, MIDI Out...; a channel preset of "Channel presets\3x Osc" too), or
+// Toxic's .tbio, GMS' .gmsynth, Morphine's .mrp. nullopt when it is not a generator LYNX plays natively (a hosted
+// plugin's .fst, an effect's, a damaged file).
+std::optional<InstrumentKind> presetKind (const std::string& path, const FlAccess& fl);
+// A new channel of that generator with the preset loaded and named after it (`presetName`; FL names the channel after
+// the preset), as FL's Browser opens a generator preset in a new channel. The mixer insert is left to the caller.
+std::optional<ChannelDef> channelFromAnyPreset (const std::string& path, const std::string& presetName, const FlAccess& fl);
+
 // The folder under Plugin presets\Generators that holds a channel kind's presets ("" = none): the engines above and
 // MIDI Out (the ◀ ▶ arrows of a channel window, round 167o).
 std::string presetFolderOf (InstrumentKind kind);
+
+// The file type of a kind's presets in its folder (issue #288, round 190rc): Toxic Biohazard's ".tbio", GMS' ".gmsynth",
+// Morphine's ".mrp", the others FL's ".fst". The channel window's preset list showed only .fst files, so these three
+// engines' menus held none of FL's presets.
+std::string presetExtensionOf (InstrumentKind kind);
 
 // Channel `current` with preset file `path` loaded, as FL does it from the ◀ ▶ arrows: the instrument's state comes
 // from the preset (MIDI Out keeps its channel and port), the channel keeps its own settings (mixer insert, volume, pan,

@@ -18136,3 +18136,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190qoTests.inc" // round 190qo: issues #270 (typing keyboard layouts), #271 (SoundFont slide velocity)
 #include "Discord1124_190quTests.inc" // round 190qu (0.1.32): Discord 11-24 (automation lanes, Split by channel, Track-only, Simple)
 #include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
+#include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
