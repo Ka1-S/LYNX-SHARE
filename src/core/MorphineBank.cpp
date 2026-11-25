@@ -91,7 +91,7 @@ struct Morphine
                         s.f (value (k + j));
             }
         };
-        array ([&f] (int k) { return (float) std::cbrt (std::max (0.0, gain * f.amp (k + 1))); }); // (amplitudes as cube roots)
+        array ([&f, gain] (int k) { return (float) std::cbrt (std::max (0.0, gain * f.amp (k + 1))); }); // (amplitudes as cube roots)
         array ([] (int) { return 0.0f; });                                                   // pan
         array ([&f] (int k) { return f.detune ? (float) f.detune (k + 1) : 0.0f; });          // detune, in harmonic numbers
         return s.b;
