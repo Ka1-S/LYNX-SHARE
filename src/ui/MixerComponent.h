@@ -307,6 +307,7 @@ public:
     juce::Rectangle<int> panAreaForSnapshot (int track) const { return panArea (track); }
     juce::Rectangle<int> soloAreaForSnapshot (int track) const { return soloArea (track); }
     juce::Rectangle<int> headerAreaForSnapshot (int track) const { return headerArea (track); }
+    juce::Rectangle<int> armAreaForSnapshot (int track) const { return armArea (track); } // (round 190rj: the automation mode's row 8)
     // round 190lr (--details190lrshot): one display frame at `nowMs` (the Waveforms view's rows, the meters), the
     // polarity / swap icons and the strip part under a point
     bool frameForSnapshot (double nowMs) { return liveFrame (nowMs); }

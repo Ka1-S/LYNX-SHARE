@@ -116,7 +116,7 @@ Also new in round 190pl:
 - **`ui.editor` `insert` + `slot`**: an insert effect's editor window, ID `editor`.
 - **`ui.show`** `pluginManager` and `versions`.
 - **Cells**: `mixer.strips` row 3 = a track's route arrow, 4 = its fader's cap where it is now, 5 = its pan knob, 6 = its solo
-  switch, 7 = its header (a click selects the track); `mixer.slots` (the Mixer's insert slots, column = the slot); `browser.tree` / `browser.results` (the Browser's and
+  switch, 7 = its header (a click selects the track), 8 = its disk recording switch; `mixer.slots` (the Mixer's insert slots, column = the slot); `browser.tree` / `browser.results` (the Browser's and
   the Loops dock's lists, column = the row; `"name"` finds a row by its label); `automationEditor` (an automation clip's editor: row 0 = point *column*, row 1 = the grid at 16th *column*, top to bottom =
   its value range); `pluginChooser` (the Mixer slot's More plugins... window: column = the row shown, `"name"` by the plugin's
   name); `pluginPicker` (row 0 = a tile, column = its
