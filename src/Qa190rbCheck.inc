@@ -317,6 +317,44 @@
                    steps > 0);
         }
 
+        // ---- UI monkey test, seed 113 (sanitizer build): heap-buffer-overflow in the Session mixer's paint. Its send rows
+        //      are laid out from the song; a row's insert the song no longer has (inserts went, another project) was
+        //      read as mixer[insert].liveReturn before the next layout
+        {
+            AudioEngine offline (false);
+            MainComponent ui (offline, false);
+            ui.setSize (1600, 1000);
+            ui.setVisible (true);
+            ui.setClipLaunchWorkflow (true);
+            ui.setClipGridView (PlaylistArea::GridView::grid);
+            const auto inserts = offline.getSong().mixer.size();
+            offline.editSong ([inserts] (Song& s) {
+                s.mixer.resize (inserts + 2);
+                s.mixer[inserts].name = "A Return";
+                s.mixer[inserts].liveReturn = true;
+                s.mixer[inserts + 1].name = "B Return";
+                s.mixer[inserts + 1].liveReturn = true;
+            }, false);
+            offline.dispatchPendingMessages();
+            ui.resized();
+            auto* grid = ui.getClipGridForSnapshot();
+            auto* mixer = grid != nullptr ? clipGridMixer (*grid) : nullptr;
+            check ("Session mixer: shown with two returns", mixer != nullptr && mixer->getHeight() > 0);
+            if (mixer != nullptr)
+            {
+                offline.editSong ([inserts] (Song& s) { s.mixer.resize (inserts); }); // (the returns go; no message runs before the paint)
+                juce::Image image (juce::Image::ARGB, juce::jmax (1, mixer->getWidth()), juce::jmax (1, mixer->getHeight()), true);
+                {
+                    juce::Graphics g (image);
+                    mixer->paintEntireComponent (g, false);
+                }
+                offline.dispatchPendingMessages();
+                check ("Session mixer: paints right after its return inserts went", offline.getSong().mixer.size() == inserts);
+            }
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            offline.dispatchPendingMessages();
+        }
+
         // ---- UI monkey test, seed 15 (release build): the Tracker painted its cells from a layout built before an undo,
         //      whose notes indexed past the pattern's (TrackerComponent::paint -> paintCell -> tracker::fxActive). Cells
         //      of a layout a step behind the song show nothing now, and a key or a click builds the layout again first
