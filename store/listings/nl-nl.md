@@ -49,6 +49,8 @@ LYNX SHARE is in alfa: verwacht nog wat ruwe randjes en meld problemen alsjeblie
 
 ## What's new
 
+LYNX SHARE 0.1.31.2 repareert een crash op de startpagina, het typtoetsenbord als piano boven gedockte plugins, uitgerekte clips die hun eerste maat herhaalden, automatiseringsbanen gemaakt van FL-projecten en twee kleinere problemen.
+
 LYNX SHARE 0.1.31.1 lost op wat jullie over 0.1.31 meldden: automatisering van FL-projecten op de regelaars, pluginvensters die niet meer opengingen, de Device-weergave, exporteren met een map in de bestandsnaam, clips op instrumentsporen, een crash in de hintbalk en het geheugen bij het opstarten.
 
 LYNX SHARE 0.1.31: een ingebouwde Tracker die ook trackermodules (.mod, .xm, .s3m, .it) opent; LYNX Model, fysieke
