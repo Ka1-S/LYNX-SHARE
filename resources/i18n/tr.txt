@@ -12847,3 +12847,6 @@ countries: tr
 "This pattern plays one channel only: there is nothing to split." = "Bu pattern yalnızca tek bir kanal çalıyor: bölünecek bir şey yok."
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "Bu sürümde Peak Controller ve Envelope Controller bağlantıları, denetleyici bir değer göndermeden önce hedeflerini en baştan ayarlar: {0}"
 "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Effector'ün daha yeni Kilohearts yasaları (kHs Ring Mod'un aşırı örneklenmiş yolu; kHs Formant Filter, kHs Delay ve kHs Clipper yerine geçenler) önceki Ring Mod yasasını ve Effector'ün kendi Vowel, Delay ve Distort'unu çalar: {0}"
+
+# round 190rc: PR #284's reset warning
+"This will reset the selected mixer track(s) and remove all plugins." = "Bu, seçili mikser kanallarını sıfırlayacak ve tüm eklentileri kaldıracak."

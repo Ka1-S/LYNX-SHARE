@@ -1501,6 +1501,12 @@ void resetToDefault (Song& song, const std::vector<int>& tracks)
             for (int i = (int) m.effects.size() - 1; i >= 0; --i)
                 removeEffectKeepRows (song, t, i);
             m.chainBlend = 1.0f;
+            // round 190rc (live check, FL 2026 on Thief's insert 3 "HI TOM"): the name and the colour go back to the
+            // defaults too ("Insert 3", the theme's colour), as FL's manual says ("Deletes all FX and resets the track
+            // name and color to default"); the routing stays. The added slot rows go with the effects.
+            m.name.clear();
+            m.colour = 0;
+            m.slotRows = 0;
         }
 }
 
