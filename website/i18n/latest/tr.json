@@ -1,7 +1,7 @@
 {
 "u.0.1.31.2.t": "0.1.31 için daha fazla düzeltme",
 "u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmeyi, yerleştirilmiş eklentiler üzerindeki klavyeden piyanoyu, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini FL'nin reddettiği dışa aktarılmış .flp dosyalarını, Browser'daki FL synth preset'lerini ve birkaç küçük sorunu düzeltiyor.",
-"u.0.1.31.2.f0": "Başlangıç sayfasındaki \"Yeni proje başlat\" listesini kaydırmak artık Windows'ta LYNX'i çökertmiyor.",
+"u.0.1.31.2.f0": "Başlangıç sayfasındaki \"Yeni proje başlat\" listesini kaydırmak listenin sonundan ötesini okuyabiliyordu; bu, Windows'ta bildirilen bir çökmenin olası nedeniydi ve artık olmuyor.",
 "u.0.1.31.2.f1": "Yerleştirilmiş bir eklentinin üzerinde, pencerenin klavye düğmesi öyle diyorsa klavyeden piyano yine önce çalıyor, ayrık bir pencerede olduğu gibi.",
 "u.0.1.31.2.f2": "\"Uzatılmış pattern klipleri pattern'lerini döngüler\" açıkken bir klibin ilk ölçüsünden sonra çizilen, yapıştırılan veya taşınan notalar duyuluyor: pattern onları içerecek kadar uzuyor.",
 "u.0.1.31.2.f3": "Playlist › \"Otomasyon kliplerini parçalarının şeritlerine taşı\" kliplerin çaldığı değerleri büyük FL projelerinde de koruyor.",
