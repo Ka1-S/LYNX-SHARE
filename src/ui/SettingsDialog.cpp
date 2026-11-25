@@ -15,6 +15,12 @@
 #include "ui/Theme.h"
 #include "platform/Paths.h"
 #include "ui/ToolWindow.h"
+#include "ui/MixerComponent.h" // round 190qx (mixeroptions::changed: Reset this page saves ui-options.txt)
+#include "core/ExtrasDefaults.h" // round 190qx
+#include "core/FlSettings.h"
+#include "core/LynxExtras.h"
+#include "core/RenderAhead.h"
+#include "core/Onboarding.h"
 
 namespace lynx
 {
@@ -152,6 +158,33 @@ public:
         panLaw.setTooltip (tr ("Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels."));
         panLaw.onChange = [this] { edit ([on = panLaw.getSelectedId() == 2] (Song& s) { s.panTriangular = on; }); };
         add (panLaw);
+
+        // round 190qx: one-line tooltips where a control had neither a tooltip nor a note, and the words people type into
+        // Settings' find bar (English, not translated)
+        {
+            const auto words = [] (juce::Component& c, const char* text) { c.getProperties().set ("lynxSearchText", text); };
+            tempo.setTooltip (tr ("The project's tempo in beats per minute (double-click: 130)"));
+            words (tempo, "BPM tempo speed");
+            beats.setTooltip (tr ("How many beats a bar has: 4 for 4/4, 3 for 3/4"));
+            words (beats, "time signature meter numerator bar length");
+            swing.setTooltip (tr ("The project's swing: every second step plays a little later, for a shuffled groove"));
+            words (swing, "shuffle groove swing");
+            pitch.setTooltip (tr ("Tunes the whole project up or down in cents (100 cents = one semitone)"));
+            words (pitch, "master pitch tune transpose tuning cents");
+            words (timeMode, "time signature time division");
+            words (panLaw, "pan law panning -3 dB");
+            crossfades.setTooltip (tr ("For this project only; the switch below sets it for new projects"));
+            words (crossfades, "crossfade fade overlap audio clips");
+            crossfadesNew.setTooltip (tr ("New projects start with automatic crossfades on"));
+            linkTracks.setTooltip (tr ("For this project only. Switching it on lists what changes and asks first"));
+            words (linkTracks, "track routing mixer insert link instrument track");
+            linkTracksNew.setTooltip (tr ("New projects start with their Playlist tracks linked to mixer tracks (a LYNX extra)"));
+            compFade.setTooltip (tr ("How long the crossfade is where a comp switches from one take to the next"));
+            words (compFade, "comping takes crossfade");
+            truncated.setTooltip (tr ("Off: a note that starts before a pattern clip's start is not played"));
+            fastDeclick.setTooltip (tr ("A note cut off by another one of its cut group fades out faster"));
+            words (fastDeclick, "cut group choke hi-hat declick");
+        }
 
         engine.addChangeListener (this);
         load();
@@ -324,6 +357,18 @@ public:
         };
         add (resetTime);
 
+        // round 190qx: one-line tooltips and Settings' search words
+        title.setTooltip (tr ("The song's title, saved with the project"));
+        author.setTooltip (tr ("Who made the song, saved with the project"));
+        genre.setTooltip (tr ("The song's genre: type one, or pick one with the arrow beside it"));
+        genreMenu.setTooltip (tr ("Pick a genre"));
+        url.setTooltip (tr ("A web page for the song: your profile, a store or a video"));
+        openLink.setTooltip (tr ("Opens the web link in your browser"));
+        comments.setTooltip (tr ("Notes about the project: lyrics, ideas, credits"));
+        showOnOpen.setTooltip (tr ("This page opens by itself every time the project is opened"));
+        for (auto* l : { &titleLabel, &authorLabel, &genreLabel, &urlLabel, &commentsLabel })
+            l->getProperties().set ("lynxSearchText", "song info metadata project information");
+
         engine.addChangeListener (this);
         load();
         startTimer (1000);
@@ -488,6 +533,8 @@ public:
         removeButton.onClick = [this] { removeSelected(); };
         addAndMakeVisible (addButton);
         addAndMakeVisible (removeButton);
+        addButton.setTooltip (tr ("Adds a folder to this list")); // (round 190qx)
+        removeButton.setTooltip (tr ("Takes the selected folder off this list; the folder itself stays on the disk"));
         folders = load();
         refresh();
     }
@@ -515,10 +562,14 @@ public:
     // the least height that shows the heading, the note, two rows and every button
     int minimumHeight() const { return 28 + 4 + 20 + 4 + juce::jmax (2 * 24 + 2, extraButton != nullptr ? 26 + 6 + 26 + 6 + 26 : 26 + 6 + 26); }
 
+    // round 190qx: words Settings' find bar also finds this list by (on its note, so the match shows the note)
+    void setSearchWords (const char* words) { noteLabel.getProperties().set ("lynxSearchText", words); }
+
     // A third button under Add / Remove (the plugin folders' "Plugin manager...", as FL's File page has it).
     void addExtraButton (const juce::String& text, std::function<void()> onClick)
     {
         extraButton = std::make_unique<juce::TextButton> (text);
+        extraButton->setTooltip (tr ("Opens the Plugin manager: scan for plugins and see the ones found")); // (round 190qx: its one use)
         extraButton->onClick = std::move (onClick);
         addAndMakeVisible (*extraButton);
         resized();
@@ -700,6 +751,12 @@ public:
         add (*pluginFolders);
         add (*jsfxFolders);
         add (*flmResources);
+        // round 190qx: the words people type into Settings' find bar (English, not translated)
+        searchFolders->setSearchWords ("missing samples relink locate search path");
+        browserFolders->setSearchWords ("browser library samples folder user data packs");
+        pluginFolders->setSearchWords ("plugin path VST VST3 CLAP scan folder");
+        jsfxFolders->setSearchWords ("JSFX REAPER effects scripts");
+        flmResources->setSearchWords ("FL Studio Mobile flm factory sounds");
     }
 
 protected:
@@ -778,6 +835,13 @@ public:
     juce::TabBarButton* createTabButton (const juce::String& name, int index) override
     {
         return new SettingsTab (name, getTabbedButtonBar(), index == firstOwnTab);
+    }
+
+    std::function<void (int)> onTabChanged; // round 190qx (the Reset button follows the page shown)
+    void currentTabChanged (int index, const juce::String&) override
+    {
+        if (onTabChanged)
+            onTabChanged (index);
     }
 };
 
@@ -879,9 +943,11 @@ public:
         }
     }
 
+    int rightInset = 0; // round 190qx: the Reset button's room at the bar's right end
+
     void resized() override
     {
-        auto r = getLocalBounds().reduced (10, 5).withTrimmedTop (1);
+        auto r = getLocalBounds().reduced (10, 5).withTrimmedTop (1).withTrimmedRight (rightInset);
         count.setBounds (r.removeFromRight (110));
         next.setBounds (r.removeFromRight (28).reduced (2, 0));
         prev.setBounds (r.removeFromRight (28).reduced (2, 0));
@@ -913,9 +979,17 @@ public:
                     std::vector<std::pair<int, Match>> found;
                     collect (*page, *page, p, q, found);
                     std::stable_sort (found.begin(), found.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+                    // (round 190qx, OPTIONS.md: a row's caption and its box or slider were two matches; one per row)
+                    int kept = 0, lastY = -1000;
                     for (auto& f : found)
+                    {
+                        if (f.first - lastY < 4)
+                            continue;
+                        lastY = f.first;
                         matches.push_back (std::move (f.second));
-                    perPage[(std::size_t) p] = (int) found.size();
+                        ++kept;
+                    }
+                    perPage[(std::size_t) p] = kept;
                 }
         }
         if (onCounts)
@@ -936,6 +1010,35 @@ public:
             show();
         }
         updateButtons();
+    }
+
+    // round 190qx (the command palette's Settings options): the box shows `caption`, and the match on page `pageIndex` whose
+    // text is the caption (else its first match there) is shown and outlined
+    bool reveal (int pageIndex, const juce::String& caption)
+    {
+        box.setText (caption, juce::dontSendNotification);
+        search (false);
+        int best = -1;
+        for (int i = 0; i < (int) matches.size(); ++i)
+            if (matches[(std::size_t) i].page == pageIndex)
+            {
+                if (matches[(std::size_t) i].text.trim() == caption.trim())
+                {
+                    best = i;
+                    break;
+                }
+                if (best < 0)
+                    best = i;
+            }
+        if (best < 0)
+        {
+            updateButtons();
+            return false;
+        }
+        current = best;
+        show();
+        updateButtons();
+        return true;
     }
 
     void step (int direction)
@@ -1054,37 +1157,350 @@ private:
     int current = -1;
 };
 
+// Round 190qx (the owner's "make the options easy"): "Reset this page" puts the options of the page shown back at the
+// defaults of a new profile, after an inline "Reset? / Cancel" (nothing pops up over the window), and offers Undo for a
+// few seconds. What makes the setup yours stays (said beside the button): the language and the layout style, the audio
+// device, the MIDI devices and controller links, the folders. Project and Info edit the song (Ctrl+Z undoes them), so
+// they have no reset; Files only lists your folders.
+juce::String pageName (SettingsPage page)
+{
+    switch (page)
+    {
+        case SettingsPage::midi: return tr ("MIDI");
+        case SettingsPage::audio: return tr ("Audio");
+        case SettingsPage::general: return tr ("General");
+        case SettingsPage::files: return tr ("Files");
+        case SettingsPage::theme: return tr ("Theme");
+        case SettingsPage::project: return tr ("Project");
+        case SettingsPage::info: return tr ("Info");
+        case SettingsPage::link: return tr ("Ableton Link");
+        case SettingsPage::extras: return tr ("LYNX extras");
+    }
+    return {};
+}
+
+bool canResetPage (SettingsPage page, const SettingsHooks& hooks)
+{
+    switch (page)
+    {
+        case SettingsPage::general: return hooks.getGeneral != nullptr && hooks.setGeneral != nullptr;
+        case SettingsPage::audio:
+        case SettingsPage::midi:
+        case SettingsPage::theme:
+        case SettingsPage::link:
+        case SettingsPage::extras: return true;
+        case SettingsPage::files:
+        case SettingsPage::project:
+        case SettingsPage::info: return false;
+    }
+    return false;
+}
+
+// what the reset leaves as it is (the confirm line and the button's tooltip say it)
+juce::String resetKeeps (SettingsPage page)
+{
+    switch (page)
+    {
+        case SettingsPage::general: return tr ("The language, the layout style, crash reports and update checks stay as they are.");
+        case SettingsPage::audio: return tr ("The audio device, its sample rate and buffer, and the measured recording latency stay as they are.");
+        case SettingsPage::midi: return tr ("Your MIDI devices, their settings and your controller links stay as they are.");
+        case SettingsPage::theme: return tr ("Your saved theme presets stay in the list.");
+        case SettingsPage::link: return tr ("Whether the Link button shows in the toolbar stays as it is.");
+        case SettingsPage::extras: return tr ("The same as Recommended. Your automatic color and icon rules stay.");
+        case SettingsPage::files: return tr ("This page lists your folders: remove one with its Remove button.");
+        case SettingsPage::project:
+        case SettingsPage::info: return tr ("This page edits the project: Ctrl+Z undoes a change.");
+    }
+    return {};
+}
+
+// Resets the page's options and returns what undoes it (empty: nothing was done)
+std::function<void()> resetPage (AudioEngine& engine, const SettingsHooks& hooks, SettingsPage page, bool persistent)
+{
+    const auto saved = [] {
+        if (mixeroptions::changed)
+            mixeroptions::changed(); // (ui-options.txt)
+    };
+    switch (page)
+    {
+        case SettingsPage::general:
+        {
+            if (! canResetPage (page, hooks))
+                return {};
+            const auto before = hooks.getGeneral();
+            auto& fl = flsettings::options();
+            struct Fl { bool autoName, restoreSolo, readTempo, newestFirst, knobs, historyOnUndo, layout, clickHold, bothButtons; int sizeMb; };
+            const Fl flBefore { fl.autoNameChannels, fl.restoreStateAfterSolo, fl.readSampleTempo, fl.historyNewestFirst, fl.undoKnobTweaks,
+                                fl.historyOnUndo, fl.projectWindowLayout, fl.clickHold, fl.bothButtonsSteps, fl.projectSizeWarnMb };
+            GeneralOptions fresh;
+            // (yours: the language and the layout, the app menu entry, the privacy choices)
+            fresh.language = before.language;
+            fresh.layoutStyle = before.layoutStyle;
+            fresh.menuEntry = before.menuEntry;
+            fresh.crashReports = before.crashReports;
+            fresh.checkUpdates = before.checkUpdates;
+            hooks.setGeneral (fresh);
+            const flsettings::Options defaults;
+            fl.autoNameChannels = defaults.autoNameChannels.load();
+            fl.restoreStateAfterSolo = defaults.restoreStateAfterSolo.load();
+            fl.readSampleTempo = defaults.readSampleTempo.load();
+            fl.historyNewestFirst = defaults.historyNewestFirst.load();
+            fl.undoKnobTweaks = defaults.undoKnobTweaks.load();
+            fl.historyOnUndo = defaults.historyOnUndo.load();
+            fl.projectWindowLayout = defaults.projectWindowLayout.load();
+            fl.clickHold = defaults.clickHold.load();
+            fl.bothButtonsSteps = defaults.bothButtonsSteps.load();
+            fl.projectSizeWarnMb = defaults.projectSizeWarnMb.load();
+            const auto tipsBefore = hooks.tipsShown ? hooks.tipsShown() : true;
+            if (hooks.showTips)
+                hooks.showTips (true);
+            saved();
+            return [hooks, before, flBefore, tipsBefore, saved] {
+                hooks.setGeneral (before);
+                auto& o = flsettings::options();
+                o.autoNameChannels = flBefore.autoName;
+                o.restoreStateAfterSolo = flBefore.restoreSolo;
+                o.readSampleTempo = flBefore.readTempo;
+                o.historyNewestFirst = flBefore.newestFirst;
+                o.undoKnobTweaks = flBefore.knobs;
+                o.historyOnUndo = flBefore.historyOnUndo;
+                o.projectWindowLayout = flBefore.layout;
+                o.clickHold = flBefore.clickHold;
+                o.bothButtonsSteps = flBefore.bothButtons;
+                o.projectSizeWarnMb = flBefore.sizeMb;
+                if (hooks.showTips)
+                    hooks.showTips (tipsBefore);
+                saved();
+            };
+        }
+        case SettingsPage::audio:
+        {
+            auto& fl = flsettings::options();
+            auto& transport = engine.getTransport();
+            struct Audio { int interpolation; bool genThreads, mixThreads, smart, smartNew, autoClose, safe, ahead, truncated, resetFx; int metronome; };
+            const Audio before { fl.interpolation, fl.multithreadGenerators, fl.multithreadMixer, fl.smartDisable, fl.smartDisableNewPlugins,
+                                 fl.autoCloseDevice, fl.safeOverloads, renderAheadOption().load(), transport.playTruncatedOnTransport.load(),
+                                 transport.resetPluginsOnTransport.load(), transport.metronomeTrack.load() };
+            const auto recordingBefore = engine.getRecordingSettings();
+            const auto apply = [&engine] (const Audio& a) {
+                auto& o = flsettings::options();
+                o.interpolation = a.interpolation;
+                o.multithreadGenerators = a.genThreads;
+                o.multithreadMixer = a.mixThreads;
+                o.smartDisable = a.smart;
+                o.smartDisableNewPlugins = a.smartNew;
+                o.autoCloseDevice = a.autoClose;
+                o.safeOverloads = a.safe;
+                renderAheadOption().store (a.ahead);
+                auto& t = engine.getTransport();
+                t.playTruncatedOnTransport.store (a.truncated);
+                t.resetPluginsOnTransport.store (a.resetFx);
+                t.metronomeTrack.store (a.metronome);
+            };
+            const flsettings::Options defaults;
+            apply ({ defaults.interpolation.load(), defaults.multithreadGenerators.load(), defaults.multithreadMixer.load(), defaults.smartDisable.load(),
+                     defaults.smartDisableNewPlugins.load(), defaults.autoCloseDevice.load(), defaults.safeOverloads.load(), true, true, false, 0 });
+            // the recording options (the measured latencies and the ping's channels are the device's: they stay)
+            auto recording = AudioEngine::RecordingSettings {};
+            recording.measured = recordingBefore.measured;
+            recording.pingOutput = recordingBefore.pingOutput;
+            recording.pingInput = recordingBefore.pingInput;
+            if (persistent)
+                engine.setRecordingSettings (recording);
+            saved();
+            return [&engine, apply, before, recordingBefore, persistent, saved] {
+                apply (before);
+                if (persistent)
+                    engine.setRecordingSettings (recordingBefore);
+                saved();
+            };
+        }
+        case SettingsPage::midi:
+        {
+            const auto before = engine.getMidiPrefs();
+            prefs::MidiPrefs fresh;
+            // (yours: the devices, the links and mappings, and the Link page's two switches)
+            fresh.inputs = before.inputs;
+            fresh.outputs = before.outputs;
+            fresh.globalLinks = before.globalLinks;
+            fresh.globalMappings = before.globalMappings;
+            fresh.link = before.link;
+            fresh.linkStartStopSync = before.linkStartStopSync;
+            engine.setMidiPrefs (fresh, persistent);
+            return [&engine, before, persistent] { engine.setMidiPrefs (before, persistent); };
+        }
+        case SettingsPage::theme:
+        {
+            const auto before = themeui::current();
+            themeui::apply (themes::Spec {}, persistent);
+            return [before, persistent] { themeui::apply (before, persistent); };
+        }
+        case SettingsPage::link:
+        {
+            const auto& p = engine.getMidiPrefs();
+            const auto enabled = p.link, sync = p.linkStartStopSync;
+            engine.setLinkEnabled (false);
+            engine.setLinkStartStopSync (false);
+            return [&engine, enabled, sync] {
+                engine.setLinkEnabled (enabled);
+                engine.setLinkStartStopSync (sync);
+            };
+        }
+        case SettingsPage::extras:
+        {
+            std::vector<std::pair<std::string, bool>> before;
+            for (const auto& item : extras::items)
+                before.emplace_back (std::string (item.id), lynxExtraOn (engine, hooks, item.id));
+            const auto userSetBefore = extras::userSet();
+            for (const auto& item : extras::items)
+                setLynxExtra (engine, hooks, item.id, extras::defaultOn (item.id), persistent);
+            extras::userSet().clear();
+            saved();
+            return [&engine, hooks, before, userSetBefore, persistent, saved] {
+                for (const auto& [id, on] : before)
+                    setLynxExtra (engine, hooks, id, on, persistent);
+                extras::userSet() = userSetBefore;
+                saved();
+            };
+        }
+        case SettingsPage::files:
+        case SettingsPage::project:
+        case SettingsPage::info: break;
+    }
+    return {};
+}
+
+// The bottom bar's right end: "Reset this page", then "Reset <page>? [Reset] [Cancel]", then "<page> reset. [Undo]"
+class ResetBar final : public juce::Component,
+                       private juce::Timer
+{
+public:
+    std::function<bool()> canReset;
+    std::function<juce::String()> currentName, keeps;
+    std::function<bool()> reset; // (false: nothing was done)
+    std::function<void()> undo;
+    std::function<void()> onStateChange; // (the bar gives it more room while it asks)
+
+    ResetBar()
+    {
+        resetButton.setComponentID ("settings.reset");
+        confirmButton.setComponentID ("settings.reset.confirm");
+        cancelButton.setComponentID ("settings.reset.cancel");
+        undoButton.setComponentID ("settings.reset.undo");
+        for (auto* b : { &resetButton, &confirmButton, &cancelButton, &undoButton })
+        {
+            b->setColour (juce::TextButton::buttonColourId, theme::colour::bg3);
+            addChildComponent (*b);
+        }
+        confirmButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
+        confirmButton.setColour (juce::TextButton::textColourOffId, theme::colour::bg0);
+        line.setFont (theme::font (theme::type::small));
+        line.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        line.setJustificationType (juce::Justification::centredRight);
+        line.setMinimumHorizontalScale (0.8f);
+        addChildComponent (line);
+        resetButton.onClick = [this] { show (State::confirm); };
+        cancelButton.onClick = [this] { show (State::idle); };
+        confirmButton.onClick = [this] {
+            if (reset && reset())
+                show (State::done);
+            else
+                show (State::idle);
+        };
+        undoButton.onClick = [this] {
+            if (undo)
+                undo();
+            show (State::idle);
+        };
+        show (State::idle);
+    }
+
+    ~ResetBar() override { stopTimer(); }
+
+    // the page shown changed: back to the button (an Undo offer ends)
+    void pageChanged() { show (State::idle); }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (0, 5).withTrimmedTop (1);
+        const auto widthOf = [this, &r] (juce::TextButton& b) {
+            return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getLookAndFeel().getTextButtonFont (b, r.getHeight()), b.getButtonText())) + 22;
+        };
+        if (state == State::idle)
+            resetButton.setBounds (r.removeFromRight (juce::jmin (r.getWidth(), widthOf (resetButton))));
+        else if (state == State::confirm)
+        {
+            cancelButton.setBounds (r.removeFromRight (widthOf (cancelButton)));
+            r.removeFromRight (6);
+            confirmButton.setBounds (r.removeFromRight (widthOf (confirmButton)));
+            r.removeFromRight (8);
+            line.setBounds (r);
+        }
+        else
+        {
+            undoButton.setBounds (r.removeFromRight (widthOf (undoButton)));
+            r.removeFromRight (8);
+            line.setBounds (r);
+        }
+    }
+
+    enum class State { idle, confirm, done };
+    State getState() const noexcept { return state; }
+    juce::Button& button (State s) noexcept { return s == State::idle ? (juce::Button&) resetButton : s == State::confirm ? (juce::Button&) confirmButton : (juce::Button&) undoButton; }
+    juce::String lineText() const { return line.getText(); }
+
+private:
+    void show (State s)
+    {
+        stopTimer();
+        state = s;
+        const auto name = currentName ? currentName() : juce::String();
+        const auto can = canReset == nullptr || canReset();
+        resetButton.setVisible (s == State::idle);
+        resetButton.setEnabled (can);
+        resetButton.setTooltip ((can ? tr ("Put this page's options back at their defaults. ") : tr ("Nothing on this page to reset. ")) + (keeps ? keeps() : juce::String()));
+        confirmButton.setVisible (s == State::confirm);
+        cancelButton.setVisible (s == State::confirm);
+        undoButton.setVisible (s == State::done);
+        line.setVisible (s != State::idle);
+        if (s == State::confirm)
+        {
+            line.setText (tr ("Reset the {0} page to its defaults?", { name }), juce::dontSendNotification);
+            line.setTooltip (keeps ? keeps() : juce::String());
+        }
+        else if (s == State::done)
+        {
+            line.setText (tr ("{0}: back at the defaults.", { name }), juce::dontSendNotification);
+            startTimer (12000); // (the Undo offer, then the button again)
+        }
+        resized();
+        repaint();
+        if (onStateChange)
+            onStateChange();
+    }
+
+    void timerCallback() override { show (State::idle); }
+
+    State state = State::idle;
+    juce::TextButton resetButton { tr ("Reset this page") }, confirmButton { tr ("Reset") }, cancelButton { tr ("Cancel") }, undoButton { tr ("Undo") };
+    juce::Label line;
+};
+
 class SettingsPanel final : public juce::Component
 {
 public:
-    SettingsPanel (AudioEngine& engine, SettingsPage page, bool persistent, SettingsHooks hooks)
+    SettingsPanel (AudioEngine& e, SettingsPage page, bool keep, SettingsHooks h) : engine (e), hooks (std::move (h)), persistent (keep)
     {
         tabs.setTabBarDepth (30);
         tabs.setOutline (0);
         // FL's order (round 190jp, design190ia FW-19: MIDI, Audio, General, File, Theme, Project, Info), then LYNX's own
         // pages after a gap (Ableton Link, named in full as Ableton's Link integration guidelines ask of other apps)
-        const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::midi, tr ("MIDI") },       { SettingsPage::audio, tr ("Audio") },
-                                                                { SettingsPage::general, tr ("General") }, { SettingsPage::files, tr ("Files") },
-                                                                { SettingsPage::theme, tr ("Theme") },     { SettingsPage::project, tr ("Project") },
-                                                                { SettingsPage::info, tr ("Info") },       { SettingsPage::link, tr ("Ableton Link") },
-                                                                { SettingsPage::extras, tr ("LYNX extras") } };
+        const SettingsPage order[] = { SettingsPage::midi, SettingsPage::audio, SettingsPage::general, SettingsPage::files, SettingsPage::theme,
+                                       SettingsPage::project, SettingsPage::info, SettingsPage::link, SettingsPage::extras };
         tabs.firstOwnTab = 7;
-        for (const auto& [p, name] : order)
+        for (const auto p : order)
         {
-            juce::Component* content = nullptr;
-            switch (p)
-            {
-                case SettingsPage::audio: content = makeAudioPage (engine, persistent).release(); break;
-                case SettingsPage::midi: content = makeMidiPage (engine, hooks, persistent).release(); break;
-                case SettingsPage::general: content = makeGeneralPage (engine, hooks, persistent).release(); break;
-                case SettingsPage::theme: content = themeui::makeThemePage().release(); break;
-                case SettingsPage::files: content = new FilesPage (engine, persistent, hooks.browserFoldersChanged, hooks.managePlugins); break;
-                case SettingsPage::project: content = new ProjectPage (engine, hooks); break;
-                case SettingsPage::info: content = new InfoPage (engine); break;
-                case SettingsPage::extras: content = makeExtrasPage (engine, hooks, persistent).release(); break;
-                case SettingsPage::link: content = makeLinkPage (engine, hooks).release(); break;
-            }
-            tabs.addTab (name, theme::colour::bg2, content, true);
+            tabs.addTab (pageName (p), theme::colour::bg2, makePage (p), true);
             pages.push_back (p);
             if (p == page)
                 tabs.setCurrentTabIndex (tabs.getNumTabs() - 1, false);
@@ -1102,12 +1518,41 @@ public:
                 }
         };
         addAndMakeVisible (find);
+        // round 190qx: "Reset this page" at the bar's right end
+        resetBar.canReset = [this] { return canResetPage (currentPage(), hooks); };
+        resetBar.currentName = [this] { return pageName (currentPage()); };
+        resetBar.keeps = [this] { return resetKeeps (currentPage()); };
+        resetBar.reset = [this] {
+            const auto page = currentPage();
+            undoReset = resetPage (engine, hooks, page, persistent);
+            undoPage = page;
+            if (undoReset == nullptr)
+                return false;
+            rebuild (page);
+            return true;
+        };
+        resetBar.undo = [this] {
+            if (undoReset == nullptr)
+                return;
+            const auto fn = std::move (undoReset);
+            undoReset = nullptr;
+            fn();
+            rebuild (undoPage);
+        };
+        tabs.onTabChanged = [this] (int) {
+            if (! rebuilding)
+                resetBar.pageChanged();
+        };
+        resetBar.onStateChange = [this] { resized(); };
+        addAndMakeVisible (resetBar);
+        resetBar.pageChanged();
         setWantsKeyboardFocus (false);
         setSize (680, 620 + findHeight);
     }
 
     static constexpr int findHeight = 36;
     SettingsFind& finder() noexcept { return find; }
+    ResetBar& resetter() noexcept { return resetBar; }
 
     bool keyPressed (const juce::KeyPress& key) override
     {
@@ -1126,8 +1571,14 @@ public:
     void resized() override
     {
         auto r = getLocalBounds();
-        find.setBounds (r.removeFromBottom (findHeight));
+        auto bottom = r.removeFromBottom (findHeight);
         tabs.setBounds (r);
+        find.setBounds (bottom);
+        // (the reset button over the find bar's right end, beside its count; the confirm line takes more room)
+        const auto resetWidth = resetBar.getState() == ResetBar::State::idle ? 150 : juce::jmin (bottom.getWidth() - 260, 470);
+        find.rightInset = resetWidth;
+        find.resized();
+        resetBar.setBounds (bottom.removeFromRight (resetWidth).withTrimmedRight (10));
     }
 
     SettingsPage currentPage() const
@@ -1143,9 +1594,70 @@ public:
                 tabs.setCurrentTabIndex ((int) i);
     }
 
+    // round 190qx: the page shown with the option `caption` outlined (the command palette's Settings options)
+    bool reveal (SettingsPage page, const juce::String& caption)
+    {
+        showPage (page);
+        for (std::size_t i = 0; i < pages.size(); ++i)
+            if (pages[i] == page)
+            {
+                if (auto* content = tabs.getTabContentComponent ((int) i))
+                    content->resized(); // (laid out before the search reads where the rows are)
+                return find.reveal ((int) i, caption);
+            }
+        return false;
+    }
+
+    juce::TabbedComponent& tabsForIndex() noexcept { return tabs; }
+    const std::vector<SettingsPage>& pageOrder() const noexcept { return pages; }
+
 private:
+    juce::Component* makePage (SettingsPage p)
+    {
+        switch (p)
+        {
+            case SettingsPage::audio: return makeAudioPage (engine, persistent).release();
+            case SettingsPage::midi: return makeMidiPage (engine, hooks, persistent).release();
+            case SettingsPage::general: return makeGeneralPage (engine, hooks, persistent).release();
+            case SettingsPage::theme: return themeui::makeThemePage().release();
+            case SettingsPage::files: return new FilesPage (engine, persistent, hooks.browserFoldersChanged, hooks.managePlugins);
+            case SettingsPage::project: return new ProjectPage (engine, hooks);
+            case SettingsPage::info: return new InfoPage (engine);
+            case SettingsPage::extras: return makeExtrasPage (engine, hooks, persistent).release();
+            case SettingsPage::link: return makeLinkPage (engine, hooks).release();
+        }
+        return new juce::Component();
+    }
+
+    // a page made again from the options as they are now (after a reset or its undo), shown where it was
+    void rebuild (SettingsPage page)
+    {
+        for (std::size_t i = 0; i < pages.size(); ++i)
+            if (pages[i] == page)
+            {
+                const juce::ScopedValueSetter<bool> busy (rebuilding, true);
+                const auto shown = tabs.getCurrentTabIndex();
+                find.field().clear();
+                find.search (false); // (no match points into the old page)
+                tabs.removeTab ((int) i);
+                tabs.addTab (pageName (page), theme::colour::bg2, makePage (page), true, (int) i);
+                tabs.setCurrentTabIndex (shown, false);
+                if (auto* content = tabs.getTabContentComponent (shown))
+                    content->setBounds (content->getBounds()); // (sized by the tabs)
+                tabs.resized();
+            }
+        resized();
+    }
+
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    bool persistent;
     SettingsTabs tabs;
     SettingsFind find;
+    ResetBar resetBar;
+    std::function<void()> undoReset;
+    SettingsPage undoPage = SettingsPage::general;
+    bool rebuilding = false;
     std::vector<SettingsPage> pages; // in tab order
 };
 
@@ -1190,10 +1702,17 @@ void closeSettings()
         closeToolWindowOf (*panel);
 }
 
+void indexOpenSettings (SettingsPanel& panel); // (round 190qx, below)
+
 void showSettings (AudioEngine& engine, SettingsPage page, SettingsHooks hooks)
 {
     // one Settings window: opening it again shows the asked page
     openToolWindow (std::make_unique<SettingsPanel> (engine, page, true, std::move (hooks)), tr ("Settings"), "settings");
+    // round 190qx: the palette's Settings options, read from this window once per version and language (laid out first)
+    juce::MessageManager::callAsync ([] {
+        if (auto* panel = openSettingsPanel())
+            indexOpenSettings (*panel);
+    });
 }
 
 SettingsFindState settingsFindForSnapshot (juce::Component& panel, const juce::String& query, int steps)
@@ -1224,5 +1743,219 @@ SettingsFindState settingsFindForSnapshot (juce::Component& panel, const juce::S
 std::unique_ptr<juce::Component> makeSettingsPanel (AudioEngine& engine, SettingsPage page, bool persistent, SettingsHooks hooks)
 {
     return std::make_unique<SettingsPanel> (engine, page, persistent, std::move (hooks));
+}
+
+// --- round 190qx: the Settings options for the command palette ----------------------------------------------------------
+namespace
+{
+double lastIndexMs = 0.0;
+
+void collectOptions (juce::Component& page, juce::Component& c, SettingsPage where, std::vector<std::pair<int, SettingsOption>>& out,
+                     std::vector<std::pair<int, juce::String>>& titles)
+{
+    if (&c != &page && ! c.isVisible())
+        return;
+    const auto y = page.getLocalPoint (&c, juce::Point<int>()).y;
+    juce::String text;
+    if (auto* title = dynamic_cast<settingsui::SectionTitle*> (&c))
+    {
+        titles.emplace_back (y, title->getText());
+        return;
+    }
+    if (dynamic_cast<juce::TextEditor*> (&c) != nullptr || dynamic_cast<juce::ComboBox*> (&c) != nullptr || dynamic_cast<juce::ListBox*> (&c) != nullptr)
+        return;
+    if (auto* button = dynamic_cast<juce::Button*> (&c))
+        text = button->getButtonText();
+    else if (auto* label = dynamic_cast<juce::Label*> (&c))
+    {
+        // a row's caption, not a note under a control (a note is a sentence) nor a value read-out
+        const auto t = label->getText().trim();
+        if (label->isEditable() || t.length() > 64 || t.endsWithChar ('.') || t.containsChar ('\n') || t.containsOnly ("0123456789.,:-+% ms"))
+            return;
+        text = t;
+    }
+    text = text.trim();
+    if (text.length() > 2)
+    {
+        SettingsOption o;
+        o.page = where;
+        o.text = text;
+        if (const auto& own = c.getProperties()["lynxSearchText"]; own.isString())
+            o.english = own.toString();
+        out.emplace_back (y, o);
+        return; // (a button's own label is not listed again)
+    }
+    for (auto* child : c.getChildren())
+        collectOptions (page, *child, where, out, titles);
+}
+} // namespace
+
+namespace
+{
+std::vector<SettingsOption>& indexCache()
+{
+    static std::vector<SettingsOption> cached;
+    return cached;
+}
+juce::String& indexLanguage()
+{
+    static juce::String language;
+    return language;
+}
+
+// (the index is kept on disk per version and language: reading the pages costs ~0.2 s, the file a few ms)
+juce::File indexFile() { return PluginHost::settingsFolder().getChildFile ("settings-index.txt"); }
+juce::String indexStamp() { return juce::String (JUCE_APPLICATION_VERSION_STRING) + " " + i18n::current(); }
+
+bool loadIndex()
+{
+    juce::StringArray lines;
+    lines.addLines (indexFile().loadFileAsString());
+    if (lines.size() < 2 || lines[0] != indexStamp())
+        return false;
+    auto& cached = indexCache();
+    cached.clear();
+    for (int i = 1; i < lines.size(); ++i)
+    {
+        juce::StringArray f;
+        f.addTokens (lines[i], "\t", {});
+        if (f.size() < 4 || ! juce::isPositiveAndBelow (f[0].getIntValue(), (int) SettingsPage::link + 1))
+            continue;
+        cached.push_back ({ (SettingsPage) f[0].getIntValue(), f[2], f[1], f[3] });
+    }
+    indexLanguage() = i18n::current();
+    return ! cached.empty();
+}
+
+void saveIndex()
+{
+    juce::String text = indexStamp() + "\n";
+    const auto clean = [] (const juce::String& t) { return t.replaceCharacters ("\t\n\r", "   "); };
+    for (const auto& o : indexCache())
+        text << (int) o.page << "\t" << clean (o.section) << "\t" << clean (o.text) << "\t" << clean (o.english) << "\n";
+    indexFile().replaceWithText (text);
+}
+} // namespace
+
+// the options of a Settings panel that exists (made off screen for the palette, or the window's own)
+void indexSettingsPanel (SettingsPanel& panel)
+{
+    auto& cached = indexCache();
+    cached.clear();
+    indexLanguage() = i18n::current();
+    auto& tabs = panel.tabsForIndex();
+    const auto& order = panel.pageOrder();
+    for (int i = 0; i < tabs.getNumTabs() && i < (int) order.size(); ++i)
+        if (auto* content = tabs.getTabContentComponent (i))
+        {
+            // (a page not shown yet may have no size; one of the open window keeps its own; each is shown back as it was)
+            const auto wasVisible = content->isVisible();
+            if (content->getWidth() < 200)
+                content->setBounds (0, 0, 720, 620);
+            content->setVisible (true);
+            content->resized();
+            std::vector<std::pair<int, SettingsOption>> found;
+            std::vector<std::pair<int, juce::String>> titles;
+            collectOptions (*content, *content, order[(std::size_t) i], found, titles);
+            content->setVisible (wasVisible);
+            std::stable_sort (found.begin(), found.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+            std::sort (titles.begin(), titles.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+            for (auto& [y, option] : found)
+            {
+                for (const auto& [ty, title] : titles)
+                    if (ty <= y)
+                        option.section = title;
+                const auto same = std::any_of (cached.begin(), cached.end(), [&option] (const SettingsOption& o) {
+                    return o.page == option.page && o.text == option.text;
+                });
+                if (! same)
+                    cached.push_back (std::move (option));
+            }
+        }
+}
+
+const std::vector<SettingsOption>& settingsOptions (AudioEngine& engine, const SettingsHooks& hooks)
+{
+    auto& cached = indexCache();
+    if (! cached.empty() && indexLanguage() == i18n::current())
+        return cached;
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    if (! loadIndex())
+    {
+        SettingsPanel panel (engine, SettingsPage::general, true, hooks);
+        panel.setSize (720, 660);
+        indexSettingsPanel (panel);
+        saveIndex();
+    }
+    lastIndexMs = juce::Time::getMillisecondCounterHiRes() - started;
+    return cached;
+}
+
+// (the first Settings window of a version reads its own pages for the palette: nothing extra is made)
+void indexOpenSettings (SettingsPanel& panel)
+{
+    if (! indexCache().empty() && indexLanguage() == i18n::current())
+        return;
+    if (loadIndex())
+        return;
+    indexSettingsPanel (panel);
+    saveIndex();
+}
+
+double settingsOptionsBuildMs() { return lastIndexMs; }
+
+juce::String settingsPageName (SettingsPage page) { return pageName (page); }
+
+bool revealInSettings (SettingsPage page, const juce::String& caption)
+{
+    auto* panel = openSettingsPanel();
+    return panel != nullptr && panel->reveal (page, caption);
+}
+
+bool settingsCanResetForSnapshot (juce::Component& panel)
+{
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    return p != nullptr && p->resetter().button (ResetBar::State::idle).isEnabled();
+}
+
+bool settingsResetForSnapshot (juce::Component& panel, bool confirm)
+{
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    if (p == nullptr || ! p->resetter().button (ResetBar::State::idle).isEnabled())
+        return false;
+    if (auto& b = p->resetter().button (ResetBar::State::idle); b.onClick)
+        b.onClick();
+    if (p->resetter().getState() != ResetBar::State::confirm)
+        return false;
+    if (! confirm)
+        return true;
+    if (auto& b = p->resetter().button (ResetBar::State::confirm); b.onClick)
+        b.onClick();
+    return p->resetter().getState() == ResetBar::State::done;
+}
+
+bool settingsUndoResetForSnapshot (juce::Component& panel)
+{
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    if (p == nullptr || p->resetter().getState() != ResetBar::State::done)
+        return false;
+    if (auto& b = p->resetter().button (ResetBar::State::done); b.onClick)
+        b.onClick();
+    return p->resetter().getState() == ResetBar::State::idle;
+}
+
+juce::Component* settingsResetBarForSnapshot (juce::Component& panel)
+{
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    return p != nullptr ? &p->resetter() : nullptr;
+}
+
+bool settingsShowPageForSnapshot (juce::Component& panel, SettingsPage page)
+{
+    auto* p = dynamic_cast<SettingsPanel*> (&panel);
+    if (p == nullptr)
+        return false;
+    p->showPage (page);
+    return p->currentPage() == page;
 }
 } // namespace lynx

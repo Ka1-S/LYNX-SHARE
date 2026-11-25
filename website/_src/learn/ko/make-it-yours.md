@@ -1,0 +1,25 @@
+---
+source: b17086f32d
+---
+## 테마 프리셋
+
+![테마 프리셋](/assets/img/learn/make-it-yours-1.webp)
+
+1. `옵션 › 테마(색상, 배경)...`를 여세요.
+2. 프리셋을 고르세요: LYNX, Ocean, Emerald, Amber, Violet, Graphite. `기본값`는 LYNX 고유의 테마로 되돌립니다.
+
+## 색상과 글자 크기
+
+![General 페이지의 글자 크기와 굵은 텍스트](/assets/img/learn/make-it-yours-2.webp)
+
+1. 노브는 색조, 채도, 밝기, 대비를 바꿉니다. 점마다 트랙이나 미터 같은 한 부분의 색을 정합니다.
+2. `일반` 페이지의 `글자 크기`와 `굵은 텍스트`로 인터페이스를 더 읽기 쉽게 만들 수 있습니다.
+
+## 언어와 다시 시작
+
+![다시 시작한 뒤 더 크고 굵어진 LYNX 글자](/assets/img/learn/make-it-yours-3.webp)
+
+1. `언어`에는 LYNX SHARE의 15개 언어가 나옵니다.
+2. 새 언어, 글꼴, 글자 크기, 굵은 텍스트는 LYNX SHARE를 다시 시작하면 적용됩니다.
+
+[설정](/wiki/settings/)도 참고하세요.

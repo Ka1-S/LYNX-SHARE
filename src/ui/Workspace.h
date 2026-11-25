@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/HowTo.h" // round 190qx
 #include <array>
 #include <functional>
 #include <memory>
@@ -97,7 +98,10 @@ public:
     std::function<void (Panel, const juce::MouseEvent&)> onTitleRightClick;
     std::function<void()> onDefaultLayout;
     // Adds the panel's own items to its options menu (the button at the left of its title bar).
-    std::function<void (Panel, juce::PopupMenu&)> onPanelMenu; // after the default layout was (re)built: fit panels to their content
+    std::function<void (Panel, juce::PopupMenu&)> onPanelMenu;
+    // round 190qx: which "How to use this..." guide a panel's menu offers (the Clip-launch / Simple layouts show other views
+    // in the Playlist's panel); unset: the panel's own (int: howto::Window)
+    std::function<howto::Window (Panel)> howToFor; // after the default layout was (re)built: fit panels to their content
 
     // Resizes a floating panel's content area to `contentWidth` x `contentHeight` (0 = keep that side),
     // keeping its top-left corner and staying inside the desktop. Ignored while maximized or detached.

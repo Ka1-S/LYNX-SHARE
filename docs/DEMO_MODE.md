@@ -134,6 +134,30 @@ Also new in round 190pl:
 `LYNX --demo190plcheck <prefix>` runs these against a real window (on a private X server) and writes
 `<prefix>-checks.txt` (files in `<prefix>-files/`); run it with `--lang pt-BR` too.
 
+### Targets of tutorial batch 3 (round 190qx)
+
+No new operation: these are new kinds of **target** for `ui.find`, `ui.click`, `ui.hover` and `ui.drag`, so the videos about
+options and settings record every language from one script.
+
+| Target | What it finds |
+|---|---|
+| `text:<English text>` | A showing label, button (a Settings tab too), combo box or text field whose own text is that English text or its translation (as `menu:` targets: without a trailing `...`). A search field also matches by its hint ("Search an action or a key..."), before and after something is typed in it. LYNX's other windows are searched first (the newest on top), then the main window |
+| `row:<English text>` | The control on that label's row: the nearest combo box, slider, switch or field to the label's right whose height covers the label's middle (a Settings page's rows: `row:Buffer size`, `row:Text size`). A click on a combo box opens its menu, whose items are `menu:` targets |
+| `settings`, `window:<id>` | The Settings window, or another tool window by its key (as `findToolWindow`) |
+| `panelmenu:<panel>` | `playlist`, `channelRack`, `pianoRoll`, `mixer` or `browser`: the panel's Window options button (the arrow at its title: detach, maximize, close, the panel's own options, How to use this...) |
+| `devices` | The Clip-launch layout's detail view (its Device View page). Cells: row 0, column *n* = device card *n*'s window button (card 0 = the chain's first) |
+
+Also:
+
+- **Playlist cells** (with Playlist › Automation lanes on): row `1000 + t` = track *t*'s first automation lane at the 16th
+  *column* (its whole height: `at` y picks the value, top = the highest; a click adds a point); row `2000 + t` = the "+A"
+  button on track *t*'s header (left of its LED; it shows while the pointer is over the header), which opens the add-lane menu.
+- **`ui.click` with `peer: true`** takes `dx` / `dy` (pixels from the `at` point): a list's row below a search field that
+  has no ID.
+
+`LYNX --demo190qxcheck <prefix>` runs these against a real window (on a private X server) and writes
+`<prefix>-checks.txt`; run it with `--lang pt-BR` too.
+
 ### Useful component IDs
 
 | Where | IDs |
@@ -141,7 +165,9 @@ Also new in round 190pl:
 | Welcome card | `welcome.card`, `welcome.choice.mobile`, `welcome.choice.fl`, `welcome.choice.live`, `welcome.choice.timeline`, `welcome.choice.new`, `welcome.skip`, `welcome.close`, `welcome.more`, `welcome.language`, `welcome.test` |
 | "Next: 3 things to try" | `next3.card`, `next3.<item>` (a row), `next3.do.<item>` (its button), `next3.close`, `next3.hide`, `next3.tutorials`. Items: `play`, `addLoop`, `recordVoice`, `steps`, `openFlp`, `plugins`, `slotClip`, `launchScene`, `openAls`, `instrumentTrack`, `recordAudio`, `openMixer` |
 | Empty-state hints | `empty.playlist`, `empty.clipGrid`, `empty.simple` (the cards); buttons `empty.channelRack`, `empty.demo`, `empty.open`, `empty.browse`, `empty.addTrack`, `empty.loops`, `empty.tour` |
-| Tips | `tip.songModeEmpty`, `tip.recordNoInput` (the cards); `tip.action`, `tip.gotIt`, `tip.noMore` |
+| Tips | `tip.songModeEmpty`, `tip.recordNoInput` (the cards); `tip.action`, `tip.gotIt`, `tip.noMore`. Round 190qx's window tips (once each, the first time the window shows): `tip.mixerRouting`, `tip.pianoRoll`, `tip.tracker`, `tip.deviceView`, `tip.automationLanes` |
+| Settings (round 190qx) | `settings.find`, `settings.reset`, `settings.reset.confirm`, `settings.reset.cancel`, `settings.reset.undo`, `general.showTips`, `extras.flExact`, `extras.recommended`, `extras.preview.<extra id>`, each extra's switch by its id (`playlist.sectionsLane`...) |
+| How-to guides and notices (round 190qx) | `howto.<window>` (playlist, channelRack, pianoRoll, mixer, browser, clipGrid, deviceView, simple, tracker, automation, settings), `howto.watch`, `howto.close`; `notice`, `notice.action`, `notice.close` |
 | Transport | `toolbar.play`, `toolbar.stop`, `toolbar.record`, `toolbar.patternMode`, `toolbar.songMode`, `toolbar.tempo`, `toolbar.key` |
 | Instruments (round 190pg) | `model.models` (LYNX Model's six models, marimba first, equal widths: use `at`), `model.bar` (its strike point), `model.hardness`, `model.position`, `model.velocity`, `model.noise`, `model.damping`, `model.resonator`, `model.motor`, `model.release`, `model.tone`, `model.volume`; `helix.<parameter index>` (every control of Helix's editors) |
 | Editors (round 190pg) | `toolbar.cpu` (the CPU panel; a double click opens the Plugin performance monitor), `palette` (the command palette), `modulators` (its window), `modulators.add`, `modulators.assign.<n>` (a modulator's Assign switch), `clipLaunch.both`, `clipLaunch.grid`, `clipLaunch.song` (the Clip-launch view switch), `channelRack`, `pianoRoll`, `playlist`, `mixer.strips`, `clipGrid` (with `cell`), `editor` (the window `ui.editor` opened), `tracker`, `tracker.edit` (its Edit switch), `playlist.sectionsLane`, `chordHelper`, `polyEditor`, `polyEditor.play`, `polyEditor.original` |

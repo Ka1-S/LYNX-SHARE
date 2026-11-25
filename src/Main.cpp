@@ -183,6 +183,8 @@
 #include "ui/GamepadInput.h"
 #include "ui/SettingsPages.h"
 #include "core/ExtrasDefaults.h" // round 190qk (--selftest extras190qk)
+#include "ui/Notices.h" // round 190qx (--selftest optionsux190qx)
+#include "ui/HowTo.h"
 #include "ui/ExtendedHintPanel.h"
 #include "core/FlSettings.h"
 #include "ui/OtherAppsExport.h"
@@ -3172,6 +3174,14 @@ public:
             return;
         }
 
+        if (args.contains ("--demo190qxcheck"))
+        {
+            // LYNX --demo190qxcheck prefix: round 190qx, the --demo targets of tutorial batch 3 (src/Demo190qxCheck.inc)
+            const auto i = args.indexOf ("--demo190qxcheck");
+            setApplicationReturnValue (runDemoCheck190qx (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--demo190plcheck"))
         {
             // LYNX --demo190plcheck prefix: round 190pl, the --demo operations of tutorial batch 2 (src/Demo190plCheck.inc)
@@ -3638,6 +3648,22 @@ public:
             const auto i = args.indexOf ("--rackauto190owshot");
             const auto arg = [&args] (int k) { return k < args.size() && ! args[k].startsWith ("--") ? args[k].unquoted() : juce::String(); };
             setApplicationReturnValue (runRackAuto190owShot (args[i + 1].unquoted(), arg (i + 2), arg (i + 3)) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --settingsshots190qx <prefix> (round 190qx): the Settings pages at 100 % and @150 (src/SettingsShots190qx.inc)
+        if (args.contains ("--settingsshots190qx"))
+        {
+            runSettingsShots190qx (args[args.indexOf ("--settingsshots190qx") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        // --optionsux190qxshot <prefix> (round 190qx: Settings reset / grouping / palette index, How-to guides, tips, notices)
+        if (args.contains ("--optionsux190qxshot"))
+        {
+            setApplicationReturnValue (runOptionsux190qxShot (args[args.indexOf ("--optionsux190qxshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -5682,6 +5708,9 @@ private:
                 extras190qkResult = "ERROR FL-exact values";
             lynx::extras::userSet() = kept;
         }
+        // round 190qx (src/Optionsux190qx.inc): the extras page by area, the Settings options for the palette, tooltips,
+        // Reset this page, the window tips, the How-to guides, the notices
+        const auto optionsux190qxResult = runOptionsux190qxSelftest (offline);
 
         // project format round trip, with accents in the name
         auto original = lynx::Song::makeDefault();
@@ -11431,7 +11460,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11562,6 +11591,7 @@ private:
                << "extras190qk=" << extras190qkResult << "\n"
                << "discord190qu=" << discord190quResult << "\n"
                << "trialmark190qt=" << trialmark190qtResult << (trialmark190qtResult == "OK" ? juce::String() : " | " + trialmark190qtLog.replace ("\n", "; ")) << "\n"
+               << "optionsux190qx=" << optionsux190qxResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -21497,6 +21527,8 @@ private:
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "Extras190qkShot.inc" // round 190qk (the LYNX extras on by default)
+#include "Optionsux190qx.inc" // round 190qx (the owner's "make the options easy")
+#include "SettingsShots190qx.inc" // round 190qx (Settings pages before / after)
 #include "IssuesShot190oq.inc" // round 190oq (issues #243-#252)
 #include "IssuesShot190qb.inc" // round 190qb (follow-ups of issues #206, #215)
 #include "Picker190qiShot.inc" // round 190qi (TOP-NEXT R6): picker and Browser quality of life
@@ -21532,6 +21564,7 @@ private:
 #include "OnboardShot190np.inc" // round 190np
 #include "Demo190pgCheck.inc" // round 190pg
 #include "Demo190plCheck.inc" // round 190pl
+#include "Demo190qxCheck.inc" // round 190qx
 #include "AutoLinks190ovCheck.inc" // round 190ov (FL automation clips linked to several controls)
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)

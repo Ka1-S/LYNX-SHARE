@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/HowTo.h" // round 190qx
 #include "core/LiveKeys.h" // (round 190ih)
 
 #include "core/ProjectKey.h"
@@ -1212,6 +1213,15 @@ private:
     void placeOnboardingCards();
     void updateEmptyHint();
     void onboardingTick(); // (from the window's timer, only while the Next-3 card shows)
+    // round 190qx: one gentle tip the first time the Mixer, the Piano roll, the Tracker, the Device view or an automation
+    // lane shows (checked twice a second while one of them is still to come; nothing once all were shown)
+    bool maybeShowWindowTip (onboarding::Tip tip, juce::Component* window);
+    juce::Component* guideAnchor (howto::Window w);
+    void showWhatsNewNotice();
+    void windowTipTick();
+    bool windowTipsPending() const noexcept;
+    int windowTipTicks = 0;
+    bool tipInsideAnchor = false; // (a window tip sits inside its window's top-right corner)
     void next3Act (onboarding::Item item);
     void checkRecordTip(); // Record (audio) with no input to record from: one tip
 

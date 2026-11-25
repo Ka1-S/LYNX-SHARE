@@ -788,6 +788,8 @@ if(LYNX_BUILD_APP)
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
         src/ui/SettingsPages.cpp
+        src/ui/Notices.cpp
+        src/ui/HowTo.cpp
         src/ui/WorkflowExtras.cpp
         src/ui/KeyFocus.cpp
         src/ui/PluginManager.cpp

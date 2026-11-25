@@ -1,4 +1,5 @@
 #include "ui/Workspace.h"
+#include "ui/HowTo.h" // round 190qx
 #include "ui/Motion.h"
 #include "ui/ThemeSettings.h"
 
@@ -190,6 +191,12 @@ public:
         if (! owner.isBrowserDockedPanel (panel))
             menu.addItem (tr ("Maximized"), ! detached, owner.isMaximised (panel), [this] { owner.toggleMaximised (panel); });
         menu.addItem (tr ("Close"), [this] { owner.hide (panel); });
+        // round 190qx (the owner's "make the options easy"): a short guide to this window and its Learn tutorial
+        {
+            const howto::Window guides[] = { howto::Window::playlist, howto::Window::channelRack, howto::Window::pianoRoll, howto::Window::mixer,
+                                             howto::Window::browser };
+            howto::addMenuItem (menu, owner.howToFor ? owner.howToFor (panel) : guides[juce::jlimit (0, workspace::panelCount - 1, (int) panel)], this);
+        }
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
     }
 

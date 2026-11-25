@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Ses yok ya da çıtırtı mı var? Seçenekler, Ses ayarları'nı açın.
+
+00:00:09.000 --> 00:00:14.400
+Sürücü: Windows'ta ASIO, Mac'te Core Audio, Linux'ta PipeWire veya ALSA.
+
+00:00:14.800 --> 00:00:20.200
+Çıkış aygıtı LYNX'i duyduğunuz yerdir. Sistem varsayılanı bilgisayarınızı izler.
+
+00:00:20.600 --> 00:00:26.200
+Arabellek boyutu: küçüğü çalarken daha hızlı yanıt verir, büyüğü işlemciye daha çok pay bırakır.
+
+00:00:26.600 --> 00:00:32.000
+Duyduğunuzdan emin olmak için bir test sesi çalın.
+
+00:00:32.400 --> 00:00:37.800
+Her yerden Yardım, Ses çıkışını test et aynısını yapar.
+
+00:00:38.200 --> 00:00:44.200
+Çıtırtı mı var? Arabelleği artırın. Notalar geç mi geliyor? Azaltın.

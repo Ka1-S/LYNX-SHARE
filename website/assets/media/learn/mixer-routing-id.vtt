@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Setiap track Mixer menuju Master. Routing mengirimnya ke tempat lain juga.
+
+00:00:09.000 --> 00:00:14.400
+Pilih track yang akan dikirim, di sini Chords.
+
+00:00:14.800 --> 00:00:20.600
+Klik panah di bawah track lain: Chords kini menuju ke sana juga.
+
+00:00:21.000 --> 00:00:26.400
+Kenop di bawahnya adalah level send: seberapa banyak yang masuk ke sana.
+
+00:00:26.800 --> 00:00:32.200
+Pasang reverb di track itu: bus reverb yang bisa dipakai semua track.
+
+00:00:32.600 --> 00:00:38.200
+Klik kanan panah untuk lainnya: Route to this track only, atau Sidechain to this track.
+
+00:00:38.600 --> 00:00:45.000
+Putar: chord mendapat ruangnya, dan setiap track tetap punya fader sendiri.

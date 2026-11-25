@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Nessun suono, o scricchiolii? Apri Options, Audio settings.
+
+00:00:09.000 --> 00:00:14.400
+Il driver: ASIO su Windows, Core Audio su Mac, PipeWire o ALSA su Linux.
+
+00:00:14.800 --> 00:00:20.200
+Il dispositivo di uscita è dove senti LYNX. System default segue il computer.
+
+00:00:20.600 --> 00:00:26.200
+Buffer size: più piccolo risponde più in fretta, più grande dà margine alla CPU.
+
+00:00:26.600 --> 00:00:32.000
+Riproduci un suono di prova per controllare di sentirlo.
+
+00:00:32.400 --> 00:00:37.800
+Da qualsiasi punto, Help, Test audio output fa lo stesso.
+
+00:00:38.200 --> 00:00:44.200
+Scricchiolii? Alza il buffer. Note in ritardo? Abbassalo.

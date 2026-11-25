@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+¿Sin sonido, o con chasquidos? Abre Options, Audio settings.
+
+00:00:09.000 --> 00:00:14.400
+El driver: ASIO en Windows, Core Audio en Mac, PipeWire o ALSA en Linux.
+
+00:00:14.800 --> 00:00:20.200
+El dispositivo de salida es donde oyes LYNX. System default sigue a tu ordenador.
+
+00:00:20.600 --> 00:00:26.200
+Buffer size: más pequeño responde más rápido al tocar, más grande da margen a la CPU.
+
+00:00:26.600 --> 00:00:32.000
+Reproduce un sonido de prueba para comprobar que lo oyes.
+
+00:00:32.400 --> 00:00:37.800
+Desde cualquier sitio, Help, Test audio output hace lo mismo.
+
+00:00:38.200 --> 00:00:44.200
+¿Chasquidos? Sube el búfer. ¿Notas tardías? Bájalo.

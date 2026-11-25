@@ -14,6 +14,10 @@
 #include "ui/StartPage.h"
 #include "ui/SetupWizard.h"
 #include "ui/Updater.h"
+#include "ui/HowTo.h" // round 190qx
+#include "ui/DetailView.h"
+#include "ui/TrackerComponent.h"
+#include "ui/ToolWindow.h"
 #include "platform/Paths.h"
 
 namespace lynx
@@ -550,6 +554,7 @@ bool MainComponent::maybeShowTip (onboarding::Tip tip, juce::Component* anchor)
     closeTip();
     tipCard = std::make_unique<onboardui::TipCard> (tip);
     tipAnchor = anchor;
+    tipInsideAnchor = false;
     auto safe = juce::Component::SafePointer<MainComponent> (this);
     const auto close = [safe] {
         juce::MessageManager::callAsync ([safe] {
@@ -597,6 +602,94 @@ void MainComponent::closeTip()
     onboardui::removeHosted (*tipCard);
     tipCard.reset();
     tipAnchor = nullptr;
+    tipInsideAnchor = false;
+}
+
+// --- round 190qx: the window tips -----------------------------------------------------------------------------------------
+namespace
+{
+howto::Window guideFor (onboarding::Tip tip)
+{
+    switch (tip)
+    {
+        case onboarding::Tip::mixerRouting: return howto::Window::mixer;
+        case onboarding::Tip::pianoRoll: return howto::Window::pianoRoll;
+        case onboarding::Tip::tracker: return howto::Window::tracker;
+        case onboarding::Tip::deviceView: return howto::Window::deviceView;
+        case onboarding::Tip::automationLanes:
+        case onboarding::Tip::songModeEmpty:
+        case onboarding::Tip::recordNoInput: break;
+    }
+    return howto::Window::automation;
+}
+} // namespace
+
+bool MainComponent::windowTipsPending() const noexcept
+{
+    if (! onboardingOn || onboard.tipsOff || onboard.hintsOff)
+        return false;
+    for (int t = (int) onboarding::Tip::mixerRouting; t < onboarding::tipCount; ++t)
+        if ((onboard.tipsSeen & (1u << (std::uint32_t) t)) == 0)
+            return true;
+    return false;
+}
+
+bool MainComponent::maybeShowWindowTip (onboarding::Tip tip, juce::Component* window)
+{
+    if (! onboardingOn || window == nullptr || setupOverlay != nullptr || ! onboarding::TipGate::canShowWindowTip (tip, onboard, tipCard != nullptr))
+        return false;
+    // once ever: retired as it shows (a gentle tip, never asked again)
+    onboarding::TipGate::gotIt (onboard, tip);
+    saveOnboarding();
+    tipCard = std::make_unique<onboardui::TipCard> (tip);
+    tipAnchor = window;
+    tipInsideAnchor = true;
+    auto safe = juce::Component::SafePointer<MainComponent> (this);
+    const auto close = [safe] {
+        juce::MessageManager::callAsync ([safe] {
+            if (safe != nullptr)
+                safe->closeTip();
+        });
+    };
+    tipCard->action = [safe, tip, close] {
+        if (safe == nullptr)
+            return;
+        const auto anchor = safe->tipAnchor;
+        close();
+        juce::MessageManager::callAsync ([tip, anchor] { howto::show (guideFor (tip), anchor.getComponent()); });
+    };
+    tipCard->gotIt = [close] { close(); };
+    tipCard->noMore = [safe, close] {
+        if (safe == nullptr)
+            return;
+        onboarding::TipGate::noMoreTips (safe->onboard);
+        safe->saveOnboarding();
+        close();
+    };
+    placeOnboardingCards();
+    return true;
+}
+
+void MainComponent::windowTipTick()
+{
+    if (tipCard != nullptr)
+    {
+        // a window tip goes with its window
+        if (tipInsideAnchor && (tipAnchor == nullptr || ! tipAnchor->isShowing()))
+            closeTip();
+        return;
+    }
+    if (mixer.isShowing() && mixer.getWidth() > 300)
+        maybeShowWindowTip (onboarding::Tip::mixerRouting, &mixer);
+    else if (pianoRoll.isShowing() && pianoRoll.getWidth() > 300)
+        maybeShowWindowTip (onboarding::Tip::pianoRoll, &pianoRoll);
+    else if (isTrackerOpen())
+    {
+        if (auto* window = findToolWindow ("tracker"); window != nullptr && window->isShowing())
+            maybeShowWindowTip (onboarding::Tip::tracker, window->getContentComponent() != nullptr ? window->getContentComponent() : (juce::Component*) window);
+    }
+    else if (detailView != nullptr && detailView->isShowing() && detailView->getPage() == DetailView::Page::devices)
+        maybeShowWindowTip (onboarding::Tip::deviceView, detailView.get());
 }
 
 // --- placing the cards ---------------------------------------------------------------------------------------------------
@@ -632,6 +725,16 @@ void MainComponent::placeOnboardingCards()
             const tour::Box all { 0, 0, getWidth(), getHeight() };
             if (const auto p = tour::placeCard (r, all, w, h, 10); p.side != tour::Side::none)
                 bounds = { p.card.x, p.card.y, p.card.w, p.card.h };
+        }
+        if (tipInsideAnchor && tipAnchor != nullptr)
+        {
+            // (round 190qx) a window tip: inside its window's top-right corner, under the title row; a window of its own
+            // (the Tracker) holds the card itself
+            auto* host = tipAnchor->getTopLevelComponent() == getTopLevelComponent() ? (juce::Component*) this : tipAnchor.getComponent();
+            const auto area = host == this ? onboardui::areaIn (*this, *tipAnchor) : tipAnchor->getLocalBounds();
+            bounds = juce::Rectangle<int> (area.getRight() - w - 16, area.getY() + 40, w, h).constrainedWithin (host->getLocalBounds());
+            onboardui::hostOnTop (*tipCard, *host, bounds);
+            return;
         }
         onboardui::hostOnTop (*tipCard, *this, bounds);
     }

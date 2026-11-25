@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.800
+W układzie z uruchamianiem klipów Device view pokazuje urządzenia ścieżki w jednym rzędzie.
+
+00:00:09.200 --> 00:00:14.600
+Kliknij ścieżkę, tu Chords: najpierw jej instrument, potem efekty.
+
+00:00:15.000 --> 00:00:20.400
+Przeciągnij efekt z Efektów audio w Browserze na łańcuch.
+
+00:00:20.800 --> 00:00:26.400
+Sygnał płynie od lewej do prawej. Każde urządzenie pokazuje swoje główne gałki.
+
+00:00:26.800 --> 00:00:32.400
+Przycisk okna otwiera pełny edytor. Ctrl+C i Ctrl+V kopiują urządzenie.
+
+00:00:32.800 --> 00:00:38.200
+Naciśnij Play: akordy przechodzą teraz przez Echoform.
+
+00:00:38.600 --> 00:00:44.400
+Ctrl+Alt+4 pokazuje Device view; Shift+Tab przełącza na klip.

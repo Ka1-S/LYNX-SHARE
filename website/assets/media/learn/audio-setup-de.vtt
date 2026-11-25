@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:03.200 --> 00:00:08.600
+Kein Ton oder Knistern? Öffne Optionen, Audioeinstellungen.
+
+00:00:09.000 --> 00:00:14.400
+Der Treiber: ASIO unter Windows, Core Audio auf dem Mac, PipeWire oder ALSA unter Linux.
+
+00:00:14.800 --> 00:00:20.200
+Das Ausgabegerät ist, wo du LYNX hörst. Systemstandard folgt deinem Computer.
+
+00:00:20.600 --> 00:00:26.200
+Puffergröße: kleiner reagiert schneller beim Spielen, größer gibt der CPU mehr Luft.
+
+00:00:26.600 --> 00:00:32.000
+Spiele einen Testton ab, um zu prüfen, dass du ihn hörst.
+
+00:00:32.400 --> 00:00:37.800
+Von überall tut Hilfe, Audioausgabe testen dasselbe.
+
+00:00:38.200 --> 00:00:44.200
+Knistern? Puffer erhöhen. Noten kommen spät? Senken.

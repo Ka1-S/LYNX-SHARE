@@ -6,6 +6,7 @@
 #include "ui/FruitySlicerEditor.h"
 #include "ui/SlicexEditor.h"
 #include "ui/PatcherEditor.h"
+#include "ui/Notices.h" // round 190qx
 
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
@@ -2675,10 +2676,11 @@ private:
                 openToolWindow (std::move (frame), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
                 return;
             }
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Patcher"),
-                                                node.effect.kind == EffectKind::plugin || node.channel.instrument == InstrumentKind::plugin
-                                                    ? tr ("This plugin could not be loaded (it is not installed or has not been scanned).")
-                                                    : tr ("This node has no editor of its own here."));
+        // round 190qx: notices, not boxes to click away
+        if (node.effect.kind == EffectKind::plugin || node.channel.instrument == InstrumentKind::plugin)
+            ui::pluginNotLoaded (juce::String::fromUTF8 ((node.effect.kind == EffectKind::plugin ? node.effect.plugin.name : node.channel.plugin.name).c_str()));
+        else
+            ui::notify ({ ui::Notice::Kind::info, tr ("This node has no editor of its own here."), {}, {}, {}, 0, "patcher.noEditor" });
     }
 
     void fit()

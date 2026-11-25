@@ -533,6 +533,21 @@ public:
         manageMessages.onClick = [this] {
             messages::manageMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&manageMessages));
         };
+        // round 190qx (the owner's "make the options easy"): Help › "Show tips and hints" here too — the empty-state hints, the
+        // tips the first time a window opens and when something can't work yet; on again also brings back "No more tips"
+        styleToggle (showTips, tr ("Show tips and hints"));
+        showTips.setComponentID ("general.showTips");
+        showTips.setTooltip (tr ("Hints over an empty Playlist, a short tip the first time the Mixer, the Piano roll, the Tracker or the Device view opens, and a tip when something can't work yet. Also in the Help menu."));
+        showTips.getProperties().set ("lynxSearchText", "tips hints onboarding help don't show tips");
+        showTips.setToggleState (hooks.tipsShown ? hooks.tipsShown() : true, juce::dontSendNotification);
+        showTips.setEnabled (hooks.showTips != nullptr);
+        showTips.onClick = [this] {
+            if (hooks.showTips)
+                hooks.showTips (showTips.getToggleState());
+        };
+        add (showTips);
+        for (auto* t : { &inputTitle, &miscTitle, &undoTitle })
+            add (*t);
         // issue #221 (round 190ng): where a remembered "Remember my choice" answer is undone
         styleNote (messagesNote, tr ("Ticked messages are shown; untick one to skip its question. A question answered with \"Remember my choice\" is unticked here: tick it, or Show all, to be asked again."));
         // FL's Hints and warnings › "Project data size warning" (round 190mr, DF-147): the size a saved project may reach
@@ -598,6 +613,11 @@ public:
                                     "when a new version is out. Help > Check for updates... asks at any time.")
                                     // round 190ns (issue #233)
                                     + " " + tr ("Off, LYNX SHARE never goes online by itself: plugin scans and everything else stay on this computer."));
+        // round 190qx: a control with a note under it says the same when pointed at
+        checkUpdates.setTooltip (updatesNote.getText());
+        crashBox.setTooltip (crashNote.getText());
+        animationBox.setTooltip (animationNote.getText());
+        layoutStyleBox.setTooltip (layoutStyleNote.getText().upToFirstOccurrenceOf ("\n", false, false));
         // round 190gh (B2): the version before the last update, and the way back to it (Help › Go back to... too)
         {
             const auto previous = persistent ? updater::previousVersion() : juce::String ("0.1.27");
@@ -608,6 +628,94 @@ public:
         }
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
+
+        // round 190qx: a one-line tooltip on every control that had neither a tooltip nor a note, and the words people from
+        // FL Studio, Live, BandLab or GarageBand type into Settings' find bar (English, not translated)
+        {
+            const auto words = [] (juce::Component& c, const char* text) { c.getProperties().set ("lynxSearchText", text); };
+            words (layoutStyleBox, "FL Studio Ableton Live BandLab GarageBand session view arrangement simple mode workflow");
+            alsSessionBox.setTooltip (tr ("Where the Session View clips of an Ableton Live set (.als) go when it opens: the Clip grid or the Playlist"));
+            words (alsSessionBox, "Ableton Live als session view import clips");
+            languageBox.setTooltip (tr ("A new language is applied when LYNX SHARE restarts."));
+            words (languageBox, "translation idioma locale");
+            fontBox.setTooltip (tr ("The typeface of the menus, buttons and labels. Applied when LYNX SHARE restarts."));
+            words (fontBox, "font typeface");
+            fontReset.setTooltip (tr ("Goes back to the default interface font"));
+            scaleBox.setTooltip (tr ("Scales the whole interface: text, buttons, panels and editors"));
+            words (scaleBox, "zoom scale UI size DPI HiDPI bigger smaller");
+            menuBox.setTooltip (tr ("Compact: menu rows close together. Comfortable: taller rows that are easier to click"));
+            words (menuBox, "menu spacing row height");
+            wavesBox.setTooltip (tr ("Audio clips draw their waveform in the clip's color, or colored by frequency"));
+            words (wavesBox, "waveform spectral spectrum audio clip colour");
+            stereoWaves.setTooltip (tr ("Audio clips show the left and right channels as two waveforms"));
+            words (stereoWaves, "waveform stereo channels");
+            noteNamesBox.setTooltip (tr ("How notes are named everywhere: C D E, the German H for B, or do re mi"));
+            words (noteNamesBox, "solfege do re mi German H note names");
+            blackNotesBox.setTooltip (tr ("Black keys named as sharps (C#) or as flats (Db)"));
+            words (blackNotesBox, "sharp flat accidentals note names");
+            everyKeyNames.setTooltip (tr ("Every Piano roll key shows its note name. Off: only the C keys and the key under the mouse"));
+            rackColumn.setTooltip (tr ("The Channel Rack lights the step column under the playhead and marks the bars while a pattern plays"));
+            words (rackColumn, "step sequencer playhead");
+            rackStepColour.setTooltip (tr ("Lit steps take their channel's color. Off: every lit step has the theme's Steps color"));
+            words (rackStepColour, "step sequencer colour");
+            pluginStyleBox.setTooltip (tr ("How LYNX SHARE's own plugin editors look: each in its own style, or one style for all"));
+            words (pluginStyleBox, "skin plugin look theme neon hardware vivid");
+            artMotion.setTooltip (tr ("Off: the plugin art of the Themed style stays still"));
+            reducedEffects.setTooltip (tr ("Plugin editors draw without glows, blooms or the open animation: lighter on the graphics card"));
+            words (reducedEffects, "performance GPU slow graphics");
+            uiAnimations.setTooltip (tr ("Off: panels and buttons change at once, and the mouse wheel scrolls in steps"));
+            words (uiAnimations, "motion fade smooth scrolling reduce motion");
+            words (animationBox, "fps frame rate refresh rate 144 Hz playhead meters CPU");
+            gpuRendering.setTooltip (tr ("Off: the windows are drawn by the CPU, which works with every graphics driver"));
+            words (gpuRendering, "Direct2D GPU hardware acceleration graphics driver flicker");
+            words (templateBox, "template new project default");
+            startupProjectBox.setTooltip (tr ("What opens at start-up: an empty project, the default template or the last project you used"));
+            words (startupProjectBox, "startup open last project template");
+            newTrackSlotsBox.setTooltip (tr ("How many effect slots a new mixer track has (10, as in FL Studio)"));
+            words (newTrackSlotsBox, "mixer insert FX effect slots");
+            splash.setTooltip (tr ("Shows LYNX SHARE's logo window while the program loads"));
+            startupSound.setTooltip (tr ("Plays a short sound when LYNX SHARE has started (Settings › Theme › Startup sound chooses it)"));
+            scanAtStart.setTooltip (tr ("At every start, plugins newly added to your plugin folders are found in the background"));
+            words (scanAtStart, "plugin scan rescan VST VST3 CLAP");
+            menuEntry.setTooltip (tr ("Adds LYNX SHARE to the desktop's applications menu and opens .lynx files with it"));
+            typingPiano.setTooltip (tr ("The computer keyboard plays notes, as in FL Studio (Ctrl+T switches it)"));
+            words (typingPiano, "computer keyboard musical typing QWERTY piano");
+            keepEditors.setTooltip (tr ("On: a click on a channel button opens its editor and the editors already open stay"));
+            firstChannel.setTooltip (tr ("When the pattern changes, the first channel with notes in it becomes the selected one"));
+            rememberSeek.setTooltip (tr ("Off: the Stop button goes back to the start, and Space to where playback started"));
+            words (rememberSeek, "return to start position stop playhead");
+            hoverValues.setTooltip (tr ("The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar"));
+            escCloses.setTooltip (tr ("On, as in FL Studio: Esc closes the focused Playlist, Channel rack, Piano roll, Mixer or plugin window"));
+            words (escCloses, "escape key close window");
+            editInBox.setTooltip (tr ("Which editor a double-click on a pattern clip in the Playlist opens"));
+            undoBox.setTooltip (tr ("How many steps Undo can go back. More steps use more memory"));
+            words (undoBox, "undo history steps levels");
+            alternateUndo.setTooltip (tr ("On, as in FL Studio: Ctrl+Z keeps stepping back. Off: Ctrl+Z undoes, and pressed again it redoes"));
+            words (alternateUndo, "undo redo Ctrl+Z");
+            autosaveBox.setTooltip (tr ("How often a backup copy of the open project is written to the backup folder"));
+            words (autosaveBox, "autosave auto save backup recovery crash");
+            keepBox.setTooltip (tr ("How many backup copies each project keeps; the oldest goes when a new one is written"));
+            openBackups.setTooltip (tr ("Opens the folder that holds the backup copies"));
+            words (openBackups, "autosave folder backups recover");
+            backupQuiet.setTooltip (tr ("A backup waits while the song plays or you play a MIDI keyboard, up to the longest wait below"));
+            longestWaitBox.setTooltip (tr ("A backup that is waiting is written anyway after this long"));
+            unusedTakes.setTooltip (tr ("When a project closes, its recorded takes that no clip uses are listed, with an offer to delete them"));
+            words (unusedTakes, "takes recordings clean up delete unused audio files disk space");
+            sandboxBox.setTooltip (tr ("Where plugins run: in LYNX SHARE's own process (fastest) or in processes apart, safe from their crashes"));
+            words (sandboxBox, "sandbox bridge crash protection isolation plugin process");
+            substitutes.setTooltip (tr ("A project keeps the original plugin and uses it again once it is installed."));
+            words (substitutes, "missing plugins replacement");
+            sampleAccurate.setTooltip (tr ("Automation reaches CLAP and VST3 plugins at its exact sample, not once per audio block"));
+            managePlugins.setTooltip (tr ("Opens the Plugin manager: scan for plugins and see the ones found"));
+            words (managePlugins, "plugin manager scan VST VST3 CLAP database");
+            manageShortcuts.setTooltip (tr ("See, search and change every keyboard shortcut."));
+            words (manageShortcuts, "keyboard shortcuts hotkeys key bindings keymap");
+            words (manageMessages, "dialogs questions don't ask again remember my choice warnings");
+            words (crashBox, "crash report bug privacy telemetry");
+            checkNow.setTooltip (tr ("Asks now whether a newer version of LYNX SHARE is out"));
+            words (checkUpdates, "update new version online privacy");
+            words (remoteControl, "API automation script local control");
+        }
 
         for (auto* b : { &templateBox, &startupProjectBox, &newTrackSlotsBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox, &dataSizeBox })
             styleCombo (*b);
@@ -676,13 +784,17 @@ private:
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
 
-        r.section (editingTitle);
+        // round 190qx (OPTIONS.md: 22 rows under one title): FL's own panel names of its General page split them
+        editingTitle.setVisible (false);
+        r.section (inputTitle);
         for (auto* t : { &clickHold, &bothButtons }) // (round 190mr: FL's General › Input)
             t->setBounds (r.full (24));
+        r.section (miscTitle);
         for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority,
                          &restoreAfterSolo, &readSampleTempo, &hoverValues, &escCloses })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
+        r.section (undoTitle);
         undoBox.setBounds (r.row (undoLabel, 120));
         undoKnobTweaks.setBounds (r.full (24)); // (round 190mv: FL's Undo history panel, after Maximum undo levels)
         alternateUndo.setBounds (r.full (24));
@@ -690,6 +802,7 @@ private:
         historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
+        showTips.setBounds (r.full (24)); // (round 190qx)
         manageMessages.setBounds (r.full().removeFromLeft (180));
         messagesNote.setBounds (r.note (messagesNote, 18)); // (round 190ng: its own wrapped line under the button)
         dataSizeBox.setBounds (r.row (dataSizeLabel, 160)); // (round 190mr, DF-147)
@@ -893,6 +1006,7 @@ private:
     juce::Label alsSessionLabel;
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
+        inputTitle { tr ("Input") }, miscTitle { tr ("Miscellaneous") }, undoTitle { tr ("Undo history") }, // (round 190qx)
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote, textSizeLabel, boldLabel;
@@ -915,6 +1029,7 @@ private:
     juce::ComboBox dataSizeBox;
     juce::ToggleButton clickHold, bothButtons; // round 190mr (DE-63, DE-16)
     juce::ToggleButton escCloses; // round 190ng (issue #217)
+    juce::ToggleButton showTips; // round 190qx
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;
@@ -1009,6 +1124,38 @@ public:
         styleNote (recordNote, tr ("Choose each mixer insert's input in the Mixer (the input box above its effect slots), arm it, then Rec + Play. "
                                    "This switch records the first two input channels into a new insert when nothing is armed."));
         recordInput.onClick = [this] { engine.setAudioRecordingArmed (recordInput.getToggleState()); };
+        recordInput.setTooltip (recordNote.getText()); // (round 190qx)
+
+        // round 190qx: one-line tooltips where a control had neither a tooltip nor a note, and the words people type into
+        // Settings' find bar (English, not translated)
+        {
+            const auto words = [] (juce::Component& c, const char* text) { c.getProperties().set ("lynxSearchText", text); };
+            driverBox.setTooltip (tr ("The kind of audio driver: ASIO or the system's own audio. The line below says what the chosen one does"));
+            words (driverBox, "ASIO WASAPI DirectSound Core Audio ALSA JACK PipeWire driver sound card audio interface");
+            outputBox.setTooltip (tr ("The audio device you listen through: speakers, headphones or an audio interface"));
+            words (outputBox, "speakers headphones sound card interface output playback");
+            inputBox.setTooltip (tr ("The audio device you record from: a microphone or an audio interface. (none): no recording"));
+            words (inputBox, "microphone mic input recording interface");
+            rateBox.setTooltip (tr ("How many samples per second the device runs at; 44100 Hz or 48000 Hz suit most work"));
+            words (rateBox, "sample rate 44.1 48 kHz frequency");
+            bufferBox.setTooltip (tr ("Smaller buffers answer faster when you play; larger ones give the CPU more room (fewer clicks)."));
+            words (bufferBox, "latency buffer size ASIO block crackles dropouts");
+            panelButton.setTooltip (tr ("Opens the driver's own settings window (ASIO drivers have one)"));
+            words (panelButton, "ASIO control panel");
+            testButton.setTooltip (tr ("Plays a short tone through the output device, to check that you hear sound"));
+            words (testButton, "no sound test speakers");
+            formatBox.setTooltip (tr ("The sample format of new recordings; 24-bit suits most recording"));
+            words (formatBox, "bit depth wav recording format 16 24 32 float");
+            takeNames.setTooltip (tr ("Off: a take is named after the project, the date and the time, as in FL Studio"));
+            words (takeNames, "take names recording file names");
+            pingOutBox.setTooltip (tr ("The output pair the measuring clicks are played on"));
+            pingInBox.setTooltip (tr ("The input the measuring clicks come back on"));
+            measureButton.setTooltip (tr ("Plays 8 clicks and times their way from the ping output back to the ping input"));
+            words (measureButton, "latency round trip offset recording delay");
+            useMeasured.setTooltip (tr ("Off: the latency the driver reports is used"));
+            words (offsetSlider, "latency offset recording delay nudge");
+            words (renderAhead, "performance CPU anticipative processing");
+        }
 
         devices.addChangeListener (this);
         refresh();
@@ -1691,6 +1838,10 @@ public:
         if (p.target >= (int) channels.size()) // a channel this project doesn't have (kept)
             plays.addItem (tr ("Plays channel {0}", { juce::String (p.target + 1) }), p.target + 2);
         plays.setSelectedId (p.target + 2, juce::dontSendNotification);
+        // round 190qx: one-line tooltips and Settings' search words
+        enabled.setTooltip (tr ("Turns this MIDI input device on or off"));
+        enabled.getProperties().set ("lynxSearchText", "MIDI keyboard controller input device enable");
+        plays.setTooltip (tr ("Which Channel Rack channel this device plays: the selected ones, or always the same one"));
         plays.onChange = [this] {
             prefsNow.target = plays.getSelectedId() - 2;
             update();
@@ -2093,6 +2244,24 @@ public:
         };
         removeAll.onClick = [this] { engine.editSong ([] (Song& s) { s.midiLinks.clear(); }); };
 
+        // round 190qx: a control with a note under it says the same when pointed at (the hint bar shows it too)
+        velocityBox.setTooltip (velocityNote.getText());
+        perfBox.setTooltip (perfNote.getText());
+        jumpBox.setTooltip (jumpNote.getText());
+        pickup.setTooltip (pickupNote.getText());
+        gamepadToggle.setTooltip (gamepadNote.getText());
+        // round 190qx: one-line tooltips where a control had neither a tooltip nor a note, and Settings' search words
+        refresh.setTooltip (tr ("Looks for MIDI devices again and reads your controller profiles again"));
+        refresh.getProperties().set ("lynxSearchText", "rescan MIDI devices reconnect keyboard not working");
+        links.setTooltip (tr ("Controller links: double-click one to open its settings"));
+        links.getProperties().set ("lynxSearchText", "MIDI learn link controller mapping CC knob fader");
+        removeLink.setTooltip (tr ("Removes the selected link"));
+        removeAll.setTooltip (tr ("Removes every link of this project; the global links stay"));
+        clockBox.getProperties().set ("lynxSearchText", "MIDI clock sync slave follow external tempo");
+        velocityBox.getProperties().set ("lynxSearchText", "velocity curve sensitivity keyboard");
+        pickup.getProperties().set ("lynxSearchText", "soft takeover jump knob fader");
+        gamepadToggle.getProperties().set ("lynxSearchText", "gamepad joystick Xbox PlayStation");
+
         if (! persistent)
         {
             // --snapshot: devices of a typical setup, and two links
@@ -2486,29 +2655,265 @@ private:
 // ================================================================================================================
 // LYNX extras (round 190am)
 // ================================================================================================================
+// Round 190qx (the owner's "make the options easy"): a small LYNX-drawn picture of what a visual extra adds, beside its
+// switch (lit in the accent while the extra is on). Vectors only, painted when the row is on screen.
+class ExtraPreview final : public juce::Component
+{
+public:
+    explicit ExtraPreview (std::string i) : id (std::move (i)) { setInterceptsMouseClicks (false, false); }
+    void setOn (bool shouldBeOn)
+    {
+        if (on != shouldBeOn)
+        {
+            on = shouldBeOn;
+            repaint();
+        }
+    }
+    static constexpr int width = 76, height = 42;
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme::colour;
+        const auto b = getLocalBounds().toFloat().reduced (0.5f);
+        g.setColour (bg1);
+        g.fillRoundedRectangle (b, theme::radius::md);
+        g.setColour (border);
+        g.drawRoundedRectangle (b, theme::radius::md, 1.0f);
+        const auto r = b.reduced (5.0f, 5.0f);
+        const auto lit = on ? accent : textDisabled;
+        const auto dim = textDisabled.withAlpha (0.55f);
+        const auto line = [&g] (float x1, float y1, float x2, float y2, float t = 1.0f) { g.drawLine (x1, y1, x2, y2, t); };
+        if (id == "mixer.loudness")
+        {
+            for (int i = 0; i < 3; ++i) // three strips, then the loudness panel
+            {
+                const auto x = r.getX() + (float) i * 11.0f;
+                g.setColour (dim);
+                g.fillRoundedRectangle (x, r.getY(), 8.0f, r.getHeight(), 1.5f);
+            }
+            auto panel = r.withTrimmedLeft (36.0f);
+            g.setColour (lit.withAlpha (0.25f));
+            g.fillRoundedRectangle (panel, 2.0f);
+            g.setColour (lit);
+            for (int i = 0; i < 3; ++i)
+                g.fillRect (panel.getX() + 3.0f, panel.getY() + 4.0f + (float) i * 9.0f, panel.getWidth() * (0.8f - 0.2f * (float) i) - 6.0f, 3.0f);
+        }
+        else if (id == "mixer.stripInserts" || id == "playlist.trackInserts")
+        {
+            const auto strip = id == "mixer.stripInserts";
+            const auto box = strip ? r.withWidth (22.0f).withX (r.getCentreX() - 11.0f) : r.withHeight (r.getHeight());
+            g.setColour (dim);
+            g.fillRoundedRectangle (box, 2.0f);
+            g.setColour (lit);
+            for (int i = 0; i < 3; ++i)
+            {
+                const auto y = box.getY() + (strip ? 4.0f : 3.0f) + (float) i * 7.0f;
+                const auto x = strip ? box.getX() + 3.0f : box.getRight() - 30.0f;
+                g.fillEllipse (x, y, 4.0f, 4.0f);
+                g.fillRect (x + 6.0f, y + 1.0f, strip ? 10.0f : 20.0f, 2.0f);
+            }
+            if (! strip)
+            {
+                g.setColour (textSecondary);
+                g.fillRect (box.getX() + 4.0f, box.getY() + 5.0f, 20.0f, 3.0f);
+            }
+        }
+        else if (id == "playlist.sectionsLane" || id == "playlist.chordLane" || id == "pianoRoll.songBarsRuler")
+        {
+            // the ruler, the new lane under it, then two tracks of clips
+            g.setColour (dim);
+            g.fillRect (r.withHeight (7.0f));
+            g.setColour (textSecondary);
+            for (int i = 0; i < 4; ++i)
+                line (r.getX() + (float) i * r.getWidth() / 4.0f, r.getY(), r.getX() + (float) i * r.getWidth() / 4.0f, r.getY() + 6.0f);
+            const auto lane = juce::Rectangle<float> (r.getX(), r.getY() + 9.0f, r.getWidth(), 8.0f);
+            g.setColour (lit);
+            if (id == "playlist.sectionsLane")
+            {
+                g.fillRoundedRectangle (lane.withWidth (r.getWidth() * 0.4f - 1.0f), 1.5f);
+                g.setColour (lit.withAlpha (0.6f));
+                g.fillRoundedRectangle (lane.withTrimmedLeft (r.getWidth() * 0.4f).withWidth (r.getWidth() * 0.6f), 1.5f);
+            }
+            else if (id == "playlist.chordLane")
+                for (int i = 0; i < 4; ++i)
+                    g.fillRoundedRectangle (lane.getX() + (float) i * lane.getWidth() / 4.0f, lane.getY(), lane.getWidth() / 4.0f - 2.0f, lane.getHeight(), 4.0f);
+            else
+                for (int i = 0; i < 4; ++i) // song bar numbers over the pattern's own
+                    g.fillRect (r.getX() + 2.0f + (float) i * r.getWidth() / 4.0f, r.getY() + 1.0f, 6.0f, 4.0f);
+            g.setColour (dim);
+            g.fillRoundedRectangle (r.getX(), r.getY() + 20.0f, r.getWidth() * 0.45f, 5.0f, 1.0f);
+            g.fillRoundedRectangle (r.getX() + r.getWidth() * 0.5f, r.getY() + 27.0f, r.getWidth() * 0.45f, 5.0f, 1.0f);
+        }
+        else if (id == "playlist.shadeFadedAudio")
+        {
+            auto clip = r.reduced (0.0f, 3.0f);
+            g.setColour (dim);
+            g.fillRoundedRectangle (clip, 2.0f);
+            g.setColour (textSecondary);
+            for (int i = 0; i < 28; ++i)
+            {
+                const auto x = clip.getX() + 2.0f + (float) i * (clip.getWidth() - 4.0f) / 28.0f;
+                const auto a = (float) ((i * 37) % 11) / 11.0f * clip.getHeight() * 0.35f + 2.0f;
+                line (x, clip.getCentreY() - a, x, clip.getCentreY() + a);
+            }
+            juce::Path fade;
+            fade.addTriangle (clip.getRight() - clip.getWidth() * 0.35f, clip.getY(), clip.getRight(), clip.getY(), clip.getRight(), clip.getBottom());
+            g.setColour ((on ? accent : bg0).withAlpha (0.55f));
+            g.fillPath (fade);
+            g.setColour (lit);
+            line (clip.getRight() - clip.getWidth() * 0.35f, clip.getY(), clip.getRight(), clip.getBottom(), 1.3f);
+        }
+        else if (id == "pianoRoll.chordHighlight")
+        {
+            const auto rowH = r.getHeight() / 8.0f;
+            for (int i = 0; i < 8; ++i)
+            {
+                const auto lightRow = i == 1 || i == 4 || i == 6;
+                g.setColour (lightRow ? lit.withAlpha (0.45f) : (i % 2 == 0 ? bg2 : bg3));
+                g.fillRect (r.getX() + 12.0f, r.getY() + (float) i * rowH, r.getWidth() - 12.0f, rowH - 0.5f);
+                g.setColour (i % 3 == 1 ? bg0 : textSecondary);
+                g.fillRect (r.getX(), r.getY() + (float) i * rowH, 10.0f, rowH - 0.5f);
+            }
+        }
+        else if (id == "simple.projectName")
+        {
+            g.setColour (dim);
+            g.fillRect (r.withHeight (9.0f));
+            g.setColour (lit);
+            g.fillRoundedRectangle (r.getCentreX() - 16.0f, r.getY() + 2.0f, 32.0f, 5.0f, 2.0f);
+            g.setColour (dim);
+            for (int i = 0; i < 3; ++i)
+                g.fillRoundedRectangle (r.getX(), r.getY() + 13.0f + (float) i * 7.0f, r.getWidth() * (0.9f - 0.2f * (float) i), 5.0f, 1.0f);
+        }
+        else if (id == "controlBar.liveScale")
+        {
+            g.setColour (dim);
+            g.fillRect (r.withHeight (12.0f).withY (r.getCentreY() - 6.0f));
+            const float w[] = { 10.0f, 14.0f, 26.0f };
+            auto x = r.getX() + 4.0f;
+            for (int i = 0; i < 3; ++i)
+            {
+                g.setColour (i == 0 ? lit : lit.withAlpha (0.6f));
+                g.drawRoundedRectangle (x, r.getCentreY() - 4.0f, w[i], 8.0f, 1.5f, 1.2f);
+                x += w[i] + 4.0f;
+            }
+        }
+        else if (id == "mixer.peakValues" || id == "mixer.correlation")
+        {
+            // three strips: meters, then the peak read-out under each (or the correlation bar)
+            for (int i = 0; i < 3; ++i)
+            {
+                const auto x = r.getX() + 6.0f + (float) i * 22.0f;
+                g.setColour (dim);
+                g.fillRoundedRectangle (x, r.getY(), 14.0f, r.getHeight() - 10.0f, 1.5f);
+                g.setColour (theme::colour::meterLow.withAlpha (0.8f));
+                g.fillRect (x + 4.0f, r.getY() + 8.0f + (float) i * 4.0f, 6.0f, r.getHeight() - 20.0f - (float) i * 4.0f);
+                g.setColour (lit);
+                if (id == "mixer.peakValues")
+                    g.fillRoundedRectangle (x, r.getBottom() - 7.0f, 14.0f, 6.0f, 1.5f);
+                else
+                {
+                    g.fillRect (x, r.getBottom() - 4.0f, 14.0f, 1.5f);
+                    g.fillRect (x + 7.0f + (float) (i - 1) * 3.0f, r.getBottom() - 7.0f, 2.0f, 6.0f);
+                }
+            }
+        }
+        else if (id == "playlist.dimUnselectedTracks" || id == "playlist.darkenMutedTracks")
+        {
+            // four tracks of clips: one selected (dim others) or one switched off (darkened)
+            const auto rowH = r.getHeight() / 4.0f;
+            for (int i = 0; i < 4; ++i)
+            {
+                const auto marked = i == 1;
+                const auto veiled = id == "playlist.dimUnselectedTracks" ? ! marked : marked;
+                auto row = juce::Rectangle<float> (r.getX(), r.getY() + (float) i * rowH, r.getWidth(), rowH - 1.5f);
+                g.setColour (bg2);
+                g.fillRect (row);
+                g.setColour (textSecondary.withAlpha (0.8f));
+                g.fillRoundedRectangle (row.getX() + 4.0f + (float) i * 6.0f, row.getY() + 1.5f, 26.0f, row.getHeight() - 3.0f, 1.5f);
+                if (veiled)
+                {
+                    g.setColour (bg0.withAlpha (on ? 0.6f : 0.25f));
+                    g.fillRect (row);
+                }
+                if (marked && id == "playlist.dimUnselectedTracks")
+                {
+                    g.setColour (lit);
+                    g.drawRect (row, 1.0f);
+                }
+            }
+        }
+        else if (id == "toolbar.grouped")
+        {
+            const float w[] = { 18.0f, 24.0f, 16.0f };
+            auto x = r.getX();
+            for (int i = 0; i < 3; ++i)
+            {
+                const auto box = juce::Rectangle<float> (x, r.getCentreY() - 9.0f, w[i], 18.0f);
+                g.setColour (on ? bg3 : bg1);
+                g.fillRoundedRectangle (box, 3.0f);
+                g.setColour (lit);
+                g.drawRoundedRectangle (box, 3.0f, 1.0f);
+                g.setColour (textSecondary);
+                g.fillRect (box.reduced (4.0f, 7.0f));
+                x += w[i] + 4.0f;
+            }
+        }
+        else if (id == "general.hoverValues")
+        {
+            const auto c = juce::Point<float> (r.getX() + 14.0f, r.getCentreY());
+            g.setColour (dim);
+            g.fillEllipse (c.x - 10.0f, c.y - 10.0f, 20.0f, 20.0f);
+            g.setColour (textSecondary);
+            line (c.x, c.y, c.x + 6.0f, c.y - 6.0f, 1.6f);
+            auto pill = juce::Rectangle<float> (r.getX() + 32.0f, r.getY() + 4.0f, r.getWidth() - 32.0f, 12.0f);
+            g.setColour (lit.withAlpha (0.85f));
+            g.fillRoundedRectangle (pill, 5.0f);
+            g.setColour (bg0);
+            g.fillRect (pill.reduced (6.0f, 4.5f));
+        }
+    }
+
+private:
+    std::string id;
+    bool on = false;
+};
+
 class ExtrasPage final : public ScrollingPage
 {
 public:
     ExtrasPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
     {
-        styleNote (intro, tr ("LYNX's own improvements. The ones that only change what you see are on by default; the ones that change "
-                              "what a key, a click or a drag does are off, so LYNX SHARE works like FL Studio until you switch one on. "
-                              "Each switch is the same setting as in the place its line names."));
+        // (round 190qx, OPTIONS.md: since 190qk most visual extras stay off for their CPU, so the intro says "some")
+        styleNote (intro, tr ("LYNX's own improvements, grouped by area. The ones that change what a key, a click or a drag does are off, so "
+                              "LYNX SHARE works like FL Studio until you switch one on; some that only change what you see are on. Each switch "
+                              "is the same setting as in the place its line names, and the picture beside a visual one shows what it adds."));
         intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-        add (intro);
+        addFixed (intro);
         // round 190qk (owner's policy 11-23): every extra off at once, or each back at its default (core/ExtrasDefaults.h)
+        // (round 190qx: the two buttons stay at the page's top while the switches scroll)
         flExact.setComponentID ("extras.flExact");
         flExact.setTooltip (tr ("Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)"));
         flExact.onClick = [this] { setAll (true); };
         recommended.setComponentID ("extras.recommended");
         recommended.setTooltip (tr ("Every LYNX extra at its default: the ones that only change the look on, the rest off"));
         recommended.onClick = [this] { setAll (false); };
-        add (flExact);
-        add (recommended);
-        std::string_view section;
+        addFixed (flExact);
+        addFixed (recommended);
+        addFixed (state);
+        styleNote (state, {});
+        state.setJustificationType (juce::Justification::centredLeft);
+        // round 190qx: grouped by area (extras::sectionOrder), each area's extras in the order they landed
+        std::vector<const extras::Item*> sorted;
         for (const auto& item : extras::items)
+            sorted.push_back (&item);
+        std::stable_sort (sorted.begin(), sorted.end(),
+                          [] (const extras::Item* a, const extras::Item* b) { return extras::sectionRank (a->section) < extras::sectionRank (b->section); });
+        std::string_view section;
+        for (const auto* itemPtr : sorted)
         {
-            if (item.section != section)
+            const auto& item = *itemPtr;
+            if (item.section != section || titles.empty())
             {
                 section = item.section;
                 titles.push_back (std::make_unique<SectionTitle> (tr (std::string (item.section).c_str())));
@@ -2517,16 +2922,25 @@ public:
             auto& row = *rows.emplace_back (std::make_unique<Row>());
             row.id = std::string (item.id);
             row.title = titles.back().get();
-            styleToggle (row.toggle, tr (std::string (item.title).c_str()));
+            // (round 190qx: every line here is a LYNX extra, so the menus' "(LYNX)" mark is left out on this page)
+            styleToggle (row.toggle, withoutLynxMark (tr (std::string (item.title).c_str())));
             row.toggle.setComponentID (juce::String (row.id)); // (--snapshot and tests find a switch by its id)
             row.toggle.onClick = [this, &row] {
                 setLynxExtra (engine, hooks, row.id, row.toggle.getToggleState(), persistent);
                 refresh(); // (what the app really did, e.g. an action that was refused)
             };
+            // (round 190qx: the hint bar and the tooltip say it too, and whether it is FL's behaviour or LYNX's)
+            row.toggle.setTooltip (tr (std::string (item.note).c_str()));
             styleNote (row.note, tr (std::string (item.note).c_str()));
             row.note.setMinimumHorizontalScale (1.0f); // (round 190iu: a long note wraps instead of being squeezed onto one line)
             add (row.toggle);
             add (row.note);
+            if (extras::isVisual (item.id))
+            {
+                row.preview = std::make_unique<ExtraPreview> (row.id);
+                row.preview->setComponentID ("extras.preview." + juce::String (row.id));
+                add (*row.preview);
+            }
         }
         // issue #239 (round 190od): the user's automatic colour / icon rules
         add (autoLookTitle);
@@ -2543,31 +2957,34 @@ public:
             refresh();
     }
 
+    void resized() override
+    {
+        // the intro and the two buttons along the top (round 190qx: they stay while the switches scroll)
+        const auto width = getWidth() - 40;
+        const auto introHeight = 4 + 15 * linesOf (intro, width);
+        const auto buttonHeight = Rows::h (26);
+        setFixedTop (14 + introHeight + 6 + buttonHeight + 10);
+        intro.setBounds (20, 14, width, introHeight);
+        auto row = juce::Rectangle<int> (20, intro.getBottom() + 6, width, buttonHeight);
+        flExact.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (flExact))));
+        row.removeFromLeft (8);
+        recommended.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (recommended))));
+        row.removeFromLeft (12);
+        state.setBounds (row);
+        ScrollingPage::resized();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        // a hairline under the fixed strip
+        g.setColour (theme::colour::border);
+        g.fillRect (0, getFixedTop() - 1, getWidth(), 1);
+    }
+
     int layout (int width) override
     {
         Rows r (width);
-        const auto noteFont = theme::font (theme::type::small);
-        const auto linesOf = [&noteFont] (const juce::Label& label, int w) {
-            juce::AttributedString text (label.getText());
-            text.setFont (noteFont);
-            juce::TextLayout fitted;
-            // (round 190oo WG-32: at the width the label draws in, its borders taken off; a ru / de note that wrapped one
-            // line more there than measured here was cut in its box)
-            fitted.createLayout (text, (float) juce::jmax (40, w - juce::jmax (8, label.getBorderSize().getLeftAndRight() + 2)));
-            return juce::jmax (1, fitted.getNumLines());
-        };
-        intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
-        {
-            // (each button as wide as its text: translations differ a lot)
-            const auto widthOf = [this] (juce::TextButton& b) {
-                return juce::jlimit (90, Rows::h (420), juce::roundToInt (juce::GlyphArrangement::getStringWidth (
-                                                             getLookAndFeel().getTextButtonFont (b, Rows::h (26)), b.getButtonText())) + 28);
-            };
-            auto row = r.full (26);
-            flExact.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (flExact))));
-            row.removeFromLeft (8);
-            recommended.setBounds (row.removeFromLeft (juce::jmin (row.getWidth(), widthOf (recommended))));
-        }
+        r.y = 6; // (the intro sits in the fixed strip above)
         const SectionTitle* title = nullptr;
         for (auto& row : rows)
         {
@@ -2576,10 +2993,19 @@ public:
                 r.section (*row->title, title == nullptr);
                 title = row->title;
             }
-            row->toggle.setBounds (r.full (24));
-            const auto noteWidth = r.area.getWidth() - noteIndent;
+            const auto previewWidth = row->preview != nullptr ? ExtraPreview::width + 10 : 0;
+            const auto caption = r.full (24);
+            row->toggle.setBounds (caption.withTrimmedRight (previewWidth));
+            const auto noteWidth = r.area.getWidth() - noteIndent - previewWidth;
             const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
-            row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
+            const auto note = r.full (noteHeight).withTrimmedLeft (noteIndent).withTrimmedRight (previewWidth).translated (0, -5);
+            row->note.setBounds (note);
+            if (row->preview != nullptr)
+            {
+                const auto top = caption.getY() + 2;
+                row->preview->setBounds (r.area.getRight() - ExtraPreview::width, top, ExtraPreview::width, ExtraPreview::height);
+                r.y = juce::jmax (r.y, top + ExtraPreview::height + rowGap);
+            }
         }
         r.section (autoLookTitle, false);
         autoLook->setBounds (r.full (autoLook->heightFor (r.area.getWidth())));
@@ -2593,12 +3019,54 @@ private:
         SectionTitle* title = nullptr;
         juce::ToggleButton toggle;
         juce::Label note;
+        std::unique_ptr<ExtraPreview> preview;
     };
+
+    static juce::String withoutLynxMark (const juce::String& caption)
+    {
+        auto t = caption.trimEnd();
+        if (t.endsWith ("(LYNX)"))
+            t = t.dropLastCharacters (6).trimEnd();
+        return t;
+    }
+
+    static int linesOf (const juce::Label& label, int w)
+    {
+        juce::AttributedString text (label.getText());
+        text.setFont (theme::font (theme::type::small));
+        juce::TextLayout fitted;
+        // (round 190oo WG-32: at the width the label draws in, its borders taken off; a ru / de note that wrapped one
+        // line more there than measured here was cut in its box)
+        fitted.createLayout (text, (float) juce::jmax (40, w - juce::jmax (8, label.getBorderSize().getLeftAndRight() + 2)));
+        return juce::jmax (1, fitted.getNumLines());
+    }
+
+    int widthOf (juce::TextButton& b)
+    {
+        // (each button as wide as its text: translations differ a lot)
+        return juce::jlimit (90, Rows::h (420), juce::roundToInt (juce::GlyphArrangement::getStringWidth (getLookAndFeel().getTextButtonFont (b, Rows::h (26)),
+                                                                                                       b.getButtonText())) + 28);
+    }
 
     void refresh()
     {
+        int on = 0, atDefault = 0, flExactCount = 0;
         for (auto& row : rows)
-            row->toggle.setToggleState (lynxExtraOn (engine, hooks, row->id), juce::dontSendNotification);
+        {
+            const auto isOn = lynxExtraOn (engine, hooks, row->id);
+            row->toggle.setToggleState (isOn, juce::dontSendNotification);
+            if (row->preview != nullptr)
+                row->preview->setOn (isOn);
+            on += isOn ? 1 : 0;
+            atDefault += isOn == extras::defaultOn (row->id) ? 1 : 0;
+            flExactCount += isOn == extras::flExactOn (row->id) ? 1 : 0;
+        }
+        // round 190qx: where the switches stand, beside the two buttons
+        const auto n = (int) rows.size();
+        state.setText (atDefault == n         ? tr ("Now: Recommended ({0} of {1} on)", { juce::String (on), juce::String (n) })
+                       : flExactCount == n    ? tr ("Now: FL-exact")
+                                              : tr ("Now: your own choice ({0} of {1} on)", { juce::String (on), juce::String (n) }),
+                       juce::dontSendNotification);
     }
 
     // round 190qk: "FL-exact" (every extra off, FL's own two on) or "Recommended" (each at its default; the extras then
@@ -2618,7 +3086,7 @@ private:
     AudioEngine& engine;
     SettingsHooks hooks;
     bool persistent;
-    juce::Label intro;
+    juce::Label intro, state;
     juce::TextButton flExact { tr ("FL-exact (turn all LYNX extras off)") }, recommended { tr ("Recommended") };
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
@@ -2671,6 +3139,11 @@ public:
             engine.setLinkStartStopSync (syncButton.getToggleState());
             refresh();
         };
+        // round 190qx: one-line tooltips and Settings' search words
+        enableButton.setTooltip (tr ("Joins or leaves the Link session: the tempo and the beat shared with other apps on the network"));
+        enableButton.getProperties().set ("lynxSearchText", "Ableton Link sync tempo network wifi jam");
+        showButton.setTooltip (tr ("Shows or hides the Link toggle in the toolbar"));
+        syncButton.setTooltip (tr ("Play and Stop are shared with the peers that also have Start Stop Sync on."));
         styleNote (syncNote, tr ("Play and Stop are shared with the peers that also have Start Stop Sync on."));
         syncNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         add (syncNote);

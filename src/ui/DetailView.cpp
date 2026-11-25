@@ -1,4 +1,5 @@
 #include "ui/TextCache.h"
+#include "ui/HowTo.h" // round 190qx
 #include "ui/ShotShowing.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
@@ -4179,6 +4180,7 @@ void DetailView::showOptionsMenu()
         if (hooks.layoutChanged != nullptr)
             hooks.layoutChanged();
     });
+    howto::addMenuItem (menu, devicesPage ? howto::Window::deviceView : howto::Window::clipGrid, this); // (round 190qx)
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&optionsButton));
 }
 

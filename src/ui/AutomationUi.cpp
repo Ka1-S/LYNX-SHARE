@@ -2,6 +2,7 @@
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
+#include "ui/HowTo.h" // round 190qx
 #include "ui/DemoMode.h" // round 190pl
 #include "ui/RemoteControl.h"
 #include "core/PlaylistOps.h"
@@ -1192,6 +1193,7 @@ void createAutomationLane (AudioEngine& engine, const AutomationTarget& target, 
     });
     if (placed >= 0)
         ui::postHint ({ tr ("Automation lane added under {0}", { tr ("Track {0}", { juce::String (placed + 1) }) }), juce::String::fromUTF8 (name.c_str()) }, 3000);
+        howto::windowShown (howto::Window::automation, nullptr); // (round 190qx: the one-time tip)
 }
 
 void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, const std::string& name, float value)
