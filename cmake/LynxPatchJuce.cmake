@@ -363,6 +363,14 @@
 #    juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp: the plugin's .ttl that JUCE's LV2 manifest helper writes
 #    names its licence, `doap:license <http://spdx.org/licenses/AGPL-3.0-or-later>` (LYNX's plugins are AGPL-3.0-or-later,
 #    LICENSE). JUCE wrote none, and lv2lint warned on every LV2 plugin of the pack ("no license specified").#
+# fix 190rb. Linux/BSD only (round 190rb, the 0.1.32 quality release), juce_events/native/juce_Messaging_linux.cpp:
+#    the event loop gathers the file-descriptor callbacks that are ready, then calls them one after the other. One of
+#    them can unregister another's (the X11 events close a plugin's editor; the last VST3 editor takes JUCE's VST3 run
+#    loop with it, whose destructor unregisters its descriptors; a CLAP plugin's descriptors go with the plugin), and the
+#    gathered copy still called the unregistered callback, whose owner was gone: two 0.1.31.1 Linux crash reports
+#    (an unordered_map look-up on a freed VST3 RunLoop::Impl right after the main loop's callback). A callback that is
+#    no longer registered when its turn comes is skipped now.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -850,6 +858,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("vertical blanks only while needed: attachment joins" "LYNX patch (round 190gv): the window's vertical blanks start"
             "            peer->addVBlankListener (this);|NL|"
             "            peer->addVBlankListener (this);|NL|           #if JUCE_WINDOWS|NL|            lynxVBlankListenerAdded (*peer); // LYNX patch (round 190gv): the window's vertical blanks start again|NL|           #endif|NL|")
+    elseif(file MATCHES "juce_Messaging_linux.cpp$")
+        lynx_juce_fix("unregistered descriptor callbacks are not called (fix 190rb)" "LYNX patch (fix 190rb)"
+            "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|            (*fn)();|NL||NL|        return ! callbackStorage.empty();|NL|    }"
+            "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|        {|NL|            // LYNX patch (fix 190rb): an earlier callback of this round may have unregistered this one, and its owner may|NL|            // be gone (a VST3 plugin's run loop, deleted with the plugin's last editor): only a callback still|NL|            // registered is called|NL|            if (! lynxStillRegistered (fn))|NL|                continue;|NL||NL|            (*fn)();|NL|        }|NL||NL|        return ! callbackStorage.empty();|NL|    }|NL||NL|    bool lynxStillRegistered (const std::shared_ptr<std::function<void()>>& fn) const|NL|    {|NL|        const ScopedLock sl (lock);|NL||NL|        for (const auto& registered : callbacks)|NL|            if (registered.second == fn)|NL|                return true;|NL||NL|        return false;|NL|    }")
     elseif(file MATCHES "juce_Direct2DHwndContext_windows.cpp$")
         lynx_juce_fix("Direct2D present pacing: declarations" "LYNX patch (round 190gv, fix 33): JUCE 8.0.4 paced"
             "namespace juce|NL|{|NL||NL|struct Direct2DHwndContext::HwndPimpl : public Direct2DGraphicsContext::Pimpl|NL|{"
@@ -918,6 +930,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)

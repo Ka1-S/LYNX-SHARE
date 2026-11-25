@@ -400,5 +400,45 @@
                        ! offline.getSong().patterns.empty() && offline.getSong().patterns[0].notes.empty());
             }
         }
+
+       #if JUCE_LINUX
+        // ---- crash reports 0a4071b9 / 83a7f664 (0.1.31.1, Linux): JUCE's event loop gathers the descriptor callbacks that
+        //      are ready and calls them in turn; when one of them unregistered another (the X11 events closing a plugin's
+        //      last VST3 editor take JUCE's VST3 run loop with it), the gathered copy still ran on its freed owner. JUCE
+        //      fix 190rb (cmake/LynxPatchJuce.cmake): a callback no longer registered is skipped
+        {
+            int first[2] = { -1, -1 }, second[2] = { -1, -1 };
+            if (::pipe (first) == 0 && ::pipe (second) == 0)
+            {
+                bool secondGone = false, calledAfterUnregister = false, firstCalled = false;
+                juce::LinuxEventLoop::registerFdCallback (first[0], [&] (int fd) {
+                    char c;
+                    juce::ignoreUnused (::read (fd, &c, 1));
+                    firstCalled = true;
+                    if (! secondGone)
+                    {
+                        juce::LinuxEventLoop::unregisterFdCallback (second[0]); // (as a run loop's destructor does)
+                        secondGone = true;
+                    }
+                });
+                juce::LinuxEventLoop::registerFdCallback (second[0], [&] (int fd) {
+                    char c;
+                    juce::ignoreUnused (::read (fd, &c, 1));
+                    calledAfterUnregister = calledAfterUnregister || secondGone;
+                });
+                juce::ignoreUnused (::write (first[1], "x", 1), ::write (second[1], "x", 1));
+                for (int i = 0; i < 20 && ! firstCalled; ++i)
+                    juce::detail::dispatchNextMessageOnSystemQueue (true);
+                check ("Linux event loop: a descriptor callback unregistered by an earlier one of the same round is not called",
+                       firstCalled && ! calledAfterUnregister);
+                juce::LinuxEventLoop::unregisterFdCallback (first[0]);
+                if (! secondGone)
+                    juce::LinuxEventLoop::unregisterFdCallback (second[0]);
+            }
+            for (const auto fd : { first[0], first[1], second[0], second[1] })
+                if (fd >= 0)
+                    ::close (fd);
+        }
+       #endif
         return result;
     }
