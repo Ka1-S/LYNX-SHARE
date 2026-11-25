@@ -47,6 +47,11 @@ bool defaultOn() noexcept;
 
 // Track `track` is an instrument track with "Clips own their notes" on.
 bool owns (const Song& song, int track) noexcept;
+// Round 190qu (Discord 11-24, sidthenugget: "sometimes it inserts an existing clip instead of a new empty one"): the pencil
+// on an empty spot of track `track` draws a NEW empty clip of it — the track owns its clips (owns), or it is an
+// instrument track in Track-only mode or in the Simple layout (1 track = 1 instrument: every clip its own). Off, the
+// Pattern layout keeps FL's pencil (the channel's one pattern, or the last clip clicked).
+bool pencilMakesNewClip (const Song& song, int track) noexcept;
 // Pattern `pattern` is a track clip.
 bool isTrackClip (const Song& song, int pattern) noexcept;
 // How many patterns are track clips.

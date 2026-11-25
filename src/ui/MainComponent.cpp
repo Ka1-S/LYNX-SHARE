@@ -5294,6 +5294,23 @@ void MainComponent::makeDetailView()
     h.selectInMixer = [this] (int insert) { mixer.selectTrack (insert); };
     h.instrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); }; // (as on the Mixer)
     h.openClip = [this] (int track, int scene) { openGridClip (track, scene); };
+    // round 190qu (Discord 11-24, kainproctor): an Arrangement clip's editor (an audio clip's sample, an automation
+    // clip's points)
+    h.openArrangementClip = [this] (int index) {
+        const auto& song = engine.getSong();
+        if (index < 0 || index >= (int) song.playlist.size())
+            return;
+        const auto& clip = song.playlist[(std::size_t) index];
+        if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
+            openAudioEditorForChannel (engine, clip.channel);
+        else if (clip.kind == ClipKind::automation && clip.automation >= 0 && clip.automation < (int) song.automations.size())
+            openAutomationEditor (engine, clip.automation);
+        else if (clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size())
+        {
+            selectPattern (clip.pattern);
+            openPianoRoll();
+        }
+    };
     h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
     h.undockPianoRoll = [this] { undockPianoRoll(); };
     h.selectPattern = [this] (int pattern) { selectPattern (pattern); };
@@ -5327,6 +5344,18 @@ void MainComponent::makeDetailView()
     };
     const auto selected = clipGridSelection (*clipGridView);
     detailView->showSelection (selected.first, selected.second);
+    // round 190qu (Discord 11-24, kainproctor: "Select a clip in the clip grid to see it here" with an Arrangement clip
+    // selected): as Live's Clip View, the Arrangement clip clicked or selected alone shows on the Clip page; a click on the
+    // grid shows the grid's slot again (showSelection)
+    playlist.onClipClicked = [this] (int clip) {
+        if (detailView != nullptr && isClipLaunchWorkflow())
+            detailView->showArrangementClip (clip);
+    };
+    playlist.onSelectionChanged = [this] {
+        if (detailView != nullptr && isClipLaunchWorkflow())
+            if (const auto& chosen = playlist.getSelectedClips(); chosen.size() == 1)
+                detailView->showArrangementClip (chosen.front());
+    };
 }
 
 // Any way the Piano roll panel comes up (F7, its button, a layout) takes a docked editor back first: from the Clip-launch
@@ -7133,8 +7162,10 @@ void MainComponent::splitPatternByChannelNow()
     int created = 0;
     engine.editSong ([&created] (Song& s) { created = splitPatternByChannel (s, s.currentPattern); });
 
-    if (created == 0)
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Split by channel"), tr ("This pattern has no notes."));
+    if (created == 0) // (round 190qu: FL's split needs two channels with notes)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Split by channel"),
+                                                engine.getSong().activePattern().notes.empty() ? tr ("This pattern has no notes.")
+                                                                                               : tr ("This pattern plays one channel only: there is nothing to split."));
 }
 
 void MainComponent::showRenamePattern (int index)
@@ -7482,7 +7513,7 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     menu.addItem (tr ("Clone") + shortcutText ("pattern.clone"), [this] { clonePatternNow(); });
     menu.addItem (tr ("Move up") + shortcutText ("pattern.moveUp"), index > 0, false, [this] { movePatternNow (-1); });
     menu.addItem (tr ("Move down") + shortcutText ("pattern.moveDown"), index + 1 < (int) song.patterns.size(), false, [this] { movePatternNow (1); });
-    menu.addItem (tr ("Split by channel (one new pattern per channel)"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); });
+    menu.addItem (tr ("Split by channel"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); }); // (round 190qu: FL's name and result)
     // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
     // REA round 168e); opened from the picker, every picked pattern is rendered (round 169k)
     if (picked.empty())

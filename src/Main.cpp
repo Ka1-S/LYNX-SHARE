@@ -4247,6 +4247,16 @@ public:
             return;
         }
 
+        if (args.contains ("--discord190qushot"))
+        {
+            // LYNX --discord190qushot <folder> [lanes.flp] (round 190qu, Discord 11-24): keys, Clip View, lanes, Simple, Track-only
+            const auto i = args.indexOf ("--discord190qushot");
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runDiscordShot190qu (args[i + 1].unquoted(), project) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--simpleduck190otshot"))
         {
             // LYNX --simpleduck190otshot <folder> (round 190ot, research190oe P5): "Duck under..." and the Echo send at 100 / 150 %
@@ -10020,6 +10030,78 @@ private:
         juce::String toolbar190qgLog;
         const auto toolbar190qgResult = toolbar190qgCheck (toolbar190qgLog);
 
+        // round 190qu (Discord 11-24): automation clips into lanes play what they played (held value between clips, the
+        // control's own value before, FL's MIN / MAX), in the engine's first 1024 slots, and back into clips; FL's Split by
+        // channel; Convert to Track-only keeps every note; a Track-only instrument track's pencil draws new clips
+        juce::String discord190quResult = "OK";
+        {
+            using namespace lynx;
+            auto s = Song::makeDefault();
+            s.playlist.clear();
+            s.channels.clear();
+            s.automations.clear();
+            s.channels.push_back (mididrop::newChannel ("Lead"));
+            trackmodes::makeInstrumentTrack (s, 2, 0);
+            s.channels[0].volume = 0.62f;
+            Automation a;
+            a.target = { AutomationTargetKind::channelVolume, 0, 0, 0 };
+            a.points = { { 0, 0.0f, 0.0f }, { 4 * ppq, 1.0f, 0.0f } };
+            a.rangeMin = 0.2f;
+            a.rangeMax = 0.6f;
+            s.automations.push_back (a);
+            for (int k = 0; k < 1030; ++k) // (more automations than the engine's slots after it, on the tempo: no owner track)
+            {
+                Automation t;
+                t.target = { AutomationTargetKind::tempo, 0, 0, 0 };
+                t.points = { { 0, 0.5f, 0.0f } };
+                s.automations.push_back (t);
+            }
+            Clip c;
+            c.kind = ClipKind::automation;
+            c.automation = 0;
+            c.track = 5;
+            c.start = 4 * ppq;
+            c.length = 4 * ppq;
+            s.playlist.push_back (c);
+            const auto moved = laneview::clipsToLanes (s);
+            const auto lane = s.playlistTracks.size() > 2 && ! s.playlistTracks[2].lanes.empty() ? s.playlistTracks[2].lanes[0].automation : -1;
+            if (moved != 1 || lane < 0 || lane >= RackState::maxAutomations)
+                discord190quResult = "ERROR lane slot " + juce::String (lane);
+            else
+            {
+                const auto& points = s.automations[(std::size_t) lane];
+                const auto atStart = points.valueAt ((double) ppq), mid = points.valueAt (6.0 * ppq), held = points.valueAt (20.0 * ppq);
+                if (std::abs (atStart - 0.62f) > 1.0e-4f || std::abs (mid - 0.4f) > 1.0e-3f || std::abs (held - 0.6f) > 1.0e-4f)
+                    discord190quResult = "ERROR lane values " + juce::String (atStart) + " / " + juce::String (mid) + " / " + juce::String (held);
+                else if (autolanes::lanesToClips (s) != 1 || laneview::laneCount (s) != 0)
+                    discord190quResult = "ERROR lanes back to clips";
+            }
+            auto p = Song::makeDefault();
+            p.patterns.assign (1, Pattern {});
+            p.patterns[0].notes = { { 0, ticksPerStep, 0, 60 }, { ticksPerStep, ticksPerStep, 2, 60 } };
+            Clip pc;
+            pc.kind = ClipKind::pattern;
+            pc.track = 0;
+            pc.length = p.barTicks();
+            p.playlist = { pc };
+            auto split = p;
+            if (discord190quResult == "OK"
+                && (splitPatternByChannel (split, 0) != 1 || split.patterns[0].name != split.channels[0].name || split.playlist.size() != 1))
+                discord190quResult = "ERROR split by channel";
+            const auto report = trackonly::convertProject (p);
+            if (discord190quResult == "OK" && (report.patternsSplit != 1 || report.clipsMoved != 2 || trackmodes::instrumentTracksOf (p, 2).empty()))
+                discord190quResult = "ERROR convert " + juce::String (report.patternsSplit) + " / " + juce::String (report.clipsMoved);
+            const auto layout = layoutstyle::current();
+            const auto trackOnly = trackonly::enabled();
+            layoutstyle::setCurrent (layoutstyle::Style::pattern);
+            trackonly::setEnabled (true);
+            const auto home = trackmodes::instrumentTracksOf (p, 0);
+            if (discord190quResult == "OK" && (home.empty() || ! trackclips::pencilMakesNewClip (p, home.front())))
+                discord190quResult = "ERROR pencil";
+            trackonly::setEnabled (trackOnly);
+            layoutstyle::setCurrent (layout);
+        }
+
         // round 190ot (research190oe P5): the Simple layout's "Duck under..." and shared Echo send in .lynx (the duck's goal,
         // Amount, side input and level-0 route; the Echo send) and in the copies for 0.1.30 / 0.1.28: the same slot, side input,
         // route and sends (an ordinary Fruity Limiter there), one view line, none for a project without a duck
@@ -11297,7 +11379,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11425,6 +11507,7 @@ private:
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
                << "toolbar_overflow_190qg=" << toolbar190qgResult << "\n"
                << "extras190qk=" << extras190qkResult << "\n"
+               << "discord190qu=" << discord190quResult << "\n"
                << "autolinks190ov=" << autolinks190ovResult << "\n"
                << "sections190ol=" << sections190olResult << "\n"
                << "heldsteps190oz=" << heldSteps190ozResult << "\n"
@@ -21368,6 +21451,7 @@ private:
 #include "DetailsShot190kn.inc" // round 190kn
 #include "SmartTipShot190ok.inc" // round 190ok (D1)
 #include "SimpleDuckShot190ot.inc" // round 190ot (research190oe P5)
+#include "Discord190quShot.inc" // round 190qu (Discord #general 11-24)
 #include "Repeats190pmShot.inc" // round 190pm (research190oe P19, P23)
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr

@@ -65,6 +65,7 @@ public:
         std::function<void (int insert)> selectInMixer;                 // LYNX extra: a selected card selects its insert
         std::function<void (int insert, ChannelDef)> instrumentDropped; // a generator dropped on the chain
         std::function<void (int track, int scene)> openClip;            // the Clip page's button: the clip in its editor
+        std::function<void (int playlistIndex)> openArrangementClip;    // (round 190qu) the same for an Arrangement clip
         std::function<void()> layoutChanged;                            // height, visibility or a setting changed
         // Slice 2 (D1a): the Clip page docks the existing Piano roll for a pattern clip. `dockPianoRoll` hands it over
         // (showing `pattern`; its panel lets go of it), `undockPianoRoll` gives it back to its panel.
@@ -85,6 +86,9 @@ public:
 
     // What it shows: the clip grid's selected track (its chain) and slot (its clip).
     void showSelection (int track, int scene);
+    // Round 190qu (Discord 11-24): an Arrangement clip selected (an index into Song::playlist) shows on the Clip page, as
+    // Live's Clip View shows the selected Arrangement clip; −1 (nothing or several selected): the grid's slot again.
+    void showArrangementClip (int playlistIndex);
     void setPage (Page page);
     Page getPage() const noexcept { return devicesPage ? Page::devices : Page::clip; }
     void togglePage(); // Shift+Tab
@@ -132,6 +136,8 @@ public:
     bool editDevice (EditCommand command);
 
     // tests and --snapshot
+    bool clipEditorDockedForCheck() const; // (round 190qu: the Clip page docks an editor for the clip it shows)
+    int arrangementClipForCheck() const;   // (round 190qu: the Arrangement clip it shows, −1: the grid's slot)
     bool duplicateLoopForCheck(); // (round gap190og, detail-019: the Clip page's Duplicate button pressed)
     void selectCardForCheck (int card);
     bool duplicateCardForCheck (int card);

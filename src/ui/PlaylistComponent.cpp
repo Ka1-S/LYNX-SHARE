@@ -3305,7 +3305,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
     // the Simple workflow's drop lane (round 184a): the first empty row invites files. Round 190jj (BandLab): while the
     // drag's ghost is on it, the lane is an empty track row (the ghost and its tag are drawn later)
-    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0 && ! (dropLaneHot && ! dropGhost.empty() && dropGhost.front().track == laneTrack))
+    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0 && dropLaneShown() && ! (dropLaneHot && ! dropGhost.empty() && dropGhost.front().track == laneTrack))
     {
         juce::Graphics::ScopedSaveState state (g);
         const auto y = trackToY (laneTrack), h = heightOf (laneTrack);
@@ -5044,6 +5044,18 @@ void PlaylistComponent::showLaneMenu (int track, int lane)
     menu.addItem (tr ("To automation clip"), [this, track, lane] {
         engine.editSong ([track, lane] (Song& s) { autolanes::laneToClip (s, track, lane); });
     });
+    // round 190qu (Discord 11-24, Live's arrangement automation with Bitwig's clip automation): the time selection's part
+    // of the lane as an automation clip under the track; the lane keeps its points (the clip wins where it plays)
+    {
+        const auto& song = engine.getSong();
+        const auto from = song.loopStart, to = song.loopEnd;
+        menu.addItem (tr ("Time selection to automation clip"), song.hasLoop(), false, [this, track, lane, from, to] {
+            int made = -1;
+            engine.editSong ([&made, track, lane, from, to] (Song& s) { made = laneview::laneRangeToClip (s, track, lane, from, to); });
+            if (made >= 0)
+                setSelection ({ made });
+        });
+    }
     menu.addItem (tr ("Remove the lane"), [this, track, lane] {
         engine.editSong ([track, lane] (Song& s) { autolanes::removeLane (s, track, lane); });
     });
@@ -6164,9 +6176,12 @@ void PlaylistComponent::setSelection (std::vector<int> indices)
 {
     std::sort (indices.begin(), indices.end());
     indices.erase (std::unique (indices.begin(), indices.end()), indices.end());
+    const auto changed = indices != selection;
     selection = std::move (indices);
     knownClipCount = engine.getSong().playlist.size();
     repaint();
+    if (changed && onSelectionChanged) // (round 190qu)
+        onSelectionChanged();
 }
 
 std::vector<int> PlaylistComponent::sortClips (std::vector<int> placed)
@@ -7385,6 +7400,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         if (c.kind == ClipKind::pattern && c.pattern != engine.getSong().currentPattern)
             engine.editSong ([p = c.pattern] (Song& s) { s.currentPattern = p; }, false);
+        if (onClipClicked) // (round 190qu: the Clip-launch Clip View shows it)
+            onClipClicked (hit);
         return;
     }
 
@@ -7408,7 +7425,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     setSelection ({});
     // round 190ne (core/TrackClips.h): on a track whose clips own their notes the pencil and the brush draw a NEW empty
     // clip of the track (Live / Bitwig), one bar long or as long as the last one drawn or resized there
-    if (const auto track = yToTrack (e.y); brush.kind == ClipKind::pattern && trackclips::owns (engine.getSong(), track))
+    // (round 190qu, Discord 11-24: an instrument track in Track-only mode or the Simple layout too, whatever the brush holds)
+    if (const auto track = yToTrack (e.y); (brush.kind == ClipKind::pattern && trackclips::owns (engine.getSong(), track))
+                                           || trackclips::pencilMakesNewClip (engine.getSong(), track))
     {
         const auto at = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
         const auto length = lastTrackClipLength > 0 ? lastTrackClipLength : engine.getSong().barTicks();
@@ -8690,7 +8709,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     {
         // round 190ne: the pencil draws the next clip of an own-clips track as long as the one resized there last
         if (const auto& song = engine.getSong(); drag == Drag::resize && dragClip >= 0 && dragClip < (int) song.playlist.size())
-            if (const auto& c = song.playlist[(std::size_t) dragClip]; c.kind == ClipKind::pattern && trackclips::owns (song, c.track) && c.length > 0)
+            if (const auto& c = song.playlist[(std::size_t) dragClip]; c.kind == ClipKind::pattern && trackclips::pencilMakesNewClip (song, c.track) && c.length > 0)
                 lastTrackClipLength = c.length;
         sortClips();
     }
@@ -10278,10 +10297,16 @@ int PlaylistComponent::paintedRows() const
     return simpleHeaders ? simpletracks::rowsShown (engine.getSong(), numTracks()) : numTracks();
 }
 
+bool PlaylistComponent::dropLaneShown() const
+{
+    // round 190qu (Discord 11-24): the strip and its "+" are for starting a song; once there is a track only on request
+    return dropLaneTrack() >= 0 && (simpletracks::dropStripAlways || ! simpletracks::anyTrack (engine.getSong()));
+}
+
 juce::Rectangle<int> PlaylistComponent::simpleAddButton() const
 {
     const auto lane = dropLaneTrack();
-    if (lane < 0)
+    if (lane < 0 || ! dropLaneShown())
         return {};
     const auto size = juce::jmin (simpleSizes().add, heightOf (lane) - 6);
     return juce::Rectangle<int> (size, size).withCentre ({ (headerWidth - rightColumn()) / 2, trackToY (lane) + heightOf (lane) / 2 });
@@ -12245,16 +12270,21 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             });
         });
     }
-    // round 177b: with lanes on, an automation clip can become part of the lane of its target
+    // round 177b: with lanes on, an automation clip can become part of the lane of its target. Round 190qu (Discord 11-24):
+    // the selected automation clips together when this one is among them, each lane playing what played before
+    // (laneview::clipsIntoLanes); a clip no track owns the control of stays (greyed)
     if (clip.kind == ClipKind::automation && autolanes::shown() && clip.automation >= 0 && clip.automation < (int) song.automations.size()
         && song.automations[(std::size_t) clip.automation].target.kind != AutomationTargetKind::none)
-        menu.addItem (tr ("Move into lane"), [this, index] {
-            setSelection ({});
-            engine.editSong ([index] (Song& s) {
-                if (index < (int) s.playlist.size() && s.playlist[(std::size_t) index].automation >= 0)
-                    autolanes::clipToLane (s, index, autolanes::trackFor (s, s.automations[(std::size_t) s.playlist[(std::size_t) index].automation].target));
-            });
-        });
+    {
+        auto chosen = std::find (selection.begin(), selection.end(), index) != selection.end() ? selection : std::vector<int> { index };
+        const auto lanes = laneview::laneFlags (song);
+        chosen.erase (std::remove_if (chosen.begin(), chosen.end(), [&song, &lanes] (int i) { return ! laneview::movable (song, i, lanes); }), chosen.end());
+        menu.addItem (chosen.size() > 1 ? tr ("Move the {0} selected clips into their lanes", { juce::String ((int) chosen.size()) }) : tr ("Move into lane"),
+                      ! chosen.empty(), false, [this, chosen] {
+                          setSelection ({});
+                          engine.editSong ([chosen] (Song& s) { laneview::clipsIntoLanes (s, chosen); });
+                      });
+    }
 
     menu.addItem (tr ("Select all clips of this source"), [this, index] { setSelection (clipops::sameSource (engine.getSong(), index)); });
     menu.addSeparator();
@@ -13646,6 +13676,45 @@ void PlaylistComponent::previousView()
 bool PlaylistComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
+
+    // round 190qu (Discord 11-24): the selected automation clips into their tracks' lanes, and the time selection of the
+    // selected track's lanes as automation clips (no default keys: FL and Live have none)
+    if (is ("playlist.selectedClipsToLanes"))
+    {
+        if (! autolanes::shown() || selection.empty())
+        {
+            ui::postHint ({ tr ("Select automation clips first (with Automation lanes on)"), {}, false, false }, 3000);
+            return true;
+        }
+        int moved = 0;
+        const auto chosen = selection;
+        setSelection ({});
+        engine.editSong ([&moved, chosen] (Song& s) { moved = laneview::clipsIntoLanes (s, chosen); });
+        ui::postHint ({ tr ("{0} automation clips moved into their tracks' lanes (Edit › Undo takes it back)", { juce::String (moved) }), {} }, 3000);
+        return true;
+    }
+    if (is ("playlist.laneRangeToClip"))
+    {
+        const auto& song = engine.getSong();
+        auto tracks = sortedTrackSelection();
+        if (tracks.empty() && currentTrack >= 0)
+            tracks.push_back (currentTrack);
+        if (! song.hasLoop() || tracks.empty())
+        {
+            ui::postHint ({ tr ("Make a time selection and select a track with automation lanes first"), {}, false, false }, 3000);
+            return true;
+        }
+        std::vector<int> made;
+        engine.editSong ([&made, tracks] (Song& s) {
+            for (const auto t : tracks)
+                if (t >= 0 && t < (int) s.playlistTracks.size())
+                    for (int l = 0; l < (int) s.playlistTracks[(std::size_t) t].lanes.size(); ++l)
+                        if (const auto c = laneview::laneRangeToClip (s, t, l, s.loopStart, s.loopEnd); c >= 0)
+                            made.push_back (c);
+        });
+        setSelection (made);
+        return true;
+    }
 
     if (is ("playlist.changeIcon")) // issue #220 (round 190ng): F3, the icon picker (search box first) of the selected tracks
     {
@@ -15297,7 +15366,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         else if (simpleHeaders && brush.kind == ClipKind::pattern && h.track >= 0 && h.track < (int) song.playlistTracks.size()
                  && song.playlistTracks[(std::size_t) h.track].mode == PlaylistTrackMode::instrument)
             hint.text = tr ("MIDI clip: [LMB] click or drag draws one on this track  [2xLMB] on a clip: edit its notes below");
-        else if (trackclips::owns (song, h.track) && brush.kind == ClipKind::pattern) // round 190ne
+        else if ((trackclips::owns (song, h.track) && brush.kind == ClipKind::pattern) || trackclips::pencilMakesNewClip (song, h.track)) // round 190ne (190qu)
             hint.text = tr ("Track clips: [LMB] draw a new empty clip  [Shift] drag a clip: a unique copy  [Shift+L] drag: a linked copy  [Ctrl+Alt+B] linked copies");
         else if (pointerclick::on)
             hint.text = tr ("Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip");

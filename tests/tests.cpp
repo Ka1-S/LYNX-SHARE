@@ -7122,12 +7122,18 @@ TEST (workflow_split_pattern_by_channel)
     lynx::Clip clip;
     clip.pattern = 0;
     song.playlist = { clip };
+    // round 190qu: FL's Split by channel (checked live in FL 2026): the pattern keeps its first channel, named after it
     const auto created = lynx::splitPatternByChannel (song, 0);
-    CHECK (created == 2 && song.patterns.size() == 3);
-    CHECK (song.patterns[0].notes.size() == 4); // the original is unchanged
-    CHECK (song.patterns[1].name == "Beat - " + song.channels[0].name && song.patterns[1].notes.size() == 2);
-    CHECK (song.patterns[2].colour == 0xff112233u && song.patterns[2].notes.size() == 2 && song.patterns[2].notes[0].channel == 2);
+    CHECK (created == 1 && song.patterns.size() == 2);
+    CHECK (song.patterns[0].name == song.channels[0].name && song.patterns[0].notes.size() == 2 && song.patterns[0].notes[0].channel == 0);
+    CHECK (song.patterns[1].name == song.channels[2].name && song.patterns[1].notes.size() == 2 && song.patterns[1].notes[0].channel == 2);
     CHECK (song.playlist[0].pattern == 0);
+    // LYNX's Convert to Track-only keeps the pattern's name in the parts
+    auto other = lynx::Song::makeDefault();
+    other.patterns.resize (1);
+    other.patterns[0].name = "Beat";
+    other.patterns[0].notes = { { 0, lynx::ticksPerStep, 0, 60 }, { lynx::ticksPerStep, lynx::ticksPerStep, 2, 60 } };
+    CHECK (lynx::splitPatternByChannel (other, 0, true) == 1 && other.patterns[0].name == "Beat - " + other.channels[0].name);
     CHECK (lynx::splitPatternByChannel (song, 99) == 0);
 }
 
@@ -18126,3 +18132,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190qjTests.inc" // round 190qj (0.1.32): issue #265 (a linked track's M and clips on other inserts), PRs #261-#266, #238
 #include "Pr268_190qmTests.inc" // round 190qm: PR #268, a switched-off Playlist track (FL's greyed clips + the LYNX row veil)
 #include "Issues190qoTests.inc" // round 190qo: issues #270 (typing keyboard layouts), #271 (SoundFont slide velocity)
+#include "Discord1124_190quTests.inc" // round 190qu (0.1.32): Discord 11-24 (automation lanes, Split by channel, Track-only, Simple)

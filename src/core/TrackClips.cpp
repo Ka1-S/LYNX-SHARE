@@ -1,4 +1,5 @@
 #include "core/TrackClips.h"
+#include "core/TrackOnly.h"
 
 #include <algorithm>
 #include <map>
@@ -32,13 +33,23 @@ Pattern copyFor (const Song& song, Pattern p, int track)
 
 bool defaultOn() noexcept
 {
-    return layoutstyle::current() != layoutstyle::Style::pattern;
+    // (round 190qu: Track-only mode too, its instrument tracks are 1 track = 1 instrument)
+    return layoutstyle::current() != layoutstyle::Style::pattern || trackonly::enabled();
 }
 
 bool owns (const Song& song, int track) noexcept
 {
     const auto* t = trackOf (song, track);
     return t != nullptr && t->ownClips && t->mode == PlaylistTrackMode::instrument;
+}
+
+bool pencilMakesNewClip (const Song& song, int track) noexcept
+{
+    if (owns (song, track))
+        return true;
+    const auto* t = trackOf (song, track);
+    return t != nullptr && t->mode == PlaylistTrackMode::instrument && t->channel >= 0 && t->channel < (int) song.channels.size()
+           && (trackonly::active() || layoutstyle::current() == layoutstyle::Style::simple);
 }
 
 bool isTrackClip (const Song& song, int pattern) noexcept

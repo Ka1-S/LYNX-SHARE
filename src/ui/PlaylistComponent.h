@@ -479,6 +479,9 @@ public:
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
+    // round 190qu (Discord 11-24): a clip was clicked / the clip selection changed (the Clip-launch Clip View follows)
+    std::function<void (int clip)> onClipClicked;
+    std::function<void()> onSelectionChanged;
     // round 190ft (FL FUN_012e3aa0): a header click made an audio / instrument track the only selected one: its mixer
     // track (the main window makes it the mixer's current track when the mixer is showing)
     std::function<void (int insert)> onLinkedMixerTrack;
@@ -1041,6 +1044,7 @@ private:
     static constexpr int linkedTwoRows = 34;
     void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
     int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
+    bool dropLaneShown() const;         // round 190qu: its strip and "+" are drawn (an empty project, or always on)
     // a level drag on a Simple header: 1 volume, 2 pan (0 none)
     int levelDrag = 0, levelInsert = -1;
     float levelStart = 0.0f;
