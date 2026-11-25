@@ -18117,3 +18117,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues274_190qrTests.inc" // round 190qr: issues #278 (AppImage manager entries), #281 (markers delete)
 #include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
 #include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
+#include "Qa190rbTests.inc" // round 190rb (0.1.32 quality): crash / memory fixes from the crash reports, ASan / UBSan and the UI monkey
