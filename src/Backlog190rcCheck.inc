@@ -55,7 +55,7 @@
                             own.push_back (f);
                     int read = 0, tried = 0;
                     std::string firstMiss;
-                    for (std::size_t k = 0; k < own.size() && tried < 120; k += juce::jmax<std::size_t> (1, own.size() / 120), ++tried)
+                    for (std::size_t k = 0; k < own.size() && tried < 120; k += std::max<std::size_t> (1, own.size() / 120), ++tried)
                     {
                         const auto c = natives::channelFromAnyPreset (own[k], "x", fl);
                         if (c && c->instrument == e.kind)
