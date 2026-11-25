@@ -441,8 +441,10 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     }
     scaleBox.setSelectedId (1, juce::dontSendNotification);
     scaleSnapButton.setEnabled (false); // until a scale is chosen
-    scaleBox.setTooltip (tr ("Highlights the notes of a scale"));
-    // issue #203 (round 190ll): the FL layout's click opens FL's Scale highlighting menu (root and scale apart)
+    scaleBox.setTooltip (tr ("Highlights the notes of a scale") + "\n" + tr ("Right-click a menu item to choose it and keep the menu open"));
+    // issue #203 (round 190ll): the FL layout's click opens FL's Scale highlighting menu (root and scale apart). Round 190ri:
+    // a right-click on an item chooses it and leaves the menu open, as FL's menus do, so root and scale go in one visit
+    scaleBox.rightClickKeepsOpen = true;
     scaleBox.onPopup = [this] { return scaleHighlightMenu(); };
     // docked (Clip-launch: Live's Clip View Scale; Simple: BandLab's Smart View): a root box and a scale box
     for (int root = 0; root < 12; ++root)
@@ -1180,27 +1182,34 @@ void PianoRollComponent::resized()
     }
     place (ghostButton, h);
     place (followButton, h);
-    place (slideButton, h, true);
-    place (colourButton, h, true);
+    // the scale comes before the groups left of it in a narrow window (nynsai, Discord 11-25; FL keeps its scale button at the
+    // toolbar's left): they leave it the room of an icon and arrow, which opens the same menu (root note and scale)
+    const auto keepForScale = pianoroll::compactChordBoxWidth + 6;
+    const auto placeBeforeScale = [&place, &bar, reserved, keepForScale] (juce::Component& c, int width) {
+        if (width <= bar.getWidth() - reserved - keepForScale)
+            return place (c, width);
+        c.setVisible (false);
+        c.setBounds ({});
+    };
+    placeBeforeScale (slideButton, h);
+    placeBeforeScale (colourButton, h);
     // the chord stamp shrinks to its icon and arrow before it is hidden (discussion #10; FL's stamp is an icon button)
-    place (chordBox, 100 <= bar.getWidth() - reserved ? 100 : pianoroll::compactChordBoxWidth, true);
-    if (splitScaleBoxes()) // (issue #203: docked, the root and the scale apart, as Live's Clip View and BandLab)
+    placeBeforeScale (chordBox, 100 <= bar.getWidth() - reserved - keepForScale ? 100 : pianoroll::compactChordBoxWidth);
+    const auto split = splitScaleBoxes() && 52 + 6 + 124 <= bar.getWidth() - reserved;
+    if (split) // (issue #203: docked, the root and the scale apart, as Live's Clip View and BandLab)
     {
         scaleBox.setVisible (false);
         place (scaleRootBox, 52, true);
-        if (scaleRootBox.isVisible())
-            place (scaleNameBox, 124, true);
-        else
-            scaleNameBox.setVisible (false);
+        place (scaleNameBox, 124, true);
     }
     else
     {
         scaleRootBox.setVisible (false);
         scaleNameBox.setVisible (false);
-        place (scaleBox, 164, true);
+        place (scaleBox, 164 <= bar.getWidth() - reserved ? 164 : 100 <= bar.getWidth() - reserved ? 100 : pianoroll::compactChordBoxWidth, true);
     }
-    if (splitScaleBoxes() ? scaleNameBox.isVisible() : scaleBox.isVisible())
-        place (scaleSnapButton, h);
+    if (split ? scaleNameBox.isVisible() : scaleBox.isVisible())
+        place (scaleSnapButton, h, true);
     else
         scaleSnapButton.setVisible (false);
     place (moreButton, h);
@@ -7697,7 +7706,7 @@ juce::PopupMenu PianoRollComponent::scaleHighlightMenu()
     const auto scale = scaleIndex(), root = scaleRoot();
     menu.addSectionHeader (tr ("Root note"));
     for (int r = 0; r < 12; ++r)
-        menu.addItem (juce::String (notenames::pitchName (r)), scale > 0, scale > 0 && root == r, [this, r, scale] { setScale (r, scale); });
+        menu.addItem (juce::String (notenames::pitchName (r)), scale > 0, scale > 0 && root == r, [this, r] { setScale (r, scaleIndex()); });
     // issue #203 (round 190ll): FL draws the roots and the scales in two columns ("Root note" | "Scale"; live190cq
     // curves190bw-05c-scale-highlighting-menu.png), the toolbar's scale box opens this menu too
     menu.addColumnBreak();

@@ -56,7 +56,7 @@ class ChordHelperPanel; // (round 190mc, ui/ChordHelper.h)
 namespace pianoroll
 {
 // the toolbar's chord stamp box when the full box (100 px) doesn't fit: its icon and its arrow
-constexpr int compactChordBoxWidth = 46;
+constexpr int compactChordBoxWidth = 46; // (the scale box too, round 190ri)
 } // namespace pianoroll
 
 class PianoRollComponent final : public juce::Component,
@@ -605,6 +605,7 @@ private:
         // open before showPopup(), and ComboBox clears that mark from the result callback of the menu *it* shows. With a
         // menu of our own, a click after the first one did nothing (the mark stayed set).
         std::function<juce::PopupMenu()> onPopup;
+        bool rightClickKeepsOpen = false; // (round 190ri) FL: "Right-click: multi-select menu options"
         void showPopup() override
         {
             if (onPopup == nullptr)
@@ -613,9 +614,30 @@ private:
                 return;
             }
             const juce::Component::SafePointer<ScaleBox> box (this);
+            if (rightClickKeepsOpen)
+                watch = std::make_unique<ButtonWatch>();
             onPopup().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMinimumWidth (getWidth()),
-                                     [box] (int) { if (box != nullptr) box->hidePopup(); });
+                                     [box] (int result) {
+                                         if (box == nullptr)
+                                             return;
+                                         const auto again = box->watch != nullptr && box->watch->right && result != 0;
+                                         box->watch.reset();
+                                         box->hidePopup();
+                                         if (again) // (the item's own action runs first)
+                                             juce::MessageManager::callAsync ([box] { if (box != nullptr && box->isShowing()) box->showPopup(); });
+                                     });
         }
+
+    private:
+        // the button of the last press while the menu is open
+        struct ButtonWatch final : juce::MouseListener
+        {
+            ButtonWatch() { juce::Desktop::getInstance().addGlobalMouseListener (this); }
+            ~ButtonWatch() override { juce::Desktop::getInstance().removeGlobalMouseListener (this); }
+            void mouseDown (const juce::MouseEvent& e) override { right = e.mods.isRightButtonDown(); }
+            bool right = false;
+        };
+        std::unique_ptr<ButtonWatch> watch;
     };
     // chord created on each click (like FL's "stamp"); round 190nu: a click opens the Stamp menu (FL's stamp button opens
     // its menu), with the Scale degree chord and its options on top
