@@ -1,3 +1,4 @@
+#include "core/GrossBeat.h"
 #include "core/Sections.h"
 #include "core/ChordLaneOps.h"
 #include "core/ClipEnvelope.h"
@@ -267,6 +268,11 @@ std::int32_t rawValue (const AutomationTarget& t, float v, const Song* song = nu
         return song != nullptr && t.index >= 0 && t.index < (int) song->channels.size()
                    ? iround (channelPitchSemitones (song->channels[(std::size_t) t.index], v) * 100.0)
                    : 0;
+    // Gross Beat's own raw ranges (round 190re; v is FL's normalised value: the scratch dial's turned round)
+    if (t.kind == AutomationTargetKind::effectParam && song != nullptr && t.param >= 0 && t.param < grossbeat::paramCount
+        && t.index >= 0 && t.index < (int) song->mixer.size() && t.slot >= 0 && t.slot < (int) song->mixer[(std::size_t) t.index].effects.size()
+        && song->mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind == EffectKind::grossBeat)
+        return grossbeat::rawFromParam (t.param, t.param == grossbeat::scratchParam ? 1.0f - v : v);
     switch (t.kind)
     {
         case AutomationTargetKind::channelVolume:
@@ -1279,6 +1285,16 @@ struct Converter
                 }
                 const auto& plugin = slotPlugin.at ({ t.index, t.slot });
                 auto param = t.param;
+                // round 190re (0.1.32 regression sweep): Gross Beat's 9 parameters, which the import has given their own
+                // target since round 190py (FL's normalised value, the scratch dial turned round), go back as FL's own;
+                // they were left out ("its target has no FL equivalent": Asher Postman's two clips)
+                if (plugin == "Gross Beat" && song.mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].kind == EffectKind::grossBeat && t.param >= 0 && t.param < grossbeat::paramCount)
+                {
+                    if (valueMap != nullptr && t.param == grossbeat::scratchParam)
+                        *valueMap = [] (float v) { return 1.0f - v; };
+                    id.raw = mixerId (t.index, found->second, flp::ControlId::pluginParamBase + t.param);
+                    return id;
+                }
                 if (plugin != "Fruity Wrapper")
                 {
                     // FL's parameter whose map lands on this LYNX parameter (FlEffects' effectParamFromFl), and the

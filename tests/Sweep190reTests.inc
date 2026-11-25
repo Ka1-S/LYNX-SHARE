@@ -130,3 +130,40 @@ TEST (sweep190re_band_and_blx_offsets_keep_the_lynx_fraction_range)
     CHECK (band.find ("clip.offset = (std::int64_t) std::floor (offset);") == std::string::npos);
     CHECK (blx.find ("clip.offset = (std::int64_t) std::floor (offset);") == std::string::npos);
 }
+
+// Export › FL Studio project: Gross Beat's automation, which the import has driven since round 190py (0.1.32), had no way
+// back: "its target has no FL equivalent" (FL's Asher Postman demo: 2 of its clips; 0.1.31 kept them). FL's own parameter
+// numbers and raw ranges again; imported, exported and imported once more, the same clips on the same parameters.
+TEST (sweep190re_gross_beat_automation_goes_back_to_fl)
+{
+    using namespace lynx;
+    if (realFlpDir.empty() || ! std::filesystem::exists (parity190py::demos()))
+        return;
+    std::filesystem::path asher;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator (parity190py::demos()))
+        if (entry.path().filename() == "Asher Postman - Future House.flp")
+            asher = entry.path();
+    if (asher.empty())
+        return;
+    const auto grossBeatClips = [] (const Song& s) {
+        std::vector<std::pair<int, int>> list; // (insert, parameter)
+        for (const auto& a : s.automations)
+            if (a.target.kind == AutomationTargetKind::effectParam && a.target.index >= 0 && a.target.index < (int) s.mixer.size()
+                && a.target.slot >= 0 && a.target.slot < (int) s.mixer[(std::size_t) a.target.index].effects.size()
+                && s.mixer[(std::size_t) a.target.index].effects[(std::size_t) a.target.slot].kind == EffectKind::grossBeat)
+                list.push_back ({ a.target.index, a.target.param });
+        std::sort (list.begin(), list.end());
+        return list;
+    };
+    FlpImportOptions options;
+    const auto first = importFlp (flp::parseProject (parity190py::readFile (asher)), options);
+    const auto before = grossBeatClips (first);
+    CHECK (! before.empty());
+    flpexport::Options exportOptions;
+    flpexport::Report report;
+    const auto bytes = flpexport::exportFlp (first, exportOptions, report);
+    for (const auto& line : report.dropped)
+        CHECK (line.find ("Gross Beat") == std::string::npos);
+    const auto second = importFlp (flp::parseProject (bytes), options);
+    CHECK (grossBeatClips (second) == before);
+}
