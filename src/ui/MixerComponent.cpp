@@ -16,6 +16,8 @@
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
+#include "ui/ImageCaches.h"
+#include "ui/PaintAB.h"
 
 #include "core/Patcherize.h"
 #include "core/Rack.h"
@@ -177,6 +179,86 @@ juce::Colour meterZoneColour (float gain) noexcept
     using namespace theme;
     const auto db = juce::Decibels::gainToDecibels (gain, -100.0f);
     return db >= colour::meterRedDb ? colour::meterClip : db >= colour::meterYellowDb ? colour::meterMid : colour::meterLow;
+}
+
+// Round 190rd (perf 9, the peak values on by default): a peak value's text from a small opaque picture of the glyphs on
+// the box's flat inside, made once per text, colour, font and box size, then only copied into place. Only with JUCE's
+// software renderer at a physical scale of 1, and only when the glyphs keep clear of the box's rounded corners: there a
+// copy of the picture's rows is the same pixels as the glyphs drawn on the box (PixelRGB and PixelARGB blend over an
+// opaque pixel alike, and an opaque RGB row is copied). Anything else (another renderer, a scale, glyphs reaching a
+// corner, LYNX_PAINT_CACHE=0): drawn straight, as before. `draw` draws the text in the box it is given.
+void drawTextStamped (juce::Graphics& g, juce::Rectangle<int> box, float corner, juce::Colour background, juce::Colour ink, std::uint64_t textKey,
+                      const std::function<void (juce::Graphics&, juce::Rectangle<int>)>& draw)
+{
+    if (box.isEmpty() || ! g.clipRegionIntersects (box))
+        return;
+    if (! ui::paintCache() || ! background.isOpaque() || g.getInternalContext().getPhysicalPixelScaleFactor() != 1.0f
+        || dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) == nullptr)
+    {
+        draw (g, box);
+        return;
+    }
+    struct Stamp
+    {
+        juce::Image image; // (null: the glyphs reach a corner, drawn straight)
+        juce::Point<int> at;
+    };
+    static std::unordered_map<std::uint64_t, Stamp> cache;
+    static const bool registered = ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    const auto mix = [] (std::uint64_t h, std::uint64_t v) { return (h ^ v) * 0x100000001b3ull; };
+    const auto& font = g.getCurrentFont();
+    auto key = mix (mix (mix (mix (0x84caa73b6a09e667ull, textKey), (std::uint64_t) box.getWidth()), (std::uint64_t) box.getHeight()), (std::uint64_t) ink.getARGB());
+    key = mix (mix (mix (mix (key, (std::uint64_t) background.getARGB()), (std::uint64_t) std::llround (corner * 8.0f)),
+                    (std::uint64_t) std::llround (font.getHeight() * 1000.0f)), (std::uint64_t) (font.getTypefaceName() + "|" + font.getTypefaceStyle()).hashCode64());
+    auto it = cache.find (key);
+    if (it == cache.end())
+    {
+        if (cache.size() > 512) // (a long session's values: start again rather than grow)
+            cache.clear();
+        Stamp stamp;
+        // where the glyphs fall: drawn alone into a clear picture of the box
+        juce::Image probe (juce::Image::ARGB, box.getWidth(), box.getHeight(), true, juce::SoftwareImageType());
+        {
+            juce::Graphics pg (probe);
+            pg.setFont (font);
+            draw (pg, box.withZeroOrigin());
+        }
+        juce::Rectangle<int> footprint;
+        {
+            const juce::Image::BitmapData data (probe, juce::Image::BitmapData::readOnly);
+            for (int y = 0; y < data.height; ++y)
+                for (int x = 0; x < data.width; ++x)
+                    if (data.getPixelColour (x, y).getAlpha() != 0)
+                        footprint = footprint.isEmpty() ? juce::Rectangle<int> (x, y, 1, 1) : footprint.getUnion ({ x, y, 1, 1 });
+        }
+        // the corners' squares (the rounded edge's blended pixels lie inside them)
+        const auto c = (int) std::ceil (corner) + 1;
+        const auto w = box.getWidth(), h = box.getHeight();
+        const juce::Rectangle<int> corners[] { { 0, 0, c, c }, { w - c, 0, c, c }, { 0, h - c, c, c }, { w - c, h - c, c, c } };
+        if (! footprint.isEmpty() && std::none_of (std::begin (corners), std::end (corners), [&footprint] (juce::Rectangle<int> k) { return k.intersects (footprint); }))
+        {
+            juce::Image image (juce::Image::RGB, footprint.getWidth(), footprint.getHeight(), false, juce::SoftwareImageType());
+            {
+                juce::Graphics ig (image);
+                ig.setColour (background);
+                ig.fillAll();
+                ig.setOrigin (-footprint.getPosition());
+                ig.setFont (font);
+                draw (ig, box.withZeroOrigin());
+            }
+            stamp.image = std::move (image);
+            stamp.at = footprint.getPosition();
+        }
+        it = cache.emplace (key, std::move (stamp)).first;
+    }
+    if (it->second.image.isNull())
+    {
+        draw (g, box);
+        return;
+    }
+    g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+    g.drawImageAt (it->second.image, box.getX() + it->second.at.x, box.getY() + it->second.at.y);
+    g.setColour (ink); // (the colour the text leaves set)
 }
 } // namespace
 
@@ -2178,21 +2260,12 @@ void MixerStrips::paint (juce::Graphics& g)
             }
             if (! cachePainting && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
                 paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
-            // round 190qh: the correlation bar and the peak value box (their values over a cached picture, as the levels)
+            // round 190qh: the correlation bar and the peak value box. Round 190rd: with their values in the cached picture
+            // too (not drawn over it every frame); a shown value that changes repaints its box in the picture (advanceExtras)
             if (showCorrelation)
-            {
-                if (cachePainting)
-                    theme::fillRoundRect (g, correlationArea (t).toFloat(), 1.5f, colour::bg0);
-                else
-                    paintCorrelation (g, t);
-            }
+                paintCorrelation (g, t);
             if (showPeakValues)
-            {
-                if (cachePainting)
-                    theme::fillRoundRect (g, peakValueArea (t).toFloat(), 2.0f, colour::bg0);
-                else
-                    paintPeakValue (g, t);
-            }
+                paintPeakValue (g, t);
 
             if (hovered (Part::meter))
             {
@@ -4947,14 +5020,13 @@ float loudnessBarPosition (float lufs) noexcept
 constexpr int loudnessRowsTop = 24, loudnessRowHeight = 16;
 } // namespace
 
-void MixerStrips::paintCorrelation (juce::Graphics& g, int t, bool overPicture) const
+void MixerStrips::paintCorrelation (juce::Graphics& g, int t) const
 {
     using namespace theme;
     const auto area = correlationArea (t);
     if (area.isEmpty())
         return;
-    if (! overPicture)
-        theme::fillRoundRect (g, area.toFloat(), 1.5f, colour::bg0);
+    theme::fillRoundRect (g, area.toFloat(), 1.5f, colour::bg0);
     const auto mid = (float) area.getCentreX();
     const auto half = (float) area.getWidth() * 0.5f - 1.0f;
     const auto v = juce::jlimit (-1.0f, 1.0f, shownCorrelation (t));
@@ -4969,25 +5041,31 @@ void MixerStrips::paintCorrelation (juce::Graphics& g, int t, bool overPicture) 
     g.fillRect (juce::Rectangle<float> (mid - 0.5f, (float) area.getY() - 1.0f, 1.0f, (float) area.getHeight() + 2.0f));
 }
 
-void MixerStrips::paintPeakValue (juce::Graphics& g, int t, bool overPicture) const
+void MixerStrips::paintPeakValue (juce::Graphics& g, int t) const
 {
     using namespace theme;
     const auto area = peakValueArea (t);
     if (area.isEmpty())
         return;
-    if (! overPicture)
-        theme::fillRoundRect (g, area.toFloat(), 2.0f, colour::bg0);
+    theme::fillRoundRect (g, area.toFloat(), 2.0f, colour::bg0);
     const auto peak = heldPeak (t);
     g.setFont (font (9.0f, true));
     if (peak <= 1.0e-5f)
     {
-        g.setColour (colour::textDisabled);
-        textcache::drawText (g, juce::String::fromUTF8 ("\xe2\x80\x94"), area, juce::Justification::centred, false); // (nothing yet)
+        static const auto dash = juce::String::fromUTF8 ("\xe2\x80\x94"); // (nothing yet)
+        drawTextStamped (g, area, 2.0f, colour::bg0, colour::textDisabled, (std::uint64_t) dash.hashCode64(), [] (juce::Graphics& k, juce::Rectangle<int> box) {
+            k.setColour (colour::textDisabled);
+            textcache::drawText (k, dash, box, juce::Justification::centred, false);
+        });
         return;
     }
     const auto db = juce::Decibels::gainToDecibels (peak, -100.0f);
-    g.setColour (db >= colour::meterRedAt (0.0f) ? colour::meterClip : db >= colour::meterYellowAt (-6.0f) ? colour::meterMid : colour::textSecondary);
-    textcache::drawFittedText (g, (db > 0.05f ? "+" : "") + juce::String (db, 1), area, juce::Justification::centred, 1, 0.7f);
+    const auto ink = db >= colour::meterRedAt (0.0f) ? colour::meterClip : db >= colour::meterYellowAt (-6.0f) ? colour::meterMid : colour::textSecondary;
+    const auto text = (db > 0.05f ? "+" : "") + juce::String (db, 1);
+    drawTextStamped (g, area, 2.0f, colour::bg0, ink, (std::uint64_t) text.hashCode64() ^ 0x5be0cd19137e2179ull, [&text, ink] (juce::Graphics& k, juce::Rectangle<int> box) {
+        k.setColour (ink);
+        textcache::drawFittedText (k, text, box, juce::Justification::centred, 1, 0.7f);
+    });
 }
 
 void MixerStrips::setShowPeakValues (bool on)
@@ -5028,10 +5106,18 @@ void MixerStrips::resetAllMeters()
 }
 
 // The meters' extras each frame (round 190qh): the highest peak per strip (from the frame's peaks, as the bars), and
-// the correlation from the tap's sums, smoothed (about 300 ms); only a box whose shown value changes is repainted
-void MixerStrips::advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, bool showing)
+// the correlation from the tap's sums, smoothed (about 300 ms); only a box whose shown value changes is repainted.
+// Round 190rd (perf 9): their values live in the cached picture, so a changed box is repainted there (a repaint of its own,
+// not part of the meters' rectangle), and at the extras' own rate (15 Hz; the smoothing still runs every frame). True
+// while a changed value waits for its turn (the frames go on until it shows).
+bool MixerStrips::advanceExtras (float elapsedMs, bool showing)
 {
     const auto tracks = engine.getSong().mixer.size();
+    extrasSinceMs += elapsedMs;
+    const auto due = extrasSinceMs >= 1000.0f / 15.0f;
+    if (due)
+        extrasSinceMs = 0.0f;
+    auto pending = false;
     if (showCorrelation)
     {
         auto& bank = engine.getMeters();
@@ -5053,9 +5139,14 @@ void MixerStrips::advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, b
             const auto px = juce::roundToInt (correlation[t] * (float) area.getWidth() * 0.5f);
             if (px != correlationShown[t])
             {
+                if (! due)
+                {
+                    pending = true;
+                    continue;
+                }
                 correlationShown[t] = px;
                 if (showing && ! isHidden ((int) t) && ! isFoldTab ((int) t))
-                    dirty = dirty.isEmpty() ? area.expanded (0, 1) : dirty.getUnion (area.expanded (0, 1));
+                    repaint (area.expanded (0, 1));
             }
         }
     }
@@ -5068,12 +5159,18 @@ void MixerStrips::advanceExtras (float elapsedMs, juce::Rectangle<int>& dirty, b
             const auto tenths = peak <= 1.0e-5f ? std::numeric_limits<int>::min() + 1 : juce::roundToInt (10.0f * juce::Decibels::gainToDecibels (peak, -100.0f));
             if (tenths != peakShown[t])
             {
+                if (! due)
+                {
+                    pending = true;
+                    continue;
+                }
                 peakShown[t] = tenths;
                 if (showing && ! isHidden ((int) t) && ! isFoldTab ((int) t))
-                    dirty = dirty.isEmpty() ? peakValueArea ((int) t) : dirty.getUnion (peakValueArea ((int) t));
+                    repaint (peakValueArea ((int) t));
             }
         }
     }
+    return pending;
 }
 
 void MixerStrips::unsoloAllOrRestore()
@@ -5397,18 +5494,15 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         const auto bars = nameBars (t);
         const auto meterShown = meters.intersects (clip) && g.clipRegionIntersects (meters);
         const auto barsShown = ! bars.isEmpty() && bars.intersects (clip) && g.clipRegionIntersects (bars);
-        // round 190qh: the correlation bar and the peak value box over the picture (their boxes are in it)
-        const auto corr = correlationArea (t), peakBox = peakValueArea (t);
-        const auto corrShown = ! corr.isEmpty() && g.clipRegionIntersects (corr);
-        const auto peakShown = ! peakBox.isEmpty() && g.clipRegionIntersects (peakBox);
-        if (! meterShown && ! barsShown && ! corrShown && ! peakShown)
+        // (round 190rd: the correlation bars and peak values are in the picture; a change repaints their box there)
+        if (! meterShown && ! barsShown)
             continue;
-        // rollup 0.1.32 step 2 (190qh's extras on by default): one saved state per strip, and only for a strip that a pinned
-        // dock block covers part of (the others draw straight: nothing to exclude)
+        // rollup 0.1.32 step 2: one saved state per strip, and only for a strip that a pinned dock block covers part of (the
+        // others draw straight: nothing to exclude)
         auto covered = false;
         if (dockOf (t) == MixerDock::middle)
         {
-            const auto column = meters.getUnion (bars).getUnion (corr).getUnion (peakBox);
+            const auto column = meters.getUnion (bars);
             for (const auto& r : pinned)
                 covered = covered || r.intersects (column);
         }
@@ -5419,10 +5513,6 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
             for (const auto& r : pinned)
                 g.excludeClipRegion (r);
         }
-        if (corrShown)
-            paintCorrelation (g, t, true);
-        if (peakShown)
-            paintPeakValue (g, t, true);
         if (meterShown && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
             paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
         else if (meterShown)
@@ -5585,7 +5675,7 @@ bool MixerStrips::liveFrame (double nowMs)
     }
     if (showPeakValues || showCorrelation) // round 190qh
     {
-        advanceExtras ((float) elapsed, dirty, showing);
+        moving = advanceExtras ((float) elapsed, showing) || moving;
         moving = moving || std::any_of (correlation.begin(), correlation.end(), [] (float c) { return c != 0.0f; });
     }
     if (meterWaveforms) // round 190lr (DF-60)
