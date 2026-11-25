@@ -19,6 +19,7 @@
 #include "engine/ProjectFile.h"
 #include "engine/RemoteError.h"
 #include "engine/RemoteHistory.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 
 #include "core/Comping.h"
@@ -564,6 +565,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
 {
     // Harmor's resynthesis (round natives190kj): the sample a part names, found as FL finds it (path variables, then the
     // file re-rooted to this PC's FL folders) and decoded by the core (WAV, FL's Ogg-in-WAV, Ogg Vorbis, WavPack)
+    nativedata::setFactoryData (flStudioAccess().roots.factoryData); // (round 190rh: FL's engine data files, wherever FL is)
     harmor::setSampleLoader ([] (const std::string& saved, harmor::SampleData& out) {
         const auto& fl = flStudioAccess();
         const auto path = locateFlSample (saved, fl.roots, {}, fl.fileExists);

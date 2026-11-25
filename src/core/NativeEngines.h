@@ -102,6 +102,22 @@ std::optional<ChannelDef> withPreset (const ChannelDef& current, const std::stri
 bool available (const InstrumentEngine& e, const FlAccess& fl);
 bool available (const EffectEngine& e, const FlAccess& fl);
 
+// Round 190rh (core/NativeData.h): which data a channel's engine plays
+enum class DataSource
+{
+    notNeeded, // the engine reads no data file
+    fl,        // FL's, from this computer's installation
+    own,       // LYNX's own set, saved in the project as such
+    ownForFl,  // LYNX's own set in place of FL's, which is not on this computer (the project keeps FL's path)
+    missing    // FL's is not here and LYNX has no set of its own: silent
+};
+DataSource dataSource (const ChannelDef& channel);
+// The file (or folder) of this computer's FL installation the engine would read, when it is there and usable; "" otherwise
+std::string flDataPath (InstrumentKind kind, const FlAccess& fl);
+// Why an engine is not available here, for the menus ("needs FL Studio 2025 or 2026 for its samples"): English, "" when
+// it is available or the reason is only "FL Studio"
+std::string needsText (InstrumentKind kind);
+
 // A new channel / slot of that engine, or nullopt when it can't be made here (FL not installed, preset unreadable,
 // the engine's data files missing). The channel keeps its default name; mixerTrack is left to the caller.
 std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& fl);

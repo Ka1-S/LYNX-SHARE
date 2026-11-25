@@ -21,6 +21,7 @@
 #include "core/Ogun.h"
 #include "core/SytrusEngine.h"
 #include "core/ThreeOsc.h"
+#include "core/NativeData.h"
 #include "core/NewtoneFx.h"
 #include "core/NoteRepeat.h"
 #include "core/PeakShapes.h"
@@ -2396,8 +2397,36 @@ void toRelease0130 (juce::var& root, Losses& lost)
 // FlOrigin "trial"; a copy opened again here keeps it). Not in projects: round 190qx's settings index and tips (settings
 // folder, ui-options), round 190qw's Soft look (.lynxtheme "look", which 0.1.31 ignores), the extras' new ui-options keys,
 // round 190rc's and round 190rb's fixes, round 190rd's caches of the paint (in memory).
+// Round 190rh: channels that play LYNX's own data set ("sample": "lynxdata:...", core/NativeData.h). Releases before it
+// read FL's file only: the channel keeps its settings and is silent there until it names one.
+void ownDataSets (juce::var& root, Losses& lost)
+{
+    juce::StringArray names;
+    std::function<void (const juce::var&, int)> walk = [&] (const juce::var& v, int depth) {
+        if (depth > 64)
+            return;
+        if (auto* list = arrayOf (v))
+            for (const auto& item : *list)
+                walk (item, depth + 1);
+        else if (auto* o = objectOf (v))
+        {
+            if (o->hasProperty ("instrument") && nativedata::isOwn (o->getProperty ("sample").toString().toStdString()))
+                addOnce (names, o->getProperty ("name").toString());
+            for (const auto& p : o->getProperties())
+                if (p.value.isObject() || p.value.isArray())
+                    walk (p.value, depth + 1);
+        }
+    };
+    walk (root["channels"], 0);
+    walk (root["mixer"], 0);
+    if (! names.isEmpty())
+        lost.push_back ({ TR_NOOP ("These channels play LYNX SHARE's own data set; this release needs FL Studio's files for their engine and plays them silent: {0}"),
+                          listOf (names), true });
+}
+
 void toRelease0131 (juce::var& root, Losses& lost)
 {
+    ownDataSets (root, lost);
     slotsFor0131 (root, lost); // (first, so the later steps see 10 slots at most)
     noteRepeatsFor0131 (root, lost);
 

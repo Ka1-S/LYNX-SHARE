@@ -150,6 +150,9 @@ unmodified in a test harness). How each one was decoded is documented round by r
 FL Studio's plugin names are used below only to say which plugin each LYNX SHARE engine is compatible with or inspired
 by. No Image-Line code, audio or wave data is part of LYNX SHARE: where an engine needs a plugin's built-in waves,
 samples, impulses or tables, LYNX SHARE reads them at run time from **your own** FL Studio installation (marked †).
+Engines marked ‡ also work **without FL Studio** (Linux, macOS, Windows without FL): where FL's data is missing they play a
+data set LYNX SHARE generates itself, which only sounds similar where the notes say so; a project remembers which set it was
+made with.
 
 ## Featured
 
@@ -232,7 +235,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | MiniSynth engine † | MiniSynth | Near-exact | 11/12 project states and 47/91 presets bit-identical, the rest −107…−147 dB |
 | Kepler engine † | Kepler | Near-exact | default patch bit-exact, demo channels −124 dB; self-oscillating presets drift in phase; Kepler Exo's "Kepler-2" states run on the same port |
 | PoiZone engine | PoiZone | Near-exact | 384/385 presets bit-identical with the delay off; delay filters median −79 dB |
-| Transistor Bass engine † | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; needs the oscillator cycles of FL's `engine_x64.dll` (FL 2025 and 2026 builds; before 0.1.24 only FL 2026's) |
+| Transistor Bass engine †‡ | Transistor Bass | Near-exact | 55/128 programs bit-exact, worst −108.6 dB; CC/pitch-bend not modelled; the "303 Pulse" cycles come from FL's `engine_x64.dll` (FL 2025 and 2026 builds); without FL the same sound except "303 Pulse", which uses LYNX SHARE's own cycles (similar); 24 LYNX presets |
 | Sawer engine † | Sawer | Near-exact | 423 presets bit-identical with effects off; reverb −137 dB; modulation by aftertouch/bend not fed |
 | Granulizer engine | Fruity Granulizer | Near-exact | within −128 dB on 100 random states; slice modes and tempo sync not played |
 | Wave Traveller engine | Wave Traveller | Exact | bit-identical with the DLL: the render test, demo states, every curve segment type, mutes, the 19 presets, live and render (sinc) modes, 44.1 / 48 kHz; samples not at 16-bit / 44.1 kHz use LYNX's conversion (REA_rodada167f-wavetraveller) |

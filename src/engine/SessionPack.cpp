@@ -10,6 +10,7 @@
 #include "core/PatternBlocks.h"
 #include "core/ProjectSafety.h"
 #include "core/SessionIds.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 #include "core/StandIns.h"
 #include "engine/AudioEngine.h"
@@ -920,8 +921,12 @@ void confine (Song& song, const juce::File& folder, const juce::File& engineFile
     applyRelocations (song, outside);
     // every other path the engine reads, also inside Patcher graphs (not in the media list, never packed)
     auto engineOnly = [&] (std::string& path) {
-        if (! path.empty() && ! within (path))
-            path = missing (path);
+        if (path.empty() || within (path) || nativedata::isOwn (path)) // (LYNX's own data sets are no files)
+            return;
+        // round 190rh: a data file of FL Studio's is read from this computer's own installation, never from another
+        // place the sender names (nothing of it is packed)
+        const auto here = nativedata::locate (path), root = nativedata::factoryData();
+        path = ! root.empty() && insideFolder (here, fileOf (root)) ? here : missing (path);
     };
     std::function<void (EffectSlot&)> slot;
     std::function<void (PatcherDoc&)> doc;

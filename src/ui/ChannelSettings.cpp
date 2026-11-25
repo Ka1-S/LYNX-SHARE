@@ -66,6 +66,7 @@
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "core/RackOps.h"
+#include "core/NativeData.h"
 #include "core/NativeEngines.h"
 #include "core/PresetCycle.h"
 #include "core/GeneratorPresets.h"
@@ -566,8 +567,9 @@ public:
         pocketSuperSaw = def.instrument == InstrumentKind::pocketSuperSaw; // round 190by
         // round 168q: the engines that run FL's own files say so when this computer lacks them
         engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
-                          || (transistorBass && ! transistorBassIsFlm (def) && ! transistorBassDllUsable (def.samplePath)) // (FLM's build needs no file)
                           || (sawer && sawerReadTable (def.samplePath).empty());
+        dataSource = natives::dataSource (def); // round 190rh: LYNX's own data set in place of FL's says so too
+        engineFilesMissing = engineFilesMissing || dataSource == natives::DataSource::missing || dataSource == natives::DataSource::ownForFl;
         sytrus = def.instrument == InstrumentKind::sytrus;
         // DrumSynth Live: the patch on the key selected in FL's editor (raw FL values)
         if (drumsynth)
@@ -2328,7 +2330,9 @@ public:
             g.fillRoundedRectangle (band, 4.0f);
             g.setColour (theme::colour::textPrimary);
             g.setFont (theme::font (theme::type::small));
-            g.drawFittedText (tr ("Needs FL Studio's files: the engine file was not found, so the channel stays silent (its settings are kept)."),
+            g.drawFittedText (dataSource == natives::DataSource::ownForFl
+                                  ? tr ("FL Studio's data for this plugin is not on this computer: LYNX SHARE's own set plays instead, so it may sound different (the project is not changed).")
+                                  : tr ("Needs FL Studio's files: the engine file was not found, so the channel stays silent (its settings are kept)."),
                               band.reduced (6.0f, 0.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.7f);
         }
         if (layout != nullptr)
@@ -2346,6 +2350,10 @@ public:
     {
         if (plugui::hostedElsewhere)
             return juce::String::fromUTF8 (hostedName.c_str());
+        if (dataSource == natives::DataSource::own || dataSource == natives::DataSource::ownForFl) // (round 190rh)
+            if (const auto* def = ref.get (engine))
+                if (const auto* e = natives::instrumentEngine (def->instrument))
+                    return tr ("{0} — FL's engine on LYNX SHARE's own data set", { juce::String::fromUTF8 (e->name) });
         return drumsynth ? tr ("DrumSynth Live — FL's engine, patch on key {0}", { juce::String (editorKey) })
                                + (wavesFound ? tr (" (next hit; recorded waves from your FL installation)")
                                              : tr (" (next hit; recorded waves not found: silent)"))
@@ -3071,6 +3079,7 @@ private:
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
          sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, pocketSuperSaw = false, sytrus = false, wavesFound = false,
          engineFilesMissing = false;
+    natives::DataSource dataSource = natives::DataSource::notNeeded;
     int editorKey = 60;
     int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
@@ -7228,6 +7237,26 @@ juce::PopupMenu ChannelFrame::buildWrapperMenu()
     };
     if (windowItems)
         windowItems (spec);
+    // round 190rh: the engine's data set (core/NativeData.h): FL's, when its file is on this computer, or LYNX's own
+    if (const auto* d = channel >= 0 && channel < (int) engine.getSong().channels.size() ? &engine.getSong().channels[(std::size_t) channel] : nullptr;
+        d != nullptr && nativedata::hasOwnSet (d->instrument) && natives::dataSource (*d) != natives::DataSource::notNeeded)
+    {
+        const auto own = nativedata::isOwn (d->samplePath);
+        const auto path = own ? natives::flDataPath (d->instrument, flStudioAccess()) : nativedata::ownPath (d->instrument);
+        const juce::Component::SafePointer<ChannelFrame> safe (this);
+        const auto kind = d->instrument;
+        spec.extra = [safe, own, path, kind, next = spec.extra] (juce::PopupMenu& m) {
+            if (next)
+                next (m);
+            m.addItem (own ? tr ("Use FL Studio's data") : tr ("Use LYNX SHARE's own data"), ! path.empty(), false, [safe, path, kind] {
+                if (safe != nullptr)
+                    safe->engine.editSong ([ch = safe->channel, path, kind] (Song& s) {
+                        if (ch >= 0 && ch < (int) s.channels.size() && s.channels[(std::size_t) ch].instrument == kind)
+                            s.channels[(std::size_t) ch].samplePath = path;
+                    });
+            });
+        };
+    }
     return wrappermenu::build (spec);
 }
 

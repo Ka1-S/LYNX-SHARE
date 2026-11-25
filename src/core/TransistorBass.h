@@ -48,7 +48,6 @@ std::unique_ptr<Instrument> makeTransistorBassInstrument();
 bool transistorBassIsFlm (const ChannelDef& channel) noexcept;
 // A state as the desktop plugin saves it (engine stream version 5, sequencer off, every program the given patch of
 // parameters 0…41), with the oversampling field (1, 2 or 4) and the engine (0 = "V1 legacy").
-std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling = 4, int engine = 0);
 // The state for FLM's module from its 14 parameters (PRMS, 0 = Enable): the equivalent desktop patch, oversampling 1.
 // Empty when there are fewer than 14 values.
 std::vector<std::uint8_t> transistorBassFlmState (const std::vector<float>& flmParams);
@@ -70,6 +69,9 @@ struct TransistorBassProgram
     std::array<Step, 32> steps {};
 };
 std::optional<TransistorBassProgram> transistorBassProgram (const std::vector<std::uint8_t>& state);
+// The state writer declared above its step type: `sequence` (round 190rh) is played by every key, transposed with it.
+std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling = 4, int engine = 0,
+                                                    const std::vector<TransistorBassProgram::Step>& sequence = {});
 // Round 190nr (GitHub discussion #202, a LYNX extra: FL's Transistor Bass copies a sequence only to another Transistor
 // Bass, as its own "TransistorBass_Pattern" clipboard data): the shown program's sequence as notes, the way its
 // sequencer plays it while a key is held (stepEvent / clockSequencer): one note per step whose gate is on, at the

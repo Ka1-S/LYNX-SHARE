@@ -4,6 +4,7 @@
 #include "core/TransistorBass.h"
 #include "core/ModelParams.h"
 #include "core/HostSlide.h"
+#include "core/NativeData.h"
 
 #include <algorithm>
 #include <array>
@@ -112,8 +113,12 @@ bool decodeWav (const std::uint8_t* p, std::size_t n, std::vector<float>& out)
     return false;
 }
 
-std::shared_ptr<const DllData> loadDll (const std::string& path)
+// the cycles of the user's own engine DLL (nullptr: no such file, or no cycles in it)
+std::shared_ptr<const DllData> loadDll (const std::string& saved)
 {
+    if (saved.empty() || nativedata::isOwn (saved))
+        return nullptr;
+    const auto path = nativedata::locate (saved); // (round 190rh: FL at another place of this computer)
     static std::mutex lock;
     static std::map<std::string, std::weak_ptr<const DllData>> cache;
     std::lock_guard<std::mutex> g (lock);
@@ -185,6 +190,39 @@ std::shared_ptr<const DllData> loadDll (const std::string& path)
         return nullptr;
     cache[path] = t;
     return t;
+}
+
+// LYNX's own cycles (core/NativeData.h), in the same two sets
+std::shared_ptr<const DllData> ownCycles()
+{
+    static const auto set = [] {
+        auto t = std::make_shared<DllData>();
+        const auto fill = [] (std::vector<Wave>& out, double rate, int count) {
+            for (auto& c : nativedata::bassPulseCycles (rate, count))
+            {
+                Wave w;
+                w.length = (int) c.size();
+                w.data = std::move (c);
+                w.data.push_back (w.data[0]);
+                out.push_back (std::move (w));
+            }
+        };
+        fill (t->recorded, 192000.0, 57);
+        fill (t->recorded2, 44100.0, 55);
+        return std::shared_ptr<const DllData> (std::move (t));
+    }();
+    return set;
+}
+
+// what a channel plays: FL's cycles; LYNX's own when its path says so, or when FL's are not on this computer. (No path
+// at all: none, FL Studio Mobile's build.)
+std::shared_ptr<const DllData> cyclesFor (const std::string& path)
+{
+    if (path.empty())
+        return nullptr;
+    if (auto fl = loadDll (path))
+        return fl;
+    return ownCycles();
 }
 
 // ----------------------------------------------------------------------------------- band-limited saw tables (§2.4)
@@ -2979,7 +3017,7 @@ public:
         dllPath = channel.samplePath;
         flmVariant = variant;
         parsed = parseState (state);
-        data = loadDll (dllPath);
+        data = cyclesFor (dllPath);
         // round 190mc: the program the new state edits is the instrument's at once — the page's follow timer must not
         // read the old engine's program (until the audio thread takes the new one) and write it into the new state
         selected.store (parsed.usable ? parsed.editProgram : -1);
@@ -3243,8 +3281,12 @@ int transistorBassOversampling (const std::vector<std::uint8_t>& state)
 
 // The layout of REA_rodada57 §2.2, the values of FL's own "Sequencer off" preset around the patch: wrapper version 2,
 // engine stream version 5, program 60, 128 programs (program k = patch k + sequence k), sequences of 16 gated C5 steps.
-std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling, int engine)
+// `sequence` (round 190rh): its steps as sequence 60, the sequencer on, and every program = patch 60 + sequence 60
+// transposed by its key (with the sequencer on a note picks the program of its key, §2.10: the line follows the keys)
+std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>& patch, int oversampling, int engine,
+                                                    const std::vector<TransistorBassProgram::Step>& sequence)
 {
+    const auto shared = ! sequence.empty();
     std::vector<std::uint8_t> e;
     const auto put = [&e] (const auto v) {
         const auto* p = (const std::uint8_t*) &v;
@@ -3254,7 +3296,7 @@ std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>&
     put ((std::int16_t) 5);
     put ((std::int32_t) 60), put ((std::int32_t) 60), put ((std::uint8_t) 0);
     for (std::int32_t k = 0; k < 128; ++k)
-        put ((std::int16_t) 0), name(), put (k), put (k), put ((std::int32_t) 0);
+        put ((std::int16_t) 0), name(), put (shared ? 60 : k), put (shared ? 60 : k), put (shared ? k - 60 : 0);
     for (int k = 0; k < 128; ++k)
         for (int c = 0; c < 2; ++c)
         {
@@ -3264,12 +3306,20 @@ std::vector<std::uint8_t> transistorBassWriteState (const std::array<float, 42>&
         }
     for (int k = 0; k < 128; ++k)
     {
-        put ((std::int16_t) 0), name(), put ((std::int16_t) 0), put ((std::int32_t) 16);
-        for (int s = 0; s < 32; ++s)
-            put ((std::int16_t) 1), put ((std::int8_t) 0), put ((std::int32_t) 60), put ((std::int8_t) 1), put (0.5), put (0.5f), put ((std::int8_t) 0);
+        const auto drawn = shared && k == 60;
+        put ((std::int16_t) 0), name(), put ((std::int16_t) 0), put (drawn ? (std::int32_t) std::min<std::size_t> (16, sequence.size()) : (std::int32_t) 16);
+        for (std::size_t s = 0; s < 32; ++s)
+        {
+            TransistorBassProgram::Step step;
+            step.note = 60, step.gate = true;
+            if (drawn && s < sequence.size())
+                step = sequence[s];
+            put ((std::int16_t) 1), put ((std::int8_t) (step.slide ? 1 : 0)), put ((std::int32_t) step.note), put ((std::int8_t) (step.gate ? 1 : 0));
+            put (0.5), put (0.5f), put ((std::int8_t) (step.accent ? 1 : 0));
+        }
         put (125.0), put ((std::int8_t) 0), put (0.0);
     }
-    put ((std::int32_t) 0);                                                       // sequencer off
+    put ((std::int32_t) (shared ? 4 : 0));                                        // sequencer (stored 0 / 4)
     put ((std::int32_t) 0), put ((std::int32_t) 0), put (0.0f), put (1.0f);      // sequence transpose, …, MIDI volume
     put ((std::int32_t) oversampling);
     put ((std::int32_t) engine);
@@ -3595,7 +3645,7 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
                                     double sampleRate, int length, const RefOptions& options)
 {
     const auto st = parseState (state);
-    auto data = loadDll (dll);
+    auto data = nativedata::isOwn (dll) ? cyclesFor (dll) : loadDll (dll);
     if (! st.usable || (data == nullptr && ! options.flm) || length <= 0)
         return {};
     auto plugin = std::make_unique<Plugin> (st, data, sampleRate, options.flm);

@@ -1,5 +1,6 @@
 #include "core/FlCurve.h"
 #include "core/FlpImport.h"
+#include "core/NativeData.h"
 #include "core/RackAutomation.h" // round 190oo (PAT-7)
 #include "core/FlmImport.h" // round 190fn: the FL Studio Mobile Rack generator
 #include "core/FruityDance.h"
@@ -1755,6 +1756,16 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 def.volume = std::clamp ((float) (std::log (10.0 * g + 1.0) / std::log (11.0)), 0.0f, 1.0f);
             };
 
+            // round 190rh: the engine on FL's state with LYNX's own data set, where FL's file is not on this computer
+            auto playOwnData = [&] (InstrumentKind kind, const char* what) {
+                def.instrument = kind;
+                def.pluginState = c.pluginState;
+                def.samplePath = nativedata::ownPath (kind);
+                adoptedFromPlugin = true;
+                if (options.report != nullptr)
+                    ++options.report->notReproduced[std::string (what) + " not found (FL Studio is not on this computer): LYNX SHARE's own set plays"];
+            };
+
             if (name == "3x osc" && ! options.threeOscAsSynth && threeOscStateUsable (c.pluginState))
             {
                 // FL's 3x Osc engine (REA_rodada47) with the channel settings its voice processor keeps (the channel's
@@ -2067,7 +2078,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             else if (name == "transistor bass")
             {
                 // FL's engine from the raw state (REA_rodada57 §2) with the "303 Pulse" oscillator cycles read at run time
-                // from the user's own engine DLL; there is no conversion to fall back to (state or DLL not usable: the
+                // from the user's own engine DLL; without it LYNX's own cycles (round 190rh; the state not usable: the
                 // channel stays unsupported)
                 const auto dll = resolveFlPath ("%FLStudioFactoryData%\\Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", options.roots);
                 if (transistorBassStateUsable (c.pluginState) && ! dll.empty() && options.fileExists && options.fileExists (dll)
@@ -2078,6 +2089,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     def.samplePath = dll;
                     adoptedFromPlugin = true;
                 }
+                else if (transistorBassStateUsable (c.pluginState))
+                    playOwnData (InstrumentKind::transistorbass, "Transistor Bass: FL's recorded 303 Pulse cycles");
             }
             else if (name == "fruity soundfont player" || name == "soundfont player")
             {

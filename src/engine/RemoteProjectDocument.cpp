@@ -3,6 +3,7 @@
 #include "engine/RemoteJsonPatch.h"
 #include "engine/RemoteError.h"
 #include "core/SessionIds.h"
+#include "core/NativeData.h"
 #include "core/Sha256.h"
 #include "core/BassDrum.h"
 #include "core/FlExtraFx.h"
@@ -381,7 +382,7 @@ struct IoReferences
 IoReferences ioReferences (const Song& song)
 {
     IoReferences result;
-    const auto path = [&] (const std::string& value) { if (! value.empty()) result.assets.insert (value); };
+    const auto path = [&] (const std::string& value) { if (! value.empty() && ! nativedata::isOwn (value)) result.assets.insert (value); }; // (LYNX's own data sets are no files)
     const auto nativeResource = [&] (const char* role, const std::string& value) {
         if (! value.empty()) result.nativeResources.insert ({ role, value });
     };

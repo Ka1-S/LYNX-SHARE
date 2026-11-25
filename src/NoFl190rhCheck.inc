@@ -1,0 +1,52 @@
+    // Round 190rh (QUEUE-0.1.33 item 78): the FL natives without FL Studio. Every engine that needs nothing is made with no
+    // installation, saved as .lynx and opened again with the same state and the same data set (core/NativeData.h); a copy
+    // for an older release says which channels it plays silent. Included in the app class (--selftest).
+    static juce::String noFl190rhCheck (juce::String& log)
+    {
+        using namespace lynx;
+        Song song = Song::makeDefault();
+        song.channels.clear();
+        int ownSets = 0;
+        for (const auto& e : natives::instrumentEngines())
+        {
+            const auto c = natives::makeChannel (e.kind, {});
+            if (c.has_value() != natives::available (e, {}))
+                return juce::String ("ERROR ") + e.name + ": listed as available without FL but not made, or the reverse";
+            if (! c)
+            {
+                log << e.name << " needs FL\n";
+                continue;
+            }
+            ownSets += nativedata::isOwn (c->samplePath) ? 1 : 0;
+            song.channels.push_back (*c);
+        }
+        for (const auto& e : natives::effectEngines())
+            if (const auto fx = natives::makeSlot (e.kind, {}))
+                song.mixer[1].effects.push_back (*fx);
+        juce::String error;
+        const auto back = ProjectFile::fromJson (ProjectFile::toJson (song), error);
+        if (! back || back->channels.size() != song.channels.size() || back->mixer[1].effects.size() != song.mixer[1].effects.size())
+            return "ERROR the project with every engine did not open again (" + error + ")";
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+        {
+            const auto &a = song.channels[i], &b = back->channels[i];
+            if (a.instrument != b.instrument || a.pluginState != b.pluginState || a.samplePath != b.samplePath || a.modelParams != b.modelParams)
+                return "ERROR " + juce::String (a.name) + ": not the same after saving and opening again";
+        }
+        for (std::size_t i = 0; i < song.mixer[1].effects.size(); ++i)
+            if (song.mixer[1].effects[i].kind != back->mixer[1].effects[i].kind || song.mixer[1].effects[i].state != back->mixer[1].effects[i].state)
+                return "ERROR an effect is not the same after saving and opening again";
+        int lines = 0;
+        for (const auto& loss : olderlynx::forRelease (song, "0.1.31").lost)
+            lines += juce::String (loss.text).contains ("own data set") ? 1 : 0;
+        log << (int) song.channels.size() << " instruments, " << (int) song.mixer[1].effects.size() << " effects, " << ownSets << " own data sets\n";
+        if (ownSets == 0 || lines != 1)
+            return "ERROR a copy for 0.1.31 does not say which channels play LYNX's own data set";
+        // a shared project: the reserved path is no file of the sender's
+        auto shared = song;
+        sessionpack::confine (shared, juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-nofl190rh"), {});
+        for (std::size_t i = 0; i < song.channels.size(); ++i)
+            if (nativedata::isOwn (song.channels[i].samplePath) && shared.channels[i].samplePath != song.channels[i].samplePath)
+                return "ERROR a shared project lost a channel's data set";
+        return "OK";
+    }

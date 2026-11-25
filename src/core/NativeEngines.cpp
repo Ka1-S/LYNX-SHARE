@@ -16,9 +16,16 @@
 #include "core/LynxBanks.h"
 #include "core/MidiOut.h"
 #include "core/MixSuite.h"
+#include "core/NativeData.h"
 #include "core/PhysicalModels.h"
 #include "core/Slicex.h"
+#include "core/TransistorBass.h"
 #include "flp/Flp.h"
+
+// TR_NOOP marks the menu texts for translation (tools/i18n_keys.py); the UI translates them
+#ifndef TR_NOOP
+ #define TR_NOOP(text) text
+#endif
 
 namespace lynx::natives
 {
@@ -116,6 +123,8 @@ const std::vector<InstrumentEngine>& instrumentEngines()
 {
     // name, preset folder (Generators), needs, beta. Engines that play from an empty state (LYNX's own defaults) need
     // nothing; the rest start from the user's FL "Default" preset (with its data files: DLL tables, wave folders...).
+    // Round 190rh: an engine with a LYNX bank (core/LynxBankList.inc) and, where it reads FL data, a set of LYNX's own
+    // (core/NativeData.h) needs nothing; with FL installed it still starts from FL's preset.
     static const std::vector<InstrumentEngine> list = {
         { InstrumentKind::threeosc, "3x Osc", "3x Osc", own, false },
         { InstrumentKind::sytrus, "Sytrus", "Sytrus", fl, false },
@@ -124,12 +133,12 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::gms, "GMS", "GMS", fl, false },
         { InstrumentKind::morphine, "Morphine", "Morphine", fl, false },
         { InstrumentKind::ogun, "Ogun", "Ogun", fl, false },
-        { InstrumentKind::toxic, "Toxic Biohazard", "Toxic Biohazard", fl, false },
-        { InstrumentKind::poizone, "PoiZone", "PoiZone", fl, false },
-        { InstrumentKind::sakura, "Sakura", "Sakura", fl, false },
+        { InstrumentKind::toxic, "Toxic Biohazard", "Toxic Biohazard", own, false },
+        { InstrumentKind::poizone, "PoiZone", "PoiZone", own, false },
+        { InstrumentKind::sakura, "Sakura", "Sakura", own, false },
         { InstrumentKind::kepler, "Kepler", "Kepler", fl, false },
         { InstrumentKind::keplerExo, "Kepler Exo", "Kepler Exo", fl, false },
-        { InstrumentKind::transistorbass, "Transistor Bass", "Transistor Bass", fl, false },
+        { InstrumentKind::transistorbass, "Transistor Bass", "Transistor Bass", own, false },
         { InstrumentKind::boobass, "BooBass", "", fl, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
         { InstrumentKind::simsynth, "SimSynth", "SimSynth", own, false },
         { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", fl, false },
@@ -141,18 +150,18 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::dx10, "Fruity DX10", "Fruity DX10", own, false },
         { InstrumentKind::plucked, "Plucked!", "Plucked!", own, false },
         { InstrumentKind::sawer, "Sawer", "Sawer", fl, false },
-        { InstrumentKind::beepmap, "BeepMap", "BeepMap", fl, false },
+        { InstrumentKind::beepmap, "BeepMap", "BeepMap", own, false },
         { InstrumentKind::flkeys, "FL Keys", "FL Keys", fl, false },
         { InstrumentKind::slayer, "FL Slayer", "FL Slayer", fl, false },
-        { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", fl, false },
+        { InstrumentKind::granulizer, "Fruity Granulizer", "Fruity Granulizer", own, false },
         { InstrumentKind::wavetraveller, "Wave Traveller", "Wave Traveller", own, false },
         { InstrumentKind::fruityslicer, "Fruity Slicer", "Fruity Slicer", own, false },
         { InstrumentKind::slicex, "Slicex", "", own, false }, // (round 190r: a new one is FL's Default preset values, decks empty)
-        { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
-        { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
+        { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", own, false },
+        { InstrumentKind::drumpad, "Drumpad", "Drumpad", own, false },
         { InstrumentKind::fpc, "FPC", "FPC", own, false }, // (without FL: FL's empty kit; the kits are FL's and the user's .fst files)
         { InstrumentKind::directwave, "DirectWave", "", own, false }, // (round 190hz: FL's new DirectWave, 128 empty programs)
-        { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
+        { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", own, false },
         { InstrumentKind::bassdrum, "BassDrum", "BassDrum", fl, false },
     };
     return list;
@@ -166,7 +175,7 @@ const std::vector<EffectEngine>& effectEngines()
         { EffectKind::equo, "EQUO", fl, false },
         { EffectKind::distructor, "Distructor", fl, false },
         { EffectKind::lovePhilter, "Fruity Love Philter", fl, false },
-        { EffectKind::grossBeat, "Gross Beat", fl, false },
+        { EffectKind::grossBeat, "Gross Beat", own, false },
         { EffectKind::convolver, "Fruity Convolver", fl, false },
         { EffectKind::flPitchShifter, "Pitch Shifter", own, false },
         { EffectKind::vintagePhaser, "Vintage Phaser", own, false },
@@ -379,6 +388,60 @@ bool available (const InstrumentEngine& e, const FlAccess& access)
 bool available (const EffectEngine& e, const FlAccess& access)
 {
     return e.needs == Needs::nothing || ! defaultPresetPath (e.presetFolder, false, access).empty();
+}
+
+namespace
+{
+// the engines that read a data file of FL's: where it is under the installation, and whether LYNX can read it
+struct FlData
+{
+    InstrumentKind kind;
+    const char* path;
+    bool (*usable) (const std::string&);
+};
+constexpr FlData flDataList[] = {
+    { InstrumentKind::transistorbass, "Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", &transistorBassDllUsable },
+};
+
+const FlData* flDataOf (InstrumentKind kind) noexcept
+{
+    for (const auto& d : flDataList)
+        if (d.kind == kind)
+            return &d;
+    return nullptr;
+}
+} // namespace
+
+DataSource dataSource (const ChannelDef& channel)
+{
+    const auto* data = flDataOf (channel.instrument);
+    if (data == nullptr || transistorBassIsFlm (channel)) // (FL Studio Mobile's build of the engine needs no file)
+        return DataSource::notNeeded;
+    if (nativedata::isOwn (channel.samplePath))
+        return DataSource::own;
+    if (! channel.samplePath.empty() && data->usable (channel.samplePath))
+        return DataSource::fl;
+    return nativedata::hasOwnSet (channel.instrument) && ! channel.samplePath.empty() ? DataSource::ownForFl : DataSource::missing;
+}
+
+std::string flDataPath (InstrumentKind kind, const FlAccess& access)
+{
+    const auto* data = flDataOf (kind);
+    if (data == nullptr || access.roots.factoryData.empty())
+        return {};
+    const auto path = resolveFlPath (std::string ("%FLStudioFactoryData%\\") + data->path, access.roots);
+    return ! path.empty() && access.fileExists && access.fileExists (path) && data->usable (path) ? path : std::string();
+}
+
+std::string needsText (InstrumentKind kind)
+{
+    switch (kind)
+    {
+        case InstrumentKind::boobass: case InstrumentKind::slayer: return TR_NOOP ("{0} (needs FL Studio 2025 or 2026 for its samples)");
+        case InstrumentKind::kepler: case InstrumentKind::keplerExo: return TR_NOOP ("{0} (needs FL Studio 2026 for its tables)");
+        case InstrumentKind::flkeys: return TR_NOOP ("{0} (needs FL Studio for its samples)");
+        default: return {};
+    }
 }
 
 std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& access)

@@ -341,7 +341,7 @@ APP_SOURCES+=(src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaCon
 APP_SOURCES+=(src/core/LinkFormula.cpp src/ui/RemoteControl.cpp)
 APP_SOURCES+=(src/core/VoiceShift.cpp)
 # FL engines usable in native projects (round 142, issue #5)
-APP_SOURCES+=(src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp src/ui/NewtoneEditor.cpp)
+APP_SOURCES+=(src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/NativeData.cpp src/core/NativeDataSets.cpp src/core/TransistorBassBank.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/HelixBank.cpp src/core/EngineLayouts.cpp src/ui/NewtoneEditor.cpp)
 APP_SOURCES+=(src/core/Layer.cpp src/ui/LayerEditor.cpp) # FL's Layer channel (round 164)
 APP_SOURCES+=(src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSurface.cpp src/ui/Controllers164.cpp) # X-Y (-Z) Controller, Control Surface, Dashboard (round 164)
 APP_SOURCES+=(src/core/VoltageController.cpp src/ui/VoltageEditor.cpp) # Voltage Controller (round 164)
