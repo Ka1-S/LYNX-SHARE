@@ -151,6 +151,7 @@
 #if JUCE_LINUX
  #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
  #include <sys/prctl.h> // (round 190ou: --multieditor255test LYNX_ME_PTRACE=1)
+ #include <sys/socket.h> // (round 190rf: --qa190rfchild display)
  #include <unistd.h>
 #endif
 #include "engine/HostingTests.h"
@@ -488,6 +489,19 @@ void onCrash (void* exceptionPointers)
         lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
     }
 }
+// Round 190rf (Linux): the X server went away (crashguard::watchDisplayConnection): the project in memory is saved as a
+// recovered project, as after a crash, before the process ends (it cannot go on without a display)
+void onDisplayLost()
+{
+    if (crashEngine == nullptr)
+        return;
+    const auto folder = lynx::platform::settingsFile ("autosave");
+    folder.createDirectory();
+    juce::String error;
+    lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S")
+                                                                         + lynx::ProjectFile::extension), error);
+}
+
 juce::File sessionsFolder()
 {
     return lynx::PluginHost::settingsFolder().getChildFile ("sessions");
@@ -2046,6 +2060,40 @@ public:
             setApplicationReturnValue (runFeel190qeTest (arg (i + 1), arg (i + 2), arg (i + 3)) ? 0 : 1);
             quit();
             return;
+        }
+        if (args.contains ("--qa190rfchild"))
+        {
+            // LYNX --qa190rfchild exit|display <folder> (round 190rf; --qa190rbtest starts it): a process with the hang
+            // watch's thread running that ends through exit() ("exit": exit code 3 expected; the static hang watch's
+            // destructor called std::terminate before) or whose display connection breaks ("display", Linux: exit code 1
+            // through crashguard::watchDisplayConnection, its session file names the lost display)
+            const auto i = args.indexOf ("--qa190rfchild");
+            const auto mode = args[i + 1];
+            const juce::File folder (args[i + 2].unquoted());
+            folder.createDirectory();
+            lynx::crashguard::beginSession (folder.getChildFile ("session.txt").getFullPathName().toStdString(), "LYNX session\n");
+            lynx::crashguard::startHangWatch (folder.getFullPathName().toStdString());
+            if (mode == "exit")
+                std::exit (3);
+           #if JUCE_LINUX
+            if (mode == "display")
+                if (auto* xlib = dlopen ("libX11.so.6", RTLD_LAZY | RTLD_LOCAL))
+                {
+                    using OpenDisplay = void* (*) (const char*);
+                    using ConnectionNumber = int (*) (void*);
+                    using Sync = int (*) (void*, int);
+                    const auto open = (OpenDisplay) dlsym (xlib, "XOpenDisplay");
+                    const auto number = (ConnectionNumber) dlsym (xlib, "XConnectionNumber");
+                    const auto sync = (Sync) dlsym (xlib, "XSync");
+                    if (auto* display = open != nullptr && number != nullptr && sync != nullptr ? open (nullptr) : nullptr)
+                    {
+                        lynx::crashguard::watchDisplayConnection (nullptr);
+                        ::shutdown (number (display), SHUT_RDWR); // (the server "went away")
+                        sync (display, 0);
+                    }
+                }
+           #endif
+            std::_Exit (2); // (not reached when the display part ran)
         }
         if (args.contains ("--qa190rbtest"))
         {
@@ -5049,6 +5097,7 @@ public:
         bindExportDoneSound(); // (round 190qr, #280)
         mainWindow = std::make_unique<MainWindow> ("LYNX SHARE", *engine); // the brand; getApplicationName() stays "LYNX" (an id: instance lock, X11 WM_CLASS, ALSA client)
         lynx::setMainWindowForOwnership (mainWindow.get());
+        lynx::crashguard::watchDisplayConnection (onDisplayLost); // (round 190rf, Linux: the display is open now)
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
         lynx::startRenderingWatch();
         startupTrace.mark ("main window built");

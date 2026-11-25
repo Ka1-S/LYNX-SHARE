@@ -487,5 +487,42 @@
                     ::close (fd);
         }
        #endif
+       #if JUCE_LINUX
+        // ---- round 190rf, crash reports 81399325 / 335428f3 / e45746ce (0.1.29 / 0.1.30 / 0.1.31, Linux): an abort
+        //      ("terminate called") at exit after the X server went away. Xlib calls exit(), the static hang watch's
+        //      destructor ran with its thread still running (std::terminate). A child process of this LYNX: ends through
+        //      exit() with the hang watch running (exit code 3, no abort), and loses its display connection (exit code 1
+        //      through LYNX's handler, the session names it)
+        {
+            const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName();
+            const auto folder = juce::File::createTempFile ("qa190rf-child");
+            const auto runChild = [&] (const juce::String& mode) {
+                juce::ChildProcess child;
+                if (! child.start (juce::StringArray { exe, "--qa190rfchild", mode, folder.getFullPathName() }, 0))
+                    return -1000;
+                if (! child.waitForProcessToFinish (60000))
+                {
+                    child.kill();
+                    return -1001;
+                }
+                return (int) child.getExitCode();
+            };
+            const auto exitCode = runChild ("exit");
+           #if defined(LYNX_SANITIZER_BUILD)
+            const auto exitOk = exitCode == 3 || exitCode == 23; // (23: LeakSanitizer's code, the child skips the shutdown)
+           #else
+            const auto exitOk = exitCode == 3;
+           #endif
+            check ("Exit with the hang watch running: exit code 3, no abort (" + juce::String (exitCode) + ")", exitOk);
+            if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
+            {
+                const auto displayCode = runChild ("display");
+                const auto session = folder.getChildFile ("session.txt").loadFileAsString();
+                check ("Display connection lost: exit code 1, the session names it (" + juce::String (displayCode) + ")",
+                       displayCode == 1 && session.contains ("the display connection was lost"));
+            }
+            folder.deleteRecursively();
+        }
+       #endif
         return result;
     }

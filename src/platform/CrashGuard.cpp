@@ -1561,7 +1561,11 @@ struct HangWatch
 };
 HangWatch& hangWatch()
 {
-    static HangWatch w;
+    // round 190rf (crash reports 0.1.29 / 0.1.30 / 0.1.31, Linux: abort at exit): kept for the process' life, never
+    // destroyed. A process that ends through exit() without LYNX's own shutdown (Xlib's after the X server went away,
+    // any exit() call) ran the static's destructor while its thread still ran: ~std::thread of a joinable thread is
+    // std::terminate. Only stopHangWatch() ends the thread.
+    static HangWatch& w = *new HangWatch;
     return w;
 }
 
@@ -1850,6 +1854,38 @@ void heartbeat() noexcept
 {
     hangWatch().lastBeat.store (nowMs());
 }
+
+#if defined(__linux__) || defined(__FreeBSD__)
+namespace
+{
+void (*displayLostHook)() = nullptr;
+
+int onDisplayIoError (void*)
+{
+    static std::atomic<bool> once { false };
+    if (! once.exchange (true))
+    {
+        note ("the display connection was lost (the X server went away): LYNX ends");
+        if (displayLostHook != nullptr)
+            displayLostHook();
+    }
+    exitNow (1);
+}
+} // namespace
+
+void watchDisplayConnection (void (*lost)()) noexcept
+{
+    using Handler = int (*) (void*);
+    using SetHandler = Handler (*) (Handler);
+    displayLostHook = lost;
+    // (libX11 as JUCE loaded it: nothing happens in a process that never opened a display)
+    if (auto* xlib = dlopen ("libX11.so.6", RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD))
+        if (auto set = (SetHandler) dlsym (xlib, "XSetIOErrorHandler"))
+            set (onDisplayIoError);
+}
+#else
+void watchDisplayConnection (void (*)()) noexcept {}
+#endif
 
 void stopHangWatch() noexcept
 {
