@@ -63,7 +63,7 @@ LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub
 
 ## What's new
 
-LYNX SHARE 0.1.31.2 fixes a start page crash, the typing keyboard over docked plugins, stretched clips that looped their first bar, automation lanes made from FL projects exported .flp files that FL refused, presets of FL's stock synths in the Browser and a few smaller issues.
+LYNX SHARE 0.1.31.2 fixes a likely cause of a start page crash, the "LYNX first" keyboard setting over docked VST3 plugins, stretched clips that looped their first bar, automation lanes made from FL projects, exported .flp files that FL refused, presets of FL's stock synths in the Browser and a few smaller issues.
 
 LYNX SHARE 0.1.31.1 fixes what you reported on 0.1.31: automation of FL projects on the controls, plugin windows that stopped opening, the Device view, Export with a folder in the file name, clips on instrument tracks, a crash in the hint bar and start-up memory.
 

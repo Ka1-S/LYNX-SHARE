@@ -1,8 +1,8 @@
 {
 "u.0.1.31.2.t": "Encore des corrections pour 0.1.31",
-"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corrige un plantage de la page d'accueil, le clavier de saisie au-dessus des plugins ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corrige une cause probable d'un plantage de la page d'accueil, le réglage de clavier « LYNX d'abord » au-dessus des plugins VST3 ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL, les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.",
 "u.0.1.31.2.f0": "Faire défiler la liste « Commencer un nouveau projet » de la page d'accueil pouvait lire au-delà de la fin de la liste, cause probable d'un plantage signalé sous Windows ; ce n'est plus le cas.",
-"u.0.1.31.2.f1": "Au-dessus d'un plugin ancré, le clavier de saisie joue de nouveau en premier quand le bouton clavier de la fenêtre le demande, comme dans une fenêtre détachée.",
+"u.0.1.31.2.f1": "Avec le bouton clavier de la fenêtre d'un plugin sur « LYNX d'abord » (« Laisser le plugin traiter les frappes avant l'hôte » désactivé), le clavier de saisie reçoit maintenant ses touches avant un plugin VST3 ancré.",
 "u.0.1.31.2.f2": "Avec « Les clips de pattern étirés bouclent leur pattern » activé, les notes dessinées, collées ou déplacées après la première mesure d'un clip s'entendent : le pattern s'allonge pour les contenir.",
 "u.0.1.31.2.f3": "Playlist › « Déplacer les clips d'automation dans les pistes de leurs pistes » garde les valeurs que jouaient les clips, aussi sur de gros projets FL.",
 "u.0.1.31.2.f4": "« Gérer les raccourcis » s'ouvre avec le curseur dans sa recherche sur les bureaux Linux qui activent les fenêtres en retard (#244) ; Options › Réglages du clavier de saisie vers piano ouvre le menu Note fondamentale / Octave / Disposition quelle que soit la taille de la fenêtre (#270).",
