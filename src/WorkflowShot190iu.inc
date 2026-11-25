@@ -186,10 +186,13 @@
         pl.setToolForSnapshot (EditTool::pencil);
         workflowextras::setExtra ("editing.tempTools", false);
 
-        // ---- 3. #191.2 MIDI files: the Pattern layout takes them only with the extra on
+        // ---- 3. #191.2 MIDI files: the Pattern layout takes them while the extra is on
         const juce::StringArray files { midiFile.getFullPathName() };
         const auto dropX = (int) pl.xOfTickForSnapshot (8.0 * ppq) + 2, dropY = pl.trackRowForSnapshot (7).getCentreY();
-        check ("pattern_layout_refuses_mid_by_default", ! pl.isInterestedInFileDrag (files));
+        // (on by default since 0.1.31.2, the owner's choice on #287; off, the Pattern layout refuses them as FL Studio ignores them)
+        check ("pattern_layout_takes_mid_by_default", pl.isInterestedInFileDrag (files));
+        workflowextras::setExtra ("playlist.midiDrop", false);
+        check ("pattern_layout_refuses_mid_with_the_extra_off", ! pl.isInterestedInFileDrag (files));
         workflowextras::setExtra ("playlist.midiDrop", true);
         check ("pattern_layout_takes_mid_with_the_extra", pl.isInterestedInFileDrag (files));
         {
