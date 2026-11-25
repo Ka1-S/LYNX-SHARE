@@ -110,3 +110,19 @@
             quit();
         });
     }
+
+    // --nofl190rhlynx <in.flp> <release> <out.lynx>: the project as that release opens it, every generator's state LYNX's own
+    // to write (no FL original kept beside it): what an older LYNX then exports as .flp is checked in FL
+    bool runNoFl190rhLynx (const juce::String& input, const juce::String& release, const juce::String& output)
+    {
+        using namespace lynx;
+        AudioEngine loader (false);
+        juce::String error;
+        if (! loader.importFlpFile (juce::File (input), error))
+            return false;
+        auto song = loader.getSong();
+        for (auto& c : song.channels)
+            c.flOrigin = {};
+        const auto copy = olderlynx::forRelease (song, release);
+        return copy.ok && juce::File (output).replaceWithText (copy.json, false, false, nullptr);
+    }

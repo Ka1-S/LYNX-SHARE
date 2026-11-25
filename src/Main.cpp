@@ -3724,6 +3724,14 @@ public:
             return;
         }
 
+        if (args.contains ("--nofl190rhlynx"))
+        {
+            const auto i = args.indexOf ("--nofl190rhlynx");
+            setApplicationReturnValue (runNoFl190rhLynx (args[i + 1].unquoted(), args[i + 2].unquoted(), args[i + 3].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --nofl190rhshot <prefix> (round 190rh: Settings > Files > FL Studio folder): src/NoFl190rhCheck.inc
         if (args.contains ("--nofl190rhshot"))
         {

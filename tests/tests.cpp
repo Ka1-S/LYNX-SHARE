@@ -103,6 +103,7 @@
 #include "core/IppCos.h"
 #include "core/Dx10.h"
 #include "core/Kepler.h"
+#include "core/NativeData.h"
 #include "core/ThreeOsc.h"
 #include "core/FlResampler.h"
 #include "core/FlKeys.h"
