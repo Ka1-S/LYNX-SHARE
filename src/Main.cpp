@@ -13340,7 +13340,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if ((juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if ((juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                 || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
                 && (only.isEmpty() || type.name == only))
             {
                 chosen = type;
@@ -18887,7 +18888,12 @@ private:
         auto outputs = std::make_shared<std::vector<std::vector<float>>>();
         auto ok = std::make_shared<bool> (true);
         auto run = std::make_shared<std::function<void (std::size_t, int)>>();
-        *run = [this, scenarios, step, outputs, ok, run, block, seconds, report] (std::size_t index, int pass) {
+        // (round 190rf, LeakSanitizer: the step holds itself weakly, what is pending holds it: a strong self-capture kept the
+        // last engine's outputs for good)
+        *run = [this, scenarios, step, outputs, ok, weakRun = std::weak_ptr (run), block, seconds, report] (std::size_t index, int pass) {
+            const auto run = weakRun.lock();
+            if (run == nullptr)
+                return;
             if (index >= scenarios->size())
             {
                 lynx::renderAheadOption().store (true);
@@ -26222,7 +26228,7 @@ private:
         offline.editSong ([] (lynx::Song& s) {
             s.video.startTimecode = 3600.0;
             s.video.burnIn = true;
-            if (s.videoTracks.size() < 2)
+            while (s.videoTracks.size() < 2) // (round 190rf, ASan: no video could be imported at all)
                 s.videoTracks.push_back ({});
             s.videoTracks[0].name = "Picture";
             s.videoTracks[1].name = "Reference";
@@ -28501,6 +28507,7 @@ private:
                 const auto menu = playlist.getTrackMenuForSnapshot (track);
                 juce::StringArray names { "Track " + juce::String (track + 1) };
                 std::vector<juce::PopupMenu> menus { menu };
+                menus.reserve (3); // (round 190rf, ASan: the iterator below walks menus[1] while the third is added)
                 for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
                     if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::theme::mnemonic (lynx::tr ("Track mode"), 'T'))
                     {
