@@ -5,6 +5,7 @@
 #include "core/NativeData.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 
@@ -97,6 +98,87 @@ std::vector<float> makeSawCycle()
     return out;
 }
 } // namespace
+
+std::vector<float> sineCycle (int points)
+{
+    std::vector<float> out ((std::size_t) points);
+    for (int i = 0; i < points; ++i)
+        out[(std::size_t) i] = (float) (bassDrumLevel * std::sin (2.0 * pi * i / points));
+    return out;
+}
+
+std::vector<float> drumNoise (const std::string& name)
+{
+    std::string n;
+    for (const auto c : name)
+        n.push_back ((char) std::tolower ((unsigned char) c));
+    const auto has = [&n] (const char* word) { return n.find (word) != std::string::npos; };
+    constexpr double rate = 44100.0;
+    const auto length = (std::size_t) (0.8 * rate);
+    std::vector<double> x (length);
+    std::uint32_t seed = 0x1234567u;
+    const auto white = [&seed] {
+        seed = seed * 1664525u + 1013904223u; // (Numerical Recipes' generator)
+        return (double) (std::int32_t) seed / 2147483648.0;
+    };
+    if (has ("metal"))
+    {
+        // six square waves at the TR-808 cymbal oscillators' frequencies (its service notes), high-passed, decaying
+        constexpr double hz[6] = { 205.3, 304.4, 369.6, 522.7, 540.0, 800.0 };
+        double last = 0.0, y = 0.0;
+        const auto a = std::exp (-2.0 * pi * 3000.0 / rate);
+        for (std::size_t i = 0; i < length; ++i)
+        {
+            const auto t = (double) i / rate;
+            double v = 0.0;
+            for (const auto f : hz)
+                v += std::fmod (t * f, 1.0) < 0.5 ? 1.0 : -1.0;
+            y = a * (y + v - last);
+            last = v;
+            x[i] = y * std::exp (-t / 0.12);
+        }
+    }
+    else if (has ("clap"))
+    {
+        // noise through a band-pass at 1 kHz under three short bursts 10 ms apart and a tail (the analogue clap circuits')
+        double low = 0.0, band = 0.0;
+        const auto f = 2.0 * std::sin (pi * 1000.0 / rate);
+        for (std::size_t i = 0; i < length; ++i)
+        {
+            const auto t = (double) i / rate;
+            const auto high = white() - low - band;
+            band += f * high;
+            low += f * band;
+            double e = 0.0;
+            for (int k = 0; k < 3; ++k)
+                if (t >= 0.01 * k)
+                    e = std::max (e, std::exp (-(t - 0.01 * k) / 0.004));
+            if (t >= 0.03)
+                e = std::max (e, 0.8 * std::exp (-(t - 0.03) / 0.06));
+            x[i] = band * e;
+        }
+    }
+    else if (has ("crush") || has ("crunch") || has ("bit"))
+    {
+        double held = 0.0;
+        for (std::size_t i = 0; i < length; ++i)
+        {
+            if (i % 12 == 0) // (3.7 kHz)
+                held = std::round (white() * 8.0) / 8.0;
+            x[i] = held * std::exp (-(double) i / rate / 0.15);
+        }
+    }
+    else
+        for (std::size_t i = 0; i < length; ++i)
+            x[i] = white() * std::exp (-(double) i / rate / 0.12);
+    double top = 1.0e-9;
+    for (const auto v : x)
+        top = std::max (top, std::fabs (v));
+    std::vector<float> out (length);
+    for (std::size_t i = 0; i < length; ++i)
+        out[i] = (float) (x[i] / top * 0.9);
+    return out;
+}
 
 std::vector<float> sawCycle()
 {

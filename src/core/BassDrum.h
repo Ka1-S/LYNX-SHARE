@@ -32,6 +32,9 @@ namespace lynx
 // true when the engine can read this BassDrum state ("SSLF", tag 1kiK/2kiK, 23 parameters)
 bool bassDrumStateUsable (const std::vector<std::uint8_t>& state);
 
+// true when `path` is BassDrum's folder with its table (here, or in this computer's FL installation: core/NativeData.h)
+bool bassDrumDataUsable (const std::string& path);
+
 // the noise sample's file name in a state ("" = none)
 std::string bassDrumNoiseName (const std::vector<std::uint8_t>& state);
 

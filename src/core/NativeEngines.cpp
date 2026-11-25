@@ -1,5 +1,6 @@
 #include "core/NativeEngines.h"
 
+#include "core/BassDrum.h"
 #include "core/DirectWaveState.h"
 
 #include <algorithm>
@@ -164,7 +165,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::fpc, "FPC", "FPC", own, false }, // (without FL: FL's empty kit; the kits are FL's and the user's .fst files)
         { InstrumentKind::directwave, "DirectWave", "", own, false }, // (round 190hz: FL's new DirectWave, 128 empty programs)
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", own, false },
-        { InstrumentKind::bassdrum, "BassDrum", "BassDrum", fl, false },
+        { InstrumentKind::bassdrum, "BassDrum", "BassDrum", own, false },
     };
     return list;
 }
@@ -404,6 +405,7 @@ struct FlData
 constexpr FlData flDataList[] = {
     { InstrumentKind::transistorbass, "Plugins\\Fruity\\Generators\\Transistor Bass\\engine_x64.dll", &transistorBassDllUsable },
     { InstrumentKind::minisynth, "Plugins\\Fruity\\Generators\\Minisynth\\oscdata.dat", &miniSynthDataUsable },
+    { InstrumentKind::bassdrum, "Plugins\\Fruity\\Generators\\BassDrum", &bassDrumDataUsable },
     { InstrumentKind::sawer, "Plugins\\Fruity\\Generators\\Sawer\\data.saw", [] (const std::string& path) { return ! sawerReadTable (path).empty(); } },
 };
 
@@ -434,7 +436,7 @@ std::string flDataPath (InstrumentKind kind, const FlAccess& access)
     if (data == nullptr || access.roots.factoryData.empty())
         return {};
     const auto path = resolveFlPath (std::string ("%FLStudioFactoryData%\\") + data->path, access.roots);
-    return ! path.empty() && access.fileExists && access.fileExists (path) && data->usable (path) ? path : std::string();
+    return ! path.empty() && data->usable (path) ? path : std::string();
 }
 
 std::string needsText (InstrumentKind kind)

@@ -3,6 +3,7 @@
 // engine's own CRT powf/sincosf algorithms where their last bits matter, and long double for FL's x87 pan law.
 
 #include "core/BassDrum.h"
+#include "core/NativeData.h"
 #include "core/DrumParamRanges.h"
 #include "core/EngineParams.h"
 #include "core/HostSlide.h"
@@ -236,6 +237,44 @@ std::shared_ptr<const Wave> readWaveAnySeparator (const std::string& path)
     auto p = path;
     std::replace (p.begin(), p.end(), '\\', '/');
     return p == path ? nullptr : readWave (p);
+}
+
+// LYNX's own table and noises (core/NativeData.h): asked for by the channel, or FL's folder is not on this computer
+std::shared_ptr<const Wave> waveOf (std::vector<float> samples)
+{
+    auto w = std::make_shared<Wave>();
+    w->length = (int) samples.size();
+    w->s = std::move (samples);
+    w->s.resize (w->s.size() + 4, 0.0f);
+    return w;
+}
+std::shared_ptr<const Wave> ownTable()
+{
+    static const auto t = waveOf (nativedata::sineCycle (1024));
+    return t;
+}
+// the folder FL's files are read from; "" = LYNX's own
+std::string dataFolder (const std::string& saved)
+{
+    if (saved.empty() || nativedata::isOwn (saved))
+        return {};
+    const auto folder = nativedata::locate (saved);
+    return readWaveAnySeparator (joinPath (folder, "sounddata")) != nullptr ? folder : std::string();
+}
+// (the presets of LYNX's own bank name LYNX's noises, also on a channel that plays FL's table)
+std::shared_ptr<const Wave> noiseFor (const std::string& folder, const std::string& name)
+{
+    if (name.empty())
+        return nullptr;
+    if (! folder.empty() && name.rfind ("LYNX ", 0) != 0)
+        return readWaveAnySeparator (joinPath (joinPath (folder, "Noise Samples"), name));
+    static std::mutex mutex;
+    static std::map<std::string, std::shared_ptr<const Wave>> cache;
+    const std::lock_guard<std::mutex> lock (mutex);
+    auto& w = cache[name];
+    if (w == nullptr)
+        w = waveOf (nativedata::drumNoise (name));
+    return w;
 }
 
 // ---- state ----
@@ -967,10 +1006,9 @@ private:
             Patch p;
             if (parse (state, p) && ! dir.empty())
             {
-                auto table = readWaveAnySeparator (joinPath (dir, "sounddata"));
-                std::shared_ptr<const Wave> noise;
-                if (! p.noise.empty())
-                    noise = readWaveAnySeparator (joinPath (joinPath (dir, "Noise Samples"), p.noise));
+                const auto folder = dataFolder (dir);
+                auto table = folder.empty() ? ownTable() : readWaveAnySeparator (joinPath (folder, "sounddata"));
+                auto noise = noiseFor (folder, p.noise);
                 auto pl = std::make_unique<Plugin>();
                 if (pl->eng.init (p, table, noise, s->rate))
                     s->plugin = std::move (pl);
@@ -1022,6 +1060,8 @@ bool bassDrumStateUsable (const std::vector<std::uint8_t>& state)
     Patch p;
     return parse (state, p);
 }
+
+bool bassDrumDataUsable (const std::string& path) { return ! dataFolder (path).empty(); }
 
 std::string bassDrumNoiseName (const std::vector<std::uint8_t>& state)
 {

@@ -315,6 +315,7 @@ add_library(lynx_core STATIC
     src/core/TransistorBassBank.cpp
     src/core/MiniSynthBank.cpp
     src/core/SawerBank.cpp
+    src/core/BassDrumBank.cpp
     src/core/ToxicBank.cpp
     src/core/BeepMapBank.cpp
     src/core/GranulizerBank.cpp

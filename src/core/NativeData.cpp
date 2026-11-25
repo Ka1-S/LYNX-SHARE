@@ -19,6 +19,7 @@ constexpr OwnSet ownSets[] = {
     { InstrumentKind::transistorbass, "transistorbass", 1 },
     { InstrumentKind::minisynth, "minisynth", 1 },
     { InstrumentKind::sawer, "sawer", 1 },
+    { InstrumentKind::bassdrum, "bassdrum", 1 },
 };
 
 const OwnSet* setOf (InstrumentKind kind) noexcept

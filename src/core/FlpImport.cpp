@@ -2224,6 +2224,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         && ! options.fileExists (folder + "\\Noise Samples\\" + noise))
                         ++options.report->partialEffects["BassDrum noise sample (not found)"];
                 }
+                else if (bassDrumStateUsable (c.pluginState))
+                    playOwnData (InstrumentKind::bassdrum, "BassDrum: FL's oscillator table and noise samples");
                 else if (synthFromBassDrum (c.pluginState, fromPlugin, pluginGain))
                     adopt();
             }

@@ -72,3 +72,13 @@ Bank: 24 presets (`core/SawerBank.cpp`).
 Engine on FL's cycle vs LYNX's, rendered: octave bands 125 Hz…8 kHz within −1.6…+1.8 dB of the plugin's after the level (measured
 before the level was rounded, plain saw, five keys); the bank's presets within −0.0…+1.3 dB in level. The waveforms are not
 aligned sample by sample (different phases), so a residual says nothing here.
+
+## 5. BassDrum — own table and noises, revision 1
+
+The oscillator table is a sine (1024 points), as a kick oscillator's, at level 0.856 from rendered audio (the bank's kicks). The noises (`drumNoise`) are generated: white noise with a
+decay ("LYNX Hiss"), white noise held at 3.7 kHz and 16 steps ("LYNX Crush"), six square waves at the TR-808 cymbal
+oscillators' frequencies through a 3 kHz high-pass ("LYNX Metal"; the frequencies are the service notes', as published in K.
+Werner, J. Abel, J. Smith, "The TR-808 Cymbal: a Physically-Informed, Circuit-Bendable, Digital Model", ICMC 2014) and noise in
+a 1 kHz band under three bursts 10 ms apart ("LYNX Clap", the analogue clap circuits' principle). No constant was taken from FL's
+table or samples. (The round's analysis had looked at both; the choice of a sine and of the noises is the textbook one.) A state made with FL's noises plays the one its name suggests (metal, clap, crunch / bit),
+else the hiss. Bank: 20 presets (`core/BassDrumBank.cpp`). Differences from FL: the body is close (a sine), noise layers differ.

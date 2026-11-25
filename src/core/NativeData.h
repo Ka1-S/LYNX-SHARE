@@ -58,6 +58,12 @@ void fallingSaw (std::vector<float>& amplitude, std::vector<float>& phase);
 // Sawer's oscillator: one cycle of 8192 points of a band-limited falling saw
 std::vector<float> sawCycle();
 
+// BassDrum: one cycle of a sine (1024 points, at the plugin's rendered level), and noise samples at 44.1 kHz for its noise section. The names LYNX's own
+// presets use are "LYNX Hiss", "LYNX Crush", "LYNX Metal" and "LYNX Clap"; any other name (a state made with FL's samples)
+// gets the one its words suggest, else the hiss.
+std::vector<float> sineCycle (int points);
+std::vector<float> drumNoise (const std::string& name);
+
 // the level of each set: 1 = the textbook shape's own; placed so that rendered audio is as loud as the plugin's
-constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507;
+constexpr double bassPulseLevel = 0.88, miniSynthLevel = 0.865, sawerLevel = 0.507, bassDrumLevel = 0.856;
 } // namespace lynx::nativedata

@@ -20,7 +20,7 @@ std::string realInstallation() { return realFlpDir.empty() ? std::string() : std
 // the engines this round's banks and sets are for (they grow with its steps)
 const std::vector<lynx::InstrumentKind>& kinds()
 {
-    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer };
+    static const std::vector<lynx::InstrumentKind> list = { lynx::InstrumentKind::transistorbass, lynx::InstrumentKind::minisynth, lynx::InstrumentKind::sawer, lynx::InstrumentKind::bassdrum };
     return list;
 }
 
@@ -189,7 +189,7 @@ TEST (noflnatives190rh_missing_fl_data)
         noflnatives190rh::Installation none ("");
         auto c = *natives::makeChannel (kind, {});
         const auto own = noflnatives190rh::render (c);
-        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : "Transistor Bass\\engine_x64.dll";
+        const char* file = kind == InstrumentKind::minisynth ? "Minisynth\\oscdata.dat" : kind == InstrumentKind::sawer ? "Sawer\\data.saw" : kind == InstrumentKind::bassdrum ? "BassDrum" : "Transistor Bass\\engine_x64.dll";
         c.samplePath = std::string ("Z:\\no such place\\Plugins\\Fruity\\Generators\\") + file;
         CHECK (natives::dataSource (c) == natives::DataSource::ownForFl);
         CHECK (noflnatives190rh::render (c) == own);
