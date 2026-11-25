@@ -524,6 +524,24 @@
                        + juce::String (cleared) + " clears)",
                    drawn.load() >= 20);
         }
+        // ---- round 190rf, UI monkey on Windows (seed 2012): a call-out box still open when LYNX quits was deleted by JUCE's
+        //      DeletedAtShutdown, after the UI and the engine its content uses (the Simple layout's tuner)
+        {
+            struct Content final : juce::Component
+            {
+                explicit Content (bool& f) : gone (f) { setSize (60, 40); }
+                ~Content() override { gone = true; }
+                bool& gone;
+            };
+            bool gone = false;
+            juce::Component host;
+            host.setSize (400, 300);
+            juce::CallOutBox::launchAsynchronously (std::make_unique<Content> (gone), { 100, 100, 20, 20 }, &host);
+            const auto openBefore = ! gone && modalDialogOpen();
+            closeModalWindows();
+            check ("Quit: a call-out box still open is deleted before the UI and the engine", openBefore && gone && ! modalDialogOpen());
+        }
+
        #if JUCE_LINUX
         // ---- round 190rf, crash reports 81399325 / 335428f3 / e45746ce (0.1.29 / 0.1.30 / 0.1.31, Linux): an abort
         //      ("terminate called") at exit after the X server went away. Xlib calls exit(), the static hang watch's

@@ -5353,6 +5353,7 @@ public:
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         lynx::remoteui::shutdown();
+        lynx::closeModalWindows(); // (round 190rf: a call-out box or dialog still open goes before the UI and the engine)
         remoteControl = nullptr; // cancels queued control work before its engine and UI go
         mainWindow = nullptr; // the UI goes before the engine
         graphicsDeviceJob = {}; // (round 190hd: the graphics device's holder, after every window)

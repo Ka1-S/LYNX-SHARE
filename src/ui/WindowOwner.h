@@ -76,6 +76,12 @@ void keepPressRaisedEditorsInFront (const juce::MouseEvent& press);
 // of its own then (kept above the main window like the panel). Detached panel windows carry the property "lynxPanel".
 bool openedFromFloatingPanel();
 
+// Round 190rf (UI monkey on Windows, seed 2012: an access violation while quitting): every call-out box, menu and modal
+// dialog that is still open is deleted now, its answer never given. Called while LYNX quits, before the UI and the engine
+// go: JUCE deletes what is still open in DeletedAtShutdown, after them, and their content read and wrote the freed engine
+// (the Simple layout's tuner, which stops listening when it is hidden).
+void closeModalWindows();
+
 // Keys a secondary window does not use (no component in it took them) go to the main window's global shortcuts, as in
 // FL (round 165q / issue #12: Space, F12 or a user's key did nothing while the Undo history, Settings, a plugin window...
 // had the focus). keepAboveMainWindow installs the forwarding on the window; the main window sets the handler. A window
