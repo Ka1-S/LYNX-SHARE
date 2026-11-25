@@ -2493,6 +2493,8 @@ void toRelease0131 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("SoundFont channels play low velocities much quieter in this release (the older velocity curve): {0}"), listOf (fonts), true });
         if (! boobass.isEmpty())
             lost.push_back ({ TR_NOOP ("BooBass plays every note at full level in this release, whatever its velocity: {0}"), listOf (boobass), true });
+    }
+
     // round 190qz: a Peak Controller (EffectSlot::engineRev 3) or an Envelope Controller (ChannelDef::engineRev 6) leaves its
     // links' targets at their own values until it sends its first value, as FL's do; 0.1.31 sends 0 / the output's base from
     // the start. A line naming the controllers that have links; the slots are written at revision 2 (the channels at 3
