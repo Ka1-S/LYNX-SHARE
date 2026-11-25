@@ -308,5 +308,47 @@
                    steps > 0);
         }
 
+        // ---- UI monkey test, seed 15 (release build): the Tracker painted its cells from a layout built before an undo,
+        //      whose notes indexed past the pattern's (TrackerComponent::paint -> paintCell -> tracker::fxActive). Cells
+        //      of a layout a step behind the song show nothing now, and a key or a click builds the layout again first
+        {
+            auto song = Song::makeDefault();
+            song.currentPattern = 0;
+            if (! song.patterns.empty() && ! song.channels.empty())
+                for (int k = 0; k < 16; ++k)
+                {
+                    Note n;
+                    n.channel = 0;
+                    n.key = 60 + (k % 12);
+                    n.start = (std::int64_t) k * (ppq / 4);
+                    n.length = ppq / 8;
+                    n.velocity = 0.8f;
+                    song.patterns[0].notes.push_back (n);
+                }
+            AudioEngine offline (false);
+            offline.setSong (song);
+            offline.dispatchPendingMessages();
+            TrackerComponent tracker (offline);
+            tracker.setSize (1280, 760);
+            offline.dispatchPendingMessages();
+            const auto before = tracker.layoutForCheck().placed.size();
+            // undo-like: the pattern loses its notes; the tracker paints and takes a key before the change message
+            offline.editSong ([] (Song& s) {
+                if (! s.patterns.empty())
+                    s.patterns[0].notes = {}; // (its storage released: an old index reads nothing that is there)
+            });
+            juce::Image image (juce::Image::ARGB, 1280, 760, true);
+            {
+                juce::Graphics g (image);
+                tracker.paintEntireComponent (g, false);
+            }
+            tracker.keyPressed (juce::KeyPress (juce::KeyPress::downKey));
+            const auto afterKey = tracker.layoutForCheck().placed.size();
+            offline.dispatchPendingMessages();
+            check ("Tracker: paints while its layout is a step behind the song, and a key builds it again first (" + juce::String ((int) before)
+                       + " notes, then " + juce::String ((int) afterKey) + ")",
+                   before >= 16 && afterKey == 0);
+        }
+
         return result;
     }
