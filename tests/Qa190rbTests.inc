@@ -59,3 +59,33 @@ TEST (qa190rb_helix_clean_sample_voice_survives_a_sample_without_levels)
     CHECK (std::any_of (l.begin() + 2400, l.begin() + 4800, [] (float v) { return v != 0.0f; })); // (the voice went on)
 }
 
+
+// LeakSanitizer in the sanitizer suite (round 190rb; ctl170i3_every_control_changes_the_render): a Fruit Kick channel's
+// instrument never freed the engine it was playing (~300 KB each time a rack dropped or rebuilt the instrument: a project
+// opened or closed, the channel deleted). Measured here with glibc's heap counters; the sanitizer build's LSan reports it
+// on its own (no heap counters there).
+#if defined(__GLIBC__) && ! defined(LYNX_SANITIZER_BUILD)
+ #include <malloc.h>
+TEST (qa190rb_fruit_kick_instrument_frees_its_engine)
+{
+    using namespace lynx;
+    const auto kick = bankstates::channelFor ("fruitkick", { 100, -500, 70, 130, 20, 5 });
+    CHECK (kick.has_value());
+    if (! kick)
+        return;
+    std::vector<float> l (512), r (512);
+    const auto cycle = [&] {
+        auto inst = makeInstrument (InstrumentKind::fruitkick);
+        inst->prepare (48000.0);
+        inst->configure (*kick, 120.0);
+        inst->noteOn (60, 0.8f);
+        inst->render (l.data(), r.data(), 512, 1.0f, 1.0f); // (the engine is taken here)
+    };
+    cycle(); // (first-time caches)
+    const auto before = mallinfo2().uordblks;
+    for (int i = 0; i < 40; ++i)
+        cycle();
+    const auto grown = (long long) mallinfo2().uordblks - (long long) before;
+    CHECK (grown < 1024 * 1024); // (the leak was ~12 MB for 40 instruments)
+}
+#endif

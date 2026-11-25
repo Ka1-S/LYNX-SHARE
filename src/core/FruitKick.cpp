@@ -361,6 +361,7 @@ public:
     {
         delete incoming.exchange (nullptr);
         delete retired.exchange (nullptr);
+        delete engine; // (round 190rb, LeakSanitizer in the sanitizer suite: the engine playing was never freed, ~300 KB each)
     }
 
     void prepare (double sr) noexcept override
