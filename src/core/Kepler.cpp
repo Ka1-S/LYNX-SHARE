@@ -4178,7 +4178,7 @@ bool keplerStateUsable (const std::vector<std::uint8_t>& state) { return parseSt
 
 bool keplerDllUsable (const std::string& path) { return loadTables (path) != nullptr; }
 
-bool keplerExoWrapped (const std::vector<std::uint8_t>& state) { return exoWrapperSize (state) > 0; }
+bool keplerExoInFlWrapper (const std::vector<std::uint8_t>& state) { return exoWrapperSize (state) > 0; }
 
 bool keplerExoState (const std::vector<std::uint8_t>& state)
 {

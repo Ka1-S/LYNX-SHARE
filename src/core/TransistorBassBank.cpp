@@ -76,7 +76,6 @@ std::vector<Preset> transistorBassBank()
         make ("Acid Line", "Acid", tb303, { { cutoff, 0.45f }, { resonance, 0.72f }, { envMod, 0.62f }, { decay, 0.35f }, { accent, 0.7f } }, { "303", "saw" }),
         make ("Squelch Box", "Acid", tb303, { { cutoff, 0.3f }, { resonance, 0.92f }, { envMod, 0.8f }, { decay, 0.28f }, { accent, 0.85f } }, { "303", "resonant" }),
         make ("Hollow Acid", "Acid", tb303, { { waveform, 0.0f }, { cutoff, 0.42f }, { resonance, 0.78f }, { envMod, 0.6f }, { decay, 0.4f } }, { "square" }),
-        make ("Slow Wah", "Acid", extended, { { cutoff, 0.3f }, { resonance, 0.8f }, { envMod, 0.55f }, { decay, 0.8f } }, { "slow" }),
         make ("Rubber Bite", "Acid", extended, { { cutoff, 0.35f }, { resonance, 0.65f }, { envMod, 0.75f }, { decay, 0.2f }, { accent, 0.9f } }, { "short" }),
         make ("Silver Lead", "Acid", extended, { { tuning, 1.0f }, { cutoff, 0.5f }, { resonance, 0.75f }, { envMod, 0.4f }, { decay, 0.55f }, { delayOn, 1.0f } }, { "lead" }),
         make ("Rust Acid", "Driven", v1, { { cutoff, 0.4f }, { resonance, 0.7f }, { envMod, 0.6f }, { distOn, 1.0f }, { drive, 0.34f }, { distVolume, 0.90f } }, { "distortion" }),

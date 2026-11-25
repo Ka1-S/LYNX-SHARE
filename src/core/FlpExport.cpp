@@ -1141,7 +1141,7 @@ struct Converter
             if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)
                 if (const auto kit = fpc::read (c.pluginState))
                     c.pluginState = fpc::write (*kit);
-            if (def.instrument == InstrumentKind::keplerExo && ! keplerExoWrapped (c.pluginState))
+            if (def.instrument == InstrumentKind::keplerExo && ! keplerExoInFlWrapper (c.pluginState))
             {
                 c.pluginState.clear(); // (FL's own default: the plugin crashes on a state that is not in its wrapper)
                 report.notes.push_back (channelLabel (def, index) + ": its settings are not in FL's layout, so FL starts Kepler Exo on its default sound");
