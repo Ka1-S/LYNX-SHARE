@@ -1,0 +1,2 @@
+# UndefinedBehaviorSanitizer suppressions for the sanitizer build (round 190rb): third-party code only, one line each
+# with the reason. Never LYNX code: fix the UB instead.

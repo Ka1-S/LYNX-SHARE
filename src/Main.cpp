@@ -436,6 +436,17 @@ struct StartupTrace
 StartupTrace startupTrace;
 void startupMarkHook (const char* step) { startupTrace.mark (step); }
 
+// Round 190rb: a sanitizer build (-DLYNX_SANITIZE) leaves SIGSEGV / SIGBUS / SIGFPE / SIGABRT to ASan and UBSan (their
+// report names the bad access and where the memory came from); LYNX_CRASHGUARD=1 installs LYNX's handlers anyway
+bool sanitizerOwnsSignals()
+{
+#if defined(LYNX_SANITIZER_BUILD)
+    return juce::SystemStats::getEnvironmentVariable ("LYNX_CRASHGUARD", {}) != "1";
+#else
+    return false;
+#endif
+}
+
 juce::File crashFolderForTest; // --faulttest: where the crash file goes instead of the settings' autosave folder
 // Crashed: try to save the project and write the backtrace (like FL's "emergency save").
 void onCrash (void* exceptionPointers)
@@ -790,8 +801,11 @@ public:
             return;
         }
 
-        // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
-        juce::SystemStats::setApplicationCrashHandler (onCrash);
+        // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave. A sanitizer build
+        // (-DLYNX_SANITIZE, round 190rb) leaves the fault signals to ASan / UBSan, whose reports name the bad access,
+        // unless LYNX_CRASHGUARD=1 asks for LYNX's own handlers (their tests)
+        if (! sanitizerOwnsSignals())
+            juce::SystemStats::setApplicationCrashHandler (onCrash);
         // rollup step 12: the crash handler's watchdog and its allocation-free crash file (platform/CrashGuard.h)
         lynx::crashguard::prepareCrashWatchdog (lynx::platform::settingsFile ("autosave").getFullPathName().toStdString());
         // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
@@ -839,7 +853,8 @@ public:
             }
             lynx::crashguard::faultForTest (args[i + 1] == "unwalkable");
         }
-        lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
+        if (! sanitizerOwnsSignals())
+            lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
 
         // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
         lynx::sfz::setDecoder ([] (const std::string& path, lynx::sfz::Audio& out) {
