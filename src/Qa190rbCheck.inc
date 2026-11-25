@@ -152,6 +152,9 @@
                        dock->stepsRowsForCheck() == (int) simplesteps::kitRows (offline.getSong(), drums).size());
                 offline.dispatchPendingMessages();
             }
+            // (the layout style is the app's setting: back to the Pattern layout for the checks that follow)
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            offline.dispatchPendingMessages();
         }
         // ---- crash reports 52879e1b / a49ceeeb (0.1.29, Windows): DetailView::DeviceChain::paintBody named an effect
         //      card's knobs with effectInfo(kind).params[knob] while the card was a step behind the song (the slot's
@@ -209,6 +212,9 @@
                 offline.dispatchPendingMessages();
                 check ("Device View: the chain paints right after its channel was deleted", offline.getSong().channels.empty());
             }
+            // (the layout style is the app's setting: back to the Pattern layout for the checks that follow)
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            offline.dispatchPendingMessages();
         }
         // ---- UI monkey test, seed 101 (sanitizer build): heap-use-after-free in the Device View. A custom card (a Rack)
         //      asked for a new layout from inside its own resize; the layout replaced that very card (its channel's kind
@@ -283,6 +289,9 @@
                     card->poke();
                     check ("Device View: a card replaced while it asked for the layout is not deleted under its own code", ! deletedInside);
                 }
+                // (the layout style is the app's setting: back to the Pattern layout for the checks that follow)
+                ui.setLayoutStyle (layoutstyle::Style::pattern);
+                offline.dispatchPendingMessages();
             }
             DetailView::instrumentCardFactory = savedFactory;
         }
