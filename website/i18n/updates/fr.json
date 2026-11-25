@@ -1,4 +1,11 @@
 {
+"u.0.1.31.2.t": "Encore des corrections pour 0.1.31",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 corrige un plantage de la page d'accueil, le clavier de saisie au-dessus des plugins ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL et deux problèmes mineurs.",
+"u.0.1.31.2.f0": "Faire défiler la liste « Commencer un nouveau projet » de la page d'accueil ne fait plus planter LYNX sous Windows.",
+"u.0.1.31.2.f1": "Au-dessus d'un plugin ancré, le clavier de saisie joue de nouveau en premier quand le bouton clavier de la fenêtre le demande, comme dans une fenêtre détachée.",
+"u.0.1.31.2.f2": "Avec « Les clips de pattern étirés bouclent leur pattern » activé, les notes dessinées, collées ou déplacées après la première mesure d'un clip s'entendent : le pattern s'allonge pour les contenir.",
+"u.0.1.31.2.f3": "Playlist › « Déplacer les clips d'automation dans les pistes de leurs pistes » garde les valeurs que jouaient les clips, aussi sur de gros projets FL.",
+"u.0.1.31.2.f4": "« Gérer les raccourcis » s'ouvre avec le curseur dans sa recherche sur les bureaux Linux qui activent les fenêtres en retard (#244) ; Options › Réglages du clavier de saisie vers piano ouvre le menu Note fondamentale / Octave / Disposition quelle que soit la taille de la fenêtre (#270).",
 "u.0.1.31.1.t": "Corrections pour la 0.1.31",
 "u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 corrige ce que vous avez signalé sur la 0.1.31 : l'automation des projets FL sur les contrôles, des fenêtres de plugins qui ne s'ouvraient plus, la vue Device, l'export avec un dossier dans le nom du fichier, les clips des pistes d'instrument, un plantage dans la barre d'aide et la mémoire au démarrage.",
 "u.0.1.31.1.f0": "Les clips d'automation FL qui pilotent plusieurs contrôles, ou un seul via une formule, font bouger chaque contrôle piloté dans le mixeur, les fenêtres de plugins et la vue Device ; un contrôle bougé à la main affiche la valeur que l'on entend (#253).",

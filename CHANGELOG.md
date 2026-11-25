@@ -3,6 +3,29 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
+## 0.1.31.2 alpha — fixes
+
+A second hotfix for 0.1.31.
+
+- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX on a display at
+  125 % / 150 %: at a scale that is not a whole number the list also draws the row under its last one, and the list read
+  a template name past its end there (Discord).
+- Fixed: the typing keyboard played nothing over a docked plugin window (Discord). The keys a plugin leaves unused now
+  play the typing keyboard docked as well as detached; and with the window's keyboard button set to "LYNX first"
+  ("Allow the plugin to handle keystrokes before the host does" unticked) the typing keyboard takes its keys before a
+  VST / VST3 plugin, which never worked for those plugins, docked or detached.
+- Fixed: with "Stretched pattern clips loop their pattern" on, a clip drawn on an instrument track looped its first bar
+  for ever: notes drawn, pasted, moved or stretched past a pattern's set length are now heard, as the length grows to
+  whole bars that hold them, like a step past it already did; a clip saved that way is mended by the next edit in it
+  (Discord).
+- Fixed: Playlist › "Move automation clips into their tracks' lanes" put wrong values on the controls of big FL
+  projects; each lane now plays exactly what its clips played (FL's clip range and mapped controls, the value held
+  between clips, muted and overlapping clips) and stays within the engine's automation slots (Discord).
+- Fixed: "Manage shortcuts" and the other search windows opened without the caret in their search box on desktops that
+  activate a new window late (Linux, Wayland) (#244).
+- New: Options › *Typing keyboard settings* (and the same in the View menu): the typing keyboard button's right-click
+  menu (Root note, Octave, Layout), also for windows of 1280-1440 px whose toolbar has no room for that button (#270).
+
 ## 0.1.31.1 alpha — fixes
 
 A hotfix for 0.1.31.

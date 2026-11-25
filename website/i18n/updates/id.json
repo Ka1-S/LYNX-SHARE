@@ -1,4 +1,11 @@
 {
+"u.0.1.31.2.t": "Perbaikan lain untuk 0.1.31",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 memperbaiki crash di halaman awal, keyboard ketik ke piano di atas plugin yang di-dock, klip yang direntangkan yang mengulang bar pertamanya, lajur otomasi dari proyek FL, dan dua masalah kecil.",
+"u.0.1.31.2.f0": "Menggulir daftar \"Mulai proyek baru\" di halaman awal tidak lagi membuat LYNX crash di Windows.",
+"u.0.1.31.2.f1": "Di atas plugin yang di-dock, keyboard ketik ke piano kembali bermain lebih dulu bila tombol keyboard jendela mengaturnya begitu, seperti di jendela terpisah.",
+"u.0.1.31.2.f2": "Dengan \"Klip pattern yang direntangkan mengulang pattern-nya\" aktif, not yang digambar, ditempel, atau dipindah setelah bar pertama klip terdengar: pattern memanjang untuk memuatnya.",
+"u.0.1.31.2.f3": "Playlist › \"Pindahkan klip otomasi ke lajur trek-nya\" mempertahankan nilai yang dimainkan klip, juga pada proyek FL besar.",
+"u.0.1.31.2.f4": "\"Kelola pintasan\" terbuka dengan kursor di kotak pencarian pada desktop Linux yang mengaktifkan jendela terlambat (#244); Opsi › Pengaturan keyboard ketik ke piano membuka menu Nada dasar / Oktaf / Tata letak di ukuran jendela apa pun (#270).",
 "u.0.1.31.1.t": "Perbaikan untuk 0.1.31",
 "u.0.1.31.1.s": "LYNX SHARE 0.1.31.1 memperbaiki yang kamu laporkan di 0.1.31: automasi proyek FL pada kontrol, jendela plugin yang berhenti terbuka, tampilan Device, ekspor dengan folder di nama file, klip di track instrumen, crash di bilah petunjuk, dan memori saat mulai.",
 "u.0.1.31.1.f0": "Klip automasi FL yang menggerakkan beberapa kontrol, atau satu kontrol lewat formula, kini menggerakkan setiap kontrolnya di mixer, jendela plugin, dan tampilan Device; kontrol yang digeser dengan tangan menampilkan nilai yang terdengar (#253).",
