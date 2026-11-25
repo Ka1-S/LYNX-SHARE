@@ -224,7 +224,7 @@ std::vector<std::uint8_t> distructorState()
     distructor::State s;
     using distructor::ModuleType;
     s.modules = { distructor::defaultModule (ModuleType::distortion), distructor::defaultModule (ModuleType::filter),
-                  distructor::defaultModule (ModuleType::chorus), distructor::defaultModule (ModuleType::ampCab) };
+                  distructor::defaultModule (ModuleType::chorus), distructor::defaultModule (ModuleType::distortion) }; // (an amp / cabinet needs FL's impulses)
     return distructor::serialize (s);
 }
 } // namespace

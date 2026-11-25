@@ -30,7 +30,12 @@
         for (std::size_t i = 0; i < song.channels.size(); ++i)
         {
             const auto &a = song.channels[i], &b = back->channels[i];
-            if (a.instrument != b.instrument || a.pluginState != b.pluginState || a.samplePath != b.samplePath || a.modelParams != b.modelParams)
+            // (parameters kept as numbers are written as text: the last bits may go, as for every project; the engines of this
+            // round keep theirs in pluginState, byte for byte)
+            auto same = a.modelParams.size() == b.modelParams.size();
+            for (std::size_t k = 0; same && k < a.modelParams.size(); ++k)
+                same = std::abs (a.modelParams[k] - b.modelParams[k]) <= 1.0e-5f * std::max (1.0f, std::abs (a.modelParams[k]));
+            if (a.instrument != b.instrument || a.pluginState != b.pluginState || a.samplePath != b.samplePath || ! same)
                 return "ERROR " + juce::String (a.name) + ": not the same after saving and opening again";
         }
         for (std::size_t i = 0; i < song.mixer[1].effects.size(); ++i)

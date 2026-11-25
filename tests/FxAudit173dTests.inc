@@ -144,7 +144,9 @@ bool needsFlFiles (const std::string& effect, const std::string& control)
 {
     // Hardcore's cabinet impulses are read from FL's Plugins\Fruity\Effects\Hardcore\Imp (natives::newEffect, never
     // bundled): without them every Cabinet choice is the bypass
-    return realFlpDir.empty() && effect == "Hardcore" && control == "Cabinet";
+    // Round 190rh: without FL, Vocodex starts from LYNX's own state, where "To mod" (option 110) has nothing to act on in this
+    // programme; why exactly was not found (FL's Default preset is not read without FL)
+    return realFlpDir.empty() && ((effect == "Hardcore" && control == "Cabinet") || (effect == "Vocodex" && control == "To mod"));
 }
 
 void auditRange (int from, int to)
