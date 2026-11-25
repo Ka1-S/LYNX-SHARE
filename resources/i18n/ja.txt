@@ -13064,3 +13064,14 @@ countries: jp
 # rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
 "Let other apps on this PC control LYNX (Remote API)" = "このPCの他のアプリにLYNXの操作を許可する（リモートAPI）"
 "Line up recordings with the audio latency" = "録音をオーディオのレイテンシーに合わせる"
+# rollup 0.1.32 step 3 (round 190rg): the extras page lists #238's track colors and round 190qi's plugin / Browser lists
+"Tracks take a muted shade of the accent color" = "トラックにアクセントカラーの落ち着いた色合いを使う"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it. Also in Options › Theme." = "自分の色を持たないトラック、ミキサートラック、チャンネルはアクセントカラーの落ち着いた色合いになります。オフ、または LYNX 本来の赤のアクセントでは FL のグレーです。「トラック」ドットが優先されます。オプション › テーマにもあります。"
+"Recent plugins in the plugin lists" = "プラグイン一覧に最近使用したプラグインを表示"
+"The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here." = "最後に選んだ 8 個のプラグインを、クイック追加パレット、プラグインピッカー、空きスロットのミキサーメニュー、Channel rack の + メニューの先頭に表示します。FL Studio に「最近使用」リストはありません。切り替えはここだけです。"
+"One row per plugin installed in several formats" = "複数の形式で入っているプラグインを 1 行にまとめる"
+"A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "CLAP、VST3、VST でインストールされたプラグインは 1 行になります。新しく選ぶと CLAP、なければ VST3、なければ VST を読み込み、右クリックで別の形式を選べます。オフ（FL Studio と同じ）：ビルドごとに 1 行です。プロジェクトは保存されている形式のままです。切り替えはここだけです。"
+"MIDI files play when clicked in the Browser" = "ブラウザーでクリックした MIDI ファイルを再生"
+"A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "ブラウザーでクリックした .mid ファイル（または Space / 再生）を、選択中のチャンネルでプロジェクトのテンポに合わせて最大 30 秒再生します。オフ（FL Studio と同じ）：何も再生されません。切り替えはここだけです。"
+"Tab completes the Browser's search" = "Tab でブラウザーの検索を補完"
+"While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "ブラウザーの検索で入力中、タグ（#word）やフォルダー名の残りが文字の後ろにグレーで表示され、Tab で確定します。オフ：何も補完されません。切り替えはここだけです。"

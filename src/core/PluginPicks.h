@@ -22,6 +22,19 @@ namespace lynx::pluginpicks
 {
 constexpr int maxRecent = 8;
 
+// Rollup 0.1.32 step 3 (the owner's choice): Recent and the one row per plugin are LYNX extras with switches on
+// Settings › LYNX extras (core/LynxExtras.h "plugins.recent", "plugins.oneRow"), on by default (message thread)
+inline bool& recentShown() noexcept
+{
+    static bool on = true;
+    return on;
+}
+inline bool& oneRowPerPlugin() noexcept
+{
+    static bool on = true;
+    return on;
+}
+
 // `key` becomes the newest; an older copy of it goes, and the list keeps at most maxRecent keys.
 inline std::vector<std::string> pushRecent (std::vector<std::string> list, const std::string& key)
 {
@@ -107,14 +120,15 @@ struct Group
     int preferred() const noexcept { return members.empty() ? -1 : members.front(); }
 };
 
-inline std::vector<Group> groupByFormat (const std::vector<Item>& items)
+// (`merge` false: one row per build, as FL lists them; the "plugins.oneRow" extra switched off)
+inline std::vector<Group> groupByFormat (const std::vector<Item>& items, bool merge = oneRowPerPlugin())
 {
     std::vector<Group> groups;
     std::map<std::string, std::size_t> byKey;
     for (int i = 0; i < (int) items.size(); ++i)
     {
         const auto& it = items[(std::size_t) i];
-        if (formatRank (it.format) > 2 || it.name.empty())
+        if (! merge || formatRank (it.format) > 2 || it.name.empty())
         {
             groups.push_back ({ { i } });
             continue;

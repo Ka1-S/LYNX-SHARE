@@ -331,7 +331,7 @@ public:
         for (auto* list : { &instruments, &effects })
         {
             std::vector<Entry> recent;
-            for (const auto& key : host.recentPlugins())
+            for (const auto& key : pluginpicks::recentShown() ? host.recentPlugins() : std::vector<std::string>()) // (the extra's switch)
             {
                 if (host.isHidden (key))
                     continue;

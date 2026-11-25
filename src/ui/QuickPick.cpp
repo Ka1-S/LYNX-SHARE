@@ -201,7 +201,7 @@ bool recentItems (juce::PopupMenu& menu, AudioEngine& engine, const std::vector<
 {
     auto& host = engine.getPluginHost();
     bool any = false;
-    for (const auto& key : host.recentPlugins())
+    for (const auto& key : pluginpicks::recentShown() ? host.recentPlugins() : std::vector<std::string>()) // (the extra's switch)
     {
         if (host.isHidden (key))
             continue;

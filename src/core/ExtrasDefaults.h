@@ -43,6 +43,15 @@ inline constexpr std::string_view onSince0132[] = {
     "playlist.darkenMutedTracks",   // PR #268: a switched-off track's whole row steps back
     "mixer.peakValues",             // round 190qh: each strip's peak since a reset under its meter
     "mixer.correlation",            // round 190qh: a stereo correlation bar under each meter
+    // rollup 0.1.32 step 3, the owner's decisions: #287 (FL ignores a .mid dropped on its Playlist, so no FL gesture
+    // changes; on since 0.1.31.2's new profiles, here for every profile that kept 0.1.31's off), #238's track colors
+    // (kept in the theme) and round 190qi's LYNX-only plugin / Browser lists, which were always on
+    "playlist.midiDrop",            // #287: a .mid dropped on the Playlist becomes a pattern clip
+    "theme.tracksFromAccent",       // #238 (PR #261-#266, round 190qj): tracks take a muted shade of the accent
+    "plugins.recent",               // round 190qi: Recent in the plugin lists
+    "plugins.oneRow",               // round 190qi: one row per plugin across VST / VST3 / CLAP
+    "browser.midiPreview",          // round 190qi: a .mid clicked in the Browser plays
+    "browser.tabCompletes",         // round 190qi: Tab completes the Browser's search
 };
 // On by default before 0.1.32 too: FL Studio's own behaviour (Esc, the start page), the Simple layout's loops (BandLab),
 // and the stretched clips' loop (issue #25, the owner's choice)

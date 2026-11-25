@@ -18,17 +18,22 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 8);
+    CHECK (std::size (extras::onSince0132) == 14);
     // the eight turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
     // and PR #268's veils and round 190qh's two Mixer views)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
                             "simple.projectName", "controlBar.liveScale", "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks",
                             "mixer.peakValues", "mixer.correlation" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
+    // rollup 0.1.32 step 3, the owner's decisions: #287's MIDI drop (FL ignores a .mid dropped there), #238's track colors
+    // and round 190qi's LYNX-only plugin / Browser lists are on too; FL-exact turns them off
+    for (const auto* id : { "playlist.midiDrop", "theme.tracksFromAccent", "plugins.recent", "plugins.oneRow", "browser.midiPreview",
+                            "browser.tabCompletes" })
+        CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",
                             "playlist.rulerSeeksAnyTool", "playlist.rangeEdits", "playlist.headerWidth", "playlist.pointerClick",
-                            "playlist.midiDrop", "project.linkTracks", "project.clipLaunchStrips", "mixer.followPlaylist",
+                            "project.linkTracks", "project.clipLaunchStrips", "mixer.followPlaylist",
                             "mixer.keepLostLinks", "record.lastLoopPassPlays", "playlist.clipLanesFolded", "mixer.loudness", "midi.gamepad",
                             "polyEdit.prepareOnOpen", "layout.trackOnly",
                             "playlist.shadeFadedAudio", "general.hoverValues", // (visual, but over the paint / idle CPU gates)
@@ -41,7 +46,7 @@ TEST (extras190qk_default_lists)
     CHECK (! extras::flExactOn ("general.stretchedClipsLoop") && extras::defaultOn ("general.stretchedClipsLoop"));
     // every extra but the game controller and the Soft look (round 190qw: kept in the theme) is kept in ui-options.txt
     for (const auto& item : extras::items)
-        CHECK (extras::uiKeyOf (item).empty() == (item.id == "midi.gamepad" || item.id == "theme.softLook"));
+        CHECK (extras::uiKeyOf (item).empty() == (item.id == "midi.gamepad" || item.id == "theme.softLook" || item.id == "theme.tracksFromAccent"));
     // the Soft look (round 190qw) is off by default and in FL-exact
     CHECK (! extras::defaultOn ("theme.softLook") && ! extras::flExactOn ("theme.softLook"));
 }

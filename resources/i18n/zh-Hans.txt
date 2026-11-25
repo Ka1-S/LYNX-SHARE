@@ -13064,3 +13064,14 @@ countries: cn sg
 # rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
 "Let other apps on this PC control LYNX (Remote API)" = "允许此电脑上的其他应用控制 LYNX（远程 API）"
 "Line up recordings with the audio latency" = "按音频延迟对齐录音"
+# rollup 0.1.32 step 3 (round 190rg): the extras page lists #238's track colors and round 190qi's plugin / Browser lists
+"Tracks take a muted shade of the accent color" = "轨道使用强调色的柔和色调"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it. Also in Options › Theme." = "没有自身颜色的轨道、混音器轨道和通道使用强调色的柔和色调。关闭时，或使用 LYNX 自带的红色强调色时：FL 的灰色。“轨道”色点优先。也在选项 › 主题中。"
+"Recent plugins in the plugin lists" = "插件列表中显示最近使用的插件"
+"The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here." = "你最近选择的 8 个插件，显示在快速添加面板、插件选择器、空混音器插槽的菜单和 Channel rack 的 + 菜单顶部。FL Studio 没有最近使用列表。唯一的开关在这里。"
+"One row per plugin installed in several formats" = "多种格式安装的插件只占一行"
+"A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "同时以 CLAP、VST3 和 VST 安装的插件只占一行：新选择时加载 CLAP，否则 VST3，否则 VST，右键可选其他格式。关闭（与 FL Studio 相同）：每个构建一行。工程保留其原有格式。唯一的开关在这里。"
+"MIDI files play when clicked in the Browser" = "在浏览器中点击 MIDI 文件即可播放"
+"A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "在浏览器中点击的 .mid 文件（或按空格 / 播放）会在选中的通道上按工程速度播放其音符，最长 30 秒。关闭（与 FL Studio 相同）：不播放任何内容。唯一的开关在这里。"
+"Tab completes the Browser's search" = "Tab 补全浏览器搜索"
+"While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "在浏览器搜索中输入时，标签（#word）或文件夹名称的其余部分会以灰色显示在文字后面，按 Tab 即可接受。关闭：不补全任何内容。唯一的开关在这里。"

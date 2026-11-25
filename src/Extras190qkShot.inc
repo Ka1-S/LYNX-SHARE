@@ -42,7 +42,11 @@
                        && on ("simple.projectName") && on ("controlBar.liveScale") && ! GeneralOptions {}.hoverValues);
             check ("new profile: the gesture / shortcut / file extras are off",
                    ! on ("playlist.wheelZones") && ! on ("editing.tempTools") && ! on ("transport.wToStart") && ! on ("playlist.rangeEdits")
-                       && ! on ("playlist.headerWidth") && ! on ("playlist.midiDrop") && ! on ("project.linkTracks"));
+                       && ! on ("playlist.headerWidth") && ! on ("project.linkTracks"));
+            // rollup 0.1.32 step 3 (the owner's decisions): #287's MIDI drop, #238's track colors, round 190qi's lists: on
+            check ("new profile: #287 MIDI drop, #238 track colors and round 190qi's plugin / Browser lists are on",
+                   on ("playlist.midiDrop") && on ("theme.tracksFromAccent") && on ("plugins.recent") && on ("plugins.oneRow")
+                       && on ("browser.midiPreview") && on ("browser.tabCompletes"));
             auto page = makeExtrasPage (engine, {}, false);
             page->setSize (760, 4800);
             const auto find = [&page] (const juce::String& id) {

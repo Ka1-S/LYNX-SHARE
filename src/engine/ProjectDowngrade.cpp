@@ -2391,6 +2391,11 @@ void toRelease0130 (juce::var& root, Losses& lost)
 // channels −2, which 0.1.31 refuses and stretches again; the stream cache's .R.same marker leaves no .R.pcm, which 0.1.31
 // takes for a missing cache and decodes again), 190qh's views (ui-options), Touch mode (ui-options), the new-track slot
 // count (ui-options), 190pz's recording sync.
+// Kept as it is, without a line (rollup 0.1.32 step 3): round 190qt's "flTrialSaved" (a project from an FL trial save;
+// 0.1.31 ignores the key, so only the trial mark of a later Export to FL Studio from 0.1.31 is lost, as with 0.1.31.1's
+// FlOrigin "trial"; a copy opened again here keeps it). Not in projects: round 190qx's settings index and tips (settings
+// folder, ui-options), round 190qw's Soft look (.lynxtheme "look", which 0.1.31 ignores), the extras' new ui-options keys,
+// round 190rc's and round 190rb's fixes, round 190rd's caches of the paint (in memory).
 void toRelease0131 (juce::var& root, Losses& lost)
 {
     slotsFor0131 (root, lost); // (first, so the later steps see 10 slots at most)

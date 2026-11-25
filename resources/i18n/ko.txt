@@ -13064,3 +13064,14 @@ countries: kr
 # rollup 0.1.32 step 3 (round 190rg): the owner's wordings for two of round 190qw's rename proposals
 "Let other apps on this PC control LYNX (Remote API)" = "이 PC의 다른 앱이 LYNX를 제어하도록 허용 (원격 API)"
 "Line up recordings with the audio latency" = "녹음을 오디오 지연 시간에 맞추기"
+# rollup 0.1.32 step 3 (round 190rg): the extras page lists #238's track colors and round 190qi's plugin / Browser lists
+"Tracks take a muted shade of the accent color" = "트랙에 강조 색의 차분한 색조 사용"
+"Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it. Also in Options › Theme." = "자체 색이 없는 트랙, 믹서 트랙, 채널은 강조 색의 차분한 색조를 사용합니다. 끄거나 LYNX 기본 빨강 강조 색이면 FL의 회색입니다. 트랙 점이 우선합니다. 옵션 › 테마에도 있습니다."
+"Recent plugins in the plugin lists" = "플러그인 목록에 최근 플러그인 표시"
+"The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here." = "최근에 고른 플러그인 8개를 빠른 추가 팔레트, 플러그인 선택기, 빈 슬롯의 믹서 메뉴, Channel rack의 + 메뉴 맨 위에 표시합니다. FL Studio에는 최근 목록이 없습니다. 전환은 여기에서만 할 수 있습니다."
+"One row per plugin installed in several formats" = "여러 형식으로 설치된 플러그인은 한 줄로"
+"A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "CLAP, VST3, VST로 설치된 플러그인은 한 줄이 됩니다. 새로 고르면 CLAP, 없으면 VST3, 없으면 VST를 불러오며, 오른쪽 클릭으로 다른 형식을 고를 수 있습니다. 끔(FL Studio와 같음): 빌드마다 한 줄입니다. 프로젝트는 저장된 형식을 유지합니다. 전환은 여기에서만 할 수 있습니다."
+"MIDI files play when clicked in the Browser" = "브라우저에서 클릭한 MIDI 파일 재생"
+"A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "브라우저에서 클릭한 .mid 파일(또는 Space / 재생)을 선택한 채널에서 프로젝트 템포로 최대 30초 동안 재생합니다. 끔(FL Studio와 같음): 아무것도 재생되지 않습니다. 전환은 여기에서만 할 수 있습니다."
+"Tab completes the Browser's search" = "Tab으로 브라우저 검색 자동 완성"
+"While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "브라우저 검색창에 입력하는 동안 태그(#word)나 폴더 이름의 나머지가 글자 뒤에 회색으로 표시되고, Tab으로 확정합니다. 끔: 아무것도 완성되지 않습니다. 전환은 여기에서만 할 수 있습니다."

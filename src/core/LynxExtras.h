@@ -240,6 +240,23 @@ inline constexpr Item items[] = {
     { "theme.softLook", TR_NOOP ("Appearance"), TR_NOOP ("Soft look (flat, muted colors, slimmer rows)"),
       TR_NOOP ("Flat steps and buttons, muted track, pattern and channel colors, slimmer Channel rack rows and plugin header, close to how LYNX 0.1.29 looked. The FL-like look stays the default. Also in Options › Theme › Appearance."),
       "theme.lynxtheme:look" },
+    // rollup 0.1.32 step 3 (the owner's step-2 decisions): issue #238's theme option (round 190qj, kept in the theme) and
+    // round 190qi's picker / Browser extras (LYNX-only lists; they had no switch), at their defaults: on
+    { "theme.tracksFromAccent", TR_NOOP ("Appearance"), TR_NOOP ("Tracks take a muted shade of the accent color"),
+      TR_NOOP ("Tracks, mixer tracks and channels without a color of their own take a muted shade of the accent. Off, or with LYNX's own red accent: FL's grey. The Tracks dot overrides it. Also in Options › Theme."),
+      "theme.lynxtheme:tracksFromAccent" },
+    { "plugins.recent", TR_NOOP ("Plugins"), TR_NOOP ("Recent plugins in the plugin lists"),
+      TR_NOOP ("The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here."),
+      "ui-options.txt:pluginRecent" },
+    { "plugins.oneRow", TR_NOOP ("Plugins"), TR_NOOP ("One row per plugin installed in several formats"),
+      TR_NOOP ("A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here."),
+      "ui-options.txt:pluginOneRow" },
+    { "browser.midiPreview", TR_NOOP ("Browser"), TR_NOOP ("MIDI files play when clicked in the Browser"),
+      TR_NOOP ("A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here."),
+      "ui-options.txt:browserMidiPreview" },
+    { "browser.tabCompletes", TR_NOOP ("Browser"), TR_NOOP ("Tab completes the Browser's search"),
+      TR_NOOP ("While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here."),
+      "ui-options.txt:browserTabCompletes" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },
@@ -247,9 +264,9 @@ inline constexpr Item items[] = {
 
 // Round 190qx (the owner's "make the options easy"): the page shows the extras grouped by area, in this order (the list
 // above is in the order the extras landed, so one area's items are spread over it). A section missing here goes last.
-inline constexpr std::string_view sectionOrder[] = { TR_NOOP ("Windows"),     TR_NOOP ("Toolbar"),     TR_NOOP ("Editing"),     TR_NOOP ("Transport"),
+inline constexpr std::string_view sectionOrder[] = { TR_NOOP ("Windows"),     TR_NOOP ("Appearance"),  TR_NOOP ("Toolbar"),     TR_NOOP ("Editing"),     TR_NOOP ("Transport"),
                                                      TR_NOOP ("Playlist"),    TR_NOOP ("Piano Roll"),  TR_NOOP ("Mixer"),       TR_NOOP ("Audio editor"),
-                                                     TR_NOOP ("Recording"),   TR_NOOP ("Export"),      TR_NOOP ("Files"),       TR_NOOP ("Device view"),
+                                                     TR_NOOP ("Recording"),   TR_NOOP ("Export"),      TR_NOOP ("Files"),       TR_NOOP ("Browser"),     TR_NOOP ("Plugins"),       TR_NOOP ("Device view"),
                                                      TR_NOOP ("Clip-launch workflow"), TR_NOOP ("Simple workflow"), TR_NOOP ("Controllers") };
 
 constexpr int sectionRank (std::string_view section) noexcept

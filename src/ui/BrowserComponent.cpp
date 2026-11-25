@@ -5987,7 +5987,7 @@ void BrowserComponent::fileSelected (const juce::File& file, bool preview)
         stopMidiPreview();
     if (isMidiFile190qi (file))
     {
-        if (preview && file.existsAsFile())
+        if (preview && file.existsAsFile() && midipreview::enabled()) // (rollup 0.1.32 step 3: the extra's switch)
         {
             engine.previewFile ({}); // (the sample preview stops, as one preview replaces another)
             startMidiPreview (file);

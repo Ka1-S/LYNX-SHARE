@@ -17,6 +17,14 @@
 
 namespace lynx::midipreview
 {
+// Rollup 0.1.32 step 3 (the owner's choice): a LYNX extra with a switch on Settings › LYNX extras ("browser.midiPreview"),
+// on by default; off, a MIDI file clicked in the Browser plays nothing, as in FL Studio (message thread)
+inline bool& enabled() noexcept
+{
+    static bool on = true;
+    return on;
+}
+
 struct Event
 {
     double ms = 0.0; // from the preview's start

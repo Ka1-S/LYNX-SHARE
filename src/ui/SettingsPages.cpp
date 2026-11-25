@@ -3240,6 +3240,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "simple.touchMode") return ui::touchmode::enabled(); // round 190pm (P23)
     if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
     if (id == "theme.softLook") return themeui::current().soft; // round 190qw (queue item 67)
+    if (id == "theme.tracksFromAccent") return themeui::current().tracksFromAccent; // issue #238 (round 190qj; listed in rollup 0.1.32 step 3)
     return false;
 }
 
@@ -3261,6 +3262,13 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     {
         auto spec = themeui::current();
         spec.soft = on;
+        themeui::apply (spec, persistent);
+        return;
+    }
+    if (id == "theme.tracksFromAccent") // issue #238 (round 190qj; listed in rollup 0.1.32 step 3): as Options › Theme sets it
+    {
+        auto spec = themeui::current();
+        spec.tracksFromAccent = on;
         themeui::apply (spec, persistent);
         return;
     }

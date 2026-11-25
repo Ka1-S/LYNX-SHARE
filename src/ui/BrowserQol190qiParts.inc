@@ -16,7 +16,7 @@ void BrowserComponent::updateSearchSuggestion (bool evenWithoutFocus)
     // listed so far, then the tags), only while the caret is at the end of what is typed
     juce::String rest, suggestion;
     const auto text = searchBox.getText();
-    if (text.isNotEmpty() && (evenWithoutFocus || searchBox.hasKeyboardFocus (true)) && searchBox.getCaretPosition() >= text.length() && similarTo == juce::File())
+    if (browsertags::tabCompletes() && text.isNotEmpty() && (evenWithoutFocus || searchBox.hasKeyboardFocus (true)) && searchBox.getCaretPosition() >= text.length() && similarTo == juce::File())
     {
         std::vector<std::string> tags;
         for (const auto& t : shownTags().all())

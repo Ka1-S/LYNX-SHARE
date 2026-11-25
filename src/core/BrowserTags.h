@@ -26,6 +26,14 @@
 
 namespace lynx::browsertags
 {
+// Rollup 0.1.32 step 3 (the owner's choice): the search box's Tab completion (round 190qi) is a LYNX extra with a switch
+// on Settings › LYNX extras ("browser.tabCompletes"), on by default; off, nothing shows greyed and Tab does what it did
+inline bool& tabCompletes() noexcept
+{
+    static bool on = true;
+    return on;
+}
+
 namespace detail
 {
 inline std::string lower (std::string s)

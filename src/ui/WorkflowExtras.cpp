@@ -29,6 +29,9 @@
 #include "core/ZoomAnchor.h" // round 190qr (#276)
 #include "core/ExportDone.h" // round 190qr (#280)
 #include "core/ClipHandle.h" // round 190qr (#274)
+#include "core/PluginPicks.h" // round 190qi (rollup 0.1.32 step 3: the extras' switches)
+#include "core/MidiPreview.h"
+#include "core/BrowserTags.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -173,6 +176,14 @@ bool readUiOption (const juce::String& key, bool on)
         saveextras::setExportNoDialog (on);
     else if (key == "simpleDropStrip") // round 190qu (Discord 11-24): the Simple drop strip under the tracks, always
         simpletracks::dropStripAlways = on;
+    else if (key == "pluginRecent") // round 190qi's lists (rollup 0.1.32 step 3: switches on the extras page)
+        pluginpicks::recentShown() = on;
+    else if (key == "pluginOneRow")
+        pluginpicks::oneRowPerPlugin() = on;
+    else if (key == "browserMidiPreview")
+        midipreview::enabled() = on;
+    else if (key == "browserTabCompletes")
+        browsertags::tabCompletes() = on;
     else
         return false;
     return true;
@@ -214,7 +225,10 @@ juce::String uiOptionsText()
            + "\nrangeEdits=" + juce::String (rangeedit::patternLayoutOn() ? 1 : 0) // (round 190pa, P14)
            + "\nalwaysCollect=" + juce::String (saveextras::alwaysCollect() ? 1 : 0) // (round 190qo, issue #251)
            + "\nexportNoDialog=" + juce::String (saveextras::exportNoDialog() ? 1 : 0) // (round 190qo, issue #215)
-           + "\nsimpleDropStrip=" + juce::String (simpletracks::dropStripAlways ? 1 : 0); // (round 190qu)
+           + "\nsimpleDropStrip=" + juce::String (simpletracks::dropStripAlways ? 1 : 0) // (round 190qu)
+           // (round 190qi's lists; rollup 0.1.32 step 3)
+           + "\npluginRecent=" + juce::String (pluginpicks::recentShown() ? 1 : 0) + "\npluginOneRow=" + juce::String (pluginpicks::oneRowPerPlugin() ? 1 : 0)
+           + "\nbrowserMidiPreview=" + juce::String (midipreview::enabled() ? 1 : 0) + "\nbrowserTabCompletes=" + juce::String (browsertags::tabCompletes() ? 1 : 0);
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -275,6 +289,14 @@ std::optional<bool> extraOn (std::string_view id)
         return saveextras::exportNoDialog();
     if (id == "simple.dropStrip") // round 190qu
         return simpletracks::dropStripAlways;
+    if (id == "plugins.recent") // round 190qi (rollup 0.1.32 step 3)
+        return pluginpicks::recentShown();
+    if (id == "plugins.oneRow")
+        return pluginpicks::oneRowPerPlugin();
+    if (id == "browser.midiPreview")
+        return midipreview::enabled();
+    if (id == "browser.tabCompletes")
+        return browsertags::tabCompletes();
     return std::nullopt;
 }
 
@@ -340,6 +362,14 @@ bool setExtra (std::string_view id, bool on)
         saveextras::setExportNoDialog (on);
     else if (id == "simple.dropStrip") // round 190qu
         simpletracks::dropStripAlways = on;
+    else if (id == "plugins.recent") // round 190qi's lists (rollup 0.1.32 step 3; the lists read them when they open)
+        pluginpicks::recentShown() = on;
+    else if (id == "plugins.oneRow")
+        pluginpicks::oneRowPerPlugin() = on;
+    else if (id == "browser.midiPreview")
+        midipreview::enabled() = on;
+    else if (id == "browser.tabCompletes")
+        browsertags::tabCompletes() = on;
     else
         return false;
     if (onChanged)

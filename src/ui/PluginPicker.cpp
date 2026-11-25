@@ -494,7 +494,8 @@ private:
         for (int i = 0; i < (int) entries.size(); ++i)
             favouriteCount += entries[(std::size_t) i].instrument == instruments && isFavouriteEntry (i) ? 1 : 0;
         groupRows.push_back ({ Group::Kind::favourites, {}, favouriteCount });
-        groupRows.push_back ({ Group::Kind::recent, {}, (int) recentRows ({}).size() }); // round 190qi
+        if (pluginpicks::recentShown()) // (rollup 0.1.32 step 3: the extra's switch)
+            groupRows.push_back ({ Group::Kind::recent, {}, (int) recentRows ({}).size() }); // round 190qi
         groupRows.push_back ({ Group::Kind::heading, TR_NOOP ("Categories"), 0 });
         for (const auto& c : plugincatalog::categories (instruments))
             groupRows.push_back ({ Group::Kind::category, c, plugincatalog::countIn (entries, instruments, c) });
@@ -582,7 +583,7 @@ private:
         f.query = query;
         f.favouritesFirst = false;
         const auto passing = plugincatalog::select (entries, {}, f);
-        for (const auto& key : engine.getPluginHost().recentPlugins())
+        for (const auto& key : pluginpicks::recentShown() ? engine.getPluginHost().recentPlugins() : std::vector<std::string>()) // (the extra's switch)
         {
             const auto entry = entryWithBuild (key);
             if (entry < 0 || std::find (passing.begin(), passing.end(), entry) == passing.end()

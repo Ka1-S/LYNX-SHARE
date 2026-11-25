@@ -9891,6 +9891,22 @@ private:
             if (rollup032Result == "OK")
                 if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.31"); ! plain.ok || ! plain.lost.empty())
                     rollup032Result = "ERROR lines for the default song (" + juce::String ((int) plain.lost.size()) + ")";
+            // rollup 0.1.32 step 3 (round 190qt): a project from an FL trial save keeps "flTrialSaved" in every copy and gets no
+            // line: 0.1.31 and older ignore the key (only the trial mark of a later Export to FL Studio from that release is
+            // lost, as 0.1.31.1's FlOrigin trial key); the copy reads back as the same project
+            if (rollup032Result == "OK")
+            {
+                auto trial = lynx::Song::makeDefault();
+                trial.flTrialSaved = true;
+                for (const auto* release : { "0.1.31", "0.1.30", "0.1.28" })
+                {
+                    const auto copy = lynx::olderlynx::forRelease (trial, release);
+                    juce::String why;
+                    const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+                    if (! copy.ok || ! copy.lost.empty() || ! back || ! back->flTrialSaved)
+                        rollup032Result = "ERROR the trial mark (round 190qt) in the copy for " + juce::String (release) + " " + copy.error + why;
+                }
+            }
 
             // round 190px's caches (not in projects; what 0.1.31 does with them)
             if (rollup032Result == "OK")
