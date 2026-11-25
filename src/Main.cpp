@@ -18405,13 +18405,16 @@ private:
         };
         // (the recursion through the message loop; written out so each step lets the engine's timer run)
         auto drive = std::make_shared<std::function<void (std::shared_ptr<Pass>)>>();
-        *drive = [this, runPass, drive, device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
+        // (round 190rf: the step holds itself weakly, the timer's call strongly: a strong self-capture never freed the passes'
+        // takes, ~4 MB, LeakSanitizer in the sanitizer sweep)
+        *drive = [this, runPass, weakDrive = std::weak_ptr (drive), device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
             if (engine == nullptr)
                 return;
             (*runPass) (pass);
             if (pass->block < pass->blocks)
             {
-                juce::Timer::callAfterDelay (40, [pass, drive] { (*drive) (pass); });
+                if (auto self = weakDrive.lock())
+                    juce::Timer::callAfterDelay (40, [pass, self] { (*self) (pass); });
                 return;
             }
             engine->stop();
@@ -18443,7 +18446,10 @@ private:
                 return;
             auto first = std::make_shared<Pass>();
             first->blocks = (int) (rate * 18.0 / n); // count-in + 8 bars
-            first->done = [this, first, step, finish, drive, onsets] {
+            first->done = [this, weakFirst = std::weak_ptr (first), step, finish, drive, onsets] { // (round 190rf: not itself)
+                const auto first = weakFirst.lock();
+                if (first == nullptr)
+                    return;
                 const auto clicks = onsets (first->out);
                 juce::String list;
                 for (std::size_t i = 0; i < std::min<std::size_t> (clicks.size(), 8); ++i)
@@ -33889,7 +33895,8 @@ private:
         check ("Mapping Browser: 2 project rows, then 3 global ones (" + juce::String ((int) shown.size()) + ")",
                shown.size() == 5 && ! shown[0].global && ! shown[1].global && shown[2].global && shown[4].global);
         {
-            const auto* ticked = find (list->rowMenu (2), everyProject);
+            const auto rowMenu = list->rowMenu (2); // (round 190rf: kept while its item is read; ASan, heap-use-after-free)
+            const auto* ticked = find (rowMenu, everyProject);
             check ("a global row's item is ticked", ticked != nullptr && ticked->isTicked);
         }
         write (*list, "b9-02-mapping-browser-global");
