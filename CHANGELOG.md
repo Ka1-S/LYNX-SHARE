@@ -7,9 +7,9 @@ The short version of each release. The full notes, with measurements, known issu
 
 A second hotfix for 0.1.31.
 
-- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX on a display at
-  125 % / 150 %: at a scale that is not a whole number the list also draws the row under its last one, and the list read
-  a template name past its end there (Discord).
+- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX: drawn at a scale
+  that is not a whole number (a display at 125 % / 150 %, LYNX's zoom), a list can also draw the row under its last one,
+  and the template list read a template name past its end there (Discord).
 - Fixed: the typing keyboard played nothing over a docked plugin window (Discord). The keys a plugin leaves unused now
   play the typing keyboard docked as well as detached; and with the window's keyboard button set to "LYNX first"
   ("Allow the plugin to handle keystrokes before the host does" unticked) the typing keyboard takes its keys before a
