@@ -20195,7 +20195,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it")) // (round 190ic: a GarageBand .band folder too; 190nw: a module)
+        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject")) // (round 190ic: a GarageBand .band folder too; 190nw: a module; 190ri: a DAWproject)
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -24558,7 +24558,7 @@ private:
             lynx::AudioEngine loader (false);
             const juce::File input (inputPath);
             // a Live set opens through the same import as an .flp (as File › Open does, and --export-als accepts an .flp)
-            if (input.hasFileExtension ("flp;als"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject")) // (round 190ri: every format File › Open imports)
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
