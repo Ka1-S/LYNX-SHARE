@@ -162,15 +162,15 @@ struct Writer
             articulator (k, k == 1 ? part.volume : k == 4 ? part.filter : Envelope {});
         for (const auto& c : part.curves)
             curve (3, c, { 0, -1, -1, -1, -1 });
-        // an empty image (version, mode, loop, gain, three times, columns, rows) and no file name
+        // an empty image (REA_rodada75 §1.1): version, mode, loop mode, gain, loop start / end / crossfade, columns, rows, three
+        // planes of no pixels; then no file name
         for (int v = 0; v < 3; ++v)
             i (0);
         put (0.0f);
-        for (int v = 0; v < 3; ++v)
-            put (0.0);
-        i (0);
-        i (0);
-        i (0);
+        for (const double v : { -1.0, -1.0, 0.0 })
+            put (v);
+        for (int v = 0; v < 2 + 3; ++v)
+            i (0);
         out.push_back (0);
         const auto size = (std::int32_t) (out.size() - sizeAt - 4);
         std::memcpy (out.data() + sizeAt, &size, 4);
