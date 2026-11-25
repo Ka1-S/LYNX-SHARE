@@ -5,6 +5,6 @@
 "u.0.1.31.2.f1": "Com o botão de teclado da janela de um plugin em \"LYNX primeiro\" (\"Permitir que o plugin trate as teclas antes do host\" desligado), o teclado do PC como piano agora recebe suas teclas antes de um plugin VST3 encaixado.",
 "u.0.1.31.2.f2": "Com \"Clipes de pattern esticados repetem o pattern\" ligado, notas desenhadas, coladas ou movidas depois do primeiro compasso de um clipe são ouvidas: o pattern cresce para contê-las.",
 "u.0.1.31.2.f3": "Playlist › \"Mover clipes de automação para as faixas das suas trilhas\" mantém os valores que os clipes tocavam, também em projetos grandes do FL.",
-"u.0.1.31.2.f4": "\"Gerenciar atalhos\" abre com o cursor na caixa de busca em desktops Linux que ativam janelas com atraso (#244); Opções › Configurações do teclado do PC como piano abre o menu Nota raiz / Oitava / Layout em qualquer tamanho de janela (#270).",
+"u.0.1.31.2.f4": "\"Gerenciar atalhos\" agora deve abrir com o cursor na caixa de busca em desktops que ativam janelas novas com atraso (#244; testado só por simulação); Opções › Configurações do teclado do PC como piano abre o menu Nota raiz / Oitava / Layout em qualquer tamanho de janela (#270).",
 "u.0.1.31.2.f5": "Exportar para o FL Studio deixa de fora uma pasta de dados do projeto que não existe neste computador (o FL 2026 parava em \"Invalid project data folder\"); um preset do FL de um sintetizador nativo clicado no Browser abre esse sintetizador com o preset (#288); arquivos MIDI soltos na Playlist viram clipes de pattern por padrão (#287)."
 }

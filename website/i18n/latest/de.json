@@ -5,6 +5,6 @@
 "u.0.1.31.2.f1": "Steht die Tastaturtaste eines Pluginfensters auf „LYNX zuerst“ („Dem Plugin erlauben, Tastendrücke vor dem Host zu verarbeiten“ aus), erhält die Schreibtastatur ihre Tasten jetzt vor einem angedockten VST3-Plugin.",
 "u.0.1.31.2.f2": "Mit „Gedehnte Pattern-Clips wiederholen ihr Pattern“ werden Noten, die nach dem ersten Takt eines Clips gezeichnet, eingefügt oder verschoben werden, gehört: das Pattern wächst mit.",
 "u.0.1.31.2.f3": "Playlist › „Automationsclips in die Spuren ihrer Tracks verschieben“ behält die Werte, die die Clips spielten, auch bei großen FL-Projekten.",
-"u.0.1.31.2.f4": "„Tastenkürzel verwalten“ öffnet sich mit dem Cursor im Suchfeld auf Linux-Desktops, die Fenster verspätet aktivieren (#244); Optionen › Einstellungen: Tastatur als Klavier öffnet das Menü Grundton / Oktave / Layout bei jeder Fenstergröße (#270).",
+"u.0.1.31.2.f4": "„Tastenkürzel verwalten“ sollte sich jetzt mit dem Cursor im Suchfeld öffnen, auf Desktops, die neue Fenster verspätet aktivieren (#244; nur per Simulation getestet); Optionen › Einstellungen: Tastatur als Klavier öffnet das Menü Grundton / Oktave / Layout bei jeder Fenstergröße (#270).",
 "u.0.1.31.2.f5": "Der Export nach FL Studio lässt einen Projektdatenordner weg, den es auf diesem Computer nicht gibt (FL 2026 stoppte bei „Invalid project data folder“); ein im Browser angeklicktes FL-Preset eines eingebauten Synths öffnet diesen Synth mit dem Preset (#288); auf die Playlist gezogene MIDI-Dateien werden standardmäßig zu Pattern-Clips (#287)."
 }

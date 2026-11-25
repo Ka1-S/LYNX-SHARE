@@ -13,7 +13,7 @@
       "With a plugin window's keyboard button on \"LYNX first\" (\"Allow the plugin to handle keystrokes before the host does\" off), the typing keyboard now takes its keys before a docked VST3 plugin.",
       "With \"Stretched pattern clips loop their pattern\" on, notes drawn, pasted or moved past a clip's first bar are heard: the pattern grows to hold them.",
       "Playlist › \"Move automation clips into their tracks' lanes\" keeps the values the clips played, also on big FL projects.",
-      "\"Manage shortcuts\" opens with the caret in its search box on Linux desktops that activate windows late (#244); Options › Typing keyboard settings opens the Root note / Octave / Layout menu on any window size (#270).",
+      "\"Manage shortcuts\" should now open with the caret in its search box on desktops that activate new windows late (#244; tested by simulation only); Options › Typing keyboard settings opens the Root note / Octave / Layout menu on any window size (#270).",
       "Export to FL Studio leaves out a project data folder that isn't on this computer (FL 2026 stopped at \"Invalid project data folder\"); an FL preset of a stock synth clicked in the Browser opens that synth with the preset (#288); MIDI files dropped on the Playlist become pattern clips by default (#287)."
     ],
     "known": []
