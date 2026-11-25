@@ -13106,3 +13106,4 @@ countries: ru by kz
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "Эта папка не является установкой FL Studio: {0}. Выберите папку с FL64.exe и Data. Ничего не изменено."
 "More than one FL Studio: choose one" = "Несколько FL Studio: выберите одну"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "FL Studio не найдена ни в обычных местах, ни на подключённых дисках. Нажмите «Обзор», если она в другом месте."
+"Every LYNX extra at its default" = "Каждое дополнение LYNX по умолчанию"

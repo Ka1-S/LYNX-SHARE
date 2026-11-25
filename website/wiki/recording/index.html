@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4a1c1908";
+window.LYNX_LANG=lang;window.LYNX_V="57ff71a6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4a1c1908">
+<link rel="stylesheet" href="/assets/site.css?v=57ff71a6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -112,7 +112,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The options are in <code>Options › Recording</code> and in the record button's right-click menu.</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td><code>Count-in</code></td><td><code>Ctrl+P</code></td><td>Off, 1 bar, 2 bars or 4 bars of metronome before recording starts. <code>Ctrl+P</code> switches between off and the length you chose last. The choice is kept when you close the program; a new install starts with 1 bar, as FL Studio does</td></tr><tr><td><code>Metronome</code></td><td><code>Ctrl+M</code></td><td>Click while playing</td></tr><tr><td><code>Wait for the first note to start</code></td><td><code>Ctrl+I</code></td><td>Recording waits until you play</td></tr><tr><td><code>Loop record</code></td><td>none</td><td>Recording loops instead of running on</td></tr><tr><td><code>Audio: punch in/out on the loop region</code></td><td>none</td><td>Plays through the loop region and keeps only the audio inside it</td></tr><tr><td><code>Audio: pre-roll</code> and <code>post-roll</code></td><td>none</td><td>Off, 1, 2 or 4 bars played before the punch-in and after the punch-out</td></tr><tr><td><code>Recording starts playback</code></td><td>none</td><td>Turning recording on also presses play</td></tr><tr><td><code>Disarm the inserts when recording stops</code></td><td>none</td><td>Armed inserts are released after each take</td></tr></tbody></table></div>
 <p><code>Low latency while recording</code> is in the record button's right-click menu and in the Mixer's insert menu under <code>Disk recording</code>. It is off by default. While an insert with an input is armed, or its monitoring is <code>On</code>, the effects that add latency on its way to the Master are bypassed. This changes only what you hear: an insert keeps all its effects when the take is tapped after them, for example with <code>Post effects</code>. The effects come back when the insert is disarmed.</p>
-<p><code>Latency compensation</code> is in the same <code>Disk recording</code> menu and is on by default, as in FL Studio. It moves each take back by the audio device's round trip, the <code>Fine adjust (samples)</code> value of the audio settings and the plugins' delay compensation. Turn it off to keep the takes where they were recorded.</p>
+<p><code>Line up recordings with the audio latency</code> (FL Studio: Latency compensation) is in the same <code>Disk recording</code> menu and is on by default, as in FL Studio. It moves each take back by the audio device's round trip, the <code>Fine adjust (samples)</code> value of the audio settings and the plugins' delay compensation. Turn it off to keep the takes where they were recorded.</p>
 <p><code>Tools › Cancel recording</code> throws away what the current recording pass wrote (its notes, automation and audio takes) and turns recording off. Playback goes on and the armed inserts stay armed.</p>
 <h2 id="recording-into-clip-slots">Recording into clip slots</h2>
 <p>In the <a href="/wiki/layouts/">Clip-launch layout</a>, takes can go into the clip grid instead of the Playlist, as in Ableton Live.</p>
@@ -135,8 +135,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4a1c1908" defer></script>
-<script src="/assets/wiki.js?v=4a1c1908" defer></script>
-<script src="/assets/motion.js?v=4a1c1908" defer></script>
+<script src="/assets/site.js?v=57ff71a6" defer></script>
+<script src="/assets/wiki.js?v=57ff71a6" defer></script>
+<script src="/assets/motion.js?v=57ff71a6" defer></script>
 </body>
 </html>

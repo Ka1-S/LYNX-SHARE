@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![La parte inferior del Gestor de plugins, con su nota de que cada archivo de plugin se examina en un proceso aparte](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Se escanean las carpetas estándar, más las que añadas:
 
 ## Ventanas de plugin acopladas y separadas
 
-El editor de un plugin se abre dentro de la ventana principal, como los demás paneles. `Separado` en el menú de la ventana del plugin da a ese plugin una ventana propia, y `Fijar encima` en el mismo menú mantiene una ventana separada por encima de las demás ventanas de LYNX SHARE.
+El editor de un plugin se abre dentro de la ventana principal, como los demás paneles. `Separado` en el menú de la ventana del plugin da a ese plugin una ventana propia, y `Siempre visible` en el mismo menú mantiene una ventana separada por encima de las demás ventanas de LYNX SHARE.
 
 `Separar todos los plugins nuevos` en `Opciones › Configuración general...` abre separados todos los plugins que añadas. `Herram. › Cambiar todos los editores de plugins a` establece `Acoplado` o `Separado` para todos los plugins del proyecto.
 

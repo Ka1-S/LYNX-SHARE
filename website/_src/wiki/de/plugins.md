@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Die Standardordner werden durchsucht, dazu die, die du hinzufügst:
 
 ## Angedockte und abgelöste Plugin-Fenster
 
-Der Editor eines Plugins öffnet sich wie die anderen Panels im Hauptfenster. `Abgelöst` im Menü des Plugin-Fensters gibt dem Plugin ein eigenes Fenster, und `Im Vordergrund anheften` im selben Menü hält ein abgelöstes Fenster über den anderen Fenstern von LYNX SHARE.
+Der Editor eines Plugins öffnet sich wie die anderen Panels im Hauptfenster. `Abgelöst` im Menü des Plugin-Fensters gibt dem Plugin ein eigenes Fenster, und `Immer im Vordergrund` im selben Menü hält ein abgelöstes Fenster über den anderen Fenstern von LYNX SHARE.
 
 `Alle neuen Plugins ablösen` unter `Optionen › Allgemeine Einstellungen...` öffnet jedes neu hinzugefügte Plugin abgelöst. `Tools › Alle Plugin-Editoren umschalten auf` setzt `Angedockt` oder `Abgelöst` für alle Plugins des Projekts.
 

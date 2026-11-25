@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Standart klasörler ve sizin eklediğiniz klasörler taranır:
 
 ## Yerleşik ve ayrı plugin pencereleri
 
-Bir plugin'in editörü, diğer paneller gibi ana pencerenin içinde açılır. Plugin penceresinin menüsündeki `Ayrılmış` o plugin'e kendi penceresini verir, aynı menüdeki `Üste sabitle` ise ayrılmış bir pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar.
+Bir plugin'in editörü, diğer paneller gibi ana pencerenin içinde açılır. Plugin penceresinin menüsündeki `Ayrılmış` o plugin'e kendi penceresini verir, aynı menüdeki `Her zaman üstte` ise ayrılmış bir pencereyi LYNX SHARE'in diğer pencerelerinin üstünde tutar.
 
 `Seçenekler › Genel ayarlar...` içindeki `Tüm yeni eklentileri ayır`, eklediğiniz her plugin'i ayrı pencerede açar. `Araçlar › Tüm plugin düzenleyicilerini şuna geçir` projedeki tüm plugin'ler için `Yerleşik` veya `Ayrılmış` ayarlar.
 

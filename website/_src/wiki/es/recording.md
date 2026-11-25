@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![La ventana Grabación pregunta qué grabar: audio, notas y automatización, todo, o audio en el editor de audio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Las opciones están en `Opciones › Grabación` y en el menú de clic derecho d
 
 `Baja latencia al grabar` está en el menú de clic derecho del botón de grabar y en el menú del insert del Mixer, en `Grabación en disco`. Está desactivado por defecto. Mientras un insert con entrada está armado, o su monitorización está en `Act.`, se omiten los efectos que añaden latencia en su camino al Master. Esto cambia solo lo que oyes: un insert conserva todos sus efectos cuando la toma se captura después de ellos, por ejemplo con `Post efectos`. Los efectos vuelven cuando el insert se desarma.
 
-`Compensación de latencia` está en el mismo menú `Grabación en disco` y está activado por defecto, como en FL Studio. Mueve cada toma hacia atrás según el viaje de ida y vuelta del dispositivo de audio, el valor `Ajuste fino (muestras)` de la configuración de audio y el retardo de compensación de los plugins. Desactívalo para dejar las tomas donde se grabaron.
+`Alinear las grabaciones con la latencia de audio` (FL Studio: Latency compensation) está en el mismo menú `Grabación en disco` y está activado por defecto, como en FL Studio. Mueve cada toma hacia atrás según el viaje de ida y vuelta del dispositivo de audio, el valor `Ajuste fino (muestras)` de la configuración de audio y el retardo de compensación de los plugins. Desactívalo para dejar las tomas donde se grabaron.
 
 `Herram. › Cancelar grabación` descarta lo que escribió la pasada de grabación actual (sus notas, automatización y tomas de audio) y desactiva la grabación. La reproducción continúa y los inserts armados siguen armados.
 

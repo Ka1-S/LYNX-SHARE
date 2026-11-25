@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![Jendela Rekaman menanyakan apa yang direkam: audio, not dan otomasi, semuanya, atau audio ke editor audio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Opsinya ada di `Opsi › Rekaman` dan di menu klik kanan tombol rekam.
 
 `Latensi rendah saat merekam` ada di menu klik kanan tombol rekam dan di menu insert Mixer di bawah `Perekaman ke disk`. Secara bawaan mati. Selama insert yang punya input sedang di-arm, atau monitoring-nya `Aktif`, efek yang menambah latensi di jalurnya menuju Master dilewati. Ini hanya mengubah apa yang kamu dengar: insert tetap memakai semua efeknya saat take diambil setelah efek-efek itu, misalnya dengan `Setelah efek`. Efeknya kembali saat insert di-disarm.
 
-`Kompensasi latensi` ada di menu `Perekaman ke disk` yang sama dan menyala secara bawaan, seperti di FL Studio. Ia menggeser tiap take mundur sebesar round trip perangkat audio, nilai `Penyesuaian halus (sample)` pada pengaturan audio, dan kompensasi delay plugin. Matikan untuk mempertahankan take di tempat ia direkam.
+`Selaraskan rekaman dengan latensi audio` (FL Studio: Latency compensation) ada di menu `Perekaman ke disk` yang sama dan menyala secara bawaan, seperti di FL Studio. Ia menggeser tiap take mundur sebesar round trip perangkat audio, nilai `Penyesuaian halus (sample)` pada pengaturan audio, dan kompensasi delay plugin. Matikan untuk mempertahankan take di tempat ia direkam.
 
 `Alat › Batalkan perekaman` membuang apa yang ditulis putaran rekaman saat ini (not, otomasi, dan take audionya) dan mematikan perekaman. Pemutaran terus berjalan dan insert yang di-arm tetap di-arm.
 

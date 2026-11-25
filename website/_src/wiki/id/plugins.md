@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Folder standar dipindai, ditambah yang kamu tambahkan:
 
 ## Jendela plugin yang menempel dan yang terpisah
 
-Editor plugin terbuka di dalam jendela utama, seperti panel lainnya. `Terlepas` di menu jendela plugin memberi plugin itu jendelanya sendiri, dan `Sematkan di atas` di menu yang sama menjaga jendela yang terpisah tetap di atas jendela LYNX SHARE yang lain.
+Editor plugin terbuka di dalam jendela utama, seperti panel lainnya. `Terlepas` di menu jendela plugin memberi plugin itu jendelanya sendiri, dan `Selalu di atas` di menu yang sama menjaga jendela yang terpisah tetap di atas jendela LYNX SHARE yang lain.
 
 `Lepaskan semua plugin baru` di `Opsi › Pengaturan umum...` membuka setiap plugin yang kamu tambahkan dalam keadaan terpisah. `Alat › Alihkan semua editor plugin ke` mengatur `Terpasang` atau `Terlepas` untuk semua plugin di proyek.
 

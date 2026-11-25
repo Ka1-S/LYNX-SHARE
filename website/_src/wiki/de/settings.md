@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![Die Seite Allgemein des Einstellungsfensters, mit den Seitenreitern oben](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ Das Einstellungsfenster hat acht Seiten: Audio, MIDI, Allgemein, Theme, Dateien,
 | `Standardvorlage`, `Projekt beim Start` | Die Vorlage, die mit `Datei › Neu` öffnet, und was beim Start öffnet: `Leeres Projekt`, `Standardvorlage` oder `Zuletzt verwendetes Projekt`. Mit `Datei › Als Vorlage speichern...` fügst du eigene hinzu |
 | `Session-Clips aus Live-Sets` | Wohin die Session-Clips eines importierten Live-Sets gehen: ins Clip-Raster oder in die Playlist nach dem Arrangement |
 | `Sprache`, `Oberflächen-Schriftart` | Gelten ab dem nächsten Start |
-| `Oberflächengröße`, `Menüdichte` | Maßstab der ganzen Oberfläche sowie kompakte oder großzügige Menüs |
+| `Oberflächengröße`, `Menüabstand` | Maßstab der ganzen Oberfläche sowie kompakte oder großzügige Menüs |
 | `Wellenformen` | Schlicht (die Clipfarbe) oder Spektralfarben, wahlweise mit getrennten Stereokanälen |
 | `Notennamen`, `Schwarze Tasten` | Englische, germanische oder Solmisationsnamen, mit Kreuzen oder Bs |
 | `Plugin-Stil` | Das Aussehen der eingebauten Plugin-Fenster: automatisch oder ein Stil für alle Plugins |
@@ -80,7 +80,7 @@ Das Einstellungsfenster hat acht Seiten: Audio, MIDI, Allgemein, Theme, Dateien,
 |---|---|
 | Theme-Feld | Wählt ein Preset. `Importieren...` und `Exportieren...` lesen und schreiben `.lynxtheme`-Dateien, `Preset speichern...` behält das aktuelle Theme, `Standard` setzt es zurück |
 | `Akzentfarbe`, `Hintergrund`, `Arbeitsbereich` | Die drei Farben eines Themes. Die Arbeitsbereichsfarbe kann automatisch dem Hintergrund folgen |
-| Arbeitsbereichsbild | Ein PNG, JPEG oder GIF hinter den Fenstern, mit `Bildanpassung`, `Bilddeckkraft` und `Abdunkeln` |
+| Arbeitsbereichsbild | Ein PNG, JPEG oder GIF hinter den Fenstern, mit `Bildanpassung`, `Bilddeckkraft` und `Bild abdunkeln` |
 | Startklang | Dein eigener Klang von 30 Sekunden oder weniger, oder der von LYNX SHARE |
 
 ## Dateien
@@ -95,7 +95,7 @@ Das Einstellungsfenster hat acht Seiten: Audio, MIDI, Allgemein, Theme, Dateien,
 
 ## LYNX extras
 
-`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Die, die nur das Aussehen ändern, sind standardmäßig an, die übrigen aus. **Wie FL** schaltet alle Extras aus, **Empfohlen** setzt jedes auf seinen Standard zurück. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt.
+`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Die, die nur das Aussehen ändern, sind standardmäßig an, ebenso ein paar kleine Ergänzungen: auf die Playlist gezogene MIDI-Dateien werden zu Pattern-Clips, die Liste „Zuletzt verwendet“ und eine Zeile pro Plugin in den Plugin-Listen sowie die MIDI-Vorschau und die Tab-Vervollständigung im Browser. Die übrigen sind aus. **Wie FL** schaltet alle Extras aus, **Empfohlen** setzt jedes auf seinen Standard zurück. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt.
 
 | Einstellung | Was sie macht |
 |---|---|

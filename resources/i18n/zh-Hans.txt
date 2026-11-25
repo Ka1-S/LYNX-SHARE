@@ -13106,3 +13106,4 @@ countries: cn sg
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "此文件夹不是 FL Studio 安装：{0}。请选择包含 FL64.exe 和 Data 的文件夹。未作任何更改。"
 "More than one FL Studio: choose one" = "有多个 FL Studio：请选择一个"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "在常用位置和已挂载的驱动器上未找到 FL Studio。如果在其他位置，请使用“浏览”。"
+"Every LYNX extra at its default" = "每个 LYNX 附加功能恢复默认"

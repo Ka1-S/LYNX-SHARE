@@ -1,7 +1,7 @@
 {
 "u.0.1.31.2.t": "Mais correções da 0.1.31",
 "u.0.1.31.2.s": "O LYNX SHARE 0.1.31.2 corrige um travamento da página inicial, o teclado do PC como piano sobre plugins encaixados, clipes esticados que repetiam só o primeiro compasso, as faixas de automação criadas de projetos do FL arquivos .flp exportados que o FL recusava, presets dos sintetizadores do FL no Browser e alguns problemas menores.",
-"u.0.1.31.2.f0": "Rolar a lista \"Começar um novo projeto\" da página inicial não trava mais o LYNX no Windows.",
+"u.0.1.31.2.f0": "Rolar a lista \"Começar um novo projeto\" da página inicial podia ler além do fim da lista, a causa provável de um travamento relatado no Windows; não faz mais isso.",
 "u.0.1.31.2.f1": "Sobre um plugin encaixado, o teclado do PC como piano volta a tocar primeiro quando o botão de teclado da janela pede isso, como numa janela solta.",
 "u.0.1.31.2.f2": "Com \"Clipes de pattern esticados repetem o pattern\" ligado, notas desenhadas, coladas ou movidas depois do primeiro compasso de um clipe são ouvidas: o pattern cresce para contê-las.",
 "u.0.1.31.2.f3": "Playlist › \"Mover clipes de automação para as faixas das suas trilhas\" mantém os valores que os clipes tocavam, também em projetos grandes do FL.",

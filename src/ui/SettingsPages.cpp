@@ -2897,7 +2897,7 @@ public:
         flExact.setTooltip (tr ("Every LYNX extra off: LYNX SHARE as FL Studio (Esc closing the focused window and the start page stay, as FL Studio has them)"));
         flExact.onClick = [this] { setAll (true); };
         recommended.setComponentID ("extras.recommended");
-        recommended.setTooltip (tr ("Every LYNX extra at its default: the ones that only change the look on, the rest off"));
+        recommended.setTooltip (tr ("Every LYNX extra at its default"));
         recommended.onClick = [this] { setAll (false); };
         addFixed (flExact);
         addFixed (recommended);

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4a1c1908";
+window.LYNX_LANG=lang;window.LYNX_V="57ff71a6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4a1c1908">
+<link rel="stylesheet" href="/assets/site.css?v=57ff71a6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -122,7 +122,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>Mixer groups fold with their chevron (or <code>Alt</code>+click for all groups). A VCA fader moves the level of its member inserts while they keep their own faders. Create one from the insert menu: under Group, choose <code>VCA › New VCA from selected</code>.</p>
 <h2 id="recording">Recording</h2>
 <p>Each insert has a record-arm button. With an insert armed, Rec and Play record its audio input into a Playlist clip. <code>Shift+R</code> arms the selected insert and starts recording in one step. See <a href="/wiki/recording/">Recording</a>.</p>
-<p>When you pick an external input for an insert that also records other audio, LYNX SHARE asks whether to switch it to <code>External input only</code>, so the take holds the input alone. <code>Mixer › Disk recording › Latency compensation</code> in the insert menu is on by default. Turned off, recorded takes are placed with no latency compensation at all.</p>
+<p>When you pick an external input for an insert that also records other audio, LYNX SHARE asks whether to switch it to <code>External input only</code>, so the take holds the input alone. <code>Mixer › Disk recording › Line up recordings with the audio latency</code> in the insert menu is on by default. Turned off, recorded takes are placed with no latency compensation at all.</p>
 <h2 id="keys">Keys</h2>
 <p><code>Ctrl+L</code> and <code>Ctrl+Shift+L</code> have this meaning only while the Mixer has focus.</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Link channels</td><td><code>Ctrl+L</code></td><td>Links the selected channels to the selected insert</td></tr><tr><td>Link to consecutive inserts</td><td><code>Ctrl+Shift+L</code></td><td>Links the selected channels to inserts starting from the selected one</td></tr><tr><td>Move inserts</td><td><code>Alt+Left</code> / <code>Alt+Right</code></td><td>Moves the selected inserts</td></tr><tr><td>Rename and colour</td><td><code>F2</code></td><td>Renames and colours the selected insert</td></tr><tr><td>Solo</td><td><code>S</code></td><td>Solos the selected inserts</td></tr><tr><td>Solo with sources</td><td><code>Alt+S</code></td><td>Solos the selected inserts and the inserts that feed them</td></tr><tr><td>Delete inserts</td><td><code>Del</code></td><td>Deletes the selected inserts, after a question</td></tr><tr><td>Arm and record</td><td><code>Shift+R</code></td><td>Arms the selected insert and starts recording</td></tr><tr><td>Open audio editor</td><td><code>Ctrl+E</code></td><td>Loads Edison into the insert's first empty slot and opens it</td></tr><tr><td>Open audio editor and record</td><td><code>Shift+E</code></td><td>The same, ready to record when the song plays</td></tr></tbody></table></div>
@@ -139,8 +139,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4a1c1908" defer></script>
-<script src="/assets/wiki.js?v=4a1c1908" defer></script>
-<script src="/assets/motion.js?v=4a1c1908" defer></script>
+<script src="/assets/site.js?v=57ff71a6" defer></script>
+<script src="/assets/wiki.js?v=57ff71a6" defer></script>
+<script src="/assets/motion.js?v=57ff71a6" defer></script>
 </body>
 </html>

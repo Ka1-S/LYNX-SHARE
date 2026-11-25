@@ -1,7 +1,7 @@
 {
 "u.0.1.31.2.t": "Kolejne poprawki do 0.1.31",
 "u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 naprawia awarię strony startowej, klawiaturę jako pianino nad zadokowanymi wtyczkami, rozciągnięte klipy powtarzające pierwszy takt, ścieżki automatyki tworzone z projektów FL eksportowane pliki .flp, których FL nie otwierał, presety syntezatorów FL w Browserze i kilka mniejszych problemów.",
-"u.0.1.31.2.f0": "Przewijanie listy „Rozpocznij nowy projekt” na stronie startowej nie powoduje już awarii LYNX w Windows.",
+"u.0.1.31.2.f0": "Przewijanie listy „Rozpocznij nowy projekt” na stronie startowej mogło czytać poza końcem listy, co było prawdopodobną przyczyną awarii zgłoszonej w Windows; już tak się nie dzieje.",
 "u.0.1.31.2.f1": "Nad zadokowaną wtyczką klawiatura jako pianino znów gra pierwsza, gdy tak ustawia przycisk klawiatury okna, jak w odłączonym oknie.",
 "u.0.1.31.2.f2": "Przy włączonej opcji „Rozciągnięte klipy patternów zapętlają pattern” nuty narysowane, wklejone lub przesunięte za pierwszy takt klipu są słyszalne: pattern wydłuża się, by je zmieścić.",
 "u.0.1.31.2.f3": "Playlist › „Przenieś klipy automatyki do ścieżek ich torów” zachowuje wartości, które grały klipy, także w dużych projektach FL.",

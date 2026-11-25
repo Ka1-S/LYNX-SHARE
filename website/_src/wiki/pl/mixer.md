@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Grupy Mixera zwija się strzałką (albo `Alt`+klik dla wszystkich grup). Suwak 
 
 Każdy insert ma przycisk uzbrojenia nagrywania. Gdy insert jest uzbrojony, Nagrywaj i Odtwórz nagrywają jego wejście audio do klipu Playlisty. `Shift+R` uzbraja zaznaczony insert i od razu zaczyna nagrywanie. Zobacz [Nagrywanie](/wiki/recording/).
 
-Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio, LYNX SHARE pyta, czy przełączyć go na `Tylko wejście zewnętrzne`, aby nagranie zawierało samo wejście. `Mixer › Nagrywanie na dysk › Kompensacja opóźnienia` w menu insertu jest domyślnie włączone. Po wyłączeniu nagrane ujęcia są umieszczane bez żadnej kompensacji opóźnienia.
+Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio, LYNX SHARE pyta, czy przełączyć go na `Tylko wejście zewnętrzne`, aby nagranie zawierało samo wejście. `Mixer › Nagrywanie na dysk › Wyrównuj nagrania do opóźnienia audio` w menu insertu jest domyślnie włączone. Po wyłączeniu nagrane ujęcia są umieszczane bez żadnej kompensacji opóźnienia.
 
 ## Klawisze
 

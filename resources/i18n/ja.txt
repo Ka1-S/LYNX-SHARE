@@ -13106,3 +13106,4 @@ countries: jp
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "このフォルダーは FL Studio のインストールではありません: {0}。FL64.exe と Data があるフォルダーを選んでください。変更はありません。"
 "More than one FL Studio: choose one" = "複数の FL Studio があります。選んでください"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "通常の場所にもマウントされたドライブにも FL Studio が見つかりません。別の場所にある場合は「参照」を使ってください。"
+"Every LYNX extra at its default" = "LYNX の追加機能をすべて初期設定に"

@@ -9,7 +9,7 @@
     "new": [],
     "better": [],
     "fixed": [
-      "Scrolling the start page's \"Start a new project\" list no longer crashes LYNX on Windows.",
+      "Scrolling the start page's \"Start a new project\" list could read past the end of its list, the likely cause of a crash reported on Windows; it no longer does.",
       "Over a docked plugin the typing keyboard plays first again when the window's keyboard button says so, as in a detached window.",
       "With \"Stretched pattern clips loop their pattern\" on, notes drawn, pasted or moved past a clip's first bar are heard: the pattern grows to hold them.",
       "Playlist › \"Move automation clips into their tracks' lanes\" keeps the values the clips played, also on big FL projects.",

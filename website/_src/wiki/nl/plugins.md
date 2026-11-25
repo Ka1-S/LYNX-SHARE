@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![Het onderste deel van het Pluginbeheer, met de opmerking dat elk pluginbestand in een apart proces wordt onderzocht](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ De standaardmappen worden gescand, plus die je zelf toevoegt:
 
 ## Vastgemaakte en losgemaakte pluginvensters
 
-De editor van een plugin opent in het hoofdvenster, net als de andere panelen. Met `Losgemaakt` in het menu van het pluginvenster krijgt die plugin een eigen venster, en met `Bovenop vastzetten` in hetzelfde menu blijft een losgemaakt venster boven de andere vensters van LYNX SHARE.
+De editor van een plugin opent in het hoofdvenster, net als de andere panelen. Met `Losgemaakt` in het menu van het pluginvenster krijgt die plugin een eigen venster, en met `Altijd bovenop` in hetzelfde menu blijft een losgemaakt venster boven de andere vensters van LYNX SHARE.
 
 Met `Alle nieuwe plug-ins losmaken` in `Opties › Algemene instellingen...` opent elke plugin die je toevoegt losgemaakt. Met `Extra › Alle plugin-editors omschakelen naar` stel je `Vastgemaakt` of `Losgemaakt` in voor alle plugins van het project.
 

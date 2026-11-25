@@ -52,7 +52,7 @@ The standard folders are scanned, plus the ones you add:
 
 ## Docked and detached plugin windows
 
-A plugin's editor opens inside the main window, like the other panels. `Detached` in the plugin window's menu gives that plugin a window of its own, and `Pin on top` in the same menu keeps a detached window above LYNX SHARE's other windows.
+A plugin's editor opens inside the main window, like the other panels. `Detached` in the plugin window's menu gives that plugin a window of its own, and `Always on top` in the same menu keeps a detached window above LYNX SHARE's other windows.
 
 `Detach all new plugins` in `Options › General settings...` opens every plugin you add detached. `Tools › Switch all plugin editors to` sets `Attached` or `Detached` for all plugins of the project.
 

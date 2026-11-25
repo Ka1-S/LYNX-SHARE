@@ -13106,3 +13106,4 @@ countries: fr be ch ca lu
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "Ce dossier n'est pas une installation de FL Studio : {0}. Choisissez le dossier qui contient FL64.exe et Data. Rien n'a été modifié."
 "More than one FL Studio: choose one" = "Plusieurs FL Studio : choisissez-en un"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "Aucun FL Studio trouvé aux emplacements habituels ni sur les lecteurs montés. Utilisez Parcourir s'il est ailleurs."
+"Every LYNX extra at its default" = "Chaque extra LYNX à sa valeur par défaut"

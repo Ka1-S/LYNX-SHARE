@@ -13106,3 +13106,4 @@ countries: tr
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "Bu klasör bir FL Studio kurulumu değil: {0}. FL64.exe ve Data içeren klasörü seçin. Hiçbir şey değişmedi."
 "More than one FL Studio: choose one" = "Birden fazla FL Studio: birini seçin"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "Alışılmış yerlerde ve bağlı sürücülerde FL Studio bulunamadı. Başka bir yerdeyse Gözat'ı kullanın."
+"Every LYNX extra at its default" = "Her LYNX ekstrası varsayılanında"

@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![Strona Ogólne okna Ustawienia, z kartami stron na górze](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 | `Domyślny szablon`, `Projekt przy starcie` | Szablon, który otwiera `Plik › Nowy`, i to, co otwiera się przy starcie: `Pusty projekt`, `Domyślny szablon` albo `Ostatnio używany projekt`. `Plik › Zapisz jako szablon...` dodaje twoje własne |
 | `Klipy sesji z zestawów Live` | Dokąd trafiają klipy sesji z zaimportowanego setu Live: do siatki klipów albo na Playlistę po aranżacji |
 | `Język`, `Czcionka interfejsu` | Zastosowane przy następnym uruchomieniu |
-| `Rozmiar interfejsu`, `Gęstość menu` | Skala całego interfejsu oraz kompaktowe lub przestronne menu |
+| `Rozmiar interfejsu`, `Odstępy w menu` | Skala całego interfejsu oraz kompaktowe lub przestronne menu |
 | `Przebiegi` | Clean (kolor klipu) albo kolory widmowe, opcjonalnie z osobnymi kanałami stereo |
 | `Nazwy nut`, `Czarne klawisze` | Nazwy angielskie, germańskie lub solfeżowe, z krzyżykami albo bemolami |
 | `Styl pluginów` | Wygląd okien wbudowanych pluginów: automatyczny albo jeden styl dla każdego pluginu |
@@ -80,7 +80,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 |---|---|
 | Pole motywu | Wybiera preset. `Importuj...` i `Eksportuj...` czytają i zapisują pliki `.lynxtheme`, `Zapisz preset...` zachowuje bieżący motyw, `Domyślny` go resetuje |
 | `Kolor akcentu`, `Tło`, `Obszar roboczy` | Trzy kolory motywu. Kolor obszaru roboczego może automatycznie podążać za tłem |
-| Obraz obszaru roboczego | PNG, JPEG lub GIF za oknami, z `Dopasowanie obrazu`, `Krycie obrazu` i `Przyciemnienie` |
+| Obraz obszaru roboczego | PNG, JPEG lub GIF za oknami, z `Dopasowanie obrazu`, `Krycie obrazu` i `Przyciemnij obraz` |
 | Dźwięk startowy | Twój własny dźwięk do 30 sekund albo własny dźwięk LYNX SHARE |
 
 ## Pliki
@@ -95,7 +95,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 
 ## Dodatki LYNX
 
-`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Te, które zmieniają tylko wygląd, są domyślnie włączone, pozostałe wyłączone. **Jak w FL** wyłącza wszystkie dodatki, **Zalecane** przywraca każdy do ustawienia domyślnego. Każdy przełącznik to to samo ustawienie, co w menu lub na stronie, którą wymienia jego wiersz.
+`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Te, które zmieniają tylko wygląd, są domyślnie włączone, podobnie jak kilka drobnych dodatków: pliki MIDI upuszczone na Playlist stają się klipami patternów, lista Ostatnie i jeden wiersz na plugin w listach pluginów oraz podgląd MIDI i uzupełnianie klawiszem Tab w Browser. Pozostałe są wyłączone. **Jak w FL** wyłącza wszystkie dodatki, **Zalecane** przywraca każdy do ustawienia domyślnego. Każdy przełącznik to to samo ustawienie, co w menu lub na stronie, którą wymienia jego wiersz.
 
 | Ustawienie | Co robi |
 |---|---|

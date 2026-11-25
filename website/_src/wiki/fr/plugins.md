@@ -1,5 +1,5 @@
 ---
-source: 933ca35b0b
+source: cc14fa4fea
 ---
 ![La partie basse du Gestionnaire de plugins, avec sa note disant que chaque fichier de plugin est examiné dans un processus séparé](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -50,7 +50,7 @@ Les dossiers standard sont analysés, plus ceux que vous ajoutez :
 
 ## Fenêtres de plugin ancrées et détachées
 
-L'éditeur d'un plugin s'ouvre dans la fenêtre principale, comme les autres panneaux. `Détaché` dans le menu de la fenêtre du plugin donne à ce plugin sa propre fenêtre, et `Épingler au premier plan` dans le même menu garde une fenêtre détachée au-dessus des autres fenêtres de LYNX SHARE.
+L'éditeur d'un plugin s'ouvre dans la fenêtre principale, comme les autres panneaux. `Détaché` dans le menu de la fenêtre du plugin donne à ce plugin sa propre fenêtre, et `Toujours au premier plan` dans le même menu garde une fenêtre détachée au-dessus des autres fenêtres de LYNX SHARE.
 
 `Détacher tous les nouveaux plugins` dans `Options › Réglages généraux...` ouvre en mode détaché chaque plugin que vous ajoutez. `Outils › Basculer tous les éditeurs de plugins en` règle `Ancré` ou `Détaché` pour tous les plugins du projet.
 

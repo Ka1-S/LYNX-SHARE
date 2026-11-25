@@ -13106,3 +13106,4 @@ countries: nl be
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "Deze map is geen FL Studio-installatie: {0}. Kies de map met FL64.exe en Data. Er is niets gewijzigd."
 "More than one FL Studio: choose one" = "Meer dan één FL Studio: kies er een"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "Geen FL Studio gevonden op de gebruikelijke plaatsen of gekoppelde schijven. Gebruik Bladeren als het ergens anders staat."
+"Every LYNX extra at its default" = "Elke LYNX-extra op de standaardwaarde"

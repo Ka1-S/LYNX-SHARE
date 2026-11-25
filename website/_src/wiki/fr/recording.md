@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![La fenêtre d'enregistrement demande quoi enregistrer : audio, notes et automation, tout, ou audio dans l'éditeur audio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Les options se trouvent dans `Options › Enregistrement` et dans le menu du cli
 
 `Faible latence à l'enregistrement` se trouve dans le menu du clic droit du bouton d'enregistrement et dans le menu d'insert du Mixer sous `Enregistrement sur disque`. Il est désactivé par défaut. Tant qu'un insert avec une entrée est armé, ou que son monitoring est sur `Actif`, les effets qui ajoutent de la latence sur son chemin vers le Master sont contournés. Cela ne change que ce que vous entendez : un insert garde tous ses effets quand la prise est captée après eux, par exemple avec `Après les effets`. Les effets reviennent quand l'insert est désarmé.
 
-`Compensation de latence` est dans le même menu `Enregistrement sur disque` et est activé par défaut, comme dans FL Studio. Elle recule chaque prise de l'aller-retour du périphérique audio, de la valeur `Ajustement fin (échantillons)` des réglages audio et de la compensation de délai des plugins. Désactivez-la pour garder les prises là où elles ont été enregistrées.
+`Aligner les enregistrements sur la latence audio` (FL Studio: Latency compensation) est dans le même menu `Enregistrement sur disque` et est activé par défaut, comme dans FL Studio. Elle recule chaque prise de l'aller-retour du périphérique audio, de la valeur `Ajustement fin (échantillons)` des réglages audio et de la compensation de délai des plugins. Désactivez-la pour garder les prises là où elles ont été enregistrées.
 
 `Outils › Annuler l'enregistrement` jette ce que la passe d'enregistrement en cours a écrit (ses notes, son automation et ses prises audio) et désactive l'enregistrement. La lecture continue et les inserts armés restent armés.
 

@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![La page Général de la fenêtre Réglages, avec les onglets de page en haut](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ La fenêtre Réglages a huit pages : Audio, MIDI, Général, Thème, Fichiers, E
 | `Modèle par défaut`, `Projet au démarrage` | Le modèle qui s'ouvre avec `Fichier › Nouveau`, et ce qui s'ouvre au démarrage : `Projet vide`, `Modèle par défaut` ou `Dernier projet utilisé`. `Fichier › Enregistrer comme modèle...` ajoute les vôtres |
 | `Clips de session des sets Live` | Où vont les clips de session d'un set Live importé : la grille de clips, ou la Playlist après l'arrangement |
 | `Langue`, `Police de l'interface` | Appliqués au prochain démarrage |
-| `Taille de l'interface`, `Densité des menus` | Échelle de toute l'interface, et menus compacts ou aérés |
+| `Taille de l'interface`, `Espacement des menus` | Échelle de toute l'interface, et menus compacts ou aérés |
 | `Formes d'onde` | Épurées (la couleur du clip) ou aux couleurs spectrales, au choix avec les canaux stéréo séparés |
 | `Noms des notes`, `Touches noires` | Noms anglais, germaniques ou en solfège, avec dièses ou bémols |
 | `Style des plugins` | L'aspect des fenêtres des plugins intégrés : automatique, ou un seul style pour tous les plugins |
@@ -80,7 +80,7 @@ La fenêtre Réglages a huit pages : Audio, MIDI, Général, Thème, Fichiers, E
 |---|---|
 | Liste des thèmes | Choisit un preset. `Importer...` et `Exporter...` lisent et écrivent des fichiers `.lynxtheme`, `Enregistrer le preset...` conserve le thème actuel, `Par défaut` le réinitialise |
 | `Couleur d'accent`, `Arrière-plan`, `Espace de travail` | Les trois couleurs d'un thème. La couleur de l'espace de travail peut suivre automatiquement l'arrière-plan |
-| Image de l'espace de travail | Un PNG, JPEG ou GIF derrière les fenêtres, avec `Ajustement de l'image`, `Opacité de l'image` et `Assombrir` |
+| Image de l'espace de travail | Un PNG, JPEG ou GIF derrière les fenêtres, avec `Ajustement de l'image`, `Opacité de l'image` et `Assombrir l'image` |
 | Son de démarrage | Votre propre son de 30 secondes ou moins, ou celui de LYNX SHARE |
 
 ## Fichiers
@@ -95,7 +95,7 @@ La fenêtre Réglages a huit pages : Audio, MIDI, Général, Thème, Fichiers, E
 
 ## Extras LYNX
 
-`Options › Extras LYNX...`. Les ajouts propres à LYNX SHARE réunis au même endroit. Ceux qui ne changent que l'apparence sont activés par défaut, les autres sont désactivés. **Comme FL** désactive tous les extras, **Recommandé** remet chacun à sa valeur par défaut. Chaque interrupteur est le même réglage que dans le menu ou la page que nomme sa ligne.
+`Options › Extras LYNX...`. Les ajouts propres à LYNX SHARE réunis au même endroit. Ceux qui ne changent que l'apparence sont activés par défaut, tout comme quelques petits ajouts : les fichiers MIDI déposés sur la Playlist deviennent des clips de pattern, la liste Récents et une ligne par plugin dans les listes de plugins, ainsi que l'aperçu MIDI et la complétion avec Tab dans le Browser. Les autres sont désactivés. **Comme FL** désactive tous les extras, **Recommandé** remet chacun à sa valeur par défaut. Chaque interrupteur est le même réglage que dans le menu ou la page que nomme sa ligne.
 
 | Réglage | Ce qu'il fait |
 |---|---|

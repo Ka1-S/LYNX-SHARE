@@ -9,6 +9,8 @@ The short version of each release. The full notes, with measurements, known issu
 - A Mixer insert can hold up to 25 effect slots, as in FL Studio 2026.2: the slot list keeps its ten rows and scrolls, a
   "+" tab under it adds a slot, and Options › General settings sets how many slots new mixer tracks get. PR #260 by
   @codewithamoako.
+- The Mixer's *Reset selected track(s) to default* also removes the track's plugins and resets its name and color, after FL's
+  warning; the routing stays. PR #284 by @codewithamoako.
 
 **Added**
 - Easier options: every Settings page has **Reset this page** (with Undo); the **?** command palette finds every Settings
@@ -20,8 +22,19 @@ The short version of each release. The full notes, with measurements, known issu
   lane shows (*Settings › General › Show tips and hints* turns them off).
 - Notices: a plugin that can't open, a saved copy, a full insert or a failed backup now show a small card at the lower
   right (with a button such as *Plugin manager...* or *Show in folder*) instead of a box to click away.
+- Soft look (*Options › Theme › Appearance*): flat steps and buttons, muted colors and slimmer plates, close to 0.1.29's look.
+- *Playlist › Edit › Cut clips at the song position* (#285) and *File › Open the project's folder* (#286).
+- Track-only mode and the Simple layout: the Piano roll shows the other tracks' notes as ghosts; a click on a Simple track's
+  instrument icon opens the instrument (Discord).
 
 **Changed**
+- Dragging the tempo hides the pointer and is not stopped by the screen's edge, as in FL Studio (#283).
+- *Settings › LYNX extras* also lists the track colors taken from the accent (#238), the Recent list and the one row per plugin
+  in the plugin lists, and the Browser's MIDI preview and Tab completion (all on, as they were).
+- Clearer names: Interface size, Menu spacing, Darken image, Waveform colors, Always on top (plugin windows), *Let other apps
+  on this PC control LYNX (Remote API)*, *Line up recordings with the audio latency* (FL's Latency compensation).
+- Opening a plugin or instrument window on Linux takes about half the work, and long paints of the Playlist (audio clips whose
+  sample was not loaded) are gone.
 - LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
   linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, the Mixer's
   peak values and correlation bars, dimmed unselected and darkened switched-off Playlist tracks); extras you switched
@@ -33,13 +46,12 @@ The short version of each release. The full notes, with measurements, known issu
 
 A second hotfix for 0.1.31.
 
-- Fixed: scrolling the start page's "Start a new project" list (wheel or scroll bar) could crash LYNX: drawn at a scale
-  that is not a whole number (a display at 125 % / 150 %, LYNX's zoom), a list can also draw the row under its last one,
-  and the template list read a template name past its end there (Discord).
-- Fixed: the typing keyboard played nothing over a docked plugin window (Discord). The keys a plugin leaves unused now
-  play the typing keyboard docked as well as detached; and with the window's keyboard button set to "LYNX first"
-  ("Allow the plugin to handle keystrokes before the host does" unticked) the typing keyboard takes its keys before a
-  VST / VST3 plugin, which never worked for those plugins, docked or detached.
+- Fixed: the start page's "Start a new project" list could read a template name past the end of its list while it was
+  scrolled, at display scales that are not a whole number. It is the likely cause of a crash reported on Windows, which
+  could not be reproduced here (Discord).
+- Fixed: with a plugin window's keyboard button on "LYNX first" ("Allow the plugin to handle keystrokes before the host
+  does" unticked), the typing keyboard never took its keys before a docked VST3 plugin. It does now, docked and detached
+  (Discord: the typing keyboard silent over a docked plugin).
 - Fixed: with "Stretched pattern clips loop their pattern" on, a clip drawn on an instrument track looped its first bar
   for ever: notes drawn, pasted, moved or stretched past a pattern's set length are now heard, as the length grows to
   whole bars that hold them, like a step past it already did; a clip saved that way is mended by the next edit in it
@@ -57,6 +69,8 @@ A second hotfix for 0.1.31.
   LYNX's own synth with an approximation of the sound; it opens that synth itself with the preset loaded and named after
   it, and Send to selected channel puts it into the selected channel's synth. The channel window's preset menus of Toxic
   Biohazard, GMS and Morphine list FL's presets (#288).
+- Fixed 12 crashes and memory errors found by sanitizer and UI stress testing, plus reported crashes (Browser, Device
+  View, Settings search, Tracker, Piano roll drag, Linux VST3, Simple drum machine…).
 - Changed: the LYNX extra "MIDI files dropped on the Playlist become pattern clips" is on by default (FL ignores a .mid
   dropped on its Playlist, so no FL gesture changes; Settings › LYNX extras turns it off) (#287).
 

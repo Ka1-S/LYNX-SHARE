@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![Kayıt penceresi ne kaydedileceğini soruyor: ses, notalar ve otomasyon, her şey ya da ses editörüne ses](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Seçenekler `Seçenekler › Kayıt` içinde ve kayıt düğmesinin sağ tık me
 
 `Kayıt sırasında düşük gecikme`, kayıt düğmesinin sağ tık menüsünde ve Mixer'ın insert menüsünde `Diske kayıt` altındadır. Varsayılan olarak kapalıdır. Girişi olan bir insert kayda hazırken veya izlemesi `Açık` iken, Master'a giden yolda gecikme ekleyen efektler devre dışı bırakılır. Bu yalnızca duyduğunuzu değiştirir: kayıt efektlerden sonra alınıyorsa, örneğin `Efektlerden sonra` ile, insert tüm efektlerini korur. İnsert'in kayda hazırlığı kaldırılınca efektler geri gelir.
 
-`Gecikme telafisi` aynı `Diske kayıt` menüsündedir ve FL Studio'daki gibi varsayılan olarak açıktır. Her kaydı ses aygıtının gidiş dönüş süresi, ses ayarlarındaki `İnce ayar (sample)` değeri ve eklentilerin gecikme telafisi kadar geri alır. Kayıtları kaydedildikleri yerde tutmak için kapatın.
+`Kayıtları ses gecikmesine göre hizala` (FL Studio: Latency compensation) aynı `Diske kayıt` menüsündedir ve FL Studio'daki gibi varsayılan olarak açıktır. Her kaydı ses aygıtının gidiş dönüş süresi, ses ayarlarındaki `İnce ayar (sample)` değeri ve eklentilerin gecikme telafisi kadar geri alır. Kayıtları kaydedildikleri yerde tutmak için kapatın.
 
 `Araçlar › Kaydı iptal et`, geçerli kayıt geçişinin yazdıklarını (notalarını, otomasyonunu ve ses kayıtlarını) atar ve kaydı kapatır. Çalma sürer ve kayda hazır insert'ler hazır kalır.
 

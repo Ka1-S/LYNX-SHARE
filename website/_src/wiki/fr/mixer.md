@@ -1,5 +1,5 @@
 ---
-source: 620ff357bd
+source: 4ea98272fd
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
@@ -90,7 +90,7 @@ Les groupes du Mixer se replient avec leur chevron (ou `Alt`+clic pour tous les 
 
 Chaque insert a un bouton d'armement d'enregistrement. Avec un insert armé, Rec et Play enregistrent son entrée audio dans un clip de Playlist. `Shift+R` arme l'insert sélectionné et lance l'enregistrement en une seule étape. Voir [Enregistrement](/wiki/recording/).
 
-Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'autres audios, LYNX SHARE demande s'il faut le passer sur `Entrée externe seule`, pour que la prise ne contienne que l'entrée. `Mixer › Enregistrement sur disque › Compensation de latence`, dans le menu de l'insert, est activé par défaut. Désactivé, les prises enregistrées sont placées sans aucune compensation de latence.
+Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'autres audios, LYNX SHARE demande s'il faut le passer sur `Entrée externe seule`, pour que la prise ne contienne que l'entrée. `Mixer › Enregistrement sur disque › Aligner les enregistrements sur la latence audio`, dans le menu de l'insert, est activé par défaut. Désactivé, les prises enregistrées sont placées sans aucune compensation de latence.
 
 ## Touches
 

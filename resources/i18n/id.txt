@@ -13106,3 +13106,4 @@ countries: id
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "Folder ini bukan instalasi FL Studio: {0}. Pilih folder yang berisi FL64.exe dan Data. Tidak ada yang diubah."
 "More than one FL Studio: choose one" = "Lebih dari satu FL Studio: pilih satu"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "FL Studio tidak ditemukan di tempat biasa atau di drive yang terpasang. Pakai Telusuri jika ada di tempat lain."
+"Every LYNX extra at its default" = "Setiap ekstra LYNX pada bawaannya"

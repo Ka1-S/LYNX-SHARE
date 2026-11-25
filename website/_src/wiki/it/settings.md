@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![La pagina Generale della finestra Impostazioni, con le schede delle pagine in alto](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ La finestra Impostazioni ha otto pagine: Audio, MIDI, Generale, Tema, File, LYNX
 | `Modello predefinito`, `Progetto all'avvio` | Il modello che si apre con `File › Nuovo` e cosa si apre all'avvio: `Progetto vuoto`, `Modello predefinito` o `Ultimo progetto usato`. `File › Salva come modello...` aggiunge i tuoi |
 | `Clip di sessione dei set di Live` | Dove vanno le clip di sessione di un set di Live importato: la griglia di clip, o la Playlist dopo l'arrangiamento |
 | `Lingua`, `Carattere dell'interfaccia` | Applicati al prossimo avvio |
-| `Dimensione dell'interfaccia`, `Densità dei menu` | Scala dell'intera interfaccia, e menu compatti o comodi |
+| `Dimensione dell'interfaccia`, `Spaziatura dei menu` | Scala dell'intera interfaccia, e menu compatti o comodi |
 | `Forme d'onda` | Pulito (il colore della clip) o colori spettrali, a scelta con i canali stereo separati |
 | `Nomi delle note`, `Tasti neri` | Nomi inglesi, germanici o in solfeggio, con diesis o bemolle |
 | `Stile dei plugin` | L'aspetto delle finestre dei plugin integrati: automatico, o uno stile per tutti i plugin |
@@ -80,7 +80,7 @@ La finestra Impostazioni ha otto pagine: Audio, MIDI, Generale, Tema, File, LYNX
 |---|---|
 | Riquadro del tema | Sceglie un preset. `Importa...` ed `Esporta...` leggono e scrivono file `.lynxtheme`, `Salva preset...` conserva il tema corrente, `Predefinito` lo ripristina |
 | `Colore principale`, `Sfondo`, `Area di lavoro` | I tre colori di un tema. Il colore dell'area di lavoro può seguire automaticamente lo sfondo |
-| Immagine dell'area di lavoro | Un PNG, JPEG o GIF dietro le finestre, con `Adattamento immagine`, `Opacità dell'immagine` e `Attenua` |
+| Immagine dell'area di lavoro | Un PNG, JPEG o GIF dietro le finestre, con `Adattamento immagine`, `Opacità dell'immagine` e `Scurisci l'immagine` |
 | Suono di avvio | Un tuo suono di 30 secondi o meno, oppure quello di LYNX SHARE |
 
 ## File
@@ -95,7 +95,7 @@ La finestra Impostazioni ha otto pagine: Audio, MIDI, Generale, Tema, File, LYNX
 
 ## LYNX extras
 
-`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un unico posto. Quelle che cambiano solo l'aspetto sono attive per impostazione predefinita, le altre sono disattivate. **Come FL** disattiva tutti gli extra, **Consigliato** riporta ciascuno al suo valore predefinito. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga indica.
+`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un unico posto. Quelle che cambiano solo l'aspetto sono attive per impostazione predefinita, così come alcune piccole aggiunte: i file MIDI rilasciati sulla Playlist diventano clip di pattern, l'elenco Recenti e una riga per plugin negli elenchi dei plugin, più l'anteprima MIDI e il completamento con Tab nel Browser. Le altre sono disattivate. **Come FL** disattiva tutti gli extra, **Consigliato** riporta ciascuno al suo valore predefinito. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga indica.
 
 | Impostazione | Cosa fa |
 |---|---|

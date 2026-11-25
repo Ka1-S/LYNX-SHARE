@@ -13106,3 +13106,4 @@ countries: kr
 "This folder is not an FL Studio installation: {0}. Choose the folder that holds FL64.exe and Data. Nothing was changed." = "이 폴더는 FL Studio 설치가 아닙니다: {0}. FL64.exe와 Data가 있는 폴더를 선택하세요. 변경된 것은 없습니다."
 "More than one FL Studio: choose one" = "FL Studio가 둘 이상입니다. 하나를 선택하세요"
 "No FL Studio was found in the usual places or on mounted drives. Use Browse if it is somewhere else." = "일반적인 위치와 마운트된 드라이브에서 FL Studio를 찾지 못했습니다. 다른 곳에 있으면 찾아보기를 사용하세요."
+"Every LYNX extra at its default" = "모든 LYNX 추가 기능을 기본값으로"

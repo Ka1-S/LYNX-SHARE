@@ -1,5 +1,5 @@
 ---
-source: d574d72a95
+source: db97618390
 ---
 ![Halaman Umum di jendela Pengaturan, dengan tab halaman di bagian atas](/assets/img/wiki/settings-general.webp)
 
@@ -51,7 +51,7 @@ Jendela Pengaturan punya delapan halaman: Audio, MIDI, Umum, Tema, File, Ekstra 
 | `Template bawaan`, `Proyek saat mulai` | Template yang terbuka dengan `File › Baru`, dan apa yang terbuka saat start: `Proyek kosong`, `Template bawaan`, atau `Proyek terakhir digunakan`. `File › Simpan sebagai template...` menambahkan milikmu sendiri |
 | `Klip sesi dari set Live` | Tempat clip sesi dari set Live yang diimpor: kisi clip, atau Playlist setelah aransemen |
 | `Bahasa`, `Font antarmuka` | Berlaku pada start berikutnya |
-| `Ukuran antarmuka`, `Kepadatan menu` | Skala seluruh antarmuka, dan menu yang ringkas atau lapang |
+| `Ukuran antarmuka`, `Jarak menu` | Skala seluruh antarmuka, dan menu yang ringkas atau lapang |
 | `Bentuk gelombang` | Bersih (warna clip) atau warna spektral, opsional dengan channel stereo terpisah |
 | `Nama not`, `Tuts hitam` | Nama Inggris, Jerman, atau solfegio, dengan kres atau mol |
 | `Gaya plugin` | Tampilan jendela plugin bawaan: otomatis, atau satu gaya untuk setiap plugin |
@@ -80,7 +80,7 @@ Jendela Pengaturan punya delapan halaman: Audio, MIDI, Umum, Tema, File, Ekstra 
 |---|---|
 | Kotak tema | Memilih preset. `Impor...` dan `Ekspor...` membaca dan menulis file `.lynxtheme`, `Simpan preset...` menyimpan tema saat ini, `Bawaan` meresetnya |
 | `Warna aksen`, `Latar belakang`, `Ruang kerja` | Tiga warna sebuah tema. Warna ruang kerja bisa mengikuti latar belakang secara otomatis |
-| Gambar ruang kerja | PNG, JPEG, atau GIF di belakang jendela, dengan `Penyesuaian gambar`, `Opasitas gambar`, dan `Redupkan` |
+| Gambar ruang kerja | PNG, JPEG, atau GIF di belakang jendela, dengan `Penyesuaian gambar`, `Opasitas gambar`, dan `Gelapkan gambar` |
 | Suara pembuka | Suaramu sendiri sepanjang 30 detik atau kurang, atau suara bawaan LYNX SHARE |
 
 ## File
@@ -95,7 +95,7 @@ Jendela Pengaturan punya delapan halaman: Audio, MIDI, Umum, Tema, File, Ekstra 
 
 ## Ekstra LYNX
 
-`Opsi › Ekstra LYNX...`. Tambahan khas LYNX SHARE di satu tempat. Yang hanya mengubah tampilan menyala secara bawaan, sisanya mati. **Sama seperti FL** mematikan semua ekstra, **Direkomendasikan** mengembalikan tiap ekstra ke nilai bawaannya. Tiap sakelar adalah pengaturan yang sama dengan yang ada di menu atau halaman yang disebut barisnya.
+`Opsi › Ekstra LYNX...`. Tambahan khas LYNX SHARE di satu tempat. Yang hanya mengubah tampilan menyala secara bawaan, begitu juga beberapa tambahan kecil: file MIDI yang dijatuhkan ke Playlist menjadi klip pattern, daftar Terbaru dan satu baris per plugin di daftar plugin, serta pratinjau MIDI dan pelengkapan dengan Tab di Browser. Sisanya mati. **Sama seperti FL** mematikan semua ekstra, **Direkomendasikan** mengembalikan tiap ekstra ke nilai bawaannya. Tiap sakelar adalah pengaturan yang sama dengan yang ada di menu atau halaman yang disebut barisnya.
 
 | Pengaturan | Fungsinya |
 |---|---|

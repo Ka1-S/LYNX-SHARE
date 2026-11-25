@@ -21,7 +21,7 @@
 <p>这些选项在 <code>选项 › 录制</code> 和录制按钮的右键菜单中。</p>
 <div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>预备拍</code></td><td><code>Ctrl+P</code></td><td>录制开始前播放关闭、1 小节、2 小节或 4 小节的节拍器。<code>Ctrl+P</code> 在关闭和你上次选择的长度之间切换。该选择在关闭程序后会保留；新安装从 1 小节开始，与 FL Studio 相同</td></tr><tr><td><code>节拍器</code></td><td><code>Ctrl+M</code></td><td>播放时发出咔嗒声</td></tr><tr><td><code>等待第一个音符再开始</code></td><td><code>Ctrl+I</code></td><td>录制等到你开始演奏才开始</td></tr><tr><td><code>循环录音</code></td><td>无</td><td>录制循环进行，而不是一直往后走</td></tr><tr><td><code>音频：在循环区域上插入录音</code></td><td>无</td><td>播放整个循环区域，只保留其中的音频</td></tr><tr><td><code>音频：预滚</code> 和 <code>post-roll</code></td><td>无</td><td>在切入之前和切出之后播放 0、1、2 或 4 小节</td></tr><tr><td><code>录制时开始播放</code></td><td>无</td><td>开启录制的同时也按下播放</td></tr><tr><td><code>停止录制时取消插入轨的预备</code></td><td>无</td><td>每遍录音之后释放已预备的插入轨</td></tr></tbody></table></div>
 <p><code>录音时低延迟</code> 位于录制按钮的右键菜单中，也位于混音台插入轨菜单的 <code>磁盘录音</code> 下。默认关闭。当带输入的插入轨处于录音待命，或它的监听为 <code>开</code> 时，它通往 Master 的路径上会增加延迟的效果器会被旁通。这只改变你听到的声音：如果录音取自这些效果器之后，例如使用 <code>效果后</code>，插入轨会保留它的所有效果器。取消录音待命后，这些效果器会恢复。</p>
-<p><code>延迟补偿</code> 在同一个 <code>磁盘录音</code> 菜单中，默认开启，与 FL Studio 中一样。它会把每段录音往回移动，移动量为音频设备的往返延迟、音频设置中的 <code>微调（采样）</code> 值，以及插件的延迟补偿。关闭它可让录音保持在录制时的位置。</p>
+<p><code>按音频延迟对齐录音</code> (FL Studio: Latency compensation) 在同一个 <code>磁盘录音</code> 菜单中，默认开启，与 FL Studio 中一样。它会把每段录音往回移动，移动量为音频设备的往返延迟、音频设置中的 <code>微调（采样）</code> 值，以及插件的延迟补偿。关闭它可让录音保持在录制时的位置。</p>
 <p><code>工具 › 取消录音</code> 会丢弃当前这一遍录制所写入的内容（它的音符、自动化和音频录音），并关闭录制。播放继续，处于录音待命的插入轨仍保持待命。</p>
 <h2 id="recording-into-clip-slots">录制到片段插槽</h2>
 <p>在<a href="/wiki/layouts/">片段启动工作流程</a>中，录音可以进入片段网格而不是播放列表，与 Ableton Live 中一样。</p>

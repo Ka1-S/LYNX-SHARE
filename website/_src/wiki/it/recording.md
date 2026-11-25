@@ -1,5 +1,5 @@
 ---
-source: 896ead3e2d
+source: a1c441284e
 ---
 ![La finestra Registrazione chiede cosa registrare: audio, note e automazione, tutto, oppure audio nell'editor audio](/assets/img/wiki/record-dialog.webp)
 
@@ -81,7 +81,7 @@ Le opzioni sono in `Opzioni › Registrazione` e nel menu del clic destro del pu
 
 `Bassa latenza in registrazione` si trova nel menu del tasto destro del pulsante di registrazione e nel menu dell'insert del Mixer sotto `Registrazione su disco`. È disattivato per impostazione predefinita. Finché un insert con un ingresso è armato, o il suo monitoraggio è su `On`, gli effetti che aggiungono latenza sul suo percorso verso il Master vengono bypassati. Cambia solo ciò che senti: un insert mantiene tutti i suoi effetti quando la take è prelevata dopo di essi, per esempio con `Dopo gli effetti`. Gli effetti tornano quando l'insert viene disarmato.
 
-`Compensazione della latenza` è nello stesso menu `Registrazione su disco` ed è attivo per impostazione predefinita, come in FL Studio. Sposta ogni take indietro del tempo di andata e ritorno del dispositivo audio, del valore `Regolazione fine (campioni)` delle impostazioni audio e del ritardo di compensazione dei plugin. Disattivalo per tenere le take dove sono state registrate.
+`Allinea le registrazioni alla latenza audio` (FL Studio: Latency compensation) è nello stesso menu `Registrazione su disco` ed è attivo per impostazione predefinita, come in FL Studio. Sposta ogni take indietro del tempo di andata e ritorno del dispositivo audio, del valore `Regolazione fine (campioni)` delle impostazioni audio e del ritardo di compensazione dei plugin. Disattivalo per tenere le take dove sono state registrate.
 
 `Strumenti › Annulla registrazione` butta via ciò che il passaggio di registrazione corrente ha scritto (le sue note, l'automazione e le take audio) e disattiva la registrazione. La riproduzione continua e gli insert armati restano armati.
 

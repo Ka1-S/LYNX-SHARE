@@ -83,7 +83,7 @@ The options are in `Options › Recording` and in the record button's right-clic
 
 `Low latency while recording` is in the record button's right-click menu and in the Mixer's insert menu under `Disk recording`. It is off by default. While an insert with an input is armed, or its monitoring is `On`, the effects that add latency on its way to the Master are bypassed. This changes only what you hear: an insert keeps all its effects when the take is tapped after them, for example with `Post effects`. The effects come back when the insert is disarmed.
 
-`Latency compensation` is in the same `Disk recording` menu and is on by default, as in FL Studio. It moves each take back by the audio device's round trip, the `Fine adjust (samples)` value of the audio settings and the plugins' delay compensation. Turn it off to keep the takes where they were recorded.
+`Line up recordings with the audio latency` (FL Studio: Latency compensation) is in the same `Disk recording` menu and is on by default, as in FL Studio. It moves each take back by the audio device's round trip, the `Fine adjust (samples)` value of the audio settings and the plugins' delay compensation. Turn it off to keep the takes where they were recorded.
 
 `Tools › Cancel recording` throws away what the current recording pass wrote (its notes, automation and audio takes) and turns recording off. Playback goes on and the armed inserts stay armed.
 

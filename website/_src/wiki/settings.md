@@ -53,7 +53,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 | `Default template`, `Startup project` | The template that opens with `File › New`, and what opens at start-up: `Empty project`, `Default template` or `Last used project`. `File › Save as template...` adds your own |
 | `Session clips of Live sets` | Where the session clips of an imported Live set go: the clip grid, or the Playlist after the arrangement |
 | `Language`, `Interface font` | Applied at the next start |
-| `Interface size`, `Menu density` | Scale of the whole interface, and compact or comfortable menus |
+| `Interface size`, `Menu spacing` | Scale of the whole interface, and compact or comfortable menus |
 | `Waveforms` | Clean (the clip colour) or spectral colours, optionally with stereo channels apart |
 | `Note names`, `Black notes` | English, Germanic or solfège names, with sharps or flats |
 | `Plugin style` | The look of the built-in plugin windows: automatic, or one style for every plugin |
@@ -82,7 +82,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 |---|---|
 | Theme box | Picks a preset. `Import...` and `Export...` read and write `.lynxtheme` files, `Save preset...` keeps the current theme, `Default` resets it |
 | `Accent color`, `Background`, `Workspace` | The three colours of a theme. The workspace colour can follow the background automatically |
-| Workspace image | A PNG, JPEG or GIF behind the windows, with `Image fit`, `Image opacity` and `Dim` |
+| Workspace image | A PNG, JPEG or GIF behind the windows, with `Image fit`, `Image opacity` and `Darken image` |
 | Startup sound | Your own sound of 30 seconds or less, or LYNX SHARE's own |
 
 ## Files
@@ -97,7 +97,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 
 ## LYNX extras
 
-`Options › LYNX extras...`. LYNX SHARE's own additions in one place. The ones that only change the look are on by default, the rest are off. **FL-exact** turns every extra off, **Recommended** puts each one back at its default. Each switch is the same setting as in the menu or page its line names.
+`Options › LYNX extras...`. LYNX SHARE's own additions in one place. The ones that only change the look are on by default, and so are a few small additions: MIDI files dropped on the Playlist become pattern clips, the Recent list and one row per plugin in the plugin lists, and the MIDI preview and the Tab completion in the Browser. The rest are off. **FL-exact** turns every extra off, **Recommended** puts each one back at its default. Each switch is the same setting as in the menu or page its line names.
 
 | Setting | What it does |
 |---|---|
