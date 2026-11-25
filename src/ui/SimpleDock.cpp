@@ -3380,6 +3380,7 @@ juce::Component* SimpleDock::stepsComponentForSnapshot() { return stepsPage.get(
 int SimpleDock::stepsRowsForCheck() const { return stepsPage->rowCountForCheck(); }
 int SimpleDock::stepsCountForCheck() const { return stepsPage->stepCountForCheck(); }
 void SimpleDock::stepsClickForCheck (int row, int step) { stepsPage->clickStepForCheck (row, step); }
+void SimpleDock::stepsHoverCellForCheck (int row, int step) { stepsPage->hoverForCheck (stepsPage->cellForCheck (row, step).getCentre()); }
 void SimpleDock::stepsLetterForCheck (int letter) { stepsPage->pickLetterForCheck (letter); }
 void SimpleDock::stepsAddClipForCheck() { stepsPage->addClipForCheck(); }
 int SimpleDock::stepsMessagesShownForCheck() const { return stepsPage->messagesShownForCheck(); }
