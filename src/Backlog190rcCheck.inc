@@ -22,7 +22,7 @@
                 if (item.subMenu != nullptr)
                     rows (*item.subMenu, out);
                 else if (! item.isSeparator && ! item.isSectionHeader && item.isEnabled && item.action != nullptr
-                         && plain (item.text) != tr ("Save preset...") && ! plain (item.text).startsWith (tr ("Delete preset"))
+                         && plain (item.text) != tr ("Save preset...") && ! plain (item.text).startsWith (tr ("Delete preset \"{0}\"", { "" }).upToFirstOccurrenceOf ("\"", false, false))
                          && plain (item.text) != tr ("Show the presets folder"))
                     out.push_back (item);
             }
