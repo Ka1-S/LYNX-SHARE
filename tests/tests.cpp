@@ -18133,5 +18133,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Picker190qiTests.inc" // round 190qi (0.1.32 R6): Recent / Hidden / one row per plugin, MIDI preview, file types, Tab completion, tag tree
 #include "Issues190qjTests.inc" // round 190qj (0.1.32): issue #265 (a linked track's M and clips on other inserts), PRs #261-#266, #238
 #include "Pr268_190qmTests.inc" // round 190qm: PR #268, a switched-off Playlist track (FL's greyed clips + the LYNX row veil)
+#include "Qa190rbTests.inc" // round 190rb (0.1.32 quality): crash / memory fixes from the crash reports, ASan / UBSan and the UI monkey
 #include "Issues190qoTests.inc" // round 190qo: issues #270 (typing keyboard layouts), #271 (SoundFont slide velocity)
 #include "Discord1124_190quTests.inc" // round 190qu (0.1.32): Discord 11-24 (automation lanes, Split by channel, Track-only, Simple)
