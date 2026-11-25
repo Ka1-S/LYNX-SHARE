@@ -9,6 +9,13 @@
     //            track mute, automation point) one undo step each: undone all = the opened song, redone all = the edited one
     // <folder>/checks.txt (ok / FAIL lines, result=OK); pictures only for the first project (or all without --fast).
     // Included in the app class of Main.cpp.
+    // the song as text without the project's clock, which runs on its own (checked by itself, below)
+    static juce::String sweep190reText (lynx::Song song)
+    {
+        song.info.workSeconds = 0.0;
+        return lynx::ProjectFile::toJson (song, false);
+    }
+
     static juce::String sweep190reFirstDiff (const juce::String& a, const juce::String& b)
     {
         if (a == b)
@@ -16,11 +23,6 @@
         juce::StringArray la, lb;
         la.addLines (a);
         lb.addLines (b);
-        // (the project's clock runs on its own: the working time is checked by itself, below)
-        for (auto* lines : { &la, &lb })
-            for (int k = lines->size(); --k >= 0;)
-                if ((*lines)[k].trimStart().startsWith ("\"workSeconds\""))
-                    lines->remove (k);
         // (a line inserted or removed puts a comma on the line before it: compare without the line-end commas)
         for (auto* lines : { &la, &lb })
             for (auto& line : *lines)
@@ -109,7 +111,7 @@
             check (tag + " open: the project has content", opened);
             if (! opened)
                 continue;
-            const auto s0 = ProjectFile::toJson (offline.getSong(), false);
+            const auto s0 = sweep190reText (offline.getSong());
 
             // --- layouts ---------------------------------------------------------------------------------------------
             struct L { const char* name; layoutstyle::Style style; bool trackOnly; };
@@ -139,7 +141,7 @@
                 if (! outside.isEmpty())
                     note ("children past the window: " + outside.joinIntoString (", "));
                 check (tag + " layout " + l.name + ": every shown part inside the window", outside.isEmpty());
-                const auto now = ProjectFile::toJson (offline.getSong(), false);
+                const auto now = sweep190reText (offline.getSong());
                 const auto diff = sweep190reFirstDiff (s0, now);
                 if (diff.isNotEmpty())
                 {
@@ -170,7 +172,7 @@
             ui.showDesktopForSnapshot (false);
             offline.dispatchPendingMessages();
             {
-                const auto diff = sweep190reFirstDiff (s0, ProjectFile::toJson (offline.getSong(), false));
+                const auto diff = sweep190reFirstDiff (s0, sweep190reText (offline.getSong()));
                 if (diff.isNotEmpty())
                     note ("song changed by showing panels: " + diff);
                 check (tag + " panels: the song is unchanged", diff.isEmpty());
@@ -185,7 +187,7 @@
                 ui.openFile (a);
                 for (int k = 0; k < 5; ++k)
                     offline.dispatchPendingMessages();
-                const auto now = ProjectFile::toJson (offline.getSong(), false);
+                const auto now = sweep190reText (offline.getSong());
                 const auto diff = sweep190reFirstDiff (s0, now);
                 if (diff.isNotEmpty())
                 {
@@ -215,7 +217,7 @@
 
             // --- undo / redo -----------------------------------------------------------------------------------------
             {
-                const auto before = ProjectFile::toJson (offline.getSong(), false);
+                const auto before = sweep190reText (offline.getSong());
                 struct E { const char* name; std::function<bool (const Song&)> can; std::function<void()> run; };
                 std::vector<E> edits {
                     { "add a note", [] (const Song& s) { return ! s.patterns.empty() && ! s.channels.empty(); },
@@ -248,7 +250,7 @@
                     e.run();
                     offline.dispatchPendingMessages();
                     juce::Thread::sleep (2);
-                    states.push_back (ProjectFile::toJson (offline.getSong(), false));
+                    states.push_back (sweep190reText (offline.getSong()));
                     done.add (e.name);
                     check (tag + " edit " + e.name + ": changes the song and can be undone",
                            states.back() != states[states.size() - 2] && offline.canUndo());
@@ -259,7 +261,7 @@
                 {
                     offline.undo();
                     offline.dispatchPendingMessages();
-                    const auto now = ProjectFile::toJson (offline.getSong(), false);
+                    const auto now = sweep190reText (offline.getSong());
                     const auto diff = sweep190reFirstDiff (states[(std::size_t) k - 1], now);
                     if (diff.isNotEmpty())
                     {
@@ -276,7 +278,7 @@
                 {
                     offline.redo();
                     offline.dispatchPendingMessages();
-                    const auto now = ProjectFile::toJson (offline.getSong(), false);
+                    const auto now = sweep190reText (offline.getSong());
                     const auto diff = sweep190reFirstDiff (states[(std::size_t) k], now);
                     if (diff.isNotEmpty())
                     {
@@ -371,7 +373,7 @@
                     errors.add (juce::String (mode.name) + ": " + what);
             };
             const auto rows = pl.trackRowForSnapshot (1).getCentreY() - pl.trackRowForSnapshot (0).getCentreY();
-            const auto before = ProjectFile::toJson (e.getSong(), false);
+            const auto before = sweep190reText (e.getSong());
             drag (0, { 0, rows });
             int moved = -1, stayed = -1; // (the drop sorts the clips)
             for (int i = 0; i < (int) e.getSong().playlist.size(); ++i)
@@ -384,7 +386,7 @@
             say ("the other clip of that pattern still plays Keys", channelsOf (stayed) == std::set<int> { 0 });
             e.undo();
             e.dispatchPendingMessages();
-            say ("one undo puts the song back", sweep190reFirstDiff (before, ProjectFile::toJson (e.getSong(), false)).isEmpty());
+            say ("one undo puts the song back", sweep190reFirstDiff (before, sweep190reText (e.getSong())).isEmpty());
         }
         layoutstyle::setCurrent (wasStyle);
         trackonly::setEnabled (wasTrackOnly);
