@@ -287,5 +287,26 @@
             DetailView::instrumentCardFactory = savedFactory;
         }
 
+        // ---- UI monkey test, seed 107 (sanitizer build): heap-use-after-free in Settings' find bar. Stepping to a match
+        //      on another page switched the tab; the page shown gets the look and feel again and its sliders make their
+        //      +/- buttons anew, so a match that was such a button was gone. The search runs again on the page shown
+        {
+            AudioEngine offline (false);
+            offline.setSong (Song::makeDefault());
+            auto panel = makeSettingsPanel (offline, SettingsPage::audio, false);
+            panel->setSize (900, 700);
+            int steps = 0, found = 0;
+            for (char c = 'a'; c <= 'z'; ++c)
+            {
+                const auto first = settingsFindForSnapshot (*panel, juce::String::charToString ((juce::juce_wchar) c));
+                found += first.matches;
+                for (int k = 1; k <= juce::jmin (24, first.matches); ++k, ++steps)
+                    settingsFindForSnapshot (*panel, juce::String::charToString ((juce::juce_wchar) c), k);
+            }
+            check ("Settings: stepping through the matches of a..z over every page (" + juce::String (steps) + " steps, " + juce::String (found)
+                       + " matches) keeps every match it shows alive",
+                   steps > 0);
+        }
+
         return result;
     }
