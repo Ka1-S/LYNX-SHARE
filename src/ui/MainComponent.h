@@ -626,6 +626,11 @@ private:
     void autosave();
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
+public:
+    // issue #286 (round 190rc): the saved project's folder in the file manager; false (and a hint) when the project has no
+    // file yet. `open` false: only says whether it would (tests)
+    bool openProjectFolder (bool open = true);
+private:
     void revertToLastBackup();
     // round 190ap: the Versions panel (saved versions and backups of this project) and its "Open as a copy"
     void showVersions();

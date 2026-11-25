@@ -80,7 +80,10 @@ inline std::int64_t songBarNumber (std::int64_t origin, std::int64_t bar, std::i
 // other pattern clips, mapped into `pattern`'s own time. FL draws these hollow. Muted clips are skipped; a clip longer
 // than its pattern loops it with stretchedClipsLoop() (LYNX extra), else plays it once (FL, round 168k). Empty when
 // the pattern is not in the Playlist.
-inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int channel, std::size_t limit = 2000)
+// `otherChannels` (round 190rc, Discord 11-24): the notes of every OTHER channel in those clips instead. In Track-only
+// mode and the Simple layout each clip is a pattern of one instrument, so FL's ghosts (the pattern's other channels) are
+// never there; the other tracks' clips playing at the same time take their place.
+inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int channel, std::size_t limit = 2000, bool otherChannels = false)
 {
     std::vector<Note> out;
     const Clip* home = nullptr;
@@ -116,7 +119,7 @@ inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int chan
         for (auto pass = firstPass; pass == firstPass || (loops && origin + pass * length < to); ++pass)
             for (const auto& n : other.notes)
             {
-                if (n.channel != channel || (loops && n.start >= length))
+                if ((otherChannels ? n.channel == channel : n.channel != channel) || (loops && n.start >= length))
                     continue;
 
                 const auto at = origin + pass * length + n.start;

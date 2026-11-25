@@ -12848,5 +12848,13 @@ countries: kr
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "이 릴리스에서는 Peak Controller와 Envelope Controller 링크가 컨트롤러가 값을 보내기 전부터 처음부터 대상을 설정합니다: {0}"
 "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Effector의 새 Kilohearts 법칙(kHs Ring Mod의 오버샘플링 경로, kHs Formant Filter·kHs Delay·kHs Clipper 대체)은 이전 Ring Mod 법칙과 Effector 자체의 Vowel·Delay·Distort를 재생합니다: {0}"
 
-# round 190rc: PR #284's reset warning
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "곡 위치에서 클립 자르기(선택한 클립, 없으면 그 위치의 모든 클립)"
+"Cut clips at the song position" = "곡 위치에서 클립 자르기"
+"Open the project's folder in the file manager" = "파일 관리자에서 프로젝트 폴더 열기"
+"Open the project's folder" = "프로젝트 폴더 열기"
+"Save the project first: it has no folder yet" = "먼저 프로젝트를 저장하세요: 아직 폴더가 없습니다"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI 파일: [2xLMB] 프로젝트로 열기  Playlist(클립), Channel Rack 또는 Piano roll로 드래그해 가져오기"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI 파일: [2xLMB] 프로젝트로 열기  Channel Rack 또는 Piano roll로 드래그해 가져오기 (Playlist로: Playlist 메뉴 › \"플레이리스트에 놓은 MIDI 파일을 패턴 클립으로 만들기\")"
 "This will reset the selected mixer track(s) and remove all plugins." = "선택한 믹서 트랙을 초기화하고 모든 플러그인을 제거합니다."
+"Instrument: [LMB] open or close its window" = "악기: [LMB] 창 열기/닫기"

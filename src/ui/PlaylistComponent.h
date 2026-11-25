@@ -191,6 +191,9 @@ public:
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
     void splitSelectionForLive(); // round 190im (R12): Live's Ctrl+E Split of the selected clips
+    // issue #285 (round 190rc): the selected clips (else every clip) that cross the song position are cut there, one
+    // undo step; the pieces are selected. Returns the number of cuts.
+    int splitAtPlayhead();
     // The key map's actions of this editor (its tools and single letters: "pianoRoll.tool.knife"...); false if not one.
     bool runKeyAction (const std::string& id);
     // The tool buttons' tooltips show the keys the key map gives them (`keyOf`: action id -> key text, "" = none).
@@ -479,6 +482,12 @@ public:
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
+    // round 190rc: the Simple header's instrument icon opens / closes the track's instrument window (MainComponent: the rack's)
+    std::function<void (int channel)> onToggleChannelWindow;
+    // the instrument channel a Simple track plays (instrument / sampler: its channel; drums: the kit's), -1 for none
+    int simpleInstrumentChannel (int track) const;
+    // where paint drew each Simple header's type icon (the click target; round 190rc)
+    const std::map<int, juce::Rectangle<int>>& simpleIconTargets() const noexcept { return simpleIconBoxes; }
     // round 190qu (Discord 11-24): a clip was clicked / the clip selection changed (the Clip-launch Clip View follows)
     std::function<void (int clip)> onClipClicked;
     std::function<void()> onSelectionChanged;
@@ -930,6 +939,7 @@ private:
     juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header (Simple headers: the M button)
     // the Simple headers' controls (round 184a): empty with FL's headers, a row too short or a track without an insert
     bool simpleHeaders = false;
+    mutable std::map<int, juce::Rectangle<int>> simpleIconBoxes; // (round 190rc: the Simple header icons, from the last paint)
     bool liveStyle = false;
     bool dragCopies = false; // the clips being moved are copies made at the press
     arrange::TimeClip timeClipboard;

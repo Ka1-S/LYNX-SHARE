@@ -2032,6 +2032,17 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--backlog190rctest"))
+        {
+            // LYNX --backlog190rctest report.txt (round 190rc, the 0.1.32 backlog; also in --selftest): src/Backlog190rcCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto result = backlog190rcCheck (log);
+            juce::File (args[args.indexOf ("--backlog190rctest") + 1].unquoted()).replaceWithText (log + "backlog190rc=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--issues190qrtest"))
         {
             // LYNX --issues190qrtest report.txt (round 190qr, issues #274-#281; also in --selftest): src/Issues190qrCheck.inc
@@ -9989,6 +10000,9 @@ private:
         // there, the zoom-around-the-song-position and gain-handle extras (src/Issues190qrCheck.inc)
         juce::String issues190qrLog;
         const auto issues190qrResult = issues190qrCheck (issues190qrLog);
+        // round 190rc (0.1.32 backlog): #288 native generator presets, ... (src/Backlog190rcCheck.inc)
+        juce::String backlog190rcLog;
+        const auto backlog190rcResult = backlog190rcCheck (backlog190rcLog);
 
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
@@ -11409,7 +11423,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11532,6 +11546,7 @@ private:
                << "autolive190qp=" << autolive190qpResult << "\n"
                << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
                << "issues190qr=" << issues190qrResult << "\n"
+               << "backlog190rc=" << backlog190rcResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
@@ -21498,6 +21513,7 @@ private:
 #include "Issue282Check.inc" // round 190qs: issue #282, FL's trial mark and the Patcher generator in Export to FL Studio
 #include "ToolbarShot190qg.inc" // round 190qg: the toolbar never hides anything silently (walk, pictures)
 #include "Issues190qrCheck.inc" // round 190qr: issues #274-#281 (markers, rack meter, zoom, extras)
+#include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

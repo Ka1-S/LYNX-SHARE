@@ -12848,5 +12848,13 @@ countries: it ch sm
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "In questa versione i collegamenti di Peak Controller ed Envelope Controller impostano i loro obiettivi fin dall'inizio, prima che il controller invii un valore: {0}"
 "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Le leggi Kilohearts più recenti di Effector (il percorso sovracampionato di kHs Ring Mod; i sostituti di kHs Formant Filter, kHs Delay e kHs Clipper) suonano la legge Ring Mod precedente e Vowel, Delay e Distort di Effector: {0}"
 
-# round 190rc: PR #284's reset warning
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Taglia le clip nella posizione del brano (quelle selezionate, altrimenti tutte le clip lì)"
+"Cut clips at the song position" = "Taglia le clip nella posizione del brano"
+"Open the project's folder in the file manager" = "Apri la cartella del progetto nel gestore file"
+"Open the project's folder" = "Apri la cartella del progetto"
+"Save the project first: it has no folder yet" = "Salva prima il progetto: non ha ancora una cartella"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "File MIDI: [2xLMB] aprilo come progetto  trascinalo sulla Playlist (una clip), sul Channel Rack o sul Piano roll per importarlo"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "File MIDI: [2xLMB] aprilo come progetto  trascinalo sul Channel Rack o sul Piano roll per importarlo (sulla Playlist: menu della Playlist › \"I file MIDI rilasciati sulla Playlist diventano clip di pattern\")"
 "This will reset the selected mixer track(s) and remove all plugins." = "Questo ripristinerà le tracce del mixer selezionate e rimuoverà tutti i plugin."
+"Instrument: [LMB] open or close its window" = "Strumento: [LMB] apri o chiudi la sua finestra"

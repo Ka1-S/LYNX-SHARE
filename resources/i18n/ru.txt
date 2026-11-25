@@ -12848,5 +12848,13 @@ countries: ru by kz
 "Peak and Envelope Controller links set their targets from the start in this release, before the controller has sent a value: {0}" = "В этой версии связи Peak Controller и Envelope Controller задают свои цели с самого начала, ещё до того, как контроллер отправит значение: {0}"
 "Effector's newer Kilohearts laws (the kHs Ring Mod's oversampled path; the kHs Formant Filter, kHs Delay and kHs Clipper stand-ins) play the earlier Ring Mod law and Effector's own Vowel, Delay and Distort: {0}" = "Более новые законы Kilohearts в Effector (передискретизированный путь kHs Ring Mod; замены kHs Formant Filter, kHs Delay и kHs Clipper) играют прежний закон Ring Mod и собственные Vowel, Delay и Distort Effector: {0}"
 
-# round 190rc: PR #284's reset warning
+# round 190rc: #285 cut at the song position, #286 the project's folder, #287 the MIDI file hint, PR #284 reset warning
+"Cut clips at the song position (the selected ones, else every clip there)" = "Разрезать клипы в позиции песни (выделенные, иначе все клипы в этом месте)"
+"Cut clips at the song position" = "Разрезать клипы в позиции песни"
+"Open the project's folder in the file manager" = "Открыть папку проекта в файловом менеджере"
+"Open the project's folder" = "Открыть папку проекта"
+"Save the project first: it has no folder yet" = "Сначала сохраните проект: у него ещё нет папки"
+"MIDI file: [2xLMB] open it as a project  drag onto the Playlist (a clip), the Channel Rack or the Piano roll to import it" = "MIDI-файл: [2xLMB] открыть как проект  перетащите на Playlist (клип), в Channel Rack или Piano roll, чтобы импортировать"
+"MIDI file: [2xLMB] open it as a project  drag onto the Channel Rack or the Piano roll to import it (onto the Playlist: Playlist menu › \"MIDI files dropped on the Playlist become pattern clips\")" = "MIDI-файл: [2xLMB] открыть как проект  перетащите в Channel Rack или Piano roll, чтобы импортировать (на Playlist: меню Playlist › \"MIDI-файлы, перетащенные в Playlist, становятся клипами паттернов\")"
 "This will reset the selected mixer track(s) and remove all plugins." = "Выбранные дорожки микшера будут сброшены, а все плагины удалены."
+"Instrument: [LMB] open or close its window" = "Инструмент: [LMB] открыть или закрыть его окно"
