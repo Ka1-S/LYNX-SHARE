@@ -312,10 +312,12 @@
                     if (card != nullptr && card->isVisible())
                         saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-0.png");
                     auto& view = ui.getPlaylistForSnapshot();
-                    for (int k = 0; k < 8; ++k)
+                    for (int k = 0; k < 9; ++k)
                     {
-                        const auto mods = k < 4 ? juce::ModifierKeys (juce::ModifierKeys::ctrlModifier) : juce::ModifierKeys (juce::ModifierKeys::altModifier);
-                        wheel (view, mods, (k % 2) == 0 ? 0.25f : 0.25f);
+                        // Ctrl+wheel (FL's zoom), Alt+wheel (rows), the plain wheel (#313: "scroll with the mouse")
+                        const auto mods = k < 3 ? juce::ModifierKeys (juce::ModifierKeys::ctrlModifier)
+                                        : k < 6 ? juce::ModifierKeys (juce::ModifierKeys::altModifier) : juce::ModifierKeys();
+                        wheel (view, mods, k == 7 ? -0.25f : 0.25f);
                         if (auto* grid = ui.getClipGridForSnapshot(); grid != nullptr && style == layoutstyle::Style::clipLaunch)
                             wheel (*grid, mods, 0.25f);
                         settle();
@@ -323,7 +325,7 @@
                     }
                     if (card != nullptr && card->isVisible())
                         saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-8.png");
-                    line (tag + ": card " + (card != nullptr ? juce::String (card->isVisible() ? "shown" : "hidden") : "none") + ", positions over 8 zoom steps: "
+                    line (tag + ": card " + (card != nullptr ? juce::String (card->isVisible() ? "shown" : "hidden") : "none") + ", positions over 9 wheel steps: "
                           + seen.joinIntoString (" | "));
                     if (pinned)
                         check (tag + ": the card stays put while the view zooms", seen.size() == 1);
