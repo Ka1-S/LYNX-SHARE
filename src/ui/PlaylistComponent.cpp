@@ -10801,9 +10801,19 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
     menu.addItem (theme::mnemonic (tr ("Rename, color and icon..."), 'R'), [this, track] { renameTrack (track); }); // (FL's text, round 190ng)
     // (issue #201, round 190ll: a colour picked here goes to every selected track when this one is among them)
-    menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
-                         colourTracks (tracks, colour);
-                     }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
+    // round 190rs (G-15): FL 2026's "Change color..." opens the colour selector (one undo step for every selected track);
+    // LYNX's palette stays right under it as "Color palette" (add, never remove)
+    {
+        const auto mouse = juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1);
+        menu.addItem (tr ("Change color..."), [this, tracks = tracksForMenu (track), mouse, current = info.colour] {
+            ui::showColourPickerPopup (mouse, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
+                                       [this, tracks] (juce::Colour c) { colourTracks (tracks, c.getARGB()); }, {},
+                                       [this, tracks] { colourTracks (tracks, 0); });
+        });
+        menu.addSubMenu (tr ("Color palette"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
+                             colourTracks (tracks, colour);
+                         }, mouse));
+    }
     menu.addItem (tr ("Random color"), [this, tracks = tracksForMenu (track)] {
         // (FL 2026, round 190ri: each selected track its own random colour, one undo step)
         const auto& palette = lynxPalette();
