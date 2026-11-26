@@ -56,7 +56,7 @@ Each time you save over an existing project file, the version that is replaced i
 |---|---|
 | `File › Revert to last backup...` | Replaces the open project with its newest backup, after asking. The project file itself only changes when you save |
 | `File › Open autosave folder` | Shows the backups in the file manager |
-| `File › Save new version` (`Ctrl+Alt+S`) | Saves as `Song_2`, `Song_3` and so on, next to the current file |
+| `File › Save new version` (`Ctrl+Alt+S`; `Ctrl+N` in the Pattern layout) | Saves as `Song_2`, `Song_3` and so on, next to the current file |
 
 The `Backup` section of `Options › General settings...` has these settings:
 

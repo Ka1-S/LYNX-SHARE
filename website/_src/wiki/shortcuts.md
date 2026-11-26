@@ -44,11 +44,11 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 | Key | What it does |
 |---|---|
-| `Ctrl+N` | New project |
+| `Ctrl+N` | Save new version in the Pattern layout (as in FL Studio); New project in the Clip-launch and Simple layouts |
 | `Ctrl+O` | Open project |
 | `Ctrl+S` | Save |
 | `Ctrl+Shift+S` | Save as |
-| `Ctrl+Alt+S` | Save new version |
+| `Ctrl+Alt+S` | Save new version (every layout) |
 | `Ctrl+R` | Export audio |
 | `Ctrl+Shift+R` | Export an MP3 file |
 | `Ctrl+Shift+M` | Export a MIDI file |
