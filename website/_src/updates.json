@@ -1,5 +1,22 @@
 [
   {
+    "version": "0.1.31.3-alpha",
+    "tag": "v0.1.31.3-alpha",
+    "date": "2026-11-26",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31.3-alpha",
+    "title": "A third hotfix for 0.1.31",
+    "summary": "LYNX SHARE 0.1.31.3 fixes swapped left and right channels on Linux with PipeWire, Online sessions in which a guest stopped getting the host's tempo or changes were undone, and Remote Control edits of new projects. Everyone in an Online session should update.",
+    "new": [],
+    "better": [],
+    "fixed": [
+      "Linux, LYNX's own PipeWire driver: a device's channels follow the device's own port order, not PipeWire's internal ids. When those ids were out of order, left and right were swapped or a multichannel input came in the wrong order (measured with loopback devices; on a real sound card it needs out-of-order ids, which can happen when PipeWire reuses them).",
+      "Online sessions: a guest whose copy of the project has another creation date than the host's gets the host's tempo and project settings again. Everyone in a session should update: a 0.1.31.2 guest still misses them with a 0.1.31.3 host.",
+      "Online sessions: changes of VCAs, the main volume, modulators, the clip grid, grooves, mix snapshots and Master looks are no longer undone at the next edit. They aren't shared with the others yet: each computer keeps its own, and LYNX says once when such a change stays on your computer.",
+      "Remote Control: project.edit applies its edits to new projects again."
+    ],
+    "known": []
+  },
+  {
     "version": "0.1.31.2-alpha",
     "tag": "v0.1.31.2-alpha",
     "date": "2026-11-25",

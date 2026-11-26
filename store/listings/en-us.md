@@ -63,9 +63,7 @@ LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub
 
 ## What's new
 
-LYNX SHARE 0.1.31.2 fixes a likely cause of a start page crash, the "LYNX first" keyboard setting over docked VST3 plugins, stretched clips that looped their first bar, automation lanes made from FL projects, exported .flp files that FL refused, presets of FL's stock synths in the Browser and a few smaller issues.
-
-LYNX SHARE 0.1.31.1 fixes what you reported on 0.1.31: automation of FL projects on the controls, plugin windows that stopped opening, the Device view, Export with a folder in the file name, clips on instrument tracks, a crash in the hint bar and start-up memory.
+LYNX SHARE 0.1.31.3 fixes swapped left and right channels on Linux with PipeWire, Online sessions in which a guest stopped getting the host's tempo or changes were undone, and Remote Control edits of new projects. Everyone in an Online session should update.
 
 LYNX SHARE 0.1.31: a built-in Tracker that also opens tracker modules (.mod, .xm, .s3m, .it); LYNX Model, physical
 models of marimba, vibraphone, xylophone, glockenspiel, tubular bells and kalimba; JSFX effect and instrument scripts; a

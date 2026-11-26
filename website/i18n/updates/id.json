@@ -1,4 +1,10 @@
 {
+"u.0.1.31.3.t": "Hotfix ketiga untuk 0.1.31",
+"u.0.1.31.3.s": "LYNX SHARE 0.1.31.3 memperbaiki kanal kiri dan kanan yang tertukar di Linux dengan PipeWire, sesi online tempat tamu berhenti menerima tempo host atau perubahan dibatalkan, dan pengeditan proyek baru lewat Kendali jarak jauh. Semua orang dalam sesi online sebaiknya memperbarui.",
+"u.0.1.31.3.f0": "Linux, driver PipeWire milik LYNX sendiri: kanal sebuah perangkat mengikuti urutan port perangkat itu sendiri, bukan id internal PipeWire. Saat id itu datang tidak berurutan, kiri dan kanan tertukar atau input multikanal datang dengan urutan yang salah (diukur dengan perangkat loopback; pada kartu suara sungguhan ini butuh id yang tidak berurutan, yang bisa terjadi saat PipeWire memakai ulang id).",
+"u.0.1.31.3.f1": "Sesi online: tamu yang salinan proyeknya punya tanggal pembuatan berbeda dari milik host kembali menerima tempo dan pengaturan proyek host. Semua orang dalam sesi sebaiknya memperbarui: tamu dengan 0.1.31.2 masih tidak menerimanya dari host dengan 0.1.31.3.",
+"u.0.1.31.3.f2": "Sesi online: perubahan VCA, volume utama, modulator, kisi klip, groove, snapshot mix, dan tampilan master tidak lagi dibatalkan pada pengeditan berikutnya. Semua itu belum dibagikan ke yang lain: setiap komputer menyimpan miliknya sendiri, dan LYNX memberi tahu sekali saat perubahan seperti itu tetap di komputer Anda.",
+"u.0.1.31.3.f3": "Kendali jarak jauh: project.edit kembali menerapkan editannya pada proyek baru.",
 "u.0.1.31.2.t": "Perbaikan lain untuk 0.1.31",
 "u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 memperbaiki kemungkinan penyebab crash di halaman awal, setelan keyboard \"LYNX dulu\" di atas plugin VST3 yang di-dock, klip yang direntangkan yang mengulang bar pertamanya, lajur otomasi dari proyek FL, file .flp hasil ekspor yang ditolak FL, preset synth bawaan FL di Browser, dan beberapa masalah kecil.",
 "u.0.1.31.2.f0": "Menggulir daftar \"Mulai proyek baru\" di halaman awal dapat membaca melewati akhir daftar, kemungkinan penyebab crash yang dilaporkan di Windows; kini tidak lagi.",

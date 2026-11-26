@@ -1,10 +1,8 @@
 {
-"u.0.1.31.2.t": "Kolejne poprawki do 0.1.31",
-"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 naprawia prawdopodobną przyczynę awarii strony startowej, ustawienie klawiatury „najpierw LYNX” nad zadokowanymi wtyczkami VST3, rozciągnięte klipy powtarzające pierwszy takt, ścieżki automatyki tworzone z projektów FL, eksportowane pliki .flp, których FL nie otwierał, presety syntezatorów FL w Browserze i kilka mniejszych problemów.",
-"u.0.1.31.2.f0": "Przewijanie listy „Rozpocznij nowy projekt” na stronie startowej mogło czytać poza końcem listy, co było prawdopodobną przyczyną awarii zgłoszonej w Windows; już tak się nie dzieje.",
-"u.0.1.31.2.f1": "Gdy przycisk klawiatury okna wtyczki jest ustawiony na „najpierw LYNX” („Pozwól wtyczce obsługiwać klawisze przed hostem” wyłączone), klawiatura jako pianino dostaje teraz swoje klawisze przed zadokowaną wtyczką VST3.",
-"u.0.1.31.2.f2": "Przy włączonej opcji „Rozciągnięte klipy patternów zapętlają pattern” nuty narysowane, wklejone lub przesunięte za pierwszy takt klipu są słyszalne: pattern wydłuża się, by je zmieścić.",
-"u.0.1.31.2.f3": "Playlist › „Przenieś klipy automatyki do ścieżek ich torów” zachowuje wartości, które grały klipy, także w dużych projektach FL.",
-"u.0.1.31.2.f4": "„Zarządzaj skrótami” powinno się teraz otwierać z kursorem w polu wyszukiwania na pulpitach, które aktywują nowe okna z opóźnieniem (#244; sprawdzone tylko w symulacji); Opcje › Ustawienia klawiatury jako pianina otwiera menu Tonika / Oktawa / Układ przy każdym rozmiarze okna (#270).",
-"u.0.1.31.2.f5": "Eksport do FL Studio pomija folder danych projektu, którego nie ma na tym komputerze (FL 2026 zatrzymywał się na „Invalid project data folder”); preset FL wbudowanego syntezatora kliknięty w Browserze otwiera ten syntezator z presetem (#288); pliki MIDI upuszczone na Playlist domyślnie stają się klipami patternów (#287)."
+"u.0.1.31.3.t": "Trzecia poprawka do 0.1.31",
+"u.0.1.31.3.s": "LYNX SHARE 0.1.31.3 naprawia zamienione lewy i prawy kanał w Linuksie z PipeWire, sesje online, w których gość przestawał dostawać tempo hosta albo zmiany były cofane, oraz edycje nowych projektów przez zdalne sterowanie. Wszyscy w sesji online powinni zaktualizować.",
+"u.0.1.31.3.f0": "Linux, własny sterownik PipeWire w LYNX: kanały urządzenia idą w kolejności portów samego urządzenia, a nie wewnętrznych id PipeWire. Gdy te id przychodziły nie po kolei, lewy i prawy kanał były zamienione albo wejście wielokanałowe przychodziło w złej kolejności (zmierzone na urządzeniach loopback; na prawdziwej karcie dźwiękowej potrzeba do tego id nie po kolei, co może się zdarzyć, gdy PipeWire używa ich ponownie).",
+"u.0.1.31.3.f1": "Sesje online: gość, którego kopia projektu ma inną datę utworzenia niż kopia hosta, znów dostaje tempo i ustawienia projektu hosta. Wszyscy w sesji powinni zaktualizować: gość z 0.1.31.2 nadal ich nie dostaje od hosta z 0.1.31.3.",
+"u.0.1.31.3.f2": "Sesje online: zmiany VCA, głośności głównej, modulatorów, siatki klipów, grooves, migawek miksu i looków mastera nie są już cofane przy następnej edycji. Nie są jeszcze udostępniane pozostałym: każdy komputer zachowuje własne, a LYNX raz informuje, gdy taka zmiana zostaje na twoim komputerze.",
+"u.0.1.31.3.f3": "Zdalne sterowanie: project.edit znów stosuje swoje edycje w nowych projektach."
 }

@@ -51,7 +51,7 @@ LYNX SHARE est en version alpha : attendez-vous à quelques imperfections, et me
 
 ## What's new
 
-LYNX SHARE 0.1.31.2 corrige une cause probable d'un plantage de la page d'accueil, le réglage de clavier « LYNX d'abord » au-dessus des plugins VST3 ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL, les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.
+LYNX SHARE 0.1.31.3 corrige les canaux gauche et droit inversés sous Linux avec PipeWire, les sessions en ligne où un invité ne recevait plus le tempo de l'hôte ou voyait des changements annulés, et les modifications du Contrôle à distance sur les nouveaux projets. Tous les participants d'une session en ligne devraient mettre à jour.
 
 LYNX SHARE 0.1.31 : un Tracker intégré qui ouvre aussi les modules tracker (.mod, .xm, .s3m, .it) ; LYNX Model, des
 modèles physiques de marimba, vibraphone, xylophone, glockenspiel, cloches tubulaires et kalimba ; des scripts JSFX
