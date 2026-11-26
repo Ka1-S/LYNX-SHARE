@@ -2986,7 +2986,7 @@ public:
         // round 190rs (G-30, ref/live-l06): Live's track title menu, in Live's order, over LYNX's own operations (one undo
         // step each); LYNX's own items after a line at the end
         // (no copy of the song to test them on: the enabling rules are the operations' own, checked here directly)
-        const auto gridClips = song.clipGrid != nullptr
+        const auto gridClips = song.clipGrid.has_value()
                                && std::any_of (song.clipGrid->clips.begin(), song.clipGrid->clips.end(), [track] (const Clip& c) { return c.track == track; });
         {
             const auto* info = track < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) track] : nullptr;
