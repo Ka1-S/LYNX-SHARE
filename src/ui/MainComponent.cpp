@@ -8895,7 +8895,8 @@ void MainComponent::timerCallback()
 
             mouseAt = source.getScreenPosition();
             if (auto* under = source.getComponentUnderMouse(); under == &hintBar)
-                hint = hintBar.getHint(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu)
+                hint = hintBar.hintToKeep(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu;
+                                             // issue #296, round 190ri: a cut hint of the last seconds comes back, whole in the bubble)
             else if (under != nullptr)
             {
                 live = source.isDragging();

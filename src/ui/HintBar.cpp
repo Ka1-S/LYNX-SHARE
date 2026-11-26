@@ -298,6 +298,8 @@ void HintBar::setHint (const Hint& hint, bool isLive)
     if (hint.text != current.text || hint.value != current.value || hint.automatable != current.automatable || hint.hasMenu != current.hasMenu
         || hint.mark != current.mark || isLive != live)
     {
+        if (current.text == lastCut.text && current.value == lastCut.value && (hint.text != current.text || hint.value != current.value)) // (issue #296: the cut hint goes away now)
+            lastCutMs = juce::Time::getMillisecondCounterHiRes();
         current = hint;
         live = isLive;
         repaint();
@@ -408,6 +410,14 @@ struct HintBar::LaidOut
     std::vector<std::vector<Item>> lines;
 };
 
+Hint HintBar::hintToKeep (double seconds) const
+{
+    if (lastCut.text.isNotEmpty() && (lastCut.text != current.text || lastCut.value != current.value)
+        && juce::Time::getMillisecondCounterHiRes() - lastCutMs < seconds * 1000.0)
+        return lastCut;
+    return current;
+}
+
 void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;
@@ -443,6 +453,7 @@ void HintBar::paint (juce::Graphics& g)
     }
 
     // the value, in a pill on the right (accent while it changes under the mouse)
+    auto valueCut = false; // (issue #301: a long name there — a Playlist track's, a picker row's — is shortened; the bubble shows it)
     if (current.value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
@@ -458,6 +469,7 @@ void HintBar::paint (juce::Graphics& g)
         g.setColour (colour::textPrimary);
         g.setFont (valueFont);
         g.drawFittedText (current.value, valueArea.toNearestInt(), juce::Justification::centred, 1, 0.8f);
+        valueCut = textcache::stringWidth (valueFont, current.value) * 0.8f > valueArea.getWidth() - 4.0f;
         r.removeFromRight (8.0f);
     }
 
@@ -499,6 +511,17 @@ void HintBar::paint (juce::Graphics& g)
                 laid.fits = laid.tiny = true;
             }
         }
+    }
+    // issue #296 (round 190ri): a hint cut at the end of its two lines shows whole in the quick-tip bubble while the mouse rests
+    // on the bar (the bar keeps the hint while the pointer is on it, round 190kn); FL's own hints are short enough for its two
+    // lines. Issue #301: a value cut in its pill (a shortened name) shows whole there too.
+    const auto cut = ! laid.fits || valueCut;
+    setQuickTip (*this, ! cut ? juce::String()
+                              : plainHint (text).replaceCharacters ("\t\n", "  ") + (valueCut ? "  -  " + current.value : juce::String()));
+    if (cut && (lastCut.text != current.text || lastCut.value != current.value))
+    {
+        lastCut = current;
+        lastCutMs = juce::Time::getMillisecondCounterHiRes();
     }
     const auto& lines = laid.lines;
     if (laid.oneLine)
@@ -545,8 +568,32 @@ juce::String quickTipOf (const juce::Component& c)
     return c.getProperties()[quickTipProperty].toString();
 }
 
+// (issue #296, round 190ri) a long tip — a hint the bar had to cut — wraps at this width
+static constexpr float tipWrapWidth = 560.0f;
+
+static juce::TextLayout wrappedTip (const juce::String& text)
+{
+    juce::AttributedString s (text);
+    s.setFont (tipNameFont());
+    s.setColour (theme::colour::textPrimary);
+    s.setWordWrap (juce::AttributedString::byWord);
+    juce::TextLayout layout;
+    layout.createLayout (s, tipWrapWidth - 2.0f * tipPadX);
+    return layout;
+}
+
+static bool tipWraps (const juce::String& tip)
+{
+    return ! tip.containsChar ('\t') && textcache::stringWidth (tipNameFont(), tip) + 2.0f * tipPadX > tipWrapWidth;
+}
+
 juce::Rectangle<int> quickTipSize (const juce::String& tip)
 {
+    if (tipWraps (tip))
+    {
+        const auto layout = wrappedTip (tip);
+        return { 0, 0, (int) std::ceil (tipWrapWidth) + 2, (int) std::ceil (layout.getHeight()) + 10 };
+    }
     const auto name = tip.upToFirstOccurrenceOf ("\t", false, false), key = tip.fromFirstOccurrenceOf ("\t", false, false);
     auto w = textcache::stringWidth (tipNameFont(), name) + 2.0f * tipPadX;
     if (key.isNotEmpty())
@@ -563,6 +610,11 @@ void paintQuickTip (juce::Graphics& g, juce::Rectangle<float> bubble, const juce
     g.setColour (colour::borderStrong.withAlpha (0.9f));
     g.drawRoundedRectangle (bubble.reduced (0.5f), radius::sm, 1.0f);
 
+    if (tipWraps (tip))
+    {
+        wrappedTip (tip).draw (g, bubble.reduced (tipPadX, 5.0f));
+        return;
+    }
     auto text = bubble.reduced (tipPadX, 0.0f);
     g.setColour (colour::textPrimary); // (round 190je, SG-25: the full token, was × 0.92)
     g.setFont (tipNameFont());

@@ -75,6 +75,10 @@ public:
     // `live`: the value is changing under the mouse (drawn in the accent colour).
     void setHint (const Hint& hint, bool live = false);
     const Hint& getHint() const noexcept { return current; }
+    // Issue #296 (round 190ri): what the bar shows while the pointer is on it — the hint it shows, or a hint it had to
+    // cut in the last `seconds` (on its way to the bar the pointer crosses other controls, whose hints replaced it). A cut
+    // hint shows whole in the bar's quick-tip bubble.
+    Hint hintToKeep (double seconds = 4.0) const;
     void paint (juce::Graphics& g) override;
     // Round 190kn (DF-47): a right-click on the hint bar opens what FL 2026 opens there, the toolbars menu (captured:
     // details190kn raw/f09), which the owner gives through `onMenu`; LYNX adds the shown value and text for the clipboard
@@ -96,6 +100,8 @@ public:
 
 private:
     Hint current;
+    Hint lastCut;           // (issue #296) the last hint that did not fit, and when it was last shown
+    double lastCutMs = 0.0;
     bool live = false;
     bool larger = false;
     // rollup 0.1.30 step 13: the text's items and lines as last laid out (HintBar.cpp), made again only when the text, the
