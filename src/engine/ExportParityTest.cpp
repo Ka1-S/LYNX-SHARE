@@ -22,6 +22,7 @@
 #include "engine/ChannelRackProcessor.h"
 #include "engine/Exporter.h"
 #include "engine/PluginHost.h"
+#include "engine/ProjectFile.h"
 #include "engine/SessionPack.h"
 #include "ui/ExportDialog.h" // (round 190jx: Render to audio and Freeze, as the menus run them)
 
@@ -309,6 +310,18 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         if (! writeSample (folder.getChildFile ("parity-" + juce::String (k) + ".wav"), k))
             return "ERROR can't write the test samples in " + folder.getFullPathName();
     auto song = paritySong (folder);
+    // (round 190rm, the import / export sweep's "the export is what you hear": LYNX_EXPORTPARITY_PROJECT=<project.lynx> runs
+    // part 1 on that project instead: its export against its playback through the stand-in device, nothing else;
+    // LYNX_EXPORTPARITY_KEEP keeps both files for loudness measurements)
+    const auto ownProject = juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_PROJECT", {});
+    if (ownProject.isNotEmpty())
+    {
+        juce::String loadError;
+        auto loaded = ProjectFile::load (juce::File (ownProject), loadError);
+        if (! loaded)
+            return "ERROR " + ownProject + ": " + loadError;
+        song = std::move (*loaded);
+    }
     // (diagnosis: LYNX_EXPORTPARITY_CHANNELS="0,2" plays only those channels; LYNX_EXPORTPARITY_NOAUTO=1 drops the automation)
     if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_CHANNELS", {}); only.isNotEmpty())
         for (int c = 0; c < (int) song.channels.size(); ++c)
@@ -407,7 +420,9 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         const auto latency = (std::int64_t) live.bounceLatency();
         const auto wanted = latency + (std::int64_t) mix.l.size();
         const auto since = juce::Time::getMillisecondCounter();
-        while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - since < 60000 && live.bounceStillPlaying())
+        // (60 s, or more for a whole song: the stand-in device runs about four times faster than real time)
+        const auto limit = (juce::uint32) juce::jmax<std::int64_t> (60000, wanted / 48);
+        while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - since < limit && live.bounceStillPlaying())
         {
             live.timerCallback();
             juce::Thread::sleep (20);
@@ -514,6 +529,8 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         }
     };
     checkPlayback (false);
+    if (ownProject.isNotEmpty())
+        return errors.isEmpty() ? juce::String ("OK ") + ownProject : "ERROR " + errors.joinIntoString ("; ");
     checkPlayback (true);
     // Round 190jb: render-ahead switched on, and off, in the middle of the song, as its load probe does under load (the rare
     // mid-song miss: 1 in ~100 runs under load, "first apart at 3.56 s"). LYNX_EXPORTPARITY_ENGAGE_AT / _RELEASE_AT =
