@@ -6,6 +6,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "ui/TouchInput.h"
+#include "ui/DragSongWatch.h"
 
 #include "core/EventPaneSplit.h"
 #include "ui/LiveClipLook.h"
@@ -931,6 +932,14 @@ private:
     int scrollY = (127 - 84) * rowHeight;       // starts showing roughly C6..C3
 
     Drag drag = Drag::none;
+    // round 190rw (Q1, ui/DragSongWatch.h): the song replaced under a held drag (undo, an Online Session guest, Remote
+    // Control, a plugin load...): the drag goes on only while the pattern's notes are the ones it holds, else it ends with
+    // no write (notes have no ids: the pattern, the channel and a fingerprint of the notes are compared)
+    ui::DragSongWatch dragWatch;
+    std::uint64_t dragNotesPrint = 0;
+    bool dragAbandoned = false;
+    std::uint64_t notesPrint() const;
+    bool dragSurvivesSwap();
     int dragNote = -1;              // grabbed note (reference for snap and preview)
     std::vector<int> dragIndices;   // notes that follow the drag
     std::vector<Note> dragOriginals;

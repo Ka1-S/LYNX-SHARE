@@ -2349,6 +2349,8 @@ void MainComponent::flUndoBackwards()
 
 void MainComponent::undoRedo (bool redo)
 {
+    if (engine.isEditGestureHeld()) // (round 190rw: a drag is held: no undo under it, as AudioEngine::undo)
+        return;
     // FL says in the hint bar what was undone and the undo level ("Undone: ...  Level 2/3")
     if (redo ? ! engine.canRedo() : ! engine.canUndo())
         return;

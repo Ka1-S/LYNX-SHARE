@@ -15,6 +15,7 @@
 #include "core/RackZip.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
+#include "ui/DragSongWatch.h"
 #include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
 #include "ui/WrapperMenu.h"
@@ -451,6 +452,15 @@ private:
     int lastPaintedRow = -1, lastPaintedStep = -1;
 
     Area knobDrag = Area::none;
+    // round 190rw (Q1, ui/DragSongWatch.h): the song replaced under a held drag (undo, an Online Session guest, Remote
+    // Control, a plugin load...): the drag goes on only while the rows are the same channels and automation clips of the
+    // same pattern, else it ends with no write
+    ui::DragSongWatch dragWatch;
+    std::uint64_t dragRowsPrint = 0;
+    bool dragAbandoned = false;
+    std::uint64_t rowsPrint() const;
+    bool dragSurvivesSwap();
+    void endDragState();
     int knobRow = -1;
     ui::ValueDrag drag;
     HeldNotes previews;        // Ctrl+click audition and step-click previews: they stop on mouse up
