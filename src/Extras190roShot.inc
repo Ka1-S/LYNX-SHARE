@@ -5,6 +5,7 @@
     //         of the part that shows; a press on it drags the gain, a press on the bottom edge beside it moves the clip, as
     //         FL does there (FL shows no handle at all in that view); switched off it is FL's place
     //   OFF-1 the Mixer's peak values and correlation bars off: the faders and meters at FL's height again
+    //   ON-2  a new project made in the Clip-launch layout has a strip for every track
     bool runExtras190roShot (const juce::String& prefix, juce::String* selftestResult = nullptr)
     {
         using namespace lynx;
@@ -48,11 +49,12 @@
         const auto bar = (std::int64_t) 4 * ppq;
 
         // --- the defaults of a new profile ----------------------------------------------------------------------------------
-        check ("new profile: the gain handle stays in view (on), the Mixer's peak values and correlation bars (off)",
-               cliphandle::gainFollowsView() && ! MixerStrips::showPeakValues && ! MixerStrips::showCorrelation
-                   && extras::defaultOn ("playlist.gainHandleFollowsView") && ! extras::defaultOn ("mixer.peakValues") && ! extras::defaultOn ("mixer.correlation"));
-        check ("FL-exact turns the three off", ! extras::flExactOn ("playlist.gainHandleFollowsView") && ! extras::flExactOn ("mixer.peakValues")
-                                                   && ! extras::flExactOn ("mixer.correlation"));
+        check ("new profile: the gain handle stays in view (on), the Clip-launch strips (on), the Mixer's peak values and correlation bars (off)",
+               cliphandle::gainFollowsView() && newProjectDefaults().clipLaunchStrips && ! MixerStrips::showPeakValues && ! MixerStrips::showCorrelation
+                   && extras::defaultOn ("playlist.gainHandleFollowsView") && extras::defaultOn ("project.clipLaunchStrips")
+                   && ! extras::defaultOn ("mixer.peakValues") && ! extras::defaultOn ("mixer.correlation"));
+        check ("FL-exact turns the four off", ! extras::flExactOn ("playlist.gainHandleFollowsView") && ! extras::flExactOn ("project.clipLaunchStrips")
+                                                  && ! extras::flExactOn ("mixer.peakValues") && ! extras::flExactOn ("mixer.correlation"));
 
         // --- ON-1: the gain handle, a press on it and a press beside it -----------------------------------------------------
         {
@@ -203,6 +205,30 @@
             strips.setShowCorrelation (false);
             pump (100);
             check ("OFF-1: switched off again, FL's height", strips.faderAreaForSnapshot (1) == fader);
+        }
+
+        // --- ON-2: a new project in the Clip-launch layout ------------------------------------------------------------------
+        {
+            MainComponent ui (engine, false);
+            ui.setSize (1920, 1080);
+            ui.setVisible (true);
+            ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
+            ui.startNewProjectForSnapshot (makeNewProject());
+            pump (300);
+            ui.resetLayoutForStyle();
+            pump (300);
+            int linked = 0;
+            for (int t = 0; t < 16; ++t)
+                linked += autolink::linkedInsertOf (engine.getSong(), t) == t + 1 ? 1 : 0;
+            check ("ON-2: a new Clip-launch project links tracks 1-16 to inserts 1-16 (" + juce::String (linked) + ")", linked == 16);
+            both (ui, ui.getLocalBounds(), "on2-cliplaunch-new-project");
+            ui.setLayoutStyle (layoutstyle::Style::pattern);
+            ui.startNewProjectForSnapshot (makeNewProject());
+            pump (300);
+            int patternLinked = 0;
+            for (int t = 0; t < 16; ++t)
+                patternLinked += autolink::linkedInsertOf (engine.getSong(), t) >= 0 ? 1 : 0;
+            check ("ON-2: a new Pattern-layout project is FL's (no links)", patternLinked == 0 && ! engine.getSong().linkTracksToMixer);
         }
 
         ui::motion::enabled() = motionBefore;

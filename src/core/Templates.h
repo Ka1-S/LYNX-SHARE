@@ -58,10 +58,11 @@ struct NewProjectDefaults
     bool autoCrossfades = true;
     // LYNX extra (round 190gz, issue #170): "Link Playlist tracks to mixer tracks in new projects" (off: FL's tracks)
     bool linkTracks = false;
-    // LYNX extra (round 190oo, design review CS O-2, off by default): a new project made while the Clip-launch layout
-    // shows starts with Track N linked to mixer insert N (linkClipLaunchStrips), so its Session mixer shows a full strip
-    // on every column, as a new Live set does
-    bool clipLaunchStrips = false;
+    // LYNX extra (round 190oo, design review CS O-2; on by default since round 190ro, EXTRAS-2.md ON-2: only new, empty
+    // projects made in the Clip-launch layout, and their .flp / .als exports play the same as unlinked): a new project made
+    // while the Clip-launch layout shows starts with Track N linked to mixer insert N (linkClipLaunchStrips), so its
+    // Session mixer shows a full strip on every column, as a new Live set does
+    bool clipLaunchStrips = true;
 
     bool operator== (const NewProjectDefaults&) const = default;
 

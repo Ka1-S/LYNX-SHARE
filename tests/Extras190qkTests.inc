@@ -18,7 +18,7 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 13);
+    CHECK (std::size (extras::onSince0132) == 14);
     // the six turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
     // and PR #268's veils; round 190ro took round 190qh's two Mixer views out again, below)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
@@ -28,12 +28,14 @@ TEST (extras190qk_default_lists)
     // and round 190qi's LYNX-only plugin / Browser lists are on too; FL-exact turns them off
     // round 190ro (EXTRAS-2.md ON-1): the gain handle that stays in view (only where FL shows none)
     for (const auto* id : { "playlist.midiDrop", "theme.tracksFromAccent", "plugins.recent", "plugins.oneRow", "browser.midiPreview",
-                            "browser.tabCompletes", "playlist.gainHandleFollowsView" })
+                            "browser.tabCompletes", "playlist.gainHandleFollowsView",
+                            // round 190ro (ON-2): new, empty Clip-launch projects only (tests/Extras190roTests.inc)
+                            "project.clipLaunchStrips" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",
                             "playlist.rulerSeeksAnyTool", "playlist.rangeEdits", "playlist.headerWidth", "playlist.pointerClick",
-                            "project.linkTracks", "project.clipLaunchStrips", "mixer.followPlaylist",
+                            "project.linkTracks", "mixer.followPlaylist",
                             "mixer.keepLostLinks", "record.lastLoopPassPlays", "playlist.clipLanesFolded", "mixer.loudness", "midi.gamepad",
                             "polyEdit.prepareOnOpen", "layout.trackOnly",
                             "playlist.shadeFadedAudio", "general.hoverValues", // (visual, but over the paint / idle CPU gates)

@@ -56,6 +56,9 @@ inline constexpr std::string_view onSince0132[] = {
     // round 190ro (EXTRAS-2.md ON-1): the gain handle moves only while the clip's middle is out of view, where FL shows no
     // handle; a press next to its half circle still moves the clip (--extras2_190roshot checks it)
     "playlist.gainHandleFollowsView", // issue #274: the clip gain handle stays in view
+    // round 190ro (EXTRAS-2.md ON-2): new, empty Clip-launch projects get a strip per track, as a new Live set; the
+    // Pattern and Simple layouts and every existing project are unchanged (tests/Extras190roTests.inc)
+    "project.clipLaunchStrips",       // round 190oo CS O-2
 };
 // On by default before 0.1.32 too: FL Studio's own behaviour (Esc, the start page), the Simple layout's loops (BandLab),
 // and the stretched clips' loop (issue #25, the owner's choice)
