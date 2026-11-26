@@ -11307,15 +11307,19 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
     return menu;
 }
 
-void PlaylistComponent::showRulerMenu()
+void PlaylistComponent::showFollowMenu()
 {
     juce::PopupMenu menu;
     menu.addItem (tr("Continuous scrolling"), true, EditorGlobals::get().isContinuousScroll(), [this] {
-        EditorGlobals::get().isContinuousScroll (! EditorGlobals::get().isContinuousScroll());
+        EditorGlobals::get().setContinuousScroll (! EditorGlobals::get().isContinuousScroll());
     });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&followButton));
 }
-void PlaylistComponent::showRulerMenu (int x)
+
+void PlaylistComponent::showRulerMenu (int x, int y)
+{
+    rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
 
 // Round 190ol (P6): the Simple layout's "Change time signature here...": numerator 1-16, denominator 2 / 4 / 8 / 16, the
 // signature in force at that bar to start with; on bar 1 it is the song's own (the top bar's box shows it)
