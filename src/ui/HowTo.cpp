@@ -197,14 +197,16 @@ int stepCount (Window w) noexcept
 
 const char* step (Window w, int index) noexcept { return juce::isPositiveAndBelow (index, stepCount (w)) ? guide (w).steps[index] : ""; }
 
-juce::String tutorialUrl (Window w)
+juce::String siteUrl (const juce::String& path)
 {
-    auto url = juce::String ("https://lynx-share.com/learn/") + tutorialSlug (w) + "/";
+    auto url = "https://lynx-share.com/" + path;
     const auto language = i18n::current();
     if (language.isNotEmpty() && language != "en")
         url << "?lang=" << (language == "pt-BR" ? juce::String ("pt") : language);
     return url;
 }
+
+juce::String tutorialUrl (Window w) { return siteUrl (juce::String ("learn/") + tutorialSlug (w) + "/"); }
 
 void addMenuItem (juce::PopupMenu& menu, Window w, juce::Component* anchor)
 {

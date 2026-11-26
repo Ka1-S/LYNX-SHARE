@@ -12334,6 +12334,15 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 closeTip();
             updateEmptyHint();
         });
+        // round 190rs (G-20, G-21): the site's tutorials, manual, FAQ and this version's notes, in the app's language (FL's
+        // Help index and tutorials, Live's manual item, BandLab's video tutorials and help centre)
+        menu.addSeparator();
+        menu.addItem (tr ("Tutorials (lynx-share.com/learn)..."), [] { juce::URL (howto::siteUrl ("learn/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("Manual (wiki)..."), [] { juce::URL (howto::siteUrl ("wiki/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("FAQ and troubleshooting..."), [] { juce::URL (howto::siteUrl ("faq/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("What's new in this version..."), [] {
+            juce::URL (howto::siteUrl ("updates/") + "#v" + juce::String (JUCE_APPLICATION_VERSION_STRING) + "-alpha").launchInDefaultBrowser();
+        });
         menu.addSeparator();
         // #228 (round 190nq); round 190rs (G-12): in Live's look "?" toggles the Info View, so the item shows the key that
         // opens the search there (Ctrl+Shift+Y)

@@ -20,6 +20,8 @@ int stepCount (Window w) noexcept;
 const char* step (Window w, int index) noexcept; // English keys, plain sentences
 const char* tutorialSlug (Window w) noexcept; // the Learn page: https://lynx-share.com/learn/<slug>/
 juce::String tutorialUrl (Window w);          // with ?lang= for the app's language
+// Round 190rs (G-20): any page of lynx-share.com ("learn/", "wiki/", "faq/"), with ?lang= for the app's language
+juce::String siteUrl (const juce::String& path);
 
 // The menu item ("How to use this..."), at the end of a window's menu: a separator, then the item
 void addMenuItem (juce::PopupMenu& menu, Window w, juce::Component* anchor);
