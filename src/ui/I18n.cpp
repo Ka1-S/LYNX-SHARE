@@ -88,6 +88,8 @@ juce::String tr (const char* englishUtf8)
         unsigned generation = ~0u;
         std::unordered_map<const char*, std::pair<std::string, juce::String>> texts;
     };
+    if (englishUtf8 == nullptr) // (some callers pass a null text: an empty one, as juce::String::fromUTF8 gave)
+        return {};
     thread_local Cache cache;
     const auto generation = textGeneration().load (std::memory_order_acquire);
     if (cache.generation != generation || cache.texts.size() > 60000)
