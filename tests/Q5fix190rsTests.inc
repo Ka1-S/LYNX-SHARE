@@ -151,7 +151,8 @@ TEST (q5fix190rs_ctrl_n_is_save_new_version_in_the_pattern_layout)
     CHECK (m.find (ctrlN, Context::global, false) == "file.saveNewVersion");
     CHECK (m.find (ctrlAltS, Context::global, false) == "file.saveNewVersion"); // (LYNX's key stays too)
     CHECK (m.chordsFor ("file.new").empty() && m.isDefault ("file.new") && m.isDefault ("file.saveNewVersion"));
-    CHECK (m.overridesJson() == "{}\n" && m.conflicts().empty());
+    CHECK (m.overridesJson() == KeyMap().overridesJson()); // (nothing to save: the layout's defaults)
+    CHECK (m.conflicts().empty());
     m.setFlFileKeys (false);
     CHECK (m.find (ctrlN, Context::global, false) == "file.new" && m.chordsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlAltS }));
 
@@ -186,19 +187,20 @@ TEST (q5fix190rs_ctrl_n_is_save_new_version_in_the_pattern_layout)
 TEST (q5fix190rs_clip_launch_duplicate_track_and_track_colour)
 {
     using namespace lynx;
-    Song s;
-    s.channels.resize (1);
-    s.channels[0].name = "Bass";
-    s.patterns.resize (1);
+    auto s = Song::makeDefault(); // (channels and inserts as a new project has them)
+    s.playlist.clear();
+    Pattern bass;
     Note n;
     n.channel = 0;
     n.length = 96;
-    s.patterns[0].notes.push_back (n);
+    bass.notes.push_back (n);
+    s.patterns.push_back (bass);
+    const auto bassPattern = (int) s.patterns.size() - 1;
     CHECK (trackmodes::makeInstrumentTrack (s, 0, 0));
     launcher::ensureGrid (s);
     Clip c;
     c.kind = ClipKind::pattern;
-    c.pattern = 0;
+    c.pattern = bassPattern;
     c.length = 384;
     CHECK (launcher::setClip (s, 0, 1, c) >= 0);
 
@@ -207,11 +209,11 @@ TEST (q5fix190rs_clip_launch_duplicate_track_and_track_colour)
     const auto newChannel = s.playlistTracks[1].channel;
     CHECK (s.playlistTracks[1].mode == PlaylistTrackMode::instrument && newChannel > 0 && newChannel < (int) s.channels.size());
     const auto* copy = launcher::clipAt (*s.clipGrid, 1, 1);
-    CHECK (copy != nullptr && copy->pattern != 0 && copy->pattern < (int) s.patterns.size());
+    CHECK (copy != nullptr && copy->pattern != bassPattern && copy->pattern < (int) s.patterns.size());
     if (copy != nullptr && copy->pattern < (int) s.patterns.size())
         CHECK (! s.patterns[(std::size_t) copy->pattern].notes.empty() && s.patterns[(std::size_t) copy->pattern].notes.front().channel == newChannel);
     const auto* original = launcher::clipAt (*s.clipGrid, 0, 1);
-    CHECK (original != nullptr && original->pattern == 0 && s.patterns[0].notes.front().channel == 0); // (the original plays on)
+    CHECK (original != nullptr && original->pattern == bassPattern && s.patterns[(std::size_t) bassPattern].notes.front().channel == 0); // (the original plays on)
 
     s.playlistTracks[1].colour = 0xff336699;
     CHECK (session::assignTrackColourToClips (s, 1) == 1);
