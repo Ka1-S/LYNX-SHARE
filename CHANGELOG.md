@@ -13,6 +13,10 @@ The short version of each release. The full notes, with measurements, known issu
   warning; the routing stays. PR #284 by @codewithamoako.
 
 **Added**
+- 3x Osc, DX10, Granulizer and BeepMap have FL Studio's **Plugin options** tab (Panning, Volume, Mod X, Mod Y, Pitch: the
+  envelopes, the LFO and the filter's Mod X / Mod Y), on the plugin's own settings (#311).
+- *Link to controller...* lists the project's automation clips, as FL Studio's *Internal controller › Automation clips*: with
+  *Remove conflicts* on, the clip drives that control alone; off, the control joins the clip's targets (#310).
 - *Transpose...* (Patterns, picker and Channel rack menus, FL's small "Semitones" box) and *Make unique as sample* with progress
   and Cancel; DAWproject export runs in the background with a progress window.
 - Easier options: every Settings page has **Reset this page** (with Undo); the **?** command palette finds every Settings
@@ -57,8 +61,13 @@ The short version of each release. The full notes, with measurements, known issu
 **Fixed**
 - **Saving on a full disk no longer destroys the project.** Since 0.1.30 a save (and Save as, autosave, every export and
   settings file) could replace the project with a cut file when the disk filled up, and only said so afterwards. Every file
-  LYNX writes now goes through one checked writer: if anything fails, the old file is left as it was and LYNX says why
-  ("Not saved: the disk is full. Your project file was not changed.").
+  LYNX writes for you now goes through one checked writer (projects, exports, settings, and the samples, takes and state
+  files it saves: Slicer, Newtone, ADR, Auto Sampler, stems, recordings, Gross Beat's .fnv): if anything fails, the old file
+  is left as it was and LYNX says why ("Not saved: the disk is full. Your project file was not changed.").
+- Export for other apps no longer deletes the exported folder after a zip that could not be written completely; Auto Sampler
+  takes and extracted stems no longer append to an older file of the same name.
+- Export to FL Studio: a one-step note on a LYNX Sampler whose ADSR is on keeps its length (FL played it to the end of the
+  sample) (#309).
 - Export to FL Studio: plugin values at the song's start are written on the plugin's own range (FL rendered LYNX's export of
   Thief as silence with a DC offset). DAWproject: every sample gets its real format (FL's Ogg-in-WAV and .wv are written as
   WAV), clip gain and pitch are kept. MIDI files carry the tempo map, time signatures and the name; File › Open takes the
