@@ -140,9 +140,9 @@ public:
     {
         if (persistent && keyMapFile().existsAsFile())
             map.loadJson (keyMapFile().loadFileAsString().toStdString());
-        map.setFlFileKeys (flFileKeys); // round 190rs (D-4): the Pattern layout's FL Ctrl+N, as the main window has it
         else if (! persistent)
             map.setChords ("pattern.next", { { keys::f9, keys::ctrl | keys::shift } }); // a changed one for the snapshot
+        map.setFlFileKeys (flFileKeys); // round 190rs (D-4): the Pattern layout's FL Ctrl+N, as the main window has it
 
         search.setTextToShowWhenEmpty (tr ("Search an action or a key (e.g. \"Ctrl+L\")"), theme::colour::textDisabled);
         search.setFont (theme::font (theme::type::body));
