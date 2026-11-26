@@ -2136,14 +2136,14 @@ void MixerStrips::paint (juce::Graphics& g)
         // round 190rs (G-06, FL 2026 pairs/16): an insert linked to a Playlist audio track and without an icon of its own
         // shows LYNX's waveform glyph there, as FL marks the link
         {
-            const auto own = trackicons::iconFor (track.icon);
-            const auto linked = own == trackicons::Icon::none && linkedToAudioTrack (song, t);
-            const auto ink = track.muted ? bandInk.withAlpha (0.5f)
-                                         : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f);
-            if (own != trackicons::Icon::none)
-                ui::drawTrackIcon (g, own, iconArea (t).toFloat(), ink);
-            else if (linked)
-                ui::drawTrackIconCached (g, trackicons::Icon::audio, iconArea (t).toFloat(), ink); // (from the picture cache)
+            const auto ink = [&] {
+                return track.muted ? bandInk.withAlpha (0.5f)
+                                   : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f);
+            };
+            if (const auto own = trackicons::iconFor (track.icon); own != trackicons::Icon::none)
+                ui::drawTrackIcon (g, own, iconArea (t).toFloat(), ink());
+            else if (linkedToAudioTrack (song, t))
+                ui::drawTrackIconCached (g, trackicons::Icon::audio, iconArea (t).toFloat(), ink()); // (from the picture cache)
         }
 
         if (! track.effects.empty() && sp.fxBadge)
