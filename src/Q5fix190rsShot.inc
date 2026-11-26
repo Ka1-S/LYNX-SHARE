@@ -205,6 +205,7 @@
         }
 
         // ---- the Clip-launch layout: G-30, G-17, G-12 ---------------------------------------------------------------------
+        ui.setSize (2560, 1080); // (room right of the last track: Live's drop-area text)
         ui.setLayoutStyle (layoutstyle::Style::clipLaunch);
         settle();
         if (auto* grid = ui.getClipGridForSnapshot())

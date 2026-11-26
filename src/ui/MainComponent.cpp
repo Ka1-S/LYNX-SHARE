@@ -241,6 +241,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
       mixer (e),
       browser (e)
 {
+    keyMap.setFlFileKeys (layoutStyle == layoutstyle::Style::pattern); // round 190rs (D-4): the Pattern layout's FL Ctrl+N from the start
     if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
     // round 190nc (DL-95): Live's Macro Mappings list takes the Browser's place while a rack maps (Live's look)

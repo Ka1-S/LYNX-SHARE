@@ -15703,7 +15703,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             if (const auto repeats = autolink::repeatedTracks (song); h.track >= 0 && h.track < (int) repeats.size() && repeats[(std::size_t) h.track] >= 0)
                 hint.value += " " + tr ("(repeats Track {0}'s instruments: plays through insert {0})", { juce::String (repeats[(std::size_t) h.track] + 1) });
         }
-        else if (routingHints && ! simpleHeaders && ! h.led) // round 190rs (G-01, LYNX extra): where an unassigned track is heard
+        else if (routingHints && ! simpleHeaders && ! h.led && ! noteedit::isGroupHeader (song, h.track)) // round 190rs (G-01, LYNX extra): where an unassigned track is heard (a group header holds no clips of its own)
         {
             if (const auto route = routeHintFor (song, h.track); route.isNotEmpty())
                 hint.value += "  " + route;
