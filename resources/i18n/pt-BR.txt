@@ -13229,3 +13229,6 @@ countries: br
 "Tab completes the Browser's search" = "Tab completa a busca do Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Enquanto você digita na busca do Browser, o resto de uma tag (#word) ou de um nome de pasta aparece em cinza depois do texto, e Tab o aceita. Desligado: nada é completado. O único botão para isso está aqui."
 "Every LYNX extra at its default" = "Cada extra do LYNX no seu padrão"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "Mudanças de andamento (o FL Studio Mobile toca a música inteira a {0} BPM)"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "Mudanças de fórmula de compasso (o FL Studio Mobile mantém a primeira da música)"
+"Playlist markers (FL Studio Mobile has none)" = "Marcadores da Playlist (o FL Studio Mobile não tem)"

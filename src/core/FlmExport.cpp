@@ -16,6 +16,7 @@
 #include "core/ModelParams.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
+#include "core/TempoMap.h"
 #include "core/TransistorBass.h"
 
 // Round 190og. The laws below are the .flm import's (core/FlmImport.cpp, FLM_FORMAT.md) turned around, so that a song
@@ -1405,6 +1406,17 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
         if (unsupported > 0)
             ctx.losses.add ("Automation clips of targets FL Studio Mobile can't automate ({0})", std::to_string (unsupported));
     }
+    // (round 190rm) FL Studio Mobile keeps one tempo and one meter for the song and has no markers: said, not dropped silently
+    if (tempomap::active (song))
+    {
+        char bpm[32];
+        std::snprintf (bpm, sizeof (bpm), "%.2f", song.bpm);
+        ctx.losses.add ("Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)", bpm);
+    }
+    if (std::any_of (song.markers().begin(), song.markers().end(), [] (const Marker& m) { return m.isSignature(); }))
+        ctx.losses.add ("Time signature changes (FL Studio Mobile keeps the song's first one)", {});
+    if (std::any_of (song.markers().begin(), song.markers().end(), [] (const Marker& m) { return ! m.isSignature(); }))
+        ctx.losses.add ("Playlist markers (FL Studio Mobile has none)", {}, false);
     if (song.arrangements.size() > 1)
         ctx.losses.add ("Other arrangements (the copy holds the current one)", {}, false);
     if (song.clipGrid && ! song.clipGrid->slots.empty())

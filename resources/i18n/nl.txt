@@ -13076,3 +13076,6 @@ countries: nl be
 "Tab completes the Browser's search" = "Tab vult de zoekopdracht van de Browser aan"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Terwijl je in de zoekbalk van de Browser typt, verschijnt de rest van een tag (#word) of mapnaam grijs na de tekst, en Tab neemt die over. Uit: er wordt niets aangevuld. De enige schakelaar ervoor is hier."
 "Every LYNX extra at its default" = "Elke LYNX-extra op de standaardwaarde"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "Tempowisselingen (FL Studio Mobile speelt het hele nummer op {0} BPM)"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "Maatsoortwisselingen (FL Studio Mobile houdt de eerste van het nummer)"
+"Playlist markers (FL Studio Mobile has none)" = "Playlist-markeringen (FL Studio Mobile heeft er geen)"

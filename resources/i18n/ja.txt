@@ -13076,3 +13076,6 @@ countries: jp
 "Tab completes the Browser's search" = "Tab でブラウザーの検索を補完"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "ブラウザーの検索で入力中、タグ（#word）やフォルダー名の残りが文字の後ろにグレーで表示され、Tab で確定します。オフ：何も補完されません。切り替えはここだけです。"
 "Every LYNX extra at its default" = "LYNX の追加機能をすべて初期設定に"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "テンポの変化（FL Studio Mobile は曲全体を {0} BPM で再生します）"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "拍子の変化（FL Studio Mobile は曲の最初の拍子だけを保持します）"
+"Playlist markers (FL Studio Mobile has none)" = "Playlist のマーカー（FL Studio Mobile にはありません）"

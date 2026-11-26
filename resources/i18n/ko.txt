@@ -13076,3 +13076,6 @@ countries: kr
 "Tab completes the Browser's search" = "Tab으로 브라우저 검색 자동 완성"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "브라우저 검색창에 입력하는 동안 태그(#word)나 폴더 이름의 나머지가 글자 뒤에 회색으로 표시되고, Tab으로 확정합니다. 끔: 아무것도 완성되지 않습니다. 전환은 여기에서만 할 수 있습니다."
 "Every LYNX extra at its default" = "모든 LYNX 추가 기능을 기본값으로"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "템포 변화 (FL Studio Mobile은 곡 전체를 {0} BPM으로 재생합니다)"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "박자표 변화 (FL Studio Mobile은 곡의 첫 박자표만 유지합니다)"
+"Playlist markers (FL Studio Mobile has none)" = "Playlist 마커 (FL Studio Mobile에는 없습니다)"

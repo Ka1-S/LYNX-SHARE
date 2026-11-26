@@ -13076,3 +13076,6 @@ countries: id
 "Tab completes the Browser's search" = "Tab melengkapi pencarian Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Saat kamu mengetik di pencarian Browser, sisa tag (#word) atau nama folder tampil abu-abu setelah teks, dan Tab menerimanya. Mati: tidak ada yang dilengkapi. Satu-satunya sakelarnya ada di sini."
 "Every LYNX extra at its default" = "Setiap ekstra LYNX pada bawaannya"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "Perubahan tempo (FL Studio Mobile memutar seluruh lagu pada {0} BPM)"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "Perubahan tanda birama (FL Studio Mobile menyimpan yang pertama dari lagu)"
+"Playlist markers (FL Studio Mobile has none)" = "Penanda Playlist (FL Studio Mobile tidak memilikinya)"

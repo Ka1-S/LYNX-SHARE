@@ -13076,3 +13076,6 @@ countries: tw hk mo
 "Tab completes the Browser's search" = "Tab 補全瀏覽器搜尋"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "在瀏覽器搜尋中輸入時，標籤（#word）或資料夾名稱的其餘部分會以灰色顯示在文字後面，按 Tab 即可接受。關閉：不補全任何內容。唯一的開關在這裡。"
 "Every LYNX extra at its default" = "每個 LYNX 附加功能恢復預設"
+"Tempo changes (FL Studio Mobile plays the whole song at {0} BPM)" = "速度變化（FL Studio Mobile 以 {0} BPM 播放整首歌曲）"
+"Time signature changes (FL Studio Mobile keeps the song's first one)" = "拍號變化（FL Studio Mobile 只保留歌曲的第一個拍號）"
+"Playlist markers (FL Studio Mobile has none)" = "Playlist 標記（FL Studio Mobile 沒有）"
