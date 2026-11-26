@@ -3055,7 +3055,8 @@ int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
     // round 190ok (D2): Settings › Audio › "Smart disable for new instrument plugins" (LYNX extra; FL's default: off)
     if (c.instrument == InstrumentKind::plugin && flsettings::options().smartDisableNewPlugins.load())
         c.setSmartDisable (true);
-    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
+    // (round 190rs D-3: no insert asked for = where a channel added to the rack goes in this layout, the Master in Pattern)
+    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert >= 0 ? insert : newChannelInsert (s, layoutstyle::current())); });
     selectionAnchor = index;
     selectRows ({ index }, index);
 
@@ -4431,7 +4432,7 @@ void ChannelRackComponent::addInstrumentItems (juce::PopupMenu& menu, int insert
             c.group = filterGroup;
         const auto kind = c.instrument;
         engine.editSong ([&] (Song& s) {
-            c.mixerTrack = s.claimFreeInsert();
+            c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3: the Master in the Pattern layout, as FL)
             index = insertAt < 0 ? (s.channels.push_back (c), (int) s.channels.size() - 1) : insertChannel (s, insertAt, c);
         });
         selectionAnchor = index;
@@ -4535,7 +4536,7 @@ void ChannelRackComponent::chooseSample (int channel, int insertAt)
                                       c.group = filterGroup;
                                   int index = 0;
                                   engine.editSong ([&] (Song& s) {
-                                      c.mixerTrack = s.claimFreeInsert();
+                                      c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3)
                                       index = insertChannel (s, std::min (insertAt, (int) s.channels.size()), c);
                                   });
                                   selectionAnchor = index;
@@ -4572,7 +4573,7 @@ void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
 
     engine.editSong ([channel, path, name] (Song& s) {
         const auto isNew = channel < 0 || channel >= (int) s.channels.size();
-        const auto freeInsert = s.claimFreeInsert();
+        const auto freeInsert = isNew ? newChannelInsert (s, layoutstyle::current()) : 0; // (round 190rs D-3)
         auto& c = isNew ? s.channels.emplace_back() : s.channels[(std::size_t) channel];
 
         if (isNew)

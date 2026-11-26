@@ -218,3 +218,19 @@ TEST (q5fix190rs_clip_launch_duplicate_track_and_track_colour)
     CHECK (launcher::settingsAt (*s.clipGrid, 1, 1) != nullptr && launcher::settingsAt (*s.clipGrid, 1, 1)->colour == 0xff336699u);
     CHECK (session::assignTrackColourToClips (s, 1) == 0); // (already)
 }
+
+// Owner decision D-3 (FL 2026 live check, round 190rs): a channel added to the Channel rack plays into the Master in the
+// Pattern layout; in the Clip-launch and Simple layouts it gets a free insert of its own
+#include "core/RackOps.h"
+TEST (q5fix190rs_new_channel_goes_to_the_master_in_the_pattern_layout)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    auto expected = song;
+    CHECK (newChannelInsert (song, layoutstyle::Style::pattern) == 0);
+    CHECK (song.mixer.size() == expected.mixer.size()); // (nothing claimed)
+    const auto free = expected.claimFreeInsert();
+    CHECK (free > 0 && newChannelInsert (song, layoutstyle::Style::clipLaunch) == free);
+    auto simple = expected;
+    CHECK (newChannelInsert (simple, layoutstyle::Style::simple) > 0);
+}

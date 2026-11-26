@@ -12,6 +12,7 @@
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
 
+#include "core/RackOps.h" // (round 190rs: newChannelInsert)
 #include "core/UserFolders.h"
 #include "core/PluginDbFolder.h"
 
@@ -7160,7 +7161,7 @@ void BrowserComponent::newSampleChannel (const juce::File& file)
         c.name = name;
         c.instrument = InstrumentKind::sampler;
         c.samplePath = path;
-        c.mixerTrack = s.claimFreeInsert();
+        c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3)
         s.channels.push_back (c);
     });
     engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
@@ -7239,7 +7240,7 @@ void BrowserComponent::openFile (const juce::File& file)
             else
             {
                 engine.editSong ([&native] (Song& s) {
-                    native->mixerTrack = s.claimFreeInsert();
+                    native->mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3)
                     s.channels.push_back (std::move (*native));
                 });
                 engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
@@ -7261,7 +7262,7 @@ void BrowserComponent::openFile (const juce::File& file)
                 c.name = name;
                 c.instrument = InstrumentKind::synth;
                 c.synth = *synth;
-                c.mixerTrack = s.claimFreeInsert();
+                c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3)
                 s.channels.push_back (c);
             });
             engine.setSelectedChannel ((int) engine.getSong().channels.size() - 1);
