@@ -1,5 +1,5 @@
 ---
-source: f439a070b5
+source: 141ffc1370
 ---
 LYNX SHARE est une DAW gratuite et open source pour Windows, macOS et Linux, avec trois dispositions dans un seul programme. Par défaut, c'est la disposition Pattern : vous programmez des patterns dans le Channel Rack et le Piano Roll, les arrangez dans la Playlist et les mixez dans le Mixer. La disposition par lancement de clips lance des clips et des scènes depuis une grille, dans le style d'Ableton Live, et la disposition simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile. `Vue › Style de disposition` permet de passer de l'un à l'autre à tout moment. Elle ouvre les projets FL Studio (`.flp`), les sets Ableton Live (`.als`), les projets FL Studio Mobile (`.flm`), les fichiers DAWproject, les projets GarageBand et BandLab et les modules tracker, exporte `.flp`, `.als`, `.dawproject` et `.flm`, et enregistre dans son propre format `.lynx`.
 
@@ -27,7 +27,7 @@ Les plugins tiers sont facultatifs. LYNX SHARE a ses propres instruments et effe
 
 ## Enregistrer votre travail
 
-`Ctrl+S` enregistre, `Ctrl+Shift+S` enregistre sous un nouveau nom, et `Ctrl+Alt+S` enregistre une nouvelle version (Song_2, Song_3 et ainsi de suite). Il y a une sauvegarde automatique, accessible depuis `Fichier › Ouvrir le dossier de sauvegarde automatique` et `Fichier › Revenir à la dernière sauvegarde...`.
+`Ctrl+S` enregistre, `Ctrl+Shift+S` enregistre sous un nouveau nom, et `Ctrl+Alt+S` enregistre une nouvelle version (Song_2, Song_3 et ainsi de suite) ; dans la disposition Pattern, `Ctrl+N` le fait aussi, comme dans FL Studio. Il y a une sauvegarde automatique, accessible depuis `Fichier › Ouvrir le dossier de sauvegarde automatique` et `Fichier › Revenir à la dernière sauvegarde...`.
 
 `Fichier › Nouveau à partir d'un modèle` propose quatre points de départ : Empty, Basic beat, Trap with 808 et House.
 

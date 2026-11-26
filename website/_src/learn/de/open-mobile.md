@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Den Song öffnen
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Der Song im Einfachen Layout](/assets/img/learn/open-mobile-2.webp)
 
-- Der Song öffnet sich im Einfachen Layout, eine Spur pro Instrument, mit Tempo, Patterns oder Regionen und Mix.
+- Der Song öffnet sich mit einer Spur pro Instrument, mit Tempo, Patterns oder Regionen und Mix. Im Einfachen Layout (`Ansicht › Layout-Stil`) sieht er der Handy-App am ähnlichsten; das Öffnen einer Datei ändert das Layout nicht.
 - Drücke Play, um ihn zu hören.
 - Klicke auf eine Spur, um sie im Dock unter der Zeitleiste zu bearbeiten.
 

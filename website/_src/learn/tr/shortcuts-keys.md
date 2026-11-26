@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Kısayol listesi
 
 ![Kısayol listesi](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. `F1`'e basın (veya `Yardım › Kısayollar`): her pencerenin tuşları, FL Studio'nunkiler. `F1`'e tekrar basmak kapatır.
+1. `F1`'e basın (veya `Yardım › Kısayollar`): her pencerenin tuşları, Pattern yerleşiminde FL Studio'nunkiler. `F1`'e tekrar basmak kapatır. (FL Studio'da `F1` kılavuzu açar; LYNX SHARE'de kılavuz `Yardım › Kılavuz (wiki)...` altındadır.)
 
 ## Bir kısayolu değiştirin
 

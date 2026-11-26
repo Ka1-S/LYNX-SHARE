@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Das Channel Rack mit Step-Zeilen](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Diese gelten, solange das Channel Rack den Fokus hat.
 | Klonen | `Alt+C` | Klont die gewählten Kanäle |
 | Löschen | `Alt+Del` | Löscht die gewählten Kanäle |
 | Gruppieren | `Alt+G` | Legt die gewählten Kanäle in eine neue Filtergruppe |
-| Zum Mixer routen | `Ctrl+L` | Schickt die gewählten Kanäle auf freie Mixer-Inserts |
+| Zu freier Mixerspur leiten | `Ctrl+L` | Schickt die gewählten Kanäle auf freie Mixer-Inserts |
 | Stummschalten | `1` bis `0` | Schaltet die Kanäle 1 bis 10 stumm oder wieder laut |
 | Solo | `Ctrl+1` bis `Ctrl+0` | Schaltet die Kanäle 1 bis 10 solo |
 | Graph-Spur | `Ctrl+K` | Blendet die Graph-Spur ein oder aus |

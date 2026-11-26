@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Gerenciador de plugins
 
 ![Opções › Gerenciador de plugins](/assets/img/learn/vst-plugins-1.webp)
 
 1. Escolha `Opções › Gerenciador de plugins...`. Ele lista todos os plugins que o LYNX encontrou, com fabricante, formato e arquivo.
-2. `Pastas de plugins...` mostra onde o LYNX procura: as pastas padrão de VST3 e CLAP, mais as que você adicionar.
+2. `Pastas de plugins...` mostra onde o LYNX procura: as pastas padrão de VST, VST3 e CLAP (também LV2 no Linux e AU no Mac), mais as que você adicionar.
 
 ## Procure plugins
 

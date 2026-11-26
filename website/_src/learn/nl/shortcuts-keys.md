@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Het overzicht van sneltoetsen
 
 ![Het overzicht van sneltoetsen](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Druk op `F1` (of `Help › Sneltoetsen`): de toetsen van elk venster, die van FL Studio. `F1` nogmaals sluit het.
+1. Druk op `F1` (of `Help › Sneltoetsen`): de toetsen van elk venster, die van FL Studio in de Pattern-lay-out. `F1` nogmaals sluit het. (In FL Studio opent `F1` de handleiding; in LYNX SHARE is de handleiding `Help › Handleiding (wiki)...`.)
 
 ## Een sneltoets wijzigen
 

@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Turu başlatın
 
 ![“Müziğe yeni başlıyorum” seçeneğiyle karşılama kartı](/assets/img/learn/first-song-tour-1.webp)
 
-1. İlk açılışta LYNX SHARE nereden geldiğinizi sorar. `Müzik yapmaya yeniyim` seçeneğini seçin.
+1. İlk açılışta LYNX SHARE nereden geldiğinizi sorar. `Müzik yapmaya yeniyim` seçeneğini seçin. Kaçırdınız mı? `Yardım › İlk şarkı turu` turu her yerleşimden başlatır; Basit yerleşime geçmesi gerektiğinde önce sorar.
 2. Basit yerleşim açılır ve turun kartı 7 adımdan 1.'yi gösterir. Her adım kullanacağınız kontrolü işaret eder.
-3. Adımı kendiniz yapın veya `Benim yerime yap` düğmesine tıklayın. `Next ›` adımı yapmadan ilerler, `‹ Back` geri döner.
+3. Adımı kendiniz yapın veya `Benim yerime yap` düğmesine tıklayın (döngü adımı bunun yerine `Döngüleri göster` sunar). `Next ›` adımı yapmadan ilerler, `‹ Back` geri döner, `Turu atla` turu bitirir.
 
 ## Beat, ton ve enstrüman
 

@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## Komut paleti
 
 !["tracker" yazılmış komut paleti](/assets/img/learn/command-palette-1.webp)
 
-1. `?` tuşuna basın (ya da `Ctrl+Shift+Y`, ya da araç çubuğundaki büyüteçe tıklayın).
+1. `?` tuşuna basın (ya da `Ctrl+Shift+Y`, ya da araç çubuğundaki büyüteçe tıklayın). Klip başlatma yerleşiminde `?`, Live'daki gibi Info View'u gösterir veya gizler; orada `Ctrl+Shift+Y` tuşlarına basın. `Yardım › Eylem ara...` da paleti açar.
 2. İstediğinizin birkaç harfini yazın. Liste her eylemi kısayoluyla, her menü öğesini yeriyle, LYNX ekstralarının anahtarlarını, Settings sayfalarını ve son projelerinizi içerir. Eylemler her dilde İngilizce adlarıyla da bulunur.
 3. Ok tuşlarıyla bir satır seçip `Enter` tuşuna basın ya da çift tıklayın. `Esc` paleti kapatır.
 

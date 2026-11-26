@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## 快速鍵表
 
 ![快速鍵表](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. 按 `F1`（或 `說明 › 快速鍵`）：顯示每個視窗的按鍵，沿用 FL Studio 自己的。再按一次 `F1` 關閉。
+1. 按 `F1`（或 `說明 › 快速鍵`）：顯示每個視窗的按鍵，在模式版面中沿用 FL Studio 自己的。再按一次 `F1` 關閉。（在 FL Studio 中 `F1` 開啟手冊；在 LYNX SHARE 中，手冊是 `說明 › 手冊 (wiki)...`。）
 
 ## 修改快速鍵
 

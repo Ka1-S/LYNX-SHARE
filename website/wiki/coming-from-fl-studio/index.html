@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="e9cd3c94";
+window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=e9cd3c94">
+<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -98,7 +98,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="open-a-flp-project">Open a .flp project</h2>
 <ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the <code>.flp</code>.</li><li>LYNX SHARE resolves the project's plugins and samples, then opens it. The title shows &quot;(imported from FL Studio)&quot;.</li><li>Choose <code>Help › Last FL Studio import report</code> to read what was approximated, left out or not found.</li><li>Choose <code>Help › Missing files...</code> to see the missing samples and plugins.</li><li>Choose <code>File › Save</code>. It asks where to write a <code>.lynx</code> file. The <code>.flp</code> itself is never written.</li></ol>
 <h2 id="what-maps-to-what">What maps to what</h2>
-<div class="tablewrap"><table><thead><tr><th>In FL Studio</th><th>In LYNX SHARE</th></tr></thead><tbody><tr><td>Playlist, Channel rack, Piano roll, Mixer</td><td>Same names, on <code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code></td></tr><tr><td>Plugin picker</td><td><code>F8</code></td></tr><tr><td>Browser</td><td><code>Alt+F8</code></td></tr><tr><td>Pattern / Song mode</td><td><code>L</code></td></tr><tr><td>Undo</td><td><code>Ctrl+Z</code> undoes, or redoes after an undo. <code>Ctrl+Alt+Z</code> undoes backwards</td></tr><tr><td>Save new version</td><td><code>Ctrl+Alt+S</code></td></tr><tr><td>Export</td><td><code>Ctrl+R</code>, MP3 on <code>Ctrl+Shift+R</code>, MIDI on <code>Ctrl+Shift+M</code></td></tr><tr><td>Mixer inserts, sends and sidechain</td><td>The same, with up to 25 effect slots per insert (10 by default)</td></tr><tr><td>Fruity Wrapper</td><td>Third-party plugins are hosted directly, see <a href="/wiki/plugins/">Third-party plugins</a></td></tr><tr><td>Native generators and effects</td><td>Play on engines LYNX SHARE recreated, see below</td></tr><tr><td><code>.flp</code> project file</td><td><code>.lynx</code> project file</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>In FL Studio</th><th>In LYNX SHARE</th></tr></thead><tbody><tr><td>Playlist, Channel rack, Piano roll, Mixer</td><td>Same names, on <code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code></td></tr><tr><td>Plugin picker</td><td><code>F8</code></td></tr><tr><td>Browser</td><td><code>Alt+F8</code></td></tr><tr><td>Pattern / Song mode</td><td><code>L</code></td></tr><tr><td>Undo</td><td><code>Ctrl+Z</code> undoes, or redoes after an undo. <code>Ctrl+Alt+Z</code> undoes backwards</td></tr><tr><td>Save new version</td><td><code>Ctrl+N</code> (as in FL Studio) or <code>Ctrl+Alt+S</code></td></tr><tr><td>Export</td><td><code>Ctrl+R</code>, MP3 on <code>Ctrl+Shift+R</code>, MIDI on <code>Ctrl+Shift+M</code></td></tr><tr><td>Mixer inserts, sends and sidechain</td><td>The same, with up to 25 effect slots per insert (10 by default)</td></tr><tr><td>Fruity Wrapper</td><td>Third-party plugins are hosted directly, see <a href="/wiki/plugins/">Third-party plugins</a></td></tr><tr><td>Native generators and effects</td><td>Play on engines LYNX SHARE recreated, see below</td></tr><tr><td><code>.flp</code> project file</td><td><code>.lynx</code> project file</td></tr></tbody></table></div>
 <p><code>Help › Shortcuts</code> lists every key.</p>
 <h2 id="what-is-imported">What is imported</h2>
 <ul><li>Channels, samples, patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation and controller links.</li><li>The Mixer: routing, levels, sidechains, track EQ and native effects with their saved settings.</li><li>Third-party VST3, VST2 and CLAP plugins inside Fruity Wrapper: replaced by the same plugin installed on your computer, with its saved state.</li></ul>
@@ -129,8 +129,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=e9cd3c94" defer></script>
-<script src="/assets/wiki.js?v=e9cd3c94" defer></script>
-<script src="/assets/motion.js?v=e9cd3c94" defer></script>
+<script src="/assets/site.js?v=ef13bf2b" defer></script>
+<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
+<script src="/assets/motion.js?v=ef13bf2b" defer></script>
 </body>
 </html>

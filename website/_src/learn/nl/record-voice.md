@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Voordat je begint
 
@@ -21,7 +21,7 @@ De knop `+ Voice-spoor` van de kaart `Hierna: 3 dingen om te proberen` doet hetz
 ![Het venster Opname: wat wil je opnemen?](/assets/img/learn/record-voice-2.webp)
 
 1. Druk op Opnemen in de werkbalk.
-2. De eerste keer vraagt een venster wat je wilt opnemen. Kies `Audio, in de Playlist als audioclip`. Vink `Niet meer vragen` aan om die keuze te bewaren.
+2. De eerste keer vraagt een venster wat je wilt opnemen. Kies `Audio, in de Playlist als audioclip`. Vink `Mijn keuze onthouden (rechtsklik op de opnameknop voor het opnamefilter)` aan om die keuze te bewaren.
 3. Druk op Afspelen en zing of spreek dan. De take wordt getekend op de Voice-track terwijl je opneemt.
 4. Druk op Stop. De take is nu een audioclip op de tijdlijn.
 5. Druk nog een keer op Opnemen om opnemen uit te zetten, zodat het volgende Afspelen alleen afspeelt.
@@ -43,5 +43,6 @@ De knop `+ Voice-spoor` van de kaart `Hierna: 3 dingen om te proberen` doet hetz
 - Komt er geen geluid binnen? Controleer het ingangsapparaat in `Opties › Audio-instellingen...`. Een Voice-track neemt op van de eerste ingang van het apparaat.
 - `Preset` boven de effecten laadt een kant-en-klare effectketen voor een stem.
 - `Heldere stem` in het menu van de track vermindert achtergrondruis.
+- Kies in de Pattern- of de Clipstart-lay-out de ingang in het ingangsvak van een Mixer-track en wapen die track, of gebruik `Extra › Audio opnemen met één klik › In de playlist als audioclip`. Zie [Opnemen](/wiki/recording/).
 
 Zie ook [Opnemen](/wiki/recording/) en [Eenvoudige lay-out](/wiki/simple-layout/).

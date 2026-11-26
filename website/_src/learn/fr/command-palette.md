@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## La palette de commandes
 
 ![La palette de commandes avec « tracker » saisi](/assets/img/learn/command-palette-1.webp)
 
-1. Appuyez sur `?` (ou `Ctrl+Shift+Y`, ou cliquez sur la loupe de la barre d'outils).
+1. Appuyez sur `?` (ou `Ctrl+Shift+Y`, ou cliquez sur la loupe de la barre d'outils). Dans la disposition Clip-launch, `?` affiche ou masque l'Info View, comme dans Live : appuyez donc sur `Ctrl+Shift+Y` là-bas. `Aide › Rechercher des actions...` l'ouvre aussi.
 2. Tapez quelques lettres de ce que vous cherchez. La liste contient chaque action avec son raccourci, chaque élément de menu avec son emplacement, les interrupteurs des extras de LYNX, les pages de Settings et vos projets récents. Les actions se trouvent aussi par leurs noms anglais, quelle que soit la langue.
 3. Choisissez une ligne avec les flèches et appuyez sur `Enter`, ou double-cliquez dessus. `Esc` ferme la palette.
 

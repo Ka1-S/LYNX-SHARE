@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Buka lagunya
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Lagu di tata letak sederhana](/assets/img/learn/open-mobile-2.webp)
 
-- Lagu terbuka di tata letak sederhana, satu track per instrumen, lengkap dengan tempo, pattern atau region, dan mix.
+- Lagu terbuka dengan satu track per instrumen, tempo, pattern atau region, dan mix. Di tata letak sederhana (`Tampilan › Gaya tata letak`) tampilannya paling mirip aplikasi ponsel; membuka file tidak mengubah tata letak.
 - Tekan Play untuk mendengarnya.
 - Klik sebuah track untuk mengeditnya di dock di bawah linimasa.
 

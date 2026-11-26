@@ -1,10 +1,12 @@
 <h2 id="driver-and-output">ドライバーと出力</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-1.webp"><img src="/assets/img/learn/audio-setup-1.webp" alt="設定のAudioページ" loading="lazy" width="690" height="685"></a></figure>
-<ol><li><code>オプション › オーディオ設定...</code> を開きます。</li><li>ドライバーを選びます: WindowsはASIO（お使いのインターフェース専用のもの、またはFL Studio ASIO）、MacはCore Audio、LinuxはPipeWireかALSAです。</li><li><code>出力デバイス</code> はLYNXの音を聴く場所です。<code>System default</code> は、パソコンが使っている出力に合わせます。</li></ol>
+<ol><li><code>オプション › オーディオ設定...</code> を開きます。</li><li>ドライバーを選びます。Windowsでは、<code>LYNX ASIO (内蔵)</code> はどのデバイスでも動作し、専用のドライバーは要りません。お使いのインターフェース専用のASIOドライバー、FL Studio ASIO、<code>Windows Audio (共有)</code> や <code>Windows Audio (排他、最低レイテンシー)</code> も選べます。MacはCore Audio、LinuxはPipeWireかALSAです。</li><li><code>出力デバイス</code> はLYNXの音を聴く場所です。<code>System default</code> は、パソコンが使っている出力に合わせます。</li><li><code>入力デバイス</code> は録音に使う入力です（マイクやギター入力）。<code>サンプルレート</code> は通常44100か48000 Hzです。</li></ol>
 <h2 id="buffer-size">バッファーサイズ</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-2.webp"><img src="/assets/img/learn/audio-setup-2.webp" alt="バッファーサイズとレイテンシー" loading="lazy" width="690" height="685"></a></figure>
 <ol><li><code>バッファーサイズ</code>: バッファーが小さいほど、キーボードを弾いたときの反応が速くなります。大きいほど、CPUに余裕ができます。</li><li>プツプツ鳴る、または音が途切れる？ 上げてください。弾いた音が遅れる？ 下げてください。</li></ol>
 <h2 id="test-the-sound">音を確認する</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-3.webp"><img src="/assets/img/learn/audio-setup-3.webp" alt="Help、Test audio output" loading="lazy" width="1280" height="720"></a></figure>
 <ol><li><code>テストサウンドを再生</code> は、選んだ出力から短い音を鳴らします。</li><li>どこからでも、<code>ヘルプ › オーディオ出力のテスト...</code> で同じことができます。</li></ol>
+<h2 id="recorded-takes-late">録音したテイクが遅れる？</h2>
+<ol><li>インターフェースは音を取り込んで再び出すまでに少し時間がかかるため、テイクがわずかに遅れて置かれることがあります。</li><li>同じAudioページの <code>録音レイテンシー補正</code> で、出力と入力をケーブルでつなぎ（またはインターフェースのループバックを使い）、<code>ラウンドトリップを計測</code> をクリックします。</li><li>LYNXがクリック音をいくつか鳴らして戻ってくるまでの遅れを測り、以後は録音したテイクをタイミングどおりに置きます。</li></ol>
 <p><a href="/wiki/audio-setup/">オーディオ設定</a>と<a href="/wiki/troubleshooting/">トラブルシューティング</a>もご覧ください。</p>

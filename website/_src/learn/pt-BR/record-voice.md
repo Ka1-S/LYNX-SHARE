@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Antes de começar
 
@@ -21,7 +21,7 @@ O botão `+ Faixa de voz` do cartão `Próximo: 3 coisas para testar` faz o mesm
 ![A janela de gravação: o que você quer gravar?](/assets/img/learn/record-voice-2.webp)
 
 1. Aperte Record na barra de ferramentas.
-2. Na primeira vez, uma janela pergunta o que gravar. Escolha `Áudio, na Playlist como clipe de áudio`. Marque `Não perguntar de novo` para manter essa escolha.
+2. Na primeira vez, uma janela pergunta o que gravar. Escolha `Áudio, na Playlist como clipe de áudio`. Marque `Lembrar minha escolha (clique direito no botão de gravar para o filtro de gravação)` para manter essa escolha.
 3. Aperte Play e cante ou fale. A take é desenhada na faixa de voz enquanto você grava.
 4. Aperte Stop. A take agora é um clipe de áudio na linha do tempo.
 5. Aperte Record mais uma vez para desligar a gravação, para que o próximo Play só toque.
@@ -43,5 +43,6 @@ O botão `+ Faixa de voz` do cartão `Próximo: 3 coisas para testar` faz o mesm
 - Não entra som? Confira o dispositivo de entrada em `Opções › Configurações de áudio...`. Uma faixa de voz grava da primeira entrada do dispositivo.
 - `Preset`, acima dos efeitos, carrega uma cadeia pronta de efeitos para voz.
 - `Voz limpa`, no menu da faixa, reduz o ruído de fundo.
+- No Layout Pattern ou Clip-launch, escolha a entrada na caixa de entrada de uma trilha do Mixer e arme essa trilha, ou use `Ferramentas › Gravação de áudio com um clique › Na playlist como clipe de áudio`. Veja [Gravação](/wiki/recording/).
 
 Veja também [Gravação](/wiki/recording/) e [Layout Simple](/wiki/simple-layout/).

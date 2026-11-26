@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Başlamadan önce
 
@@ -21,7 +21,7 @@ source: 6cdabe8ca5
 ![Kayıt penceresi: ne kaydetmek istersiniz?](/assets/img/learn/record-voice-2.webp)
 
 1. Araç çubuğunda Record'a basın.
-2. İlk seferde bir pencere ne kaydedileceğini sorar. `Ses, Playlist'e ses klibi olarak` seçeneğini seçin. Bu seçimi korumak için `Bir daha sorma` kutusunu işaretleyin.
+2. İlk seferde bir pencere ne kaydedileceğini sorar. `Ses, Playlist'e ses klibi olarak` seçeneğini seçin. Bu seçimi korumak için `Seçimimi hatırla (kayıt filtresi için kayıt düğmesine sağ tıklayın)` kutusunu işaretleyin.
 3. Play'e basın, sonra şarkı söyleyin veya konuşun. Kayıt sürerken take, Voice izinde çizilir.
 4. Stop'a basın. Take artık zaman çizelgesinde bir ses klibidir.
 5. Kaydı kapatmak için Record'a bir kez daha basın; böylece bir sonraki Play yalnızca çalar.
@@ -43,5 +43,6 @@ source: 6cdabe8ca5
 - Ses gelmiyor mu? `Seçenekler › Ses ayarları...` içindeki giriş aygıtını kontrol edin. Bir Voice izi aygıtın ilk girişinden kaydeder.
 - Efektlerin üstündeki `Preset`, ses için hazır bir efekt zinciri yükler.
 - İzin menüsündeki `Temiz ses` arka plan gürültüsünü azaltır.
+- Pattern veya Klip başlatma yerleşiminde girişi bir Mixer izinin giriş kutusunda seçin ve o izi kayda hazırlayın ya da `Araçlar › Tek tıkla ses kaydı › Ses klibi olarak çalma listesine` seçeneğini kullanın. Bkz. [Kayıt](/wiki/recording/).
 
 Ayrıca bkz. [Kayıt](/wiki/recording/) ve [Basit yerleşim](/wiki/simple-layout/).

@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Abra a música
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![A música no Layout Simple](/assets/img/learn/open-mobile-2.webp)
 
-- A música abre no Layout Simple, com uma faixa por instrumento, o andamento, os patterns ou regiões e a mixagem.
+- A música abre com uma faixa por instrumento, o andamento, os patterns ou regiões e a mixagem. No Layout Simple (`Exibir › Estilo de layout`) ela fica mais parecida com o app do celular; abrir um arquivo não muda o layout.
 - Aperte Play para ouvir.
 - Clique numa faixa para editá-la no dock sob a linha do tempo.
 

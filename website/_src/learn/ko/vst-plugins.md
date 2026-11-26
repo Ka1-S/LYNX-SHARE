@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## 플러그인 관리자
 
 ![Options › Plugin manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. `옵션 › 플러그인 관리자...`를 고르세요. LYNX가 찾은 모든 플러그인이 제조사, 포맷, 파일과 함께 표시됩니다.
-2. `플러그인 폴더...`는 LYNX가 찾는 위치를 보여 줍니다. 표준 VST3와 CLAP 폴더, 그리고 직접 추가한 폴더입니다.
+2. `플러그인 폴더...`는 LYNX가 찾는 위치를 보여 줍니다. 표준 VST, VST3, CLAP 폴더(Linux에서는 LV2, Mac에서는 AU도), 그리고 직접 추가한 폴더입니다.
 
 ## 플러그인 검색
 

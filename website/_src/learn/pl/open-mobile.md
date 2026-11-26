@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Otwórz utwór
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Utwór w Prostym układzie](/assets/img/learn/open-mobile-2.webp)
 
-- Utwór otwiera się w Prostym układzie, jedna ścieżka na instrument, z tempem, patternami lub regionami i miksem.
+- Utwór otwiera się z jedną ścieżką na instrument, z tempem, patternami lub regionami i miksem. W Prostym układzie (`Widok › Styl układu`) wygląda najbliżej aplikacji na telefon; otwarcie pliku nie zmienia układu.
 - Naciśnij Play, żeby go usłyszeć.
 - Kliknij ścieżkę, żeby edytować ją w doku pod osią czasu.
 

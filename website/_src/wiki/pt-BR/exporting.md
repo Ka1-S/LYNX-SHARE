@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![A janela de exportação com WAV selecionado: intervalo, cauda e arquivos à esquerda, formato à direita, opções de mixagem embaixo](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ O `.dawproject` contém faixas, pastas, clipes, notas, áudio com seus marcadore
 - `Gravar também um vídeo com esta mixagem` só aparece quando o projeto tem uma faixa de vídeo, e precisa do FFmpeg.
 - `Renderizar pelo hardware em tempo real` só aparece quando o projeto tem um insert de hardware ativo. Essa exportação leva o tempo da música.
 - A renderização em áudio, em que um insert é convertido em clipe de áudio, toca cerca de 5 dB mais alto que o insert que ele substitui nesta versão.
+- Para levar um projeto para outro computador, `Arquivo › Reunir tudo e salvar` copia para a pasta do projeto os samples e gravações que estão fora dela (`Arquivo › Sempre reunir e salvar` faz isso a cada salvamento), e `Arquivo › Exportar › Pacote de loops zipado...` põe o projeto e todos os arquivos que ele usa num único `.zip`.
 
 ## Veja também
 

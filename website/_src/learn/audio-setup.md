@@ -7,7 +7,7 @@ summary: No sound, or crackles? Choose the driver and the output device, set the
 ![The Audio page of Settings](/assets/img/learn/audio-setup-1.webp)
 
 1. Open `Options › Audio settings...`.
-2. Pick the driver. On Windows, `LYNX ASIO (built in)` works with any device and needs no driver of its own; your interface's own ASIO driver, FL Studio ASIO and `Windows Audio (shared)` or `(exclusive, lowest latency)` are there too. Core Audio on a Mac, PipeWire or ALSA on Linux.
+2. Pick the driver. On Windows, `LYNX ASIO (built in)` works with any device and needs no driver of its own; your interface's own ASIO driver, FL Studio ASIO and `Windows Audio (shared)` or `Windows Audio (exclusive, lowest latency)` are there too. Core Audio on a Mac, PipeWire or ALSA on Linux.
 3. `Output device` is where you hear LYNX. `System default` follows the output your computer uses.
 4. `Input device` is what you record from (a microphone, a guitar input). `Sample rate` is usually 44100 or 48000 Hz.
 

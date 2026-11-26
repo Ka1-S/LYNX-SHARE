@@ -1,13 +1,14 @@
 ---
-source: 6d1d7a664e
+source: 297095d385
 ---
 ## Treiber und Ausgang
 
 ![Die Audio-Seite der Einstellungen](/assets/img/learn/audio-setup-1.webp)
 
 1. Öffne `Optionen › Audioeinstellungen...`.
-2. Wähle den Treiber: ASIO unter Windows (der eigene deiner Schnittstelle oder FL Studio ASIO), Core Audio auf dem Mac, PipeWire oder ALSA unter Linux.
+2. Wähle den Treiber. Unter Windows funktioniert `LYNX ASIO (integriert)` mit jedem Gerät und braucht keinen eigenen Treiber; der ASIO-Treiber deiner Schnittstelle, FL Studio ASIO und `Windows Audio (gemeinsam)` oder `Windows Audio (exklusiv, niedrigste Latenz)` sind auch da. Core Audio auf dem Mac, PipeWire oder ALSA unter Linux.
 3. `Ausgabegerät` ist, wo du LYNX hörst. `System default` folgt dem Ausgang, den dein Computer benutzt.
+4. `Eingabegerät` ist, wovon du aufnimmst (ein Mikrofon, ein Gitarreneingang). `Samplerate` ist meist 44100 oder 48000 Hz.
 
 ## Puffergröße
 
@@ -22,5 +23,11 @@ source: 6d1d7a664e
 
 1. `Testton abspielen` spielt einen kurzen Ton über den gewählten Ausgang.
 2. Von überall tut `Hilfe › Audioausgabe testen...` dasselbe.
+
+## Aufgenommene Takes zu spät?
+
+1. Deine Schnittstelle braucht einen Moment, um den Klang herein- und wieder hinauszubringen, deshalb kann ein Take etwas zu spät landen.
+2. Verbinde auf derselben Audio-Seite unter `Aufnahme-Latenzausgleich` einen Ausgang per Kabel mit einem Eingang (oder nutze den Loopback deiner Schnittstelle) und klicke auf `Round Trip messen`.
+3. LYNX spielt ein paar Klicks, misst, wie spät sie zurückkommen, und legt aufgenommene Takes von da an passend in die Zeit.
 
 Siehe auch [Audio-Einrichtung](/wiki/audio-setup/) und [Fehlerbehebung](/wiki/troubleshooting/).

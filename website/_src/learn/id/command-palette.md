@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## Command palette
 
 ![Command palette dengan "tracker" diketik](/assets/img/learn/command-palette-1.webp)
 
-1. Tekan `?` (atau `Ctrl+Shift+Y`, atau klik kaca pembesar di toolbar).
+1. Tekan `?` (atau `Ctrl+Shift+Y`, atau klik kaca pembesar di toolbar). Di tata letak peluncuran klip, `?` menampilkan atau menyembunyikan Info View, seperti di Live, jadi di sana tekan `Ctrl+Shift+Y`. `Bantuan › Cari tindakan...` juga membukanya.
 2. Ketik beberapa huruf dari yang kamu cari. Daftarnya memuat setiap aksi beserta pintasannya, setiap item menu beserta lokasinya, saklar tambahan LYNX, halaman Settings, dan proyek terbaru. Aksi juga bisa ditemukan lewat nama Inggrisnya di semua bahasa.
 3. Pilih satu baris dengan tombol panah lalu tekan `Enter`, atau klik dua kali. `Esc` menutup palette.
 

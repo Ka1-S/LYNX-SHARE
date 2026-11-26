@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![WAV seçili dışa aktarma penceresi: solda aralık, kuyruk ve dosyalar, sağda format, altta miks seçenekleri](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alt
 - `Bu miksle bir video da yaz` yalnızca projede bir video izi varsa görünür ve FFmpeg gerektirir.
 - `Donanım üzerinden gerçek zamanlı render al` yalnızca projede etkin bir donanım insert'i varsa görünür. Bu dışa aktarma şarkı kadar sürer.
 - Bir insert'in ses klibine bounce edildiği Render to audio, bu sürümde yerine geçtiği insert'ten yaklaşık 5 dB daha yüksek çalar.
+- Bir projeyi başka bir bilgisayara taşımak için `Dosya › Hepsini topla ve kaydet`, proje klasörünün dışındaki örnekleri ve kayıtları klasöre kopyalar (`Dosya › Her zaman topla ve kaydet` bunu her kayıtta yapar); `Dosya › Dışa aktar › Sıkıştırılmış loop paketi...` ise projeyi ve kullandığı her dosyayı tek bir `.zip` dosyasına koyar.
 
 ## İlgili sayfalar
 

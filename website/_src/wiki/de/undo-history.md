@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![Das Fenster Rückgängig-Verlauf: sechs Schritte von Start bis Add notes, mit Mute: Kick als aktuellem](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Jedes Mal, wenn du über eine bestehende Projektdatei speicherst, wird die erset
 |---|---|
 | `Datei › Zur letzten Sicherung zurückkehren...` | Ersetzt das geöffnete Projekt nach Rückfrage durch sein neuestes Backup. Die Projektdatei selbst ändert sich erst, wenn du speicherst |
 | `Datei › Ordner der automatischen Sicherung öffnen` | Zeigt die Backups im Dateimanager |
-| `Datei › Neue Version speichern` (`Ctrl+Alt+S`) | Speichert als `Song_2`, `Song_3` und so weiter, neben der aktuellen Datei |
+| `Datei › Neue Version speichern` (`Ctrl+Alt+S`; `Ctrl+N` im Pattern-Layout) | Speichert als `Song_2`, `Song_3` und so weiter, neben der aktuellen Datei |
 
 Der Bereich `Sicherung` unter `Optionen › Allgemeine Einstellungen...` hat diese Einstellungen:
 

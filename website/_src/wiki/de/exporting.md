@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![Das Export-Fenster mit gewähltem WAV: Bereich, Ausklang und Dateien links, Format rechts, Mix-Optionen darunter](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ Die `.dawproject` enthält Spuren, Ordner, Clips, Noten, Audio mit seinen Warp-M
 - `Auch ein Video mit diesem Mix schreiben` erscheint nur, wenn das Projekt eine Videospur hat, und braucht FFmpeg.
 - `In Echtzeit über die Hardware rendern` erscheint nur, wenn das Projekt ein aktives Hardware-Insert hat. Dieser Export dauert so lang wie der Song.
 - Beim Rendern in Audio, wenn ein Insert in einen Audioclip gebounct wird, spielt dieser in dieser Version etwa 5 dB lauter als das Insert, das er ersetzt.
+- Um ein Projekt auf einen anderen Computer zu bringen, kopiert `Datei › Alles sammeln und speichern` die Samples und Aufnahmen von außerhalb des Projektordners hinein (`Datei › Immer sammeln und speichern` macht das bei jedem Speichern), und `Datei › Exportieren › Gezipptes Loop-Paket...` packt das Projekt und jede Datei, die es benutzt, in eine einzige `.zip`.
 
 ## Siehe auch
 

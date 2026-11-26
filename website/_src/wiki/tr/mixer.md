@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Mixer](/assets/img/mixer.webp)
 
-Her kanal bir Mixer insert'i üzerinden çalar. Her insert'in bir fader'ı, pan'ı, mute ve solo düğmeleri, bir tepe ölçeri, her biri kendi dry/wet miktarına sahip en fazla 25 efekt yuvası ve dahili bir EQ'su vardır. Başka yere yönlendirmedikçe bütün insert'ler Master'da buluşur. Mixer'ı göstermek veya gizlemek için `F9` tuşuna basın.
+Her kanal bir Mixer insert'i (bir Mixer izi; insert de denir) üzerinden çalar. Playlist izleri Mixer izi değildir: yalnızca klip tutarlar ve bir klip nerede durursa dursun kanallarının insert'leri üzerinden çalar, bu yüzden Playlist izi 1, insert 1 değildir. Her insert'in bir fader'ı, pan'ı, mute ve solo düğmeleri, bir tepe ölçeri, her biri kendi dry/wet miktarına sahip en fazla 25 efekt yuvası ve dahili bir EQ'su vardır. Başka yere yönlendirmedikçe bütün insert'ler Master'da buluşur. Mixer'ı göstermek veya gizlemek için `F9` tuşuna basın.
 
 Bir projede en fazla 500 insert olabilir. Mixer'da yeni bir tane için ekleme şeridi vardır. Mixer'ın başlık çubuğundaki kutu, `Kompakt` ile `Çok büyük` arasında sekiz kanal şeridi düzeninden birini seçer.
 
@@ -21,7 +21,9 @@ Channel Rack'te insert numarasını seçmek için kanalın yönlendirme kutusunu
 
 Channel Rack'teki `Ctrl+L`, seçili birçok kanal üzerinde aynı anda çalışır. Her biri kendi boş insert'ine gider.
 
-Mixer odaktayken `Ctrl+L`, seçili kanalları seçili insert'e bağlar; `Ctrl+Shift+L` ise onları, ondan başlayarak ardışık insert'lere bağlar.
+Mixer odaktayken `Ctrl+L` (`Seçili kanalları bu mixer kanalına yönlendir`) seçili kanalları seçili insert'e gönderir; `Ctrl+Shift+L` (`Seçili kanalları bu mixer kanalından başlayarak yönlendir`) ise onları, ondan başlayarak ardışık insert'lere gönderir.
+
+Playlist izlerini insert'lerle eşleştirmek için Playlist menüsündeki `Playlist parçalarını mikser kanallarına bağla`, geçerli proje için iz 1'i insert 1'e, iz 2'yi insert 2'ye bağlar ve böyle devam eder. Bir Playlist izinin başlığının üzerine gelmek kliplerinin nerede duyulduğunu söyler (Ayarlar › LYNX ekstraları içinde `Yönlendirme ipuçları (LYNX)`).
 
 ## Insert'leri seçmek ve taşımak
 

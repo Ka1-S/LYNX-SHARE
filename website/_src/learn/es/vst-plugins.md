@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Gestor de plugins
 
 ![Opciones › Gestor de plugins](/assets/img/learn/vst-plugins-1.webp)
 
 1. Elige `Opciones › Gestor de plugins...`. Lista todos los plugins que LYNX encontró, con su fabricante, formato y archivo.
-2. `Carpetas de plugins...` muestra dónde busca LYNX: las carpetas estándar de VST3 y CLAP, más las que añadas.
+2. `Carpetas de plugins...` muestra dónde busca LYNX: las carpetas estándar de VST, VST3 y CLAP (también LV2 en Linux y AU en Mac), más las que añadas.
 
 ## Busca plugins
 

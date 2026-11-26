@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![Okno Zarządzaj skrótami: przeszukiwalna lista akcji z klawiszami każdej z nich](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Niektóre z tych klawiszy robią coś innego w edytorze, który ma fokus. W Pian
 
 | Klawisz | Co robi |
 |---|---|
-| `Ctrl+N` | Nowy projekt |
+| `Ctrl+N` | Zapisz nową wersję w układzie Pattern (tak jak w FL Studio); Nowy projekt w układach Clip-launch i Prostym |
 | `Ctrl+O` | Otwórz projekt |
 | `Ctrl+S` | Zapisz |
 | `Ctrl+Shift+S` | Zapisz jako |
-| `Ctrl+Alt+S` | Zapisz nową wersję |
+| `Ctrl+Alt+S` | Zapisz nową wersję (każdy układ) |
 | `Ctrl+R` | Eksport audio |
 | `Ctrl+Shift+R` | Eksportuj plik MP3 |
 | `Ctrl+Shift+M` | Eksportuj plik MIDI |
@@ -118,7 +118,7 @@ Te klawisze działają tylko w układu z uruchamianiem klipów.
 | `Alt+C` | Klonuje zaznaczone kanały |
 | `Alt+Del` | Usuwa zaznaczone kanały |
 | `Alt+G` | Grupuje zaznaczone kanały |
-| `Ctrl+L` | Kieruje zaznaczone kanały na wolne inserty Mixera |
+| `Ctrl+L` | Kieruj do wolnej ścieżki miksera (zaznaczone kanały dostają wolne inserty Mixera) |
 | `Ctrl+K` | Włącza lub wyłącza pasy wykresu kroków |
 | `1` do `0` | Wycisza lub przywraca kanały od 1 do 10 |
 | `Ctrl+1` do `Ctrl+0` | Włącza solo dla kanałów od 1 do 10 |
@@ -239,8 +239,8 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `F2` | Zmienia nazwę i kolor zaznaczonego inserta |
 | `S` | Solo dla zaznaczonych insertów |
 | `Alt+S` | Solo dla zaznaczonych insertów razem z insertami, które je zasilają |
-| `Ctrl+L` | Łączy zaznaczone kanały z zaznaczonym insertem |
-| `Ctrl+Shift+L` | Łączy zaznaczone kanały z insertami, zaczynając od zaznaczonego |
+| `Ctrl+L` | Kieruj zaznaczone kanały do tej ścieżki (zaznaczony insert) |
+| `Ctrl+Shift+L` | Kieruj zaznaczone kanały, zaczynając od tej ścieżki (zaznaczony insert) |
 | `Alt+L` | Zaznacza kanały połączone z zaznaczonym insertem |
 | `Del` | Usuń zaznaczone inserty. LYNX SHARE najpierw pyta |
 | `Ctrl+E` | Otwiera edytor audio |

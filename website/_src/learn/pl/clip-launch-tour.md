@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## Siatka i aranżacja
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Na karcie powitalnej kliknij `Ableton Live lub Bitwig` albo wybierz `Widok › Styl układu › Układ z uruchamianiem klipów`.
 2. Ścieżki Playlist to kolumny siatki klipów, a każdy wiersz to scena. Aranżacja jest po prawej.
-3. Tutaj otwieramy utwór demo LYNX. Jego aranżacja ma trzy sekcje: Intro, Verse i Hook.
+3. Tutaj otwieramy jeden z utworów demo LYNX (`Plik › Nowy z szablonu` albo strona startowa). Jego aranżacja ma trzy sekcje: Intro, Verse i Hook.
 
 ## Sceny z sekcji
 

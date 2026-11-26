@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![Geri alma geçmişi penceresi: Start'tan Add notes'a altı adım, geçerli adım olarak Mute: Kick](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Var olan bir proje dosyasının üzerine her kaydedişinizde, yerine geçilen s�
 |---|---|
 | `Dosya › Son yedeğe dön...` | Sorduktan sonra açık projeyi en yeni yedeğiyle değiştirir. Proje dosyasının kendisi yalnızca kaydettiğinizde değişir |
 | `Dosya › Otomatik kayıt klasörünü aç` | Yedekleri dosya yöneticisinde gösterir |
-| `Dosya › Yeni sürüm kaydet` (`Ctrl+Alt+S`) | Geçerli dosyanın yanına `Song_2`, `Song_3` gibi kaydeder |
+| `Dosya › Yeni sürüm kaydet` (`Ctrl+Alt+S`; Pattern yerleşiminde `Ctrl+N`) | Geçerli dosyanın yanına `Song_2`, `Song_3` gibi kaydeder |
 
 `Seçenekler › Genel ayarlar...` içindeki `Yedek` bölümünde şu ayarlar bulunur:
 

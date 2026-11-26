@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## Kisi dan arrangement
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Di kartu sambutan, klik `Ableton Live atau Bitwig`, atau pilih `Tampilan › Gaya tata letak › Alur kerja peluncuran klip`.
 2. Track Playlist menjadi kolom kisi klip; setiap baris adalah satu scene. Arrangement ada di sebelah kanan.
-3. Di sini kita membuka lagu demo LYNX. Arrangement-nya punya tiga bagian: Intro, Verse, dan Hook.
+3. Di sini kita membuka salah satu lagu demo LYNX (`File › Baru dari template`, atau halaman awal). Arrangement-nya punya tiga bagian: Intro, Verse, dan Hook.
 
 ## Scene dari bagian lagu
 

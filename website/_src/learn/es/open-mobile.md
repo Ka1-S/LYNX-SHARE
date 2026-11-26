@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Abre la canción
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![La canción en el Diseño simple](/assets/img/learn/open-mobile-2.webp)
 
-- La canción se abre en el Diseño simple, con una pista por instrumento, el tempo, los patrones o regiones y la mezcla.
+- La canción se abre con una pista por instrumento, el tempo, los patrones o regiones y la mezcla. En el Diseño simple (`Ver › Estilo de diseño`) se parece más a la app del móvil; abrir un archivo no cambia el diseño.
 - Pulsa Play para oírla.
 - Haz clic en una pista para editarla en el dock bajo la línea de tiempo.
 

@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Ściągawka skrótów
 
 ![Ściągawka skrótów](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Naciśnij `F1` (albo `Pomoc › Skróty`): klawisze każdego okna, te z FL Studio. Ponowne `F1` ją zamyka.
+1. Naciśnij `F1` (albo `Pomoc › Skróty`): klawisze każdego okna, w układzie Pattern te z FL Studio. Ponowne `F1` ją zamyka. (W FL Studio `F1` otwiera podręcznik; w LYNX SHARE podręcznik to `Pomoc › Podręcznik (wiki)...`.)
 
 ## Zmień skrót
 

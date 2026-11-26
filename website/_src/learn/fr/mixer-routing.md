@@ -1,11 +1,20 @@
 ---
-source: da7928152b
+source: ee9bb943c6
 ---
+## Pistes de la Playlist et pistes du Mixer
+
+Dans la disposition Pattern, une piste de la Playlist n'est pas une piste du Mixer : la piste 1 de la Playlist n'est pas la piste 1 du Mixer (l'insert 1).
+
+- Les pistes de la Playlist ne contiennent que des clips. Un clip joue à travers les pistes du Mixer de ses canaux, où qu'il se trouve.
+- Chaque canal du Channel rack joue dans la piste du Mixer dont le numéro figure dans sa case de routage, entre les boutons et son nom. Faites glisser la case pour la changer ; `Ctrl+L` donne aux canaux sélectionnés des pistes du Mixer libres.
+- Trois endroits vous disent où va un son : la case de routage dans le Channel rack, l'indication quand vous pointez l'en-tête d'une piste de la Playlist, et l'indication d'une piste du Mixer, qui liste les canaux qui y jouent.
+- Vous voulez les associer ? `Lier les pistes de la Playlist aux pistes de mixage` dans le menu de la Playlist lie la piste 1 à la piste 1 du Mixer, la piste 2 à la piste 2 du Mixer et ainsi de suite, pour le projet actuel.
+
 ## Sélectionnez une piste
 
 ![Le Mixer avec la piste Chords sélectionnée](/assets/img/learn/mixer-routing-1.webp)
 
-1. Ouvrez le Mixer avec `F9`. Chaque piste va au Master.
+1. Ouvrez le Mixer avec `F9`. Chaque piste du Mixer va au Master.
 2. Cliquez sur la piste à envoyer, ici Chords.
 
 ## Routage et niveau d'envoi

@@ -1,5 +1,5 @@
 ---
-source: f439a070b5
+source: 141ffc1370
 ---
 LYNX SHARE 是一款免费开源的 DAW，支持 Windows、macOS 和 Linux，一个程序里有三种工作流程。默认是 FL Studio 工作流程：你在通道机架和钢琴卷帘中编写样式，在播放列表中编排，在混音台中混音。片段启动工作流程以 Ableton Live 的风格从网格启动片段和场景，简易工作流程则把 BandLab 易上手的单窗口风格和 FL Studio Mobile 的工作方式结合在一起。`视图 › 布局样式` 可随时在它们之间切换。它能打开 FL Studio 工程（`.flp`）、Ableton Live 套装（`.als`）、FL Studio Mobile 工程（`.flm`）、DAWproject 文件、GarageBand 和 BandLab 工程以及跟踪器模块，导出 `.flp`、`.als`、`.dawproject` 和 `.flm`，并以自己的 `.lynx` 格式保存。
 
@@ -27,7 +27,7 @@ LYNX SHARE 是一款免费开源的 DAW，支持 Windows、macOS 和 Linux，一
 
 ## 保存你的工作
 
-`Ctrl+S` 保存，`Ctrl+Shift+S` 另存为新名称，`Ctrl+Alt+S` 保存新版本（Song_2、Song_3，依此类推）。还有自动保存，可通过 `文件 › 打开自动保存文件夹` 和 `文件 › 恢复到上一个备份...` 访问。
+`Ctrl+S` 保存，`Ctrl+Shift+S` 另存为新名称，`Ctrl+Alt+S` 保存新版本（Song_2、Song_3，依此类推）；在模式布局中 `Ctrl+N` 也可以，和 FL Studio 一样。还有自动保存，可通过 `文件 › 打开自动保存文件夹` 和 `文件 › 恢复到上一个备份...` 访问。
 
 `文件 › 从模板新建` 提供四个起点：空、Basic beat、Trap with 808 和 House。
 

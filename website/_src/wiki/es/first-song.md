@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Esta página recorre una vez todo el camino: un patrón de batería, una melodía, un arreglo, una mezcla y un archivo exportado. Cada parte enlaza con la página que cubre su ventana al completo. Si en algún momento no oyes nada, consulta [Configuración de audio](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Para añadir un sonido que no está, haz clic en el cuadro `+ añadir canal` baj
 
 ## Mezclar y añadir un efecto
 
-1. Pulsa `F9` para mostrar el [Mixer](/wiki/mixer/). Los cinco canales iniciales ya suenan por los inserts 1 a 5, y un canal añadido desde el menú `+ añadir canal` toma un insert libre. El número del cuadro de ruta del canal en el Channel Rack indica cuál.
+1. Pulsa `F9` para mostrar el [Mixer](/wiki/mixer/). Una pista del Mixer también se llama insert. Los cinco canales iniciales ya suenan por los inserts 1 a 5 (las pistas de la Playlist solo contienen clips, así que la pista 1 de la Playlist no es el insert 1), y un canal añadido desde el menú `+ añadir canal` suena en el Master (su cuadro de ruta muestra `---`), como en FL Studio. El número del cuadro de ruta del canal en el Channel Rack indica cuál.
 2. Para pasar canales a inserts libres propios, selecciónalos en el Channel Rack y pulsa `Ctrl+L`. Cada insert toma el nombre y el color del canal.
 3. Arrastra el fader de un insert para fijar su nivel.
 4. Haz clic en un insert para seleccionarlo. El panel de efectos de la derecha muestra sus ranuras de efecto (diez filas, y la lista se desplaza).
@@ -60,7 +60,7 @@ Para añadir un sonido que no está, haz clic en el cuadro `+ añadir canal` baj
 | Playlist | `F5` | Muestra u oculta la Playlist |
 | Modo Patrón o Canción | `L` | Cambia lo que reproduce `Space` |
 | Mixer | `F9` | Muestra u oculta el Mixer |
-| Enviar a inserts libres | `Ctrl+L` | Da a los canales seleccionados sus propios inserts del Mixer |
+| Enrutar a pista de mezclador libre | `Ctrl+L` | Da a los canales seleccionados sus propios inserts del Mixer |
 | Guardar | `Ctrl+S` | Guarda el proyecto como `.lynx` |
 | Exportar | `Ctrl+R` | Abre la ventana de exportación con el último formato usado |
 

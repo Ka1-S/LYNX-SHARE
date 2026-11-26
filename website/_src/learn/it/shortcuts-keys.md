@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Il foglio delle scorciatoie
 
 ![Il foglio delle scorciatoie](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Premi `F1` (o `Aiuto › Scorciatoie`): i tasti di ogni finestra, quelli di FL Studio. `F1` di nuovo lo chiude.
+1. Premi `F1` (o `Aiuto › Scorciatoie`): i tasti di ogni finestra, quelli di FL Studio nel layout Pattern. `F1` di nuovo lo chiude. (In FL Studio `F1` apre il manuale; in LYNX SHARE il manuale è `Aiuto › Manuale (wiki)...`.)
 
 ## Cambia una scorciatoia
 

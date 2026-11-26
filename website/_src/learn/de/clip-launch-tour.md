@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## Das Raster und das Arrangement
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Klicke auf der Willkommenskarte auf `Ableton Live oder Bitwig` oder wähle `Ansicht › Layout-Stil › Clip-Start-Arbeitsablauf`.
 2. Die Spuren der Playlist sind die Spalten des Clip-Rasters, jede Zeile ist eine Szene. Das Arrangement liegt rechts.
-3. Hier öffnen wir den Demo-Song von LYNX. Sein Arrangement hat drei Abschnitte: Intro, Verse und Hook.
+3. Hier öffnen wir einen der Demo-Songs von LYNX (`Datei › Neu aus Vorlage` oder die Startseite). Sein Arrangement hat drei Abschnitte: Intro, Verse und Hook.
 
 ## Szenen aus Abschnitten
 

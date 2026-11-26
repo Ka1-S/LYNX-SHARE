@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## .als 열기
 
 ![File › Open...](/assets/img/learn/open-als-1.webp)
 
 1. `파일 › 열기...`(`Ctrl+O`)을 선택하고 프로젝트 폴더 안의 세트 `.als` 파일을 고릅니다.
-2. LYNX SHARE가 클립 실행 레이아웃으로 엽니다. Ableton Live 자체는 필요 없고, `.als`는 절대 바뀌지 않습니다.
+2. LYNX SHARE가 세트를 엽니다. 클립 실행 레이아웃(`보기 › 레이아웃 스타일`)에서는 Live처럼 세션 클립이 클립 그리드에 놓입니다. 파일을 열어도 레이아웃은 바뀌지 않습니다. Ableton Live 자체는 필요 없고, `.als`는 절대 바뀌지 않습니다.
 
 ## 가져오는 것
 

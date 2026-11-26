@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="e9cd3c94";
+window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=e9cd3c94">
+<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -91,13 +91,15 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <main>
 <div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.save-backups.t">Save, versions and backups</h1><p data-i18n="lt.save-backups.s">Save your song as a LYNX project, keep each idea as a new version, and get an older state back from the backups LYNX writes while you work.</p><p class="tmeta"><span data-i18n="lr.l.any">Any layout</span> · <span>0:52</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="save-backups"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/save-backups-en.webp"><source src="/assets/media/learn/save-backups-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/save-backups-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/save-backups-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/save-backups-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/save-backups-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/save-backups-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/save-backups-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/save-backups-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/save-backups-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/save-backups-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/save-backups-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/save-backups-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/save-backups-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/save-backups-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/save-backups-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/save-backups-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/save-backups-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/save-backups-en-720.mp4" download>720p, 2.4 MB</a> · <a href="/assets/media/learn/save-backups-en-1080.mp4" download>1080p, 3.9 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.save-backups.c0">Save as</span></button></li><li><button type="button" data-seek="14.6"><b>0:15</b> <span data-i18n="lt.save-backups.c1">Save and new versions</span></button></li><li><button type="button" data-seek="31.4"><b>0:31</b> <span data-i18n="lt.save-backups.c2">Versions and backups</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="save-as">Save as</h2>
 <figure><a class="shot" href="/assets/img/learn/save-backups-1.webp"><img src="/assets/img/learn/save-backups-1.webp" alt="The project saved as My beat" loading="lazy" width="1000" height="620"></a></figure>
-<ol><li>Choose <code>File › Save as...</code> and give the project a name. A LYNX project (.lynx) keeps everything: patterns, the Mixer, plugins and their settings.</li><li>From then on <code>File › Save</code> (<code>Ctrl+S</code>) saves over it. The file it replaces goes to the backups.</li></ol>
+<ol><li>Choose <code>File › Save as...</code> and give the project a name. A LYNX project (.lynx) keeps the patterns, the Mixer, the plugins and their settings, and points to its samples and recordings, which stay files of their own.</li><li>From then on <code>File › Save</code> (<code>Ctrl+S</code>) saves over it. The file it replaces goes to the backups.</li></ol>
 <h2 id="save-new-version">Save new version</h2>
 <figure><a class="shot" href="/assets/img/learn/save-backups-2.webp"><img src="/assets/img/learn/save-backups-2.webp" alt="Saved as a new version" loading="lazy" width="1000" height="420"></a></figure>
-<ol><li>Trying an idea? <code>File › Save new version</code> (<code>Ctrl+Alt+S</code>) saves the project as My beat_2, next to the first, and keeps working in it.</li><li>LYNX also writes backups while you work, so a crash or a mistake costs little.</li></ol>
+<ol><li>Trying an idea? <code>File › Save new version</code> (<code>Ctrl+N</code> in the Pattern layout, as in FL Studio; <code>Ctrl+Alt+S</code> in every layout) saves the project as My beat_2, next to the first, and keeps working in it.</li><li>LYNX also writes backups while you work, so a crash or a mistake costs little.</li></ol>
 <h2 id="versions-and-backups">Versions and backups</h2>
 <figure><a class="shot" href="/assets/img/learn/save-backups-3.webp"><img src="/assets/img/learn/save-backups-3.webp" alt="The Versions window" loading="lazy" width="840" height="500"></a></figure>
 <ol><li><code>File › Versions...</code> lists the saved versions and the backups of this project, newest first.</li><li>Choose one and click <code>Open as a copy</code>: it opens as a new, unsaved project, and the files stay as they are. <code>Label...</code> adds a note to it.</li><li><code>File › Revert to last backup...</code> replaces the open project with its newest backup. The project file itself only changes when you save.</li></ol>
+<h2 id="move-a-project-to-another-computer">Move a project to another computer</h2>
+<ol><li>Samples and recordings are files beside the <code>.lynx</code>, not inside it. <code>File › Collect all and save</code> copies the ones from outside the project's folder into it and saves; tick <code>File › Always collect and save</code> to do it on every save.</li><li><code>File › Export › Zipped loop package...</code> writes one <code>.zip</code> with the project and every file it uses: copy that file to the other computer.</li><li><code>File › Open the project's folder</code> shows where the project and its files are.</li></ol>
 <p>See also <a href="/wiki/undo-history/">Undo and history</a>.</p></div><nav class="wpn"><a href="/learn/export-mp3/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.export-mp3.t">Export your song as MP3 or WAV</b></a><a href="/learn/simple-loops/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.simple-loops.t">Build a song from loops</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
@@ -108,8 +110,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=e9cd3c94" defer></script>
-<script src="/assets/learn.js?v=e9cd3c94" defer></script>
-<script src="/assets/motion.js?v=e9cd3c94" defer></script>
+<script src="/assets/site.js?v=ef13bf2b" defer></script>
+<script src="/assets/learn.js?v=ef13bf2b" defer></script>
+<script src="/assets/motion.js?v=ef13bf2b" defer></script>
 </body>
 </html>

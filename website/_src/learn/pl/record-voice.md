@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Zanim zaczniesz
 
@@ -21,7 +21,7 @@ Przycisk `+ Ścieżka głosu` na karcie `Dalej: 3 rzeczy do wypróbowania` robi 
 ![Okno Recording: co chcesz nagrać?](/assets/img/learn/record-voice-2.webp)
 
 1. Naciśnij Record na pasku narzędzi.
-2. Za pierwszym razem okno pyta, co nagrywać. Wybierz `Audio do Playlisty jako klip audio`. Zaznacz `Nie pytaj więcej`, żeby zachować ten wybór.
+2. Za pierwszym razem okno pyta, co nagrywać. Wybierz `Audio do Playlisty jako klip audio`. Zaznacz `Zapamiętaj wybór (prawy klik na nagrywaniu: filtr nagrywania)`, żeby zachować ten wybór.
 3. Naciśnij Play, potem śpiewaj albo mów. Podejście rysuje się na ścieżce Voice w trakcie nagrywania.
 4. Naciśnij Stop. Podejście jest teraz klipem audio na osi czasu.
 5. Naciśnij Record jeszcze raz, żeby wyłączyć nagrywanie, a następny Play tylko odtwarzał.
@@ -43,5 +43,6 @@ Przycisk `+ Ścieżka głosu` na karcie `Dalej: 3 rzeczy do wypróbowania` robi 
 - Nic nie wchodzi? Sprawdź urządzenie wejściowe w `Opcje › Ustawienia audio...`. Ścieżka Voice nagrywa z pierwszego wejścia urządzenia.
 - `Preset` nad efektami wczytuje gotowy łańcuch efektów dla głosu.
 - `Czysty wokal` w menu ścieżki zmniejsza szum tła.
+- W układzie Pattern lub Clip-launch wybierz wejście w polu wejścia ścieżki Mixera i uzbrój tę ścieżkę albo użyj `Narzędzia › Nagrywanie audio jednym kliknięciem › Do playlisty jako klip audio`. Zobacz [Nagrywanie](/wiki/recording/).
 
 Zobacz też [Nagrywanie](/wiki/recording/) i [Prosty układ](/wiki/simple-layout/).

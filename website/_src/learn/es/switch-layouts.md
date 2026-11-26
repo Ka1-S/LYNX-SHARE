@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## Elige de dónde vienes
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile o GarageBand`: el Diseño simple, una sola ventana con pistas, loops y grabación rápida.
    - `FL Studio`: el Diseño Pattern, con Channel Rack, Piano Roll, Playlist y Mixer.
    - `Ableton Live o Bitwig`: el Diseño Clip-launch, con una cuadrícula de clips y escenas.
+   - `Logic, Cubase, Reaper, Pro Tools o Studio One`: el Diseño simple con el Mixer a mano, una pista por instrumento en una línea de tiempo.
+   - `Estoy empezando con la música`: el Diseño simple y un tour breve de la primera canción.
 3. Haz clic en uno. Aquí elegimos BandLab: el Diseño simple se abre con un beat inicial en una pista Drums.
 
 ## Cambia de diseño

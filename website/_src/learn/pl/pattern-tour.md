@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![Mixer ze ścieżką dla każdego kanału](/assets/img/learn/pattern-tour-4.webp)
 
 1. Naciśnij `F9`, żeby otworzyć Mixer.
-2. Każdy kanał gra na ścieżkę Mixera. Przeciągnij suwak, żeby ustawić poziom, a efekty dodaj w slotach ścieżki.
-3. Ścieżka Master po lewej to to, co słyszysz i eksportujesz.
+2. Każdy kanał gra do ścieżki Mixera (insertu), której numer jest w jego polu routingu: małym polu między gałkami a nazwą kanału w Channel Rack (kanały startowe używają 1–5). Przeciągnij pole albo pokręć nad nim kółkiem myszy, żeby je zmienić, kliknij je dwukrotnie, żeby zobaczyć tę ścieżkę Mixera, i naciśnij `Ctrl+L`, żeby dać zaznaczonym kanałom wolne ścieżki Mixera.
+3. Ścieżki Playlisty zawierają tylko klipy, więc ścieżka Playlisty 1 to nie ścieżka Mixera 1: klip gra przez ścieżki Mixera swoich kanałów, gdziekolwiek leży. Wskaż nagłówek ścieżki Playlisty, żeby przeczytać, gdzie słychać jej klipy; `Połącz ścieżki Playlisty ze ścieżkami miksera` w menu Playlisty łączy je w pary, ścieżkę 1 ze ścieżką Mixera 1 i tak dalej. Więcej w [Routing ścieżek w Mixerze](/learn/mixer-routing/).
+4. Przeciągnij suwak, żeby ustawić poziom ścieżki Mixera, a efekty dodaj w jej slotach. Ścieżka Master po lewej to to, co słyszysz i eksportujesz.
 
 ## Warto wiedzieć
 
 - `F5`, `F6`, `F7` i `F9` pokazują lub ukrywają cztery okna, tak jak w FL Studio. `F8` otwiera wybieracz wtyczek.
+- Pas na dole Piano Roll ustawia velocity każdej nuty.
 - Ten sam projekt otwiera się też w układach Prostym i Clip-launch: zobacz [Jeden projekt, trzy układy](/learn/switch-layouts/).
 
 Zobacz też [Przechodzisz z FL Studio](/wiki/coming-from-fl-studio/) i [Skróty klawiszowe](/wiki/shortcuts/).

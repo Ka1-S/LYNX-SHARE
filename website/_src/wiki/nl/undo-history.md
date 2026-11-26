@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![Het venster Bewerkgeschiedenis: zes stappen van Start tot Add notes, met Mute: Kick als de huidige](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Elke keer dat je over een bestaand projectbestand heen opslaat, wordt de versie 
 |---|---|
 | `Bestand › Terugzetten naar laatste back-up...` | Vervangt het geopende project door zijn nieuwste back-up, na een vraag. Het projectbestand zelf verandert pas als je opslaat |
 | `Bestand › Map voor automatisch opslaan openen` | Toont de back-ups in de bestandsbeheerder |
-| `Bestand › Nieuwe versie opslaan` (`Ctrl+Alt+S`) | Slaat op als `Song_2`, `Song_3` enzovoort, naast het huidige bestand |
+| `Bestand › Nieuwe versie opslaan` (`Ctrl+Alt+S`; `Ctrl+N` in de Pattern-lay-out) | Slaat op als `Song_2`, `Song_3` enzovoort, naast het huidige bestand |
 
 De sectie `Back-up` van `Opties › Algemene instellingen...` heeft deze instellingen:
 

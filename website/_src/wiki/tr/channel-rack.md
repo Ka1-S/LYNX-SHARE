@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Step satırlarıyla Channel Rack](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Bunlar Channel Rack odaktayken çalışır.
 | Klonla | `Alt+C` | Seçili kanalları klonlar |
 | Sil | `Alt+Del` | Seçili kanalları siler |
 | Grupla | `Alt+G` | Seçili kanalları yeni bir filtre grubuna koyar |
-| Mixer'e yönlendir | `Ctrl+L` | Seçili kanalları boş Mixer insert'lerine gönderir |
+| Boş mikser kanalına yönlendir | `Ctrl+L` | Seçili kanalları boş Mixer insert'lerine gönderir |
 | Sessiz | `1` - `0` | 1 ile 10 arası kanalları susturur veya sesini açar |
 | Solo | `Ctrl+1` - `Ctrl+0` | 1 ile 10 arası kanalları solo yapar |
 | Grafik şeridi | `Ctrl+K` | Grafik şeridini gösterir veya gizler |

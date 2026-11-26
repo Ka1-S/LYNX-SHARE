@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Pengelola plugin
 
 ![Options › Plugin manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. Pilih `Opsi › Pengelola plugin...`. Ia mencantumkan setiap plugin yang ditemukan LYNX, lengkap dengan vendor, format, dan filenya.
-2. `Folder plugin...` menunjukkan tempat LYNX mencari: folder VST3 dan CLAP standar, plus folder apa pun yang kamu tambahkan.
+2. `Folder plugin...` menunjukkan tempat LYNX mencari: folder VST, VST3, dan CLAP standar (juga LV2 di Linux dan AU di Mac), plus folder apa pun yang kamu tambahkan.
 
 ## Pindai plugin
 

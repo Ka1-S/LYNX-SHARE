@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![Jendela Riwayat urungkan: enam langkah dari Start sampai Add notes, dengan Mute: Kick sebagai langkah saat ini](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Setiap kali kamu menyimpan menimpa file proyek yang sudah ada, versi yang tertim
 |---|---|
 | `File › Kembalikan ke cadangan terakhir...` | Mengganti proyek yang terbuka dengan cadangan terbarunya, setelah bertanya. File proyeknya sendiri baru berubah saat kamu menyimpan |
 | `File › Buka folder simpan otomatis` | Menampilkan cadangan di file manager |
-| `File › Simpan versi baru` (`Ctrl+Alt+S`) | Menyimpan sebagai `Song_2`, `Song_3`, dan seterusnya, di sebelah file saat ini |
+| `File › Simpan versi baru` (`Ctrl+Alt+S`; `Ctrl+N` di tata letak Pattern) | Menyimpan sebagai `Song_2`, `Song_3`, dan seterusnya, di sebelah file saat ini |
 
 Bagian `Cadangan` di `Opsi › Pengaturan umum...` punya pengaturan berikut:
 

@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![Das Fenster Tastenkürzel verwalten: eine durchsuchbare Liste von Aktionen mit ihren Tasten](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Einige dieser Tasten tun in einem Editor mit Fokus etwas anderes. Im Piano Roll 
 
 | Taste | Was sie bewirkt |
 |---|---|
-| `Ctrl+N` | Neues Projekt |
+| `Ctrl+N` | Neue Version speichern im Pattern-Layout (wie in FL Studio); Neues Projekt im Clip-Start- und im Einfachen Layout |
 | `Ctrl+O` | Projekt öffnen |
 | `Ctrl+S` | Speichern |
 | `Ctrl+Shift+S` | Speichern unter |
-| `Ctrl+Alt+S` | Neue Version speichern |
+| `Ctrl+Alt+S` | Neue Version speichern (jedes Layout) |
 | `Ctrl+R` | Audio exportieren |
 | `Ctrl+Shift+R` | Eine MP3-Datei exportieren |
 | `Ctrl+Shift+M` | Eine MIDI-Datei exportieren |
@@ -118,7 +118,7 @@ Diese Tasten funktionieren nur im Clip-Start-Arbeitsablauf.
 | `Alt+C` | Die gewählten Kanäle klonen |
 | `Alt+Del` | Die gewählten Kanäle löschen |
 | `Alt+G` | Die gewählten Kanäle gruppieren |
-| `Ctrl+L` | Die gewählten Kanäle auf freie Mixer-Inserts schicken |
+| `Ctrl+L` | Zu freier Mixerspur leiten (die gewählten Kanäle bekommen freie Mixer-Inserts) |
 | `Ctrl+K` | Step-Graph-Spuren ein oder aus |
 | `1` bis `0` | Die Kanäle 1 bis 10 stumm- oder wieder laut schalten |
 | `Ctrl+1` bis `Ctrl+0` | Die Kanäle 1 bis 10 solo schalten |
@@ -239,8 +239,8 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `F2` | Den gewählten Insert umbenennen und färben |
 | `S` | Die gewählten Inserts solo schalten |
 | `Alt+S` | Die gewählten Inserts samt der Inserts solo schalten, die sie speisen |
-| `Ctrl+L` | Die gewählten Kanäle mit dem gewählten Insert verknüpfen |
-| `Ctrl+Shift+L` | Die gewählten Kanäle mit Inserts verknüpfen, beginnend beim gewählten |
+| `Ctrl+L` | Ausgewählte Kanäle auf diese Spur routen (das gewählte Insert) |
+| `Ctrl+Shift+L` | Ausgewählte Kanäle ab dieser Spur routen (das gewählte Insert) |
 | `Alt+L` | Die mit dem gewählten Insert verknüpften Kanäle wählen |
 | `Del` | Die gewählten Inserts löschen. LYNX SHARE fragt vorher nach |
 | `Ctrl+E` | Den Audio-Editor öffnen |

@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![Okno eksportu z wybranym WAV: zakres, ogon i pliki po lewej, format po prawej, opcje miksu poniżej](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ Gdy utwór ma sekcje na ścieżce sekcji, `Jeden plik na sekcję` tnie go na sek
 - `Zapisz też wideo z tym miksem` pojawia się tylko wtedy, gdy projekt ma ścieżkę wideo, i wymaga FFmpeg.
 - `Renderuj przez sprzęt w czasie rzeczywistym` pojawia się tylko wtedy, gdy projekt ma aktywny insert sprzętowy. Taki eksport trwa tyle, co utwór.
 - Render do audio, czyli zgranie insertu do klipu audio, gra w tej wersji około 5 dB głośniej niż insert, który zastępuje.
+- Żeby przenieść projekt na inny komputer, `Plik › Zbierz wszystko i zapisz` kopiuje do folderu projektu sample i nagrania spoza niego (`Plik › Zawsze zbieraj i zapisuj` robi to przy każdym zapisie), a `Plik › Eksportuj › Spakowany pakiet loopów...` umieszcza projekt i wszystkie używane przez niego pliki w jednym `.zip`.
 
 ## Powiązane
 

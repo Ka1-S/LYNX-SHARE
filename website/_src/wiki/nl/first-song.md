@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Deze pagina loopt één keer het hele traject door: een drumpattern, een melodie, een arrangement, een mix en een geëxporteerd bestand. Elk onderdeel verwijst naar de pagina die het bijbehorende venster volledig behandelt. Hoor je op enig moment niets, zie dan [Audio instellen](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Om een geluid toe te voegen dat er niet is, klik je op het vak `+ kanaal toevoeg
 
 ## Mixen en een effect toevoegen
 
-1. Druk op `F9` om de [Mixer](/wiki/mixer/) te tonen. De vijf beginkanalen spelen al via insert 1 tot 5, en een kanaal dat je via het menu `+ kanaal toevoegen` toevoegt, neemt een vrije insert. Het nummer in het routevak van het kanaal in het Channel Rack geeft aan welke.
+1. Druk op `F9` om de [Mixer](/wiki/mixer/) te tonen. Een Mixer-track heet ook een insert. De vijf beginkanalen spelen al via insert 1 tot 5 (Playlist-tracks bevatten alleen clips, dus Playlist-track 1 is niet insert 1), en een kanaal dat je via het menu `+ kanaal toevoegen` toevoegt, speelt naar de Master (zijn routevak toont `---`), zoals in FL Studio. Het nummer in het routevak van het kanaal in het Channel Rack geeft aan welke.
 2. Om kanalen naar eigen vrije inserts te verplaatsen, selecteer je ze in het Channel Rack en druk je op `Ctrl+L`. Elke insert neemt de naam en kleur van het kanaal over.
 3. Sleep aan de fader van een insert om het niveau in te stellen.
 4. Klik op een insert om hem te selecteren. Het effectenpaneel rechts toont de effectslots ervan (tien rijen, de lijst scrolt).
@@ -60,7 +60,7 @@ Om een geluid toe te voegen dat er niet is, klik je op het vak `+ kanaal toevoeg
 | Playlist | `F5` | Toont of verbergt de Playlist |
 | Pattern- of Song-modus | `L` | Wisselt wat `Space` afspeelt |
 | Mixer | `F9` | Toont of verbergt de Mixer |
-| Naar vrije inserts sturen | `Ctrl+L` | Geeft de geselecteerde kanalen hun eigen Mixer-inserts |
+| Naar vrij mixerspoor leiden | `Ctrl+L` | Geeft de geselecteerde kanalen hun eigen Mixer-inserts |
 | Opslaan | `Ctrl+S` | Slaat het project op als `.lynx` |
 | Exporteren | `Ctrl+R` | Opent het exportvenster met het laatst gebruikte formaat |
 

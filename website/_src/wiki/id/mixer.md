@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Mixer](/assets/img/mixer.webp)
 
-Setiap channel diputar lewat sebuah insert Mixer. Setiap insert punya fader, pan, mute dan solo, meter puncak, hingga 25 slot efek dengan jumlah dry/wet masing-masing, dan EQ bawaan. Semua insert berakhir di Master kecuali kamu mengarahkannya ke tempat lain. Tekan `F9` untuk menampilkan atau menyembunyikan Mixer.
+Setiap channel diputar lewat sebuah insert Mixer (track Mixer, juga disebut insert). Track Playlist bukan track Mixer: track Playlist hanya berisi klip, dan sebuah klip diputar lewat insert channel-nya di mana pun letaknya, jadi track Playlist 1 bukan insert 1. Setiap insert punya fader, pan, mute dan solo, meter puncak, hingga 25 slot efek dengan jumlah dry/wet masing-masing, dan EQ bawaan. Semua insert berakhir di Master kecuali kamu mengarahkannya ke tempat lain. Tekan `F9` untuk menampilkan atau menyembunyikan Mixer.
 
 Satu proyek bisa punya hingga 500 insert. Mixer punya strip tambah untuk insert baru. Kotak di bilah judul Mixer memilih satu dari delapan tata letak strip, dari `Ringkas` sampai `Ekstra besar`.
 
@@ -21,7 +21,9 @@ Di Channel Rack, seret kotak rute channel (atau pakai roda di atasnya) untuk mem
 
 `Ctrl+L` di Channel Rack bekerja pada beberapa channel terpilih sekaligus. Masing-masing masuk ke insert kosongnya sendiri.
 
-Saat Mixer sedang fokus, `Ctrl+L` menautkan channel terpilih ke insert terpilih, dan `Ctrl+Shift+L` menautkannya ke insert berurutan mulai dari situ.
+Saat Mixer sedang fokus, `Ctrl+L` (`Rutekan channel terpilih ke track ini`) mengirim channel terpilih ke insert terpilih, dan `Ctrl+Shift+L` (`Rutekan channel terpilih mulai dari track ini`) mengirimnya ke insert berurutan mulai dari situ.
+
+Untuk memasangkan track Playlist dengan insert, `Tautkan trek Playlist ke trek mixer` di menu Playlist menautkan track 1 ke insert 1, track 2 ke insert 2, dan seterusnya, untuk proyek ini. Menunjuk judul track Playlist memberi tahu di mana klipnya terdengar (`Petunjuk routing (LYNX)` di Pengaturan › Ekstra LYNX).
 
 ## Memilih dan memindahkan insert
 
@@ -59,7 +61,7 @@ Edison, editor dan perekam audio, bisa berada di slot efek mana pun, beberapa pe
 
 - `Buka editor audio` (`Ctrl+E`) di menu insert memuat Edison ke slot kosong pertama insert dan membukanya. `Buka editor audio dan rekam` (`Shift+E`) memuatnya siap merekam saat lagu diputar.
 - Mode rekam adalah `Sekarang`, `Saat input` (bawaan: ia menunggu input melewati threshold), `Input`, dan `Saat putar`. `Tambahkan` menaruh rekaman baru setelah audio yang sudah ada. Waktu rekam maksimum adalah `Selamanya` atau 1, 3, 5, 10, 30, atau 60 menit: slot baru dimulai pada 30, `Buka editor audio dan rekam` mengaturnya ke 5.
-- `Sinkron` memutar audio Edison pada waktu lagu selama lagu diputar.
+- `Sync` memutar audio Edison pada waktu lagu selama lagu diputar.
 - Edison terus merekam setelah kamu menutup jendelanya.
 - `Alat › Makro › Hapus semua instance Edison` mengosongkan setiap slot Edison di proyek, setelah ada pertanyaan.
 - Slot Edison di proyek FL Studio (.flp) terbuka bersama audionya.

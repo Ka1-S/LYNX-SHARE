@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## Scegli da dove vieni
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile o GarageBand`: il layout semplice, una sola finestra con tracce, loop e registrazione rapida.
    - `FL Studio`: il layout Pattern, con Channel Rack, Piano Roll, Playlist e Mixer.
    - `Ableton Live o Bitwig`: il layout Clip-launch, con una griglia di clip e scene.
+   - `Logic, Cubase, Reaper, Pro Tools o Studio One`: il layout semplice con il Mixer a portata di mano, una traccia per strumento su una timeline.
+   - `Sono alle prime armi con la musica`: il layout semplice e un breve tour del primo brano.
 3. Cliccane uno. Qui scegliamo BandLab: il layout semplice si apre con un beat di partenza su una traccia Drums.
 
 ## Cambia layout

@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Prima di iniziare
 
@@ -21,7 +21,7 @@ Il pulsante `+ Traccia voce` della scheda `Prossimo: 3 cose da provare` fa lo st
 ![La finestra di registrazione: cosa vuoi registrare?](/assets/img/learn/record-voice-2.webp)
 
 1. Premi Record nella barra degli strumenti.
-2. La prima volta, una finestra chiede cosa registrare. Scegli `Audio, nella Playlist come clip audio`. Spunta `Non chiedere più` per mantenere questa scelta.
+2. La prima volta, una finestra chiede cosa registrare. Scegli `Audio, nella Playlist come clip audio`. Spunta `Ricorda la mia scelta (clic destro sul pulsante di registrazione per il filtro di registrazione)` per mantenere questa scelta.
 3. Premi Play, poi canta o parla. La take viene disegnata sulla traccia Voce mentre registri.
 4. Premi Stop. La take ora è una clip audio sulla timeline.
 5. Premi ancora Record per disattivare la registrazione, così il prossimo Play riproduce soltanto.
@@ -43,5 +43,6 @@ Il pulsante `+ Traccia voce` della scheda `Prossimo: 3 cose da provare` fa lo st
 - Non entra nessun suono? Controlla il dispositivo di ingresso in `Opzioni › Impostazioni audio...`. Una traccia Voce registra dal primo ingresso del dispositivo.
 - `Preset`, sopra gli effetti, carica una catena di effetti già pronta per la voce.
 - `Voce pulita` nel menu della traccia riduce il rumore di fondo.
+- Nel layout Pattern o Clip-launch, scegli l'ingresso nella casella di ingresso di una traccia del Mixer e arma quella traccia, oppure usa `Strumenti › Registrazione audio con un clic › Nella playlist come clip audio`. Vedi [Registrazione](/wiki/recording/).
 
 Vedi anche [Registrazione](/wiki/recording/) e [Layout semplice](/wiki/simple-layout/).

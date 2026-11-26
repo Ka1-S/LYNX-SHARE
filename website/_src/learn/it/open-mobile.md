@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Apri il brano
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Il brano nel layout semplice](/assets/img/learn/open-mobile-2.webp)
 
-- Il brano si apre nel layout semplice, con una traccia per strumento, il tempo, i pattern o le regioni e il mix.
+- Il brano si apre con una traccia per strumento, il tempo, i pattern o le regioni e il mix. Nel layout semplice (`Vista › Stile del layout`) appare il più vicino possibile all'app del telefono; aprire un file non cambia il layout.
 - Premi Play per ascoltarlo.
 - Clicca una traccia per modificarla nel dock sotto la timeline.
 

@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## Choisir d'où vous venez
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile ou GarageBand` : la disposition Simple, une seule fenêtre avec pistes, loops et enregistrement rapide.
    - `FL Studio` : la disposition Pattern, avec Channel Rack, Piano Roll, Playlist et Mixer.
    - `Ableton Live ou Bitwig` : la disposition Clip-launch, avec une grille de clips et de scènes.
+   - `Logic, Cubase, Reaper, Pro Tools ou Studio One` : la disposition Simple avec le Mixer à portée de main, une piste par instrument sur une timeline.
+   - `Je débute en musique` : la disposition Simple et une courte visite du premier morceau.
 3. Cliquez sur l'une d'elles. Ici nous choisissons BandLab : la disposition Simple s'ouvre avec un beat de départ sur une piste Drums.
 
 ## Changer de disposition

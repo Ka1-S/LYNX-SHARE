@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## Pilih dari mana kamu datang
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile, atau GarageBand`: tata letak sederhana, satu jendela berisi track, loop, dan perekaman cepat.
    - `FL Studio`: tata letak Pattern, dengan Channel Rack, Piano Roll, Playlist, dan Mixer.
    - `Ableton Live atau Bitwig`: tata letak peluncuran klip, dengan kisi klip dan scene.
+   - `Logic, Cubase, Reaper, Pro Tools, atau Studio One`: tata letak sederhana dengan Mixer siap dipakai, satu track per instrumen di linimasa.
+   - `Saya baru membuat musik`: tata letak sederhana dan tur lagu pertama yang singkat.
 3. Klik salah satu. Di sini kita pilih BandLab: tata letak sederhana terbuka dengan beat awal di track Drums.
 
 ## Ganti tata letak

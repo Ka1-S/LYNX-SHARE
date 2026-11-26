@@ -1,5 +1,5 @@
 ---
-source: add9ced36a
+source: ee6ca2a4d9
 ---
 LYNX SHARE 保留了你熟悉的工作流程：通道機架、樣式、播放清單和混音器，按鍵也一樣。它可以直接開啟 `.flp` 專案，也能把專案寫回去。
 
@@ -35,7 +35,7 @@ LYNX SHARE 是獨立的程式，與 Image-Line 沒有任何隸屬、認可或贊
 | 瀏覽器 | `Alt+F8` |
 | 樣式 / 歌曲模式 | `L` |
 | 復原 | `Ctrl+Z` 復原，復原之後再按則是重做。`Ctrl+Alt+Z` 向後復原 |
-| 儲存新版本 | `Ctrl+Alt+S` |
+| 儲存新版本 | `Ctrl+N`（和 FL Studio 一樣）或 `Ctrl+Alt+S` |
 | 匯出 | `Ctrl+R`，MP3 是 `Ctrl+Shift+R`，MIDI 是 `Ctrl+Shift+M` |
 | 混音器插入軌、傳送和側鏈 | 相同，每個插入軌最多有 25 個效果器插槽（預設 10 個） |
 | Fruity Wrapper | 第三方外掛直接被代管，見[第三方外掛](/wiki/plugins/) |

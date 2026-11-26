@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Il Mixer](/assets/img/mixer.webp)
 
-Ogni canale suona attraverso un insert del Mixer. Ogni insert ha un fader, il pan, mute e solo, un indicatore di picco, fino a 25 slot effetto con una quantità dry/wet ciascuno e un EQ integrato. Tutti gli insert finiscono nel Master, a meno che tu non li instradi altrove. Premi `F9` per mostrare o nascondere il Mixer.
+Ogni canale suona attraverso un insert del Mixer (una traccia del Mixer, chiamata anche insert). Le tracce della Playlist non sono tracce del Mixer: contengono solo clip, e un clip suona attraverso gli insert dei suoi canali ovunque si trovi, quindi la traccia 1 della Playlist non è l'insert 1. Ogni insert ha un fader, il pan, mute e solo, un indicatore di picco, fino a 25 slot effetto con una quantità dry/wet ciascuno e un EQ integrato. Tutti gli insert finiscono nel Master, a meno che tu non li instradi altrove. Premi `F9` per mostrare o nascondere il Mixer.
 
 Un progetto può avere fino a 500 insert. Il Mixer ha una striscia di aggiunta per un nuovo insert. Il riquadro nella barra del titolo del Mixer sceglie uno degli otto layout delle strisce, da `Compatto` a `Extra grande`.
 
@@ -21,7 +21,9 @@ Nel Channel Rack, trascina il riquadro di instradamento del canale (o usa la rot
 
 `Ctrl+L` nel Channel Rack funziona su più canali selezionati insieme. Ognuno va su un proprio insert libero.
 
-Con il Mixer in primo piano, `Ctrl+L` collega i canali selezionati all'insert selezionato e `Ctrl+Shift+L` li collega a insert consecutivi a partire da quello.
+Con il Mixer in primo piano, `Ctrl+L` (`Instrada i canali selezionati su questa traccia`) manda i canali selezionati all'insert selezionato e `Ctrl+Shift+L` (`Instrada i canali selezionati a partire da questa traccia`) li manda a insert consecutivi a partire da quello.
+
+Per abbinare le tracce della Playlist agli insert, `Collega le tracce della Playlist alle tracce del mixer` nel menu della Playlist collega la traccia 1 all'insert 1, la traccia 2 all'insert 2 e così via, per il progetto corrente. Puntando l'intestazione di una traccia della Playlist vedi dove si sentono i suoi clip (`Suggerimenti di instradamento (LYNX)` in Impostazioni › Extra di LYNX).
 
 ## Selezionare e spostare gli insert
 

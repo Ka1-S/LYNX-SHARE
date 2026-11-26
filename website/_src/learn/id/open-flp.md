@@ -1,12 +1,12 @@
 ---
-source: 136366330e
+source: f015d99f56
 ---
 ## Buka file .flp
 
 ![File › Open...](/assets/img/learn/open-flp-1.webp)
 
 1. Pilih `File › Buka...` (`Ctrl+O`), atau jatuhkan `.flp` ke jendela.
-2. Pilih proyeknya. LYNX SHARE mencari plugin dan sample-nya, lalu membukanya di tata letak Pattern.
+2. Pilih proyeknya. LYNX SHARE mencari plugin dan sample-nya, lalu membukanya. Di tata letak Pattern (`Tampilan › Gaya tata letak`) tampilannya seperti di FL Studio; membuka file tidak mengubah tata letak.
 3. FL Studio sendiri tidak diperlukan, dan file `.flp` tidak pernah diubah.
 
 ## Apa yang ikut terbawa
@@ -15,7 +15,7 @@ source: 136366330e
 
 - Pattern beserta not-nya, Playlist dengan track dan marker-nya, channel, serta Mixer dengan rute, level, dan efeknya.
 - Plugin bawaan FL Studio, seperti 3x Osc, diputar di engine yang dibuat ulang oleh LYNX SHARE. Klik nama channel untuk membuka jendelanya.
-- Plugin VST3 dan CLAP pihak ketiga dimuat jika plugin yang sama terpasang.
+- Plugin VST, VST3, dan CLAP pihak ketiga (AU di Mac) dimuat jika plugin yang sama terpasang.
 
 ![3x Osc dibuka dari Channel Rack](/assets/img/learn/open-flp-3.webp)
 

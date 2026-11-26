@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## Réglages MIDI
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Des notes jouées dans le Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Sélectionnez un instrument dans le Channel rack et jouez : vous l'entendez tout de suite.
+1. Sélectionnez un instrument dans le Channel rack (dans la disposition Simple ou Clip-launch, sélectionnez une piste) et jouez : vous l'entendez tout de suite.
 2. Aucun pilote ni réglage n'est nécessaire : les claviers class-compliant fonctionnent directement.
 
 ## Enregistrez des notes
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Appuyez sur Enregistrer, choisissez `Notes et automation`, puis appuyez sur Play et jouez votre partie.
 2. Arrêtez : les notes sont dans le Piano roll, prêtes à être modifiées et quantifiées.
+
+## Bon à savoir
+
+- Pour tourner un bouton depuis les boutons de votre clavier, faites un clic droit sur le bouton dans LYNX, choisissez `Lier à un contrôleur...` et tournez un bouton de votre clavier. Dans la disposition Clip-launch, `Ctrl+M` (MIDI Map Mode) assigne plusieurs commandes d'un coup. Voir [Contrôleurs MIDI](/wiki/midi-controllers/).
 
 Voir aussi [Contrôleurs MIDI](/wiki/midi-controllers/).

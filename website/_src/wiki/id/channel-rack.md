@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Channel Rack dengan baris-baris step](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Ini bekerja saat Channel Rack sedang fokus.
 | Kloning | `Alt+C` | Mengkloning channel terpilih |
 | Hapus | `Alt+Del` | Menghapus channel terpilih |
 | Grup | `Alt+G` | Memasukkan channel terpilih ke grup filter baru |
-| Rutekan ke Mixer | `Ctrl+L` | Mengirim channel terpilih ke insert Mixer yang kosong |
+| Rutekan ke trek mixer kosong | `Ctrl+L` | Mengirim channel terpilih ke insert Mixer yang kosong |
 | Mute | `1` sampai `0` | Me-mute atau membatalkan mute channel 1 sampai 10 |
 | Solo | `Ctrl+1` sampai `Ctrl+0` | Solo channel 1 sampai 10 |
 | Jalur grafik | `Ctrl+K` | Menampilkan atau menyembunyikan jalur grafik |

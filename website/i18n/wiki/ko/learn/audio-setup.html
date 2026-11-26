@@ -1,10 +1,12 @@
 <h2 id="driver-and-output">드라이버와 출력</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-1.webp"><img src="/assets/img/learn/audio-setup-1.webp" alt="설정의 Audio 페이지" loading="lazy" width="690" height="685"></a></figure>
-<ol><li><code>옵션 › 오디오 설정...</code>를 여세요.</li><li>드라이버를 고르세요. Windows에서는 ASIO(오디오 인터페이스 전용 드라이버 또는 FL Studio ASIO), Mac에서는 Core Audio, Linux에서는 PipeWire 또는 ALSA입니다.</li><li><code>출력 장치</code>는 LYNX 소리를 듣는 곳입니다. <code>System default</code>는 컴퓨터가 쓰는 출력을 따라갑니다.</li></ol>
+<ol><li><code>옵션 › 오디오 설정...</code>를 여세요.</li><li>드라이버를 고르세요. Windows에서는 <code>LYNX ASIO(내장)</code> 드라이버가 어떤 장치와도 작동하며 따로 드라이버가 필요 없습니다. 오디오 인터페이스 전용 ASIO 드라이버, FL Studio ASIO, <code>Windows 오디오(공유)</code> 또는 <code>Windows 오디오(독점, 최저 레이턴시)</code>도 있습니다. Mac에서는 Core Audio, Linux에서는 PipeWire 또는 ALSA입니다.</li><li><code>출력 장치</code>는 LYNX 소리를 듣는 곳입니다. <code>System default</code>는 컴퓨터가 쓰는 출력을 따라갑니다.</li><li><code>입력 장치</code> 항목은 녹음할 입력(마이크, 기타 입력)입니다. <code>샘플 레이트</code> 값은 보통 44100 또는 48000 Hz입니다.</li></ol>
 <h2 id="buffer-size">버퍼 크기</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-2.webp"><img src="/assets/img/learn/audio-setup-2.webp" alt="지연 시간과 함께 보이는 버퍼 크기" loading="lazy" width="690" height="685"></a></figure>
 <ol><li><code>버퍼 크기</code>: 버퍼가 작으면 건반을 칠 때 반응이 빠르고, 크면 CPU에 더 여유가 생깁니다.</li><li>지직거리거나 소리가 끊기나요? 값을 올리세요. 연주할 때 소리가 늦나요? 값을 내리세요.</li></ol>
 <h2 id="test-the-sound">소리 테스트</h2>
 <figure><a class="shot" href="/assets/img/learn/audio-setup-3.webp"><img src="/assets/img/learn/audio-setup-3.webp" alt="Help, Test audio output" loading="lazy" width="1280" height="720"></a></figure>
 <ol><li><code>테스트 사운드 재생</code>는 선택한 출력으로 짧은 소리를 재생합니다.</li><li>어디서든 <code>도움말 › 오디오 출력 테스트...</code>으로 같은 일을 할 수 있습니다.</li></ol>
+<h2 id="recorded-takes-late">녹음한 테이크가 늦나요?</h2>
+<ol><li>오디오 인터페이스는 소리를 받아들이고 다시 내보내는 데 잠깐 시간이 걸리므로, 테이크가 조금 늦게 놓일 수 있습니다.</li><li>같은 Audio 페이지의 <code>녹음 레이턴시 보정</code> 아래에서 케이블로 출력을 입력에 연결하고(또는 인터페이스의 루프백을 쓰고) <code>왕복 지연 측정</code> 버튼을 클릭하세요.</li><li>LYNX가 클릭 소리를 몇 번 재생해 얼마나 늦게 돌아오는지 재고, 그다음부터 녹음한 테이크를 박자에 맞게 놓습니다.</li></ol>
 <p><a href="/wiki/audio-setup/">오디오 설정</a>과 <a href="/wiki/troubleshooting/">문제 해결</a>도 참고하세요.</p>

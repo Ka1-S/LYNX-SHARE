@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Menedżer pluginów
 
 ![Opcje › Menedżer pluginów](/assets/img/learn/vst-plugins-1.webp)
 
 1. Wybierz `Opcje › Menedżer pluginów...`. Pokazuje każdy plugin znaleziony przez LYNX, z producentem, formatem i plikiem.
-2. `Foldery pluginów...` pokazuje, gdzie LYNX szuka: w standardowych folderach VST3 i CLAP oraz w każdym dodanym przez ciebie.
+2. `Foldery pluginów...` pokazuje, gdzie LYNX szuka: w standardowych folderach VST, VST3 i CLAP (także LV2 w Linuksie i AU na Macu) oraz w każdym dodanym przez ciebie.
 
 ## Szukaj pluginów
 

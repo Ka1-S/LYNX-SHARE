@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Şarkıyı açın
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Basit yerleşimde şarkı](/assets/img/learn/open-mobile-2.webp)
 
-- Şarkı Basit yerleşimde açılır; her enstrüman için bir iz, tempo, pattern'ler veya bölgeler ve miks ile birlikte.
+- Şarkı her enstrüman için bir iz, tempo, pattern'ler veya bölgeler ve miks ile birlikte açılır. Basit yerleşimde (`Görünüm › Yerleşim stili`) telefon uygulamasına en yakın görünür; bir dosya açmak yerleşimi değiştirmez.
 - Duymak için Play'e basın.
 - Düzenlemek için bir ize tıklayın; zaman çizelgesinin altındaki dock'ta açılır.
 

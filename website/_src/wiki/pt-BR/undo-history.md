@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![A janela do histórico de desfazer: seis passos de Start a Add notes, com Mudo: Kick como o atual](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Cada vez que você salva por cima de um arquivo de projeto existente, a versão 
 |---|---|
 | `Arquivo › Voltar ao último backup...` | Substitui o projeto aberto pela cópia mais nova dele, depois de perguntar. O arquivo do projeto só muda quando você salva |
 | `Arquivo › Abrir pasta de salvamento automático` | Mostra as cópias no gerenciador de arquivos |
-| `Arquivo › Salvar nova versão` (`Ctrl+Alt+S`) | Salva como `Song_2`, `Song_3` e assim por diante, ao lado do arquivo atual |
+| `Arquivo › Salvar nova versão` (`Ctrl+Alt+S`; `Ctrl+N` no Layout Pattern) | Salva como `Song_2`, `Song_3` e assim por diante, ao lado do arquivo atual |
 
 A seção `Cópia de segurança` de `Opções › Configurações gerais...` tem estas configurações:
 

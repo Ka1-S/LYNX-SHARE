@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## 插件管理器
 
 ![Options › Plugin manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. 选择 `选项 › 插件管理器...`。它列出 LYNX 找到的所有插件，以及厂商、格式和文件。
-2. `插件文件夹...` 显示 LYNX 查找的位置：标准的 VST3 和 CLAP 文件夹，以及你添加的任何文件夹。
+2. `插件文件夹...` 显示 LYNX 查找的位置：标准的 VST、VST3 和 CLAP 文件夹（Linux 上还有 LV2，Mac 上还有 AU），以及你添加的任何文件夹。
 
 ## 扫描插件
 

@@ -1,5 +1,5 @@
 ---
-source: add9ced36a
+source: ee6ca2a4d9
 ---
 LYNX SHARE는 익숙한 작업 방식을 그대로 유지합니다. 채널 랙, 패턴, 플레이리스트, 믹서가 있고 키도 같습니다. `.flp` 프로젝트를 바로 열고, 같은 형식으로 다시 쓸 수도 있습니다.
 
@@ -35,7 +35,7 @@ FL Studio와 다른 점:
 | 브라우저 | `Alt+F8` |
 | 패턴 / 송 모드 | `L` |
 | 실행 취소 | `Ctrl+Z`는 실행 취소하고, 실행 취소 직후에는 다시 실행합니다. `Ctrl+Alt+Z`는 뒤로 실행 취소합니다 |
-| 새 버전 저장 | `Ctrl+Alt+S` |
+| 새 버전 저장 | `Ctrl+N`(FL Studio와 같음) 또는 `Ctrl+Alt+S` |
 | 내보내기 | `Ctrl+R`, MP3는 `Ctrl+Shift+R`, MIDI는 `Ctrl+Shift+M` |
 | 믹서 인서트, 센드, 사이드체인 | 같으며, 인서트마다 이펙트 슬롯이 최대 25개입니다(기본값 10) |
 | Fruity Wrapper | 서드파티 플러그인을 직접 호스팅합니다. [서드파티 플러그인](/wiki/plugins/)을 참고하세요 |

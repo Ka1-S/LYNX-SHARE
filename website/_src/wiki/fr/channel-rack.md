@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Le Channel Rack avec ses lignes de steps](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Elles fonctionnent quand le Channel Rack a le focus.
 | Cloner | `Alt+C` | Clone les canaux sélectionnés |
 | Supprimer | `Alt+Del` | Supprime les canaux sélectionnés |
 | Grouper | `Alt+G` | Met les canaux sélectionnés dans un nouveau groupe de filtre |
-| Router vers le Mixer | `Ctrl+L` | Envoie les canaux sélectionnés vers des inserts du Mixer libres |
+| Router vers une piste de mixage libre | `Ctrl+L` | Envoie les canaux sélectionnés vers des inserts du Mixer libres |
 | Muet | `1` to `0` | Coupe ou rétablit le son des canaux 1 à 10 |
 | Solo | `Ctrl+1` to `Ctrl+0` | Met en solo les canaux 1 à 10 |
 | Couloir de graphe | `Ctrl+K` | Affiche ou masque le couloir de graphe |

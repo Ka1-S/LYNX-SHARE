@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="e9cd3c94";
+window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=e9cd3c94">
+<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -106,7 +106,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="backups">Backups</h2>
 <p>LYNX SHARE saves a backup copy of the open project every 2 minutes by default, and keeps the 10 newest per project. A backup is a normal <code>.lynx</code> file in the <code>autosave</code> folder inside the settings folder, named after the project with <code>(autosaved on ...)</code> and the date and time.</p>
 <p>Each time you save over an existing project file, the version that is replaced is copied to the same folder with <code>(overwritten on ...)</code> in its name.</p>
-<div class="tablewrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>File › Revert to last backup...</code></td><td>Replaces the open project with its newest backup, after asking. The project file itself only changes when you save</td></tr><tr><td><code>File › Open autosave folder</code></td><td>Shows the backups in the file manager</td></tr><tr><td><code>File › Save new version</code> (<code>Ctrl+Alt+S</code>)</td><td>Saves as <code>Song_2</code>, <code>Song_3</code> and so on, next to the current file</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td><code>File › Revert to last backup...</code></td><td>Replaces the open project with its newest backup, after asking. The project file itself only changes when you save</td></tr><tr><td><code>File › Open autosave folder</code></td><td>Shows the backups in the file manager</td></tr><tr><td><code>File › Save new version</code> (<code>Ctrl+Alt+S</code>; <code>Ctrl+N</code> in the Pattern layout)</td><td>Saves as <code>Song_2</code>, <code>Song_3</code> and so on, next to the current file</td></tr></tbody></table></div>
 <p>The <code>Backup</code> section of <code>Options › General settings...</code> has these settings:</p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Save a backup copy</code></td><td><code>Never</code>, or an interval in minutes</td></tr><tr><td><code>Backups kept per project</code></td><td>1, 3, 5, 10, 20 or 50</td></tr><tr><td><code>Wait with backups while the song plays or a MIDI keyboard is being played</code></td><td>Holds a backup back so it does not interrupt you</td></tr><tr><td><code>Longest wait between backups</code></td><td>5 to 60 minutes. A backup is made after this time even while you play</td></tr></tbody></table></div>
 <p>If the last session ended unexpectedly, the next start offers to open the newest backup that session saved.</p>
@@ -123,8 +123,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=e9cd3c94" defer></script>
-<script src="/assets/wiki.js?v=e9cd3c94" defer></script>
-<script src="/assets/motion.js?v=e9cd3c94" defer></script>
+<script src="/assets/site.js?v=ef13bf2b" defer></script>
+<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
+<script src="/assets/motion.js?v=ef13bf2b" defer></script>
 </body>
 </html>

@@ -1,11 +1,20 @@
 ---
-source: da7928152b
+source: ee9bb943c6
 ---
+## Playlist izleri ve Mixer izleri
+
+Pattern yerleşiminde bir Playlist izi bir Mixer izi değildir: Playlist izi 1, Mixer izi 1 (insert 1) değildir.
+
+- Playlist izleri yalnızca klip tutar. Bir klip, nerede durursa dursun kanallarının Mixer izleri üzerinden çalar.
+- Channel Rack'in her kanalı, numarası rota kutusunda (knob'lar ile adının arasında) yazan Mixer izine çalar. Değiştirmek için kutuyu sürükleyin; `Ctrl+L` seçili kanallara boş Mixer izleri verir.
+- Bir sesin nereye gittiğini üç yer söyler: Channel Rack'teki rota kutusu, bir Playlist izinin başlığının üzerine geldiğinizde çıkan ipucu ve kendisine çalan kanalları listeleyen bir Mixer izinin ipucu.
+- Eşleştirmek mi istiyorsunuz? Playlist menüsündeki `Playlist parçalarını mikser kanallarına bağla`, geçerli proje için iz 1'i Mixer izi 1'e, iz 2'yi Mixer izi 2'ye bağlar ve böyle devam eder.
+
 ## Bir kanal seçin
 
 ![Chords seçili Mixer](/assets/img/learn/mixer-routing-1.webp)
 
-1. Mixer'i `F9` ile açın. Her iz Master'a gider.
+1. Mixer'i `F9` ile açın. Her Mixer izi Master'a gider.
 2. Göndermek istediğiniz ize tıklayın, burada Chords.
 
 ## Yönlendirme ve send seviyesi

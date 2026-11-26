@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## 快捷键表
 
 ![快捷键表](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. 按 `F1`（或 `帮助 › 快捷键`）：显示每个窗口的按键，沿用 FL Studio 自己的。再按一次 `F1` 关闭。
+1. 按 `F1`（或 `帮助 › 快捷键`）：显示每个窗口的按键，在模式布局中沿用 FL Studio 自己的。再按一次 `F1` 关闭。（在 FL Studio 中 `F1` 打开手册；在 LYNX SHARE 中，手册是 `帮助 › 手册 (wiki)...`。）
 
 ## 修改快捷键
 

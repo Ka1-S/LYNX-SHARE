@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## Wybierz, skąd przychodzisz
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile lub GarageBand`: Prosty układ, jedno okno ze ścieżkami, pętlami i szybkim nagrywaniem.
    - `FL Studio`: układ Pattern z Channel Rack, Piano Roll, Playlist i Mixer.
    - `Ableton Live lub Bitwig`: układ Clip-launch z siatką klipów i scen.
+   - `Logic, Cubase, Reaper, Pro Tools lub Studio One`: Prosty układ z Mixerem pod ręką, jedna ścieżka na instrument na osi czasu.
+   - `Dopiero zaczynam tworzyć muzykę`: Prosty układ i krótka wycieczka po pierwszym utworze.
 3. Kliknij jedną z nich. Tutaj wybieramy BandLab: otwiera się Prosty układ z gotowym beatem na ścieżce Drums.
 
 ## Przełącz układ

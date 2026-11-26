@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## O Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![O Mixer com uma faixa por canal](/assets/img/learn/pattern-tour-4.webp)
 
 1. Aperte `F9` para abrir o Mixer.
-2. Cada canal toca numa faixa do Mixer. Arraste um fader para ajustar o nível e adicione efeitos nos slots da faixa.
-3. A faixa Master, à esquerda, é o que você ouve e o que exporta.
+2. Cada canal toca na faixa do Mixer (insert) cujo número está na caixa de rota dele: a caixinha entre os knobs e o nome do canal no Channel Rack (os canais iniciais usam de 1 a 5). Arraste a caixa ou gire a roda do mouse sobre ela para mudá-la, dê dois cliques para ver essa faixa do Mixer e aperte `Ctrl+L` para dar faixas livres do Mixer aos canais selecionados.
+3. As faixas da Playlist só guardam clipes, então a faixa 1 da Playlist não é a faixa 1 do Mixer: um clipe toca pelas faixas do Mixer dos seus canais, onde quer que esteja. Aponte para o cabeçalho de uma faixa da Playlist para ler onde os clipes dela são ouvidos; `Vincular faixas da Playlist às trilhas do mixer` no menu da Playlist pareia as duas, a faixa 1 com a faixa 1 do Mixer e assim por diante. Mais em [Roteie trilhas no Mixer](/learn/mixer-routing/).
+4. Arraste um fader para ajustar o nível de uma faixa do Mixer e adicione efeitos nos slots dela. A faixa Master, à esquerda, é o que você ouve e o que exporta.
 
 ## Bom saber
 
 - `F5`, `F6`, `F7` e `F9` mostram ou escondem as quatro janelas, como no FL Studio. `F8` abre o seletor de plugins (Plugin picker).
+- A faixa na parte de baixo do Piano Roll define a velocity de cada nota.
 - O mesmo projeto também abre nos layouts Simple e Clip-launch: veja [Um projeto, três layouts](/learn/switch-layouts/).
 
 Veja também [Vindo do FL Studio](/wiki/coming-from-fl-studio/) e [Atalhos de teclado](/wiki/shortcuts/).

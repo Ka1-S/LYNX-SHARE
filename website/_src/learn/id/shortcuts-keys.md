@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Lembar pintasan
 
 ![Lembar pintasan](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Tekan `F1` (atau `Bantuan › Pintasan`): tombol setiap jendela, sama seperti FL Studio. `F1` lagi menutupnya.
+1. Tekan `F1` (atau `Bantuan › Pintasan`): tombol setiap jendela, sama seperti FL Studio di tata letak Pattern. `F1` lagi menutupnya. (Di FL Studio `F1` membuka manual; di LYNX SHARE manualnya ada di `Bantuan › Manual (wiki)...`.)
 
 ## Ubah pintasan
 

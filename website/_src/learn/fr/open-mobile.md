@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Ouvrir le morceau
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Le morceau dans la disposition Simple](/assets/img/learn/open-mobile-2.webp)
 
-- Le morceau s'ouvre dans la disposition Simple, avec une piste par instrument, le tempo, les patterns ou régions et le mixage.
+- Le morceau s'ouvre avec une piste par instrument, le tempo, les patterns ou régions et le mixage. Dans la disposition Simple (`Vue › Style de disposition`), il ressemble le plus à l'appli du téléphone ; ouvrir un fichier ne change pas la disposition.
 - Appuyez sur Lecture pour l'écouter.
 - Cliquez sur une piste pour la modifier dans le dock sous la timeline.
 

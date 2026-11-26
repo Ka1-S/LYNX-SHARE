@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## MIDI ayarları
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Piyano rulosuna çalınan notalar](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Channel Rack'te bir enstrüman seçip çalın: hemen duyarsınız.
+1. Channel Rack'te bir enstrüman seçip (Basit veya Klip başlatma yerleşiminde bir iz seçin) çalın: hemen duyarsınız.
 2. Sürücü veya kurulum gerekmez: class-compliant klavyeler doğrudan çalışır.
 
 ## Nota kaydedin
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Kayıt'a basın, `Notalar ve otomasyon` seçeneğini seçin, sonra Çal'a basıp partinizi çalın.
 2. Durdurun: notalar Piyano rulosunda, düzenlemeye ve kuantize etmeye hazır.
+
+## Bilmekte fayda var
+
+- Klavyenizin knob'larıyla bir knob'u oynatmak için LYNX'te o knob'a sağ tıklayın, `Kontrolcüye bağla...` seçeneğini seçin ve klavyenizde bir knob'u çevirin. Klip başlatma yerleşiminde `Ctrl+M` (MIDI Map Mode) birkaç kontrolü bir kerede eşler. Bkz. [MIDI kontrolcüleri](/wiki/midi-controllers/).
 
 Ayrıca bkz. [MIDI kontrolcüleri](/wiki/midi-controllers/).

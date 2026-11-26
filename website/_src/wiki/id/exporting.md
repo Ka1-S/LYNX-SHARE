@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ Ketika lagu punya bagian di jalur Sections, `Satu file per bagian` memotongnya p
 - `Tulis juga video dengan mix ini` hanya muncul saat proyek punya track video, dan membutuhkan FFmpeg.
 - `Render melalui hardware secara real-time` hanya muncul saat proyek punya insert hardware yang aktif. Ekspor itu memakan waktu sepanjang lagunya.
 - Render to audio, saat sebuah insert di-bounce menjadi clip audio, diputar sekitar 5 dB lebih keras daripada insert yang digantikannya di versi ini.
+- Untuk memindahkan proyek ke komputer lain, `File › Kumpulkan semua dan simpan` menyalin sample dan rekaman dari luar folder proyek ke dalamnya (`File › Selalu kumpulkan dan simpan` melakukannya setiap kali menyimpan), dan `File › Ekspor › Paket loop zip...` memasukkan proyek dan setiap file yang dipakainya ke dalam satu `.zip`.
 
 ## Terkait
 

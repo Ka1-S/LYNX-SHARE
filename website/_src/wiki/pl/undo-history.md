@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![Okno Historia cofania: sześć kroków od Start do Add notes, z Mute: Kick jako bieżącym](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Za każdym razem, gdy zapisujesz nad istniejącym plikiem projektu, zastępowana
 |---|---|
 | `Plik › Przywróć ostatnią kopię zapasową...` | Zastępuje otwarty projekt jego najnowszą kopią, po zapytaniu. Sam plik projektu zmienia się dopiero, gdy zapiszesz |
 | `Plik › Otwórz folder autozapisu` | Pokazuje kopie w menedżerze plików |
-| `Plik › Zapisz nową wersję` (`Ctrl+Alt+S`) | Zapisuje jako `Song_2`, `Song_3` i tak dalej, obok bieżącego pliku |
+| `Plik › Zapisz nową wersję` (`Ctrl+Alt+S`; `Ctrl+N` w układzie Pattern) | Zapisuje jako `Song_2`, `Song_3` i tak dalej, obok bieżącego pliku |
 
 Sekcja `Kopia zapasowa` w `Opcje › Ustawienia ogólne...` ma te ustawienia:
 

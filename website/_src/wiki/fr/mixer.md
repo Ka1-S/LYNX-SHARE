@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
-Chaque canal passe par un insert du Mixer. Chaque insert a un fader, un pan, un bouton Muet et un solo, un vumètre de crête, jusqu'à 25 emplacements d'effets avec chacun un taux dry/wet, et un EQ intégré. Tous les inserts finissent dans le Master, sauf si vous les routez ailleurs. Appuyez sur `F9` pour afficher ou masquer le Mixer.
+Chaque canal passe par un insert du Mixer (une piste du Mixer, aussi appelée insert). Les pistes de la Playlist ne sont pas des pistes du Mixer : elles ne contiennent que des clips, et un clip joue à travers les inserts de ses canaux où qu'il se trouve, donc la piste 1 de la Playlist n'est pas l'insert 1. Chaque insert a un fader, un pan, un bouton Muet et un solo, un vumètre de crête, jusqu'à 25 emplacements d'effets avec chacun un taux dry/wet, et un EQ intégré. Tous les inserts finissent dans le Master, sauf si vous les routez ailleurs. Appuyez sur `F9` pour afficher ou masquer le Mixer.
 
 Un projet peut avoir jusqu'à 500 inserts. Le Mixer a une bande d'ajout pour en créer un nouveau. La liste dans la barre de titre du Mixer choisit l'une des huit dispositions de bandes, de `Compacte` à `Très grand`.
 
@@ -21,7 +21,9 @@ Dans le Channel Rack, faites glisser la case de routage du canal (ou utilisez la
 
 `Ctrl+L` dans le Channel Rack agit sur plusieurs canaux sélectionnés à la fois. Chacun va sur son propre insert libre.
 
-Quand le Mixer a le focus, `Ctrl+L` lie les canaux sélectionnés à l'insert sélectionné, et `Ctrl+Shift+L` les lie à des inserts consécutifs à partir de celui-ci.
+Quand le Mixer a le focus, `Ctrl+L` (`Router les canaux sélectionnés vers cette piste`) envoie les canaux sélectionnés vers l'insert sélectionné, et `Ctrl+Shift+L` (`Router les canaux sélectionnés à partir de cette piste`) les envoie vers des inserts consécutifs à partir de celui-ci.
+
+Pour associer les pistes de la Playlist aux inserts, `Lier les pistes de la Playlist aux pistes de mixage` dans le menu de la Playlist lie la piste 1 à l'insert 1, la piste 2 à l'insert 2 et ainsi de suite, pour le projet actuel. Pointer l'en-tête d'une piste de la Playlist indique où ses clips sont entendus (`Indications de routage (LYNX)` dans Réglages › Extras LYNX).
 
 ## Sélectionner et déplacer des inserts
 

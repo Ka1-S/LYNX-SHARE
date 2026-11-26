@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Halaman ini menelusuri seluruh jalurnya sekali jalan: pattern drum, melodi, aransemen, mix, dan file hasil ekspor. Setiap bagian menaut ke halaman yang membahas jendelanya secara lengkap. Jika di titik mana pun kamu tidak mendengar apa-apa, lihat [Pengaturan audio](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Untuk menambah suara yang belum ada, klik kotak `+ tambah channel` di bawah bari
 
 ## Mix dan menambahkan efek
 
-1. Tekan `F9` untuk menampilkan [Mixer](/wiki/mixer/). Lima channel awal sudah dimainkan lewat insert 1 sampai 5, dan channel yang ditambahkan dari menu `+ tambah channel` mengambil insert kosong. Angka di kotak rute channel di Channel Rack menunjukkan insert yang mana.
+1. Tekan `F9` untuk menampilkan [Mixer](/wiki/mixer/). Track Mixer juga disebut insert. Lima channel awal sudah dimainkan lewat insert 1 sampai 5 (track Playlist hanya berisi klip, jadi track Playlist 1 bukan insert 1), dan channel yang ditambahkan dari menu `+ tambah channel` diputar ke Master (kotak rutenya bertuliskan `---`), seperti di FL Studio. Angka di kotak rute channel di Channel Rack menunjukkan insert yang mana.
 2. Untuk memindahkan channel ke insert kosong miliknya sendiri, pilih channel di Channel Rack dan tekan `Ctrl+L`. Setiap insert memakai nama dan warna channel.
 3. Seret fader insert untuk mengatur levelnya.
 4. Klik sebuah insert untuk memilihnya. Panel efek di sebelah kanan menampilkan slot efeknya (sepuluh baris, daftarnya bisa digulir).
@@ -60,7 +60,7 @@ Untuk menambah suara yang belum ada, klik kotak `+ tambah channel` di bawah bari
 | Playlist | `F5` | Menampilkan atau menyembunyikan Playlist |
 | Mode Pattern atau Song | `L` | Mengganti apa yang diputar oleh `Space` |
 | Mixer | `F9` | Menampilkan atau menyembunyikan Mixer |
-| Kirim ke insert kosong | `Ctrl+L` | Memberi channel terpilih insert Mixer miliknya sendiri |
+| Rutekan ke trek mixer kosong | `Ctrl+L` | Memberi channel terpilih insert Mixer miliknya sendiri |
 | Simpan | `Ctrl+S` | Menyimpan proyek sebagai `.lynx` |
 | Ekspor | `Ctrl+R` | Membuka jendela ekspor dengan format yang terakhir dipakai |
 

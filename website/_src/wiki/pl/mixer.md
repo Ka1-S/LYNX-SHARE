@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Mixer](/assets/img/mixer.webp)
 
-Każdy kanał gra przez insert Mixera. Każdy insert ma suwak, panoramę, wyciszenie i solo, miernik szczytów, do 25 slotów efektów z własną ilością dry/wet oraz wbudowany korektor. Wszystkie inserty kończą w Masterze, chyba że poprowadzisz je gdzie indziej. Naciśnij `F9`, żeby pokazać lub ukryć Mixer.
+Każdy kanał gra przez insert Mixera (ścieżkę Mixera, nazywaną też insertem). Ścieżki Playlisty nie są ścieżkami Mixera: zawierają tylko klipy, a klip gra przez inserty swoich kanałów, gdziekolwiek leży, więc ścieżka Playlisty 1 to nie insert 1. Każdy insert ma suwak, panoramę, wyciszenie i solo, miernik szczytów, do 25 slotów efektów z własną ilością dry/wet oraz wbudowany korektor. Wszystkie inserty kończą w Masterze, chyba że poprowadzisz je gdzie indziej. Naciśnij `F9`, żeby pokazać lub ukryć Mixer.
 
 Projekt może mieć do 500 insertów. Mixer ma pasek dodawania nowego. Pole w pasku tytułu Mixera wybiera jeden z ośmiu układów pasków, od `Kompaktowy` do `Bardzo duży`.
 
@@ -21,7 +21,9 @@ W Channel Racku przeciągnij pole trasy kanału (albo użyj na nim kółka), że
 
 `Ctrl+L` w Channel Racku działa na kilku zaznaczonych kanałach naraz. Każdy trafia do własnego wolnego insertu.
 
-Przy aktywnym Mixerze `Ctrl+L` łączy zaznaczone kanały z zaznaczonym insertem, a `Ctrl+Shift+L` łączy je z kolejnymi insertami, zaczynając od niego.
+Przy aktywnym Mixerze `Ctrl+L` (`Kieruj zaznaczone kanały do tej ścieżki`) kieruje zaznaczone kanały do zaznaczonego insertu, a `Ctrl+Shift+L` (`Kieruj zaznaczone kanały, zaczynając od tej ścieżki`) kieruje je do kolejnych insertów, zaczynając od niego.
+
+Żeby połączyć ścieżki Playlisty z insertami w pary, `Połącz ścieżki Playlisty ze ścieżkami miksera` w menu Playlisty łączy ścieżkę 1 z insertem 1, ścieżkę 2 z insertem 2 i tak dalej, w bieżącym projekcie. Wskazanie nagłówka ścieżki Playlisty mówi, gdzie słychać jej klipy (`Podpowiedzi routingu (LYNX)` w Ustawienia › Dodatki LYNX).
 
 ## Zaznaczaj i przesuwaj inserty
 

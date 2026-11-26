@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## Pengaturan MIDI
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Nada yang dimainkan ke Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Pilih instrumen di Channel rack dan mainkan: kamu langsung mendengarnya.
+1. Pilih instrumen di Channel rack (di tata letak sederhana atau peluncuran klip, pilih sebuah track) dan mainkan: kamu langsung mendengarnya.
 2. Tidak perlu driver atau pengaturan: keyboard class-compliant langsung berfungsi.
 
 ## Rekam nada
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Tekan Record, pilih `Not dan otomasi`, lalu tekan Play dan mainkan bagianmu.
 2. Stop: nada sudah ada di Piano roll, siap diedit dan dikuantisasi.
+
+## Perlu diketahui
+
+- Untuk menggerakkan sebuah kenop dari kenop keyboard-mu, klik kanan kenop itu di LYNX, pilih `Tautkan ke kontroler...` lalu gerakkan sebuah kenop di keyboard-mu. Di tata letak peluncuran klip, `Ctrl+M` (MIDI Map Mode) memetakan beberapa kontrol sekaligus. Lihat [Kontroler MIDI](/wiki/midi-controllers/).
 
 Lihat juga [Kontroler MIDI](/wiki/midi-controllers/).

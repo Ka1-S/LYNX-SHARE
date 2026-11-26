@@ -1,5 +1,5 @@
 ---
-source: f439a070b5
+source: 141ffc1370
 ---
 LYNX SHARE adalah DAW gratis dan open-source untuk Windows, macOS, dan Linux dengan tiga alur kerja dalam satu program. Bawaannya adalah alur kerja FL Studio: kamu memprogram pattern di Channel Rack dan Piano Roll, menyusunnya di Playlist, dan memixnya di Mixer. Alur kerja peluncuran klip meluncurkan clip dan scene dari kisi, bergaya Ableton Live, dan alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile. `Tampilan › Gaya tata letak` beralih di antaranya kapan saja. Program ini membuka proyek FL Studio (`.flp`), set Ableton Live (`.als`), proyek FL Studio Mobile (`.flm`), file DAWproject, proyek GarageBand dan BandLab, serta modul tracker, mengekspor `.flp`, `.als`, `.dawproject`, dan `.flm`, dan menyimpan format `.lynx` miliknya sendiri.
 
@@ -27,7 +27,7 @@ Plugin pihak ketiga bersifat opsional. LYNX SHARE punya instrumen dan efeknya se
 
 ## Menyimpan pekerjaan
 
-`Ctrl+S` menyimpan, `Ctrl+Shift+S` menyimpan dengan nama baru, dan `Ctrl+Alt+S` menyimpan versi baru (Song_2, Song_3, dan seterusnya). Ada autosave, yang bisa dijangkau lewat `File › Buka folder simpan otomatis` dan `File › Kembalikan ke cadangan terakhir...`.
+`Ctrl+S` menyimpan, `Ctrl+Shift+S` menyimpan dengan nama baru, dan `Ctrl+Alt+S` menyimpan versi baru (Song_2, Song_3, dan seterusnya); di tata letak Pattern `Ctrl+N` juga melakukannya, seperti di FL Studio. Ada autosave, yang bisa dijangkau lewat `File › Buka folder simpan otomatis` dan `File › Kembalikan ke cadangan terakhir...`.
 
 `File › Baru dari template` punya empat titik awal: Empty, Basic beat, Trap with 808, dan House.
 

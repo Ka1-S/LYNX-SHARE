@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## A grade e o arranjo
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. No cartão de boas-vindas, clique em `Ableton Live ou Bitwig`, ou escolha `Exibir › Estilo de layout › Layout de lançamento de clipes`.
 2. As faixas da Playlist são as colunas da grade de clipes; cada linha é uma cena. O arranjo fica à direita.
-3. Aqui abrimos a música de demonstração do LYNX. O arranjo dela tem três seções: Intro, Verse e Hook.
+3. Aqui abrimos uma das músicas de demonstração do LYNX (`Arquivo › Novo a partir de modelo`, ou a página inicial). O arranjo dela tem três seções: Intro, Verse e Hook.
 
 ## Cenas a partir das seções
 

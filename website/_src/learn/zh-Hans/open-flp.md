@@ -1,12 +1,12 @@
 ---
-source: 136366330e
+source: f015d99f56
 ---
 ## 打开 .flp
 
 ![File › Open...](/assets/img/learn/open-flp-1.webp)
 
 1. 选择 `文件 › 打开...`（`Ctrl+O`），或把 `.flp` 拖到窗口上。
-2. 选好工程。LYNX SHARE 会找到它的插件和采样，然后在模式布局中打开。
+2. 选好工程。LYNX SHARE 会找到它的插件和采样，然后打开它。在模式布局（`视图 › 布局样式`）中，它看起来和在 FL Studio 中一样；打开文件不会改变布局。
 3. 不需要安装 FL Studio，`.flp` 文件也绝不会被修改。
 
 ## 会带过来什么
@@ -15,7 +15,7 @@ source: 136366330e
 
 - 带音符的样式、带音轨和标记的播放列表、通道，以及带路由、电平和效果器的混音器。
 - FL Studio 自带的插件（例如 3x Osc）会在 LYNX SHARE 重新实现的引擎上播放。点击通道名称即可打开它的窗口。
-- 只要安装了相同的插件，第三方 VST3 和 CLAP 插件也会加载。
+- 只要安装了相同的插件，第三方 VST、VST3 和 CLAP 插件（Mac 上还有 AU）也会加载。
 
 ![从 Channel rack 打开的 3x Osc](/assets/img/learn/open-flp-3.webp)
 

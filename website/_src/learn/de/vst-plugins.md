@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Plugin-Manager
 
 ![Optionen › Plugin-Manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. Wähle `Optionen › Plugin-Manager...`. Er listet jedes Plugin auf, das LYNX gefunden hat, mit Hersteller, Format und Datei.
-2. `Plugin-Ordner...` zeigt, wo LYNX sucht: die Standardordner für VST3 und CLAP sowie jeden Ordner, den du hinzufügst.
+2. `Plugin-Ordner...` zeigt, wo LYNX sucht: die Standardordner für VST, VST3 und CLAP (unter Linux auch LV2, auf dem Mac AU) sowie jeden Ordner, den du hinzufügst.
 
 ## Nach Plugins suchen
 

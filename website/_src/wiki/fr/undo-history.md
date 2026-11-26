@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![La fenêtre Historique des annulations : six étapes de Start à Add notes, avec Muet : Kick comme étape actuelle](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Chaque fois que vous enregistrez par-dessus un fichier de projet existant, la ve
 |---|---|
 | `Fichier › Revenir à la dernière sauvegarde...` | Remplace le projet ouvert par sa sauvegarde la plus récente, après confirmation. Le fichier de projet lui-même ne change que lorsque vous enregistrez |
 | `Fichier › Ouvrir le dossier de sauvegarde automatique` | Montre les sauvegardes dans le gestionnaire de fichiers |
-| `Fichier › Enregistrer une nouvelle version` (`Ctrl+Alt+S`) | Enregistre sous `Song_2`, `Song_3` et ainsi de suite, à côté du fichier actuel |
+| `Fichier › Enregistrer une nouvelle version` (`Ctrl+Alt+S` ; `Ctrl+N` dans la disposition Pattern) | Enregistre sous `Song_2`, `Song_3` et ainsi de suite, à côté du fichier actuel |
 
 La section `Sauvegarde` de `Options › Réglages généraux...` contient ces réglages :
 
