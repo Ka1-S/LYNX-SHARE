@@ -379,6 +379,11 @@ void LiveSessionManager::setState (State s, const juce::String& text)
 {
     state = s;
     status = text;
+    if (s == State::live && ! keptSeen) // (round 190rj: what this copy has when it goes live is no change of its own)
+    {
+        keptSeen.emplace();
+        live::copyKeptLocal (engine.getSong(), *keptSeen);
+    }
     if (onChange)
         onChange();
 }
@@ -390,6 +395,8 @@ juce::String LiveSessionManager::hostName() const
 
 void LiveSessionManager::start (const Options& o)
 {
+    keptSeen.reset();
+    keptHinted.clear();
     if (isActive())
         return;
     options = o;
@@ -507,6 +514,8 @@ void LiveSessionManager::onRoomCreated (const juce::String& room, const juce::St
 
 void LiveSessionManager::join (const juce::String& code, const Options& o)
 {
+    keptSeen.reset();
+    keptHinted.clear();
     if (isActive())
         return;
     options = o;
@@ -1767,6 +1776,7 @@ void LiveSessionManager::pollLocal()
         return;
     lastStamp = engine.getSongStamp();
     lastLocalChangeMs = juce::Time::currentTimeMillis();
+    noteKeptLocal();
     auto p = replica->poll (engine.getSong());
     if (! p)
         return;
@@ -1783,6 +1793,22 @@ void LiveSessionManager::pollLocal()
     set (m, "base", (juce::int64) p->baseRev);
     set (m, "patch", patchToVar (p->patch));
     sendJson (hostPeer, m);
+}
+
+void LiveSessionManager::noteKeptLocal()
+{
+    // round 190rj: a change of something the session does not share yet stays on this computer: say so, once per item
+    const auto& now = engine.getSong();
+    if (! keptSeen)
+    {
+        keptSeen.emplace();
+        live::copyKeptLocal (now, *keptSeen);
+        return;
+    }
+    for (const auto item : live::keptLocalChanges (*keptSeen, now))
+        if (keptHinted.insert ((int) item).second && onHint)
+            onHint (tr ("{0} isn't shared in Online sessions yet: the others won't hear this change", { tr (live::keptLocalName (item)) }));
+    live::copyKeptLocal (now, *keptSeen);
 }
 
 void LiveSessionManager::sendPresence()

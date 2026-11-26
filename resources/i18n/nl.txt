@@ -12659,3 +12659,4 @@ countries: nl be
 "Move this rule up (the first matching rule wins)" = "Deze regel omhoog verplaatsen (de eerste regel die past wint)"
 "Move this rule down" = "Deze regel omlaag verplaatsen"
 "Typing keyboard settings" = "Instellingen van het typtoetsenbord als piano"
+"{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0} wordt in online sessies nog niet gedeeld: de anderen horen deze wijziging niet"

@@ -96,6 +96,8 @@ constexpr int keptLocalCount = 7;
 void copyKeptLocal (const Song& from, Song& to);
 // the kept-local things that differ between a and b
 std::vector<KeptLocal> keptLocalChanges (const Song& a, const Song& b);
+// the item's name as the UI shows it (an English key of the translation tables)
+const char* keptLocalName (KeptLocal item);
 
 // --- ownership (§2.2) -------------------------------------------------------------------------------------------------
 
