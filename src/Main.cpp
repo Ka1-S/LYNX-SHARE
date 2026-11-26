@@ -403,6 +403,56 @@ namespace
 {
 lynx::AudioEngine* crashEngine = nullptr;
 
+// --export-dawproject --stress (round 190ri, kainproctor's DAWproject export): a song as heavy as his imported FL project —
+// the arrangement repeated to past 1,200 bars, some clips muted, every kind of time marker (also two skips in a row), an
+// audio clip whose sample is not on this computer and a channel whose plugin is not installed
+void community190riStressSong (lynx::Song& s)
+{
+    const auto barTicks = (std::int64_t) 4 * lynx::ppq;
+    lynx::laneview::clipsToLanes (s); // (his: "many lanes made with clips to lanes")
+    auto end = std::max<std::int64_t> (s.songLength(), barTicks * 4);
+    const auto once = s.playlist;
+    for (std::int64_t at = end; at < barTicks * 1200 && ! once.empty(); at += end)
+        for (auto c : once)
+        {
+            c.start += at;
+            c.uid = 0;
+            s.playlist.push_back (c);
+        }
+    for (std::size_t i = 0; i < s.playlist.size(); i += 7)
+        s.playlist[i].muted = true;
+    int bar = 1;
+    for (const auto action : { lynx::Marker::none, lynx::Marker::start, lynx::Marker::markerSkip, lynx::Marker::markerSkip, lynx::Marker::markerLoop,
+                               lynx::Marker::markerPause, lynx::Marker::timeSignature, lynx::Marker::punchIn, lynx::Marker::punchOut, lynx::Marker::songLoop })
+    {
+        lynx::Marker m;
+        m.tick = barTicks * (bar += 8);
+        m.name = "m" + std::to_string (bar);
+        m.action = action;
+        if (action == lynx::Marker::timeSignature)
+            m.numerator = 3;
+        s.addMarker (m);
+    }
+    lynx::ChannelDef missing;
+    missing.name = "Missing sample";
+    missing.instrument = lynx::InstrumentKind::audioClip;
+    missing.samplePath = "/nonexistent/round190ri/kick.wav";
+    s.channels.push_back (missing);
+    lynx::Clip audio;
+    audio.kind = lynx::ClipKind::audio;
+    audio.channel = (int) s.channels.size() - 1;
+    audio.start = barTicks * 3;
+    audio.length = barTicks;
+    audio.track = 0;
+    s.playlist.push_back (audio);
+    lynx::ChannelDef plugin;
+    plugin.name = "Missing plugin";
+    plugin.instrument = lynx::InstrumentKind::plugin;
+    plugin.plugin.name = "Not Installed Synth";
+    plugin.plugin.id = "VST3-NotInstalledSynth-1a2b3c4d-5e6f7a8b";
+    s.channels.push_back (plugin);
+}
+
 // Startup trace (REA round 116): with LYNX_TRACE_STARTUP set, the time of each startup step since the C++ runtime
 // started is written to %APPDATA%\LYNX\startup.log (the loader's own time before that is not included).
 struct StartupTrace
@@ -4610,6 +4660,45 @@ public:
         {
             const auto i = args.indexOf ("--export-als");
             runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
+        // --export-dawproject <in> <out.dawproject> [--stress] (round 190ri, kainproctor's "Doesn't work"): File › Export ›
+        // DAWproject without the window; the time, the size, the notes and the result to "<out>.txt". --stress makes the song
+        // like his: the arrangement repeated to 1,200+ bars, the automation clips as lanes, every kind of marker, some clips
+        // muted, a sample and a plugin that are not on this computer
+        if (args.contains ("--export-dawproject"))
+        {
+            const auto i = args.indexOf ("--export-dawproject");
+            const juce::File input (args[i + 1].unquoted()), output (args[i + 2].unquoted());
+            juce::String error, report;
+            auto ok = false;
+            {
+                lynx::AudioEngine loader (false);
+                if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject"))
+                    ok = loader.importFlpFile (input, error);
+                else if (auto song = lynx::ProjectFile::load (input, error))
+                {
+                    loader.setSong (std::move (*song));
+                    ok = true;
+                }
+                if (ok && args.contains ("--stress"))
+                    loader.editSong ([] (lynx::Song& s) { community190riStressSong (s); });
+                if (ok)
+                {
+                    loader.capturePluginStates();
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    juce::StringArray notes;
+                    ok = lynx::writeDawProjectFile (loader.getSong(), &loader.getPluginHost(), output, notes, error);
+                    report << "ms=" << juce::String (juce::Time::getMillisecondCounterHiRes() - t0, 0) << "\nbytes=" << output.getSize()
+                           << "\nbars=" << loader.getSong().barAt (loader.getSong().songLength()).number << "\nclips=" << (int) loader.getSong().playlist.size()
+                           << "\nnotes=" << notes.size() << "\n" << notes.joinIntoString ("\n") << "\n";
+                }
+            }
+            report << "result=" << (ok ? "OK" : "ERROR " + error) << "\n";
+            juce::File (output.getFullPathName() + ".txt").replaceWithText (report);
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
             return;
         }
 
