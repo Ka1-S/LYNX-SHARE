@@ -6,7 +6,7 @@ summary: The shortcut sheet on F1, changing any shortcut in Manage shortcuts, an
 
 ![The shortcut sheet](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Press `F1` (or `Help › Shortcuts`): the keys of every window, FL Studio's own. `F1` again closes it.
+1. Press `F1` (or `Help › Shortcuts`): the keys of every window, FL Studio's own in the Pattern layout. `F1` again closes it. (In FL Studio `F1` opens the manual; in LYNX SHARE the manual is `Help › Manual (wiki)...`.)
 
 ## Change a shortcut
 

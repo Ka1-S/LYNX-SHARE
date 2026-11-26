@@ -32,12 +32,14 @@ summary: The FL Studio way in LYNX SHARE: steps in the Channel rack, a melody in
 ![The Mixer with a track per channel](/assets/img/learn/pattern-tour-4.webp)
 
 1. Press `F9` for the Mixer.
-2. Each channel plays into a Mixer track. Drag a fader to set its level, and add effects in the track's slots.
-3. The Master track on the left is what you hear and what you export.
+2. Each channel plays into the Mixer track (insert) whose number is in its route box: the small box between the knobs and the channel's name in the Channel rack (the starter channels use 1 to 5). Drag the box or turn the mouse wheel over it to change it, double-click it to see that Mixer track, and press `Ctrl+L` to give the selected channels free Mixer tracks.
+3. Playlist tracks only hold clips, so Playlist track 1 is not Mixer track 1: a clip plays through its channels' Mixer tracks wherever it sits. Point at a Playlist track's header to read where its clips are heard; `Link Playlist tracks to mixer tracks` in the Playlist menu pairs them, track 1 with Mixer track 1 and so on. More in [Route tracks in the Mixer](/learn/mixer-routing/).
+4. Drag a fader to set a Mixer track's level, and add effects in its slots. The Master track on the left is what you hear and what you export.
 
 ## Good to know
 
 - `F5`, `F6`, `F7` and `F9` show or hide the four windows, as in FL Studio. `F8` opens the Plugin picker.
+- The lane at the bottom of the Piano roll sets each note's velocity.
 - The same project opens in the Simple and Clip-launch layouts too: see [One project, three layouts](/learn/switch-layouts/).
 
 See also [Coming from FL Studio](/wiki/coming-from-fl-studio/) and [Keyboard shortcuts](/wiki/shortcuts/).

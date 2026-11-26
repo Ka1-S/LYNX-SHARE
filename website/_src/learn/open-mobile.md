@@ -1,6 +1,6 @@
 ---
 title: Bring your phone songs
-summary: Open FL Studio Mobile (.flm), BandLab (.blx) and GarageBand (.band) songs in LYNX SHARE: they land in the Simple layout, one track per instrument.
+summary: Open FL Studio Mobile (.flm), BandLab (.blx) and GarageBand (.band) songs in LYNX SHARE, one track per instrument. The Simple layout shows them as the phone apps do.
 ---
 ## Open the song
 
@@ -13,7 +13,7 @@ summary: Open FL Studio Mobile (.flm), BandLab (.blx) and GarageBand (.band) son
 
 ![The song in the Simple layout](/assets/img/learn/open-mobile-2.webp)
 
-- The song opens in the Simple layout, one track per instrument, with the tempo, the patterns or regions and the mix.
+- The song opens with one track per instrument, the tempo, the patterns or regions and the mix. In the Simple layout (`View › Layout style`) it looks closest to the phone app; opening a file doesn't change the layout.
 - Press Play to hear it.
 - Click a track to edit it in the dock under the timeline.
 

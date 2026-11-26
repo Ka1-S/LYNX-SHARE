@@ -1,13 +1,13 @@
 ---
 title: Open an FL Studio project
-summary: Open a .flp in the Pattern layout: patterns, Playlist, channels and Mixer come over, and FL Studio's own plugins play on LYNX's engines.
+summary: Open a .flp: patterns, Playlist, channels and Mixer come over, and FL Studio's own plugins play on LYNX's engines. The Pattern layout shows it as FL Studio does.
 ---
 ## Open the .flp
 
 ![File › Open...](/assets/img/learn/open-flp-1.webp)
 
 1. Choose `File › Open...` (`Ctrl+O`), or drop the `.flp` on the window.
-2. Pick the project. LYNX SHARE finds its plugins and samples, then opens it in the Pattern layout.
+2. Pick the project. LYNX SHARE finds its plugins and samples, then opens it. In the Pattern layout (`View › Layout style`) it looks as it did in FL Studio; opening a file doesn't change the layout.
 3. FL Studio itself is not needed, and the `.flp` file is never changed.
 
 ## What comes over
@@ -16,7 +16,7 @@ summary: Open a .flp in the Pattern layout: patterns, Playlist, channels and Mix
 
 - Patterns with their notes, the Playlist with its tracks and markers, the channels, the Mixer with its routes, levels and effects.
 - FL Studio's own plugins, such as 3x Osc, play on engines LYNX SHARE recreated. Click a channel's name to open its window.
-- Third-party VST3 and CLAP plugins load when the same plugin is installed.
+- Third-party VST, VST3 and CLAP plugins (AU on a Mac) load when the same plugin is installed.
 
 ![3x Osc opened from the Channel rack](/assets/img/learn/open-flp-3.webp)
 

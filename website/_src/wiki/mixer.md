@@ -5,7 +5,7 @@ status: full
 ---
 ![The Mixer](/assets/img/mixer.webp)
 
-Every channel plays through a Mixer insert. Each insert has a fader, pan, mute and solo, a peak meter, up to 25 effect slots with a dry/wet amount each, and a built-in EQ. All inserts end up in the Master unless you route them elsewhere. Press `F9` to show or hide the Mixer.
+Every channel plays through a Mixer insert (a Mixer track, also called an insert). Playlist tracks are not Mixer tracks: they only hold clips, and a clip plays through its channels' inserts wherever it sits, so Playlist track 1 is not insert 1. Each insert has a fader, pan, mute and solo, a peak meter, up to 25 effect slots with a dry/wet amount each, and a built-in EQ. All inserts end up in the Master unless you route them elsewhere. Press `F9` to show or hide the Mixer.
 
 A project can have up to 500 inserts. The Mixer has an add strip for a new one. The box in the Mixer's title bar picks one of eight strip layouts, from `Compact` to `Extra large`.
 
@@ -23,7 +23,9 @@ In the Channel rack, drag the channel's route box (or use the wheel on it) to pi
 
 `Ctrl+L` in the Channel rack works on several selected channels at once. Each goes to its own free insert.
 
-With the Mixer focused, `Ctrl+L` links the selected channels to the selected insert, and `Ctrl+Shift+L` links them to consecutive inserts starting from it.
+With the Mixer focused, `Ctrl+L` (`Route selected channels to this track`) sends the selected channels to the selected insert, and `Ctrl+Shift+L` (`Route selected channels starting from this track`) sends them to consecutive inserts starting from it.
+
+To pair Playlist tracks with inserts, `Link Playlist tracks to mixer tracks` in the Playlist menu links track 1 to insert 1, track 2 to insert 2 and so on, for the current project. Pointing at a Playlist track's header tells where its clips are heard (`Routing hints (LYNX)` in Settings › LYNX extras).
 
 ## Select and move inserts
 

@@ -6,7 +6,7 @@ summary: Press ? and type to run any menu item, shortcut or setting; then watch 
 
 ![The command palette with "tracker" typed](/assets/img/learn/command-palette-1.webp)
 
-1. Press `?` (or `Ctrl+Shift+Y`, or click the magnifier in the toolbar).
+1. Press `?` (or `Ctrl+Shift+Y`, or click the magnifier in the toolbar). In the Clip-launch layout `?` shows or hides the Info View, as in Live, so press `Ctrl+Shift+Y` there. `Help › Search actions...` opens it too.
 2. Type a few letters of what you want. The list holds every action with its shortcut, every menu item with its place, the LYNX extras' switches, the Settings pages and your recent projects. Actions are found by their English names in every language too.
 3. Pick a row with the arrow keys and press `Enter`, or double-click it. `Esc` closes the palette.
 

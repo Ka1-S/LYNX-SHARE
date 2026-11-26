@@ -14,7 +14,7 @@ summary: Plug in a MIDI keyboard, check it in Options › MIDI settings, play an
 
 ![Notes played into the Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Select an instrument in the Channel rack and play: you hear it at once.
+1. Select an instrument in the Channel rack (in the Simple or Clip-launch layout, select a track) and play: you hear it at once.
 2. No driver or setup is needed: class-compliant keyboards just work.
 
 ## Record notes
@@ -23,5 +23,9 @@ summary: Plug in a MIDI keyboard, check it in Options › MIDI settings, play an
 
 1. Press Record, choose `Notes and automation`, then press Play and play your part.
 2. Stop: the notes are in the Piano roll, ready to edit and quantize.
+
+## Good to know
+
+- To move a knob from your keyboard's knobs, right-click the knob in LYNX, choose `Link to controller...` and move a knob on your keyboard. In the Clip-launch layout, `Ctrl+M` (MIDI Map Mode) maps several controls at once. See [MIDI controllers](/wiki/midi-controllers/).
 
 See also [MIDI controllers](/wiki/midi-controllers/).
