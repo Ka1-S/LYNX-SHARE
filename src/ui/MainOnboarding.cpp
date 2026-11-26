@@ -323,7 +323,14 @@ void MainComponent::showGettingStarted()
                     safe->hideGettingStarted();
             });
         };
-        next3Card->tutorials = [] { juce::URL ("https://lynx-share.com/wiki/getting-started/").launchInDefaultBrowser(); };
+        // round 190rs (G-25, T-8): the layout's own Learn tutorial in the app's language (was the English wiki page)
+        next3Card->tutorials = [safe] {
+            const auto style = safe != nullptr ? safe->layoutStyle : layoutstyle::Style::pattern;
+            const auto slug = style == layoutstyle::Style::clipLaunch ? "learn/clip-launch-tour/"
+                              : style == layoutstyle::Style::simple   ? "learn/simple-beat/"
+                                                                      : "learn/pattern-tour/";
+            juce::URL (howto::siteUrl (slug)).launchInDefaultBrowser();
+        };
     }
     if (persistent)
         onboardCtx.plugins = engine.getPluginHost().getKnownPlugins().getNumTypes();
