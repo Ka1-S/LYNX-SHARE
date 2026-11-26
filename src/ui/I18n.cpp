@@ -1,6 +1,8 @@
 #include "ui/I18n.h"
 
 #include <algorithm>
+#include <memory>
+#include <unordered_map>
 
 #include "core/Inflate.h"
 #include "engine/PluginHost.h"
@@ -30,22 +32,53 @@ bool isKnown (const juce::String& id)
             return true;
     return false;
 }
+
+// Round 190ri (paint gate): juce::LocalisedStrings finds a key by a linear search through its table, on every tr() — some
+// in paint code. The current table's keys in a hash map (the same keys, the same texts: LocalisedStrings is made with
+// case-sensitive keys and keeps the last of a repeated key, as the map is filled from it); juce::translate itself still
+// has the table for any direct caller.
+struct StringHash
+{
+    std::size_t operator() (const juce::String& s) const noexcept { return s.hash(); }
+};
+using TextMap = std::unordered_map<juce::String, juce::String, StringHash>;
+
+std::shared_ptr<const TextMap>& textMapSlot()
+{
+    static std::shared_ptr<const TextMap> map;
+    return map;
+}
+
+std::shared_ptr<const TextMap> textMap()
+{
+    return std::atomic_load (&textMapSlot());
+}
+
+juce::String translated (const juce::String& english)
+{
+    if (const auto map = textMap())
+    {
+        const auto it = map->find (english);
+        return it != map->end() ? it->second : english;
+    }
+    return english; // (no table: English as written)
+}
 } // namespace
 
 juce::String tr (const juce::String& english)
 {
-    return juce::translate (english);
+    return translated (english);
 }
 
 juce::String tr (const char* englishUtf8)
 {
-    return juce::translate (juce::String::fromUTF8 (englishUtf8));
+    return translated (juce::String::fromUTF8 (englishUtf8));
 }
 
 juce::String trc (const char* contextAndEnglishUtf8)
 {
     const auto key = juce::String::fromUTF8 (contextAndEnglishUtf8);
-    const auto text = juce::translate (key);
+    const auto text = translated (key);
     if (text != key || ! key.startsWithChar ('@'))
         return text;
     return key.fromFirstOccurrenceOf (": ", false, false);
@@ -180,7 +213,19 @@ void initialise (const juce::StringArray& args)
     currentId() = id;
     // English has no translation table; its display table (resources/i18n/en/display.txt) changes what a few keys show
     const auto table = id == "en" ? juce::String::fromUTF8 (data::englishDisplay) : tableText (id);
-    juce::LocalisedStrings::setCurrentMappings (table.isEmpty() ? nullptr : new juce::LocalisedStrings (table, false));
+    auto* strings = table.isEmpty() ? nullptr : new juce::LocalisedStrings (table, false);
+    std::shared_ptr<const TextMap> map;
+    if (strings != nullptr)
+    {
+        auto fresh = std::make_shared<TextMap>();
+        const auto& pairs = strings->getMappings();
+        fresh->reserve ((std::size_t) pairs.size());
+        for (int i = 0; i < pairs.size(); ++i)
+            (*fresh)[pairs.getAllKeys()[i]] = pairs.getAllValues()[i];
+        map = std::move (fresh);
+    }
+    std::atomic_store (&textMapSlot(), map);
+    juce::LocalisedStrings::setCurrentMappings (strings);
 }
 } // namespace i18n
 } // namespace lynx
