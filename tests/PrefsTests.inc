@@ -8,6 +8,24 @@ TEST (prefs_key_values)
     CHECK (kv.at ("a") == "3" && kv.at ("b") == "two words" && kv.at ("c").empty());
 }
 
+// A folder whose name ends in a space (".../lunx ") is a different folder than ".../lunx": the New project window saved
+// the path in new-project.txt, parseKeyValues trimmed the space, and the next project went to another folder (a second
+// "lunx" in Finder). encodeSettingsPath/decodeSettingsPath keep the path exactly as it is.
+TEST (prefs_paths_keep_a_trailing_space)
+{
+    using namespace lynx::prefs;
+    const std::string spaced = "/Users/me/Desktop/all in mac ssd/lunx ";
+    CHECK (encodeSettingsPath (spaced) == spaced + "/");
+    CHECK (decodeSettingsPath (encodeSettingsPath (spaced)) == spaced);
+    // through a settings line, as the New project window writes it
+    const auto kv = parseKeyValues ("show=1\nfolder=" + encodeSettingsPath (spaced) + "\nownFolder=1\n");
+    CHECK (decodeSettingsPath (kv.at ("folder")) == spaced);
+    // every other path is written and read as it is (a drive root included)
+    CHECK (encodeSettingsPath ("/Users/me/Music") == "/Users/me/Music");
+    CHECK (decodeSettingsPath ("/Users/me/Music") == "/Users/me/Music");
+    CHECK (encodeSettingsPath ("C:\\") == "C:\\" && decodeSettingsPath ("C:\\") == "C:\\");
+}
+
 TEST (prefs_autosave_choices_and_backup_rotation)
 {
     using namespace lynx::prefs;

@@ -497,3 +497,46 @@ TEST (clipprops_bar_beat_tick_text)
     for (std::int64_t t : { (std::int64_t) 0, beat * 7 + 33, bar * 100 + 1 })
         CHECK (parsePosition (formatPosition (t, lynx::Meter (4, 4)), lynx::Meter (4, 4)) == t && parseLength (formatLength (t, lynx::Meter (7, 4)), lynx::Meter (7, 4)) == t);
 }
+
+// FL names new projects for you: "Untitled", then "Untitled 1", "Untitled 2"... — the first free name in the folder,
+// never an "already exists" error (core/Templates.cpp freeProjectName, the New project window's Name field).
+TEST (new_project_names_are_filled_in_and_never_clash)
+{
+    namespace fs = std::filesystem;
+    using namespace lynx;
+    std::error_code ec;
+    const auto dir = (fs::temp_directory_path (ec) / ("lynx_newproject_" + processTempTag())).string();
+    fs::remove_all (dir, ec);
+    fs::create_directories (dir, ec);
+    const auto write = [] (const std::string& path) {
+        fs::create_directories (fs::path (path).parent_path());
+        std::ofstream out (path);
+        out << "x";
+    };
+
+    // nothing there: the name the window shows
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled");
+    // its folder and file taken: "Untitled 1", then "Untitled 2"
+    write (dir + "/Untitled/Untitled.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 1");
+    write (dir + "/Untitled 1/Untitled 1.lynx");
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 2");
+    // an empty folder counts as taken too: the new project gets a folder of its own
+    fs::create_directories (dir + "/Untitled 2", ec);
+    CHECK (freeProjectName (dir, "", true, ".lynx") == "Untitled 3");
+
+    // without the project's own folder only the project file matters
+    write (dir + "/flat/Untitled.lynx");
+    CHECK (freeProjectName (dir + "/flat", "Untitled", false, ".lynx") == "Untitled 1");
+    CHECK (freeProjectName (dir + "/flat", "Untitled 2", false, ".lynx") == "Untitled 2");
+
+    // a name typed by the user follows the same rule; characters the file system refuses become '_'
+    write (dir + "/My Song/My Song.lynx");
+    CHECK (freeProjectName (dir, "My Song", true, ".lynx") == "My Song 1");
+    CHECK (freeProjectName (dir, "My: Song?", true, ".lynx") == "My_ Song_");
+
+    // no folder yet: the name as it is (the save window comes later)
+    CHECK (freeProjectName ({}, "", true, ".lynx") == "Untitled");
+    CHECK (freeProjectName ({}, "Sketch", true, ".lynx") == "Sketch");
+    fs::remove_all (dir, ec);
+}

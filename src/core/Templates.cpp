@@ -5,7 +5,9 @@
 #include "core/SynthPresets.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <optional>
+#include <system_error>
 
 namespace lynx
 {
@@ -141,6 +143,29 @@ std::string newProjectPath (const NewProjectSetup& setup, const char* extension)
         folder.pop_back();
     const auto name = legalProjectName (setup.name);
     return folder + "/" + (setup.ownFolder ? name + "/" : std::string()) + name + extension;
+}
+
+std::string freeProjectName (const std::string& folder, const std::string& base, bool ownFolder, const char* extension)
+{
+    const auto stem = legalProjectName (base);
+    NewProjectSetup setup;
+    setup.folder = folder;
+    setup.ownFolder = ownFolder;
+    std::error_code ec;
+    for (int n = 0; n < 10000; ++n)
+    {
+        setup.name = n == 0 ? stem : stem + " " + std::to_string (n);
+        const auto path = newProjectPath (setup, extension);
+        if (path.empty())
+            return setup.name; // (not saved yet: no folder to clash with)
+        const std::filesystem::path file (path);
+        if (std::filesystem::exists (file, ec))
+            continue;
+        if (ownFolder && std::filesystem::exists (file.parent_path(), ec)) // (an empty or older folder there too)
+            continue;
+        return setup.name;
+    }
+    return stem;
 }
 
 void applySetup (Song& song, const NewProjectSetup& setup)
