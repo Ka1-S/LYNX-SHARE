@@ -11310,7 +11310,7 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
 void PlaylistComponent::showFollowMenu()
 {
     juce::PopupMenu menu;
-    menu.addItem (tr("Continuous scrolling"), true, EditorGlobals::get().isContinuousScroll(), [this] {
+    menu.addItem (tr("Continuous scrolling"), true, EditorGlobals::get().isContinuousScroll(), [] {
         EditorGlobals::get().setContinuousScroll (! EditorGlobals::get().isContinuousScroll());
     });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&followButton));
@@ -15478,7 +15478,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
         const auto grid = gridArea();
         const auto newStart = EditorGlobals::get().isContinuousScroll()
-                                    ? transportedit::followViewStartContinuous (tick, 120.0 / pixelsPerTick)
+                                    ? transportedit::followViewStartContinuous (tick, 180.0 / pixelsPerTick)
                                     : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                         20.0 / pixelsPerTick);
 
