@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Il Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Quando scegli un ingresso esterno per un insert che registra anche altro audio, 
 ## Da sapere
 
 - `Misuratore di loudness accanto al Master (LYNX)`, in `Opzioni › Mixer`, mostra la loudness a breve termine e integrata (LUFS) e il true peak dell'uscita del Master, con un pulsante `Ripristina`.
+- `Compensa anche le automazioni di fader e di routing (LYNX)`, in `Compensazione del ritardo dei plugin` nel menu dell'insert, è attivo nei nuovi progetti. È un'impostazione dell'intero progetto. Con plugin che aggiungono latenza, suona l'automazione di fader, pan, mandate e fader VCA tanto tardi quanto l'audio su cui agisce. FL Studio ritarda solo l'automazione delle manopole dei plugin, quindi lì lo stesso progetto suona un po' diverso. I progetti venuti da FL Studio e i progetti precedenti lo hanno disattivato, e `Come FL` non lo cambia.
 - Un plugin strumento con più uscite può suonare ciascuna uscita su un proprio insert. Vedi [Plugin di terze parti](/wiki/plugins/).
 - `Ctrl+L` fa cose diverse nel Channel Rack e nel Mixer. Nel rack sceglie insert liberi. Nel Mixer usa l'insert selezionato.
 - Gli interruttori di instradamento compaiono sulle altre strisce, non su quella selezionata.

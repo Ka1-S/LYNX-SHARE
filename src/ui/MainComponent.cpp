@@ -10023,7 +10023,7 @@ void MainComponent::openStartupProject()
     startNewProject (std::move (song), {});
 }
 
-// Round 190oo (design review CS O-2, a LYNX extra, off by default): a new, empty project made while the Clip-launch
+// Round 190oo (design review CS O-2, a LYNX extra, on by default since round 190ro): a new, empty project made while the Clip-launch
 // layout shows links Track N to insert N (core/Templates.h linkClipLaunchStrips), so the Session mixer shows a strip on
 // every column as a new Live set does. Demos and starter songs (they have clips) and the other layouts are unchanged.
 Song MainComponent::withClipLaunchStrips (Song song)

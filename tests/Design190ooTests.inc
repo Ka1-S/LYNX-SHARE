@@ -4,18 +4,19 @@
 #include "core/PlaylistOps.h"
 #include "core/Templates.h"
 
-// CS O-2: a new Clip-launch project links Track N to insert N (Live's new set: a strip on every track), off by default
+// CS O-2: a new Clip-launch project links Track N to insert N (Live's new set: a strip on every track), on by default since
+// round 190ro
 TEST (design190oo_cliplaunch_strips_option)
 {
     using namespace lynx;
     NewProjectDefaults d;
-    CHECK (! d.clipLaunchStrips && d.toText().find ("newClipLaunchStrips=0") != std::string::npos);
+    CHECK (d.clipLaunchStrips && d.toText().find ("newClipLaunchStrips=1") != std::string::npos);
     CHECK (NewProjectDefaults::ownsKey ("newClipLaunchStrips"));
     NewProjectDefaults back;
-    back.readKey ("newClipLaunchStrips", "1");
-    CHECK (back.clipLaunchStrips);
-    d.clipLaunchStrips = true;
-    CHECK (d.toText().find ("newClipLaunchStrips=1") != std::string::npos);
+    back.readKey ("newClipLaunchStrips", "0");
+    CHECK (! back.clipLaunchStrips);
+    d.clipLaunchStrips = false;
+    CHECK (d.toText().find ("newClipLaunchStrips=0") != std::string::npos);
     bool listed = false;
     for (const auto& item : extras::items)
         listed = listed || (item.id == "project.clipLaunchStrips" && item.settingsKey == "ui-options.txt:newClipLaunchStrips");

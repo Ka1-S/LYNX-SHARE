@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYN
 ## Bilmekte fayda var
 
 - `Seçenekler › Mixer` içindeki `Master'ın yanında ses yüksekliği ölçer (LYNX)`, Master çıkışının kısa vadeli ve entegre loudness'ını (LUFS) ve true peak'ini bir `Sıfırla` düğmesiyle gösterir.
+- `Fader ve yönlendirme otomasyonlarını da telafi et (LYNX)`, insert menüsündeki `Plugin gecikme telafisi` altında, yeni projelerde açıktır. Tüm projenin ayarıdır. Gecikme ekleyen eklentilerle, fader, pan, gönderme ve VCA fader otomasyonunu etki ettiği ses kadar geç çalar. FL Studio yalnızca eklenti düğmelerinin otomasyonunu geciktirir, bu yüzden aynı proje orada biraz farklı duyulur. FL Studio'dan gelen projelerde ve eski projelerde kapalıdır ve `FL ile aynı` onu değiştirmez.
 - Birden fazla çıkışı olan bir enstrüman plugin'i her çıkışını kendi insert'inde çalabilir. Bkz. [Üçüncü taraf plugin'ler](/wiki/plugins/).
 - `Ctrl+L` Channel Rack'te ve Mixer'da farklı işler yapar. Rack'te boş insert'leri seçer. Mixer'da seçili insert'i kullanır.
 - Yönlendirme anahtarları seçili şeridde değil, diğer şeritlerde görünür.

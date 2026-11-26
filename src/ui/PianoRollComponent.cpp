@@ -5421,7 +5421,9 @@ void PianoRollComponent::zoomToSelection()
         view.scroll = t0;
     }
     view.scrollY = juce::jmax (0, rowFor ((low + high) / 2) * rowHeight - gridArea().getHeight() / 2);
-    showView (viewStack.toggle (before, clampedView (view)));
+    // (round 190ro, D-2: pressed again, FL's view stays; LYNX's extra goes back)
+    const auto lynxKeys = zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern);
+    showView (lynxKeys ? viewStack.toggle (before, clampedView (view)) : viewStack.push (before, clampedView (view)));
 }
 
 // --- round 190qe (TOP-NEXT R1): edge scroll, view stack, zoom glide, selection history ---------------------------------
@@ -5555,6 +5557,13 @@ void PianoRollComponent::settleViewGlide()
 double PianoRollComponent::keyZoomAnchorPx() const
 {
     const auto grid = gridArea();
+    // round 190ro (D-2): FL's anchor unless the LYNX extra "editing.zoomKeysLynx" is on (always outside the Pattern layout)
+    if (! zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern))
+    {
+        const auto mouse = getMouseXYRelative();
+        return zoomanchor::flKeyAnchorPx (isMouseOver (true) && grid.contains (mouse) ? std::optional<double> ((double) (mouse.x - grid.getX())) : std::nullopt,
+                                          (double) grid.getWidth());
+    }
     const auto& song = engine.getSong();
     const auto playing = engine.getTransport().playing.load();
     std::optional<double> playhead, selected;

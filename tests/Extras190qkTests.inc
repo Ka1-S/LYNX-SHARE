@@ -19,27 +19,32 @@ TEST (extras190qk_default_lists)
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
     CHECK (std::size (extras::onSince0132) == 14);
-    // the eight turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
-    // and PR #268's veils and round 190qh's two Mixer views)
+    // the six turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
+    // and PR #268's veils; round 190ro took round 190qh's two Mixer views out again, below)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
-                            "simple.projectName", "controlBar.liveScale", "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks",
-                            "mixer.peakValues", "mixer.correlation" })
+                            "simple.projectName", "controlBar.liveScale", "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // rollup 0.1.32 step 3, the owner's decisions: #287's MIDI drop (FL ignores a .mid dropped there), #238's track colors
     // and round 190qi's LYNX-only plugin / Browser lists are on too; FL-exact turns them off
+    // round 190ro (EXTRAS-2.md ON-1): the gain handle that stays in view (only where FL shows none)
     for (const auto* id : { "playlist.midiDrop", "theme.tracksFromAccent", "plugins.recent", "plugins.oneRow", "browser.midiPreview",
-                            "browser.tabCompletes" })
+                            "browser.tabCompletes", "playlist.gainHandleFollowsView",
+                            // round 190ro (ON-2): new, empty Clip-launch projects only (tests/Extras190roTests.inc)
+                            "project.clipLaunchStrips" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",
                             "playlist.rulerSeeksAnyTool", "playlist.rangeEdits", "playlist.headerWidth", "playlist.pointerClick",
-                            "project.linkTracks", "project.clipLaunchStrips", "mixer.followPlaylist",
+                            "project.linkTracks", "mixer.followPlaylist",
                             "mixer.keepLostLinks", "record.lastLoopPassPlays", "playlist.clipLanesFolded", "mixer.loudness", "midi.gamepad",
                             "polyEdit.prepareOnOpen", "layout.trackOnly",
                             "playlist.shadeFadedAudio", "general.hoverValues", // (visual, but over the paint / idle CPU gates)
                             // rollup 0.1.32 step 2: rounds 190qo, 190qr, 190ld's audio editor wheel, 190qg's Grouped toolbar
-                            "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition", "playlist.gainHandleFollowsView",
-                            "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped" })
+                            "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition",
+                            "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped",
+                            "editing.zoomKeysLynx", // round 190ro (D-2): FL 2026 zooms around the pointer, a second Shift+5 does nothing
+                            // round 190ro (EXTRAS-2.md OFF-1): 19 px off every FL Mixer fader and meter, +1.6 % a column
+                            "mixer.peakValues", "mixer.correlation" })
         CHECK (! extras::defaultOn (id) && ! extras::flExactOn (id));
     // FL-exact: FL's own two on, the stretched clips' loop (issue #25) off
     CHECK (extras::flExactOn ("general.escCloses") && extras::flExactOn ("general.startPage"));
@@ -104,5 +109,31 @@ TEST (extras190qk_the_users_choice_stays)
     std::vector<std::string> none;
     extras::followDefaults (none);
     CHECK (none.empty() && extras::userSet().empty());
+    extras::userSet() = kept;
+}
+
+// Round 190ro (EXTRAS-2.md OFF-1): the Mixer's peak values and correlation bars, on in the 0.1.32 rollup's steps 2-4, are off
+// again. A profile written by such a build that never switched them (not in the user-set list) follows the new default;
+// one whose user switched them (in the list) keeps the choice, on or off.
+TEST (extras190ro_mixer_extras_off_again)
+{
+    using namespace lynx;
+    const auto kept = extras::userSet();
+    CHECK (! extras::defaultOn ("mixer.peakValues") && ! extras::defaultOn ("mixer.correlation"));
+    CHECK (! extras::defaultOnBefore0132 ("mixer.peakValues") && ! extras::flExactOn ("mixer.correlation"));
+    // a rollup build's file: both written at the old default (on), the user had only set the inserts column
+    std::vector<std::string> followed { "mixerPeakValues=1", "mixerCorrelation=1", "trackInserts=0", "extrasUserSet=playlist.trackInserts" };
+    extras::followDefaults (followed);
+    CHECK ((followed == std::vector<std::string> { "mixerPeakValues=0", "mixerCorrelation=0", "trackInserts=0", "extrasUserSet=playlist.trackInserts" }));
+    // the user switched the peak values off and then on again (it stays in the list), the bars were never touched
+    std::vector<std::string> chosen { "mixerPeakValues=1", "mixerCorrelation=1", "extrasUserSet=mixer.peakValues" };
+    extras::followDefaults (chosen);
+    CHECK (chosen[0] == "mixerPeakValues=1" && chosen[1] == "mixerCorrelation=0");
+    // a 0.1.31 file has neither key: nothing to change, nothing set
+    std::vector<std::string> old { "wheelZones=0" };
+    extras::followDefaults (old);
+    CHECK (old == std::vector<std::string> { "wheelZones=0" } && extras::userSet().empty());
+    // switched on from the page later: it joins the list when written
+    CHECK (extras::noteUserChoices ("\nmixerPeakValues=1\nmixerCorrelation=0") == "\nextrasUserSet=mixer.peakValues");
     extras::userSet() = kept;
 }

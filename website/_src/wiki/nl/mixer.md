@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt
 ## Goed om te weten
 
 - `Luidheidsmeter naast de Master (LYNX)`, in `Opties › Mixer`, toont de loudness op korte termijn en de geïntegreerde loudness (LUFS) en de true peak van de uitgang van de Master, met een knop `Reset`.
+- `Fader- en routeautomatisering ook compenseren (LYNX)`, onder `Plugin-vertragingscompensatie` in het insertmenu, staat aan in nieuwe projecten. Het is een instelling voor het hele project. Met plug-ins die latentie toevoegen speelt het de automatisering van faders, panning, sends en VCA-faders net zo laat als de audio waarop ze werkt. FL Studio vertraagt alleen de automatisering van plug-inknoppen, dus daar klinkt hetzelfde project iets anders. Projecten uit FL Studio en oudere projecten hebben het uit, en `Als FL` verandert het niet.
 - Een instrumentplugin met meerdere uitgangen kan elke uitgang op een eigen insert laten spelen. Zie [Plugins van derden](/wiki/plugins/).
 - `Ctrl+L` doet verschillende dingen in het Channel Rack en in de Mixer. In het rack kiest het vrije inserts. In de Mixer gebruikt het de geselecteerde insert.
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.

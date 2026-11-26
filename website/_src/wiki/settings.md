@@ -97,7 +97,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 
 ## LYNX extras
 
-`Options › LYNX extras...`. LYNX SHARE's own additions in one place. The ones that only change the look are on by default, and so are a few small additions: MIDI files dropped on the Playlist become pattern clips, the Recent list and one row per plugin in the plugin lists, and the MIDI preview and the Tab completion in the Browser. The rest are off. **FL-exact** turns every extra off, **Recommended** puts each one back at its default. Each switch is the same setting as in the menu or page its line names.
+`Options › LYNX extras...`. LYNX SHARE's own additions in one place. Some that only change the look are on by default, and so are a few small additions: MIDI files dropped on the Playlist become pattern clips, the clip gain handle stays in view, new Clip-launch projects get a mixer track for every track, the Recent list and one row per plugin in the plugin lists, and the MIDI preview and the Tab completion in the Browser. Two that are on change the sound: stretched pattern clips loop their pattern, and in the Simple layout a dropped loop takes the tempo and key found in its audio. The rest are off. **FL-exact** turns every extra off, **Recommended** puts each one back at its default. Each switch is the same setting as in the menu or page its line names, and the line of each one on by default says so.
 
 | Setting | What it does |
 |---|---|

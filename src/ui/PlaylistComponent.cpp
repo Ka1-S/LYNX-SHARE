@@ -11925,6 +11925,9 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
         zoom.addSeparator();
         zoom.addItem (tr ("Zoom around the song position") + " (LYNX)", true, zoomanchor::atSongPosition(),
                       [] { workflowextras::setExtra ("editing.zoomAtSongPosition", ! zoomanchor::atSongPosition()); });
+        // round 190ro (D-2): round 190qe's zoom keys, off as FL in the Pattern layout
+        zoom.addItem (tr ("Zoom keys: LYNX's anchor, and Shift+5 again goes back (LYNX)"), true, zoomanchor::lynxKeys(),
+                      [] { workflowextras::setExtra ("editing.zoomKeysLynx", ! zoomanchor::lynxKeys()); });
         menu.addSubMenu (tr ("Zoom"), zoom);
     }
 
@@ -13732,7 +13735,9 @@ void PlaylistComponent::zoomToSelection()
             target.scrollY = juce::jmax (0, trackToY (top) - tracksTop() + scrollY);
     }
 
-    showView (viewStack.toggle (before, clampedView (target)));
+    // (round 190ro, D-2: pressed again, FL's view stays; LYNX's extra goes back)
+    const auto lynxKeys = zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern);
+    showView (lynxKeys ? viewStack.toggle (before, clampedView (target)) : viewStack.push (before, clampedView (target)));
 }
 
 // The view as the scroll bars would leave it (the song's range, the tracks' height): the stack compares views exactly
@@ -13875,6 +13880,13 @@ void PlaylistComponent::showView (const viewstack::View& target)
 double PlaylistComponent::keyZoomAnchorPx() const
 {
     const auto grid = gridArea();
+    // round 190ro (D-2): FL's anchor unless the LYNX extra "editing.zoomKeysLynx" is on (always outside the Pattern layout)
+    if (! zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern))
+    {
+        const auto mouse = getMouseXYRelative();
+        return zoomanchor::flKeyAnchorPx (isMouseOver (true) && grid.contains (mouse) ? std::optional<double> ((double) (mouse.x - grid.getX())) : std::nullopt,
+                                          (double) grid.getWidth());
+    }
     const auto& song = engine.getSong();
     const auto playing = engine.getTransport().playing.load() && song.mode == PlayMode::song;
     std::optional<double> playhead, selected;

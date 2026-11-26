@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Der Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Wählst du für einen Insert einen externen Eingang, der auch anderes Audio aufn
 ## Gut zu wissen
 
 - `Lautheitsanzeige neben dem Master (LYNX)` unter `Optionen › Mixer` zeigt die Short-Term- und die Integrated-Lautheit (LUFS) sowie den True Peak des Master-Ausgangs, mit einem Button `Reset`.
+- `Fader- und Routing-Automationen ebenfalls ausgleichen (LYNX)` unter `Plugin-Latenzausgleich` im Insert-Menü ist in neuen Projekten an. Es ist eine Einstellung für das ganze Projekt. Bei Plugins mit Latenz spielt es die Automation von Fadern, Panorama, Sends und VCA-Fadern so spät wie das Audio, auf das sie wirkt. FL Studio verzögert nur die Automation von Plugin-Reglern, daher klingt dasselbe Projekt dort etwas anders. Projekte aus FL Studio und ältere Projekte haben es aus, und `Wie FL` ändert es nicht.
 - Ein Instrument-Plugin mit mehreren Ausgängen kann jeden Ausgang auf einem eigenen Insert spielen. Siehe [Plugins von Drittanbietern](/wiki/plugins/).
 - `Ctrl+L` macht im Channel Rack und im Mixer Unterschiedliches. Im Rack wählt es freie Inserts. Im Mixer nutzt es das gewählte Insert.
 - Die Routing-Schalter erscheinen auf den anderen Streifen, nicht auf dem gewählten.

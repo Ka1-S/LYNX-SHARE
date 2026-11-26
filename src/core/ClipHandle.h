@@ -1,6 +1,7 @@
 #pragma once
 
-// Issue #274 (round 190qr), a LYNX extra (off by default): the Playlist's clip gain handle stays in view.
+// Issue #274 (round 190qr), a LYNX extra (on by default since round 190ro, EXTRAS-2.md ON-1: it only shows where FL shows
+// no handle at all, and a press beside its half circle still moves the clip): the Playlist's clip gain handle stays in view.
 // FL Studio 2026 draws an audio clip's gain handle (a semicircle on its bottom edge) in the middle of the clip, so when
 // one zooms in on a long clip its middle is often off screen and the handle with it (REAPER keeps its item volume in the
 // item's title bar). On: while the clip's middle is scrolled out of view, the handle sits in the middle of the part of
@@ -12,7 +13,7 @@ namespace lynx::cliphandle
 {
 inline bool& gainFollowsView() noexcept
 {
-    static bool on = false;
+    static bool on = true;
     return on;
 }
 } // namespace lynx::cliphandle

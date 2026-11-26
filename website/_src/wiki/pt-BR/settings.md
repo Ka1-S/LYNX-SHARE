@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![A página General da janela Configurações, com as abas de página ao longo do topo](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ A janela Configurações tem oito páginas: Audio, MIDI, General, Theme, Files, 
 
 ## LYNX extras
 
-`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. As que só mudam o visual vêm ligadas por padrão, assim como algumas pequenas adições: arquivos MIDI soltos na Playlist viram clipes de pattern, a lista Recentes e uma linha por plugin nas listas de plugins, e a prévia de MIDI e a conclusão com Tab no Browser. As demais vêm desligadas. **Igual ao FL** desliga todos os extras, **Recomendado** devolve cada um ao seu padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita.
+`Opções › Extras do LYNX...`. As adições próprias do LYNX SHARE num só lugar. Algumas que só mudam o visual vêm ligadas por padrão, assim como algumas pequenas adições: arquivos MIDI soltos na Playlist viram clipes de pattern, a alça de ganho do clipe fica à vista, novos projetos do layout Clip-launch ganham uma faixa de mixer para cada faixa, a lista Recentes e uma linha por plugin nas listas de plugins, e a prévia de MIDI e a conclusão com Tab no Browser. Duas das que vêm ligadas mudam o som: clipes de pattern esticados repetem o pattern e, no layout Simple, um loop solto recebe o andamento e o tom encontrados no áudio. As demais vêm desligadas. **Igual ao FL** desliga todos os extras, **Recomendado** devolve cada um ao seu padrão. Cada chave é a mesma configuração do menu ou da página que a linha dela cita, e a linha de cada uma que vem ligada diz isso.
 
 | Configuração | O que faz |
 |---|---|
