@@ -32,7 +32,8 @@ namespace lynx::extras
 // --- the defaults ----------------------------------------------------------------------------------------------------
 // On by default since 0.1.32 (round 190qk; EXTRAS.md of the round has the reasons): visual only, no gesture, file or
 // sound change, and no paint or idle cost over the gates (Shade faded audio was measured +1.3 % on Thief's Playlist, the
-// value beside the mouse +0.6-1 % idle CPU in --uiperf: both stay off).
+// value beside the mouse +0.6-1 % idle CPU in --uiperf: both stay off). Round 190ro (EXTRAS-2.md): the Mixer's peak values and
+// correlation bars off again, the gain handle that stays in view and the Clip-launch strips of new projects on.
 inline constexpr std::string_view onSince0132[] = {
     "pianoRoll.chordHighlight", // the Piano roll's rows light the Chord lane's chord (only a song with chords)
     "playlist.trackInserts",    // the effects column on linked track headers (only while tracks are linked)
@@ -41,8 +42,8 @@ inline constexpr std::string_view onSince0132[] = {
     // rollup 0.1.32 step 2 (the owner's policy 11-23): visual only, on from the start
     "playlist.dimUnselectedTracks", // PR #267: the other tracks step back while tracks are selected
     "playlist.darkenMutedTracks",   // PR #268: a switched-off track's whole row steps back
-    "mixer.peakValues",             // round 190qh: each strip's peak since a reset under its meter
-    "mixer.correlation",            // round 190qh: a stereo correlation bar under each meter
+    // (round 190qh's "mixer.peakValues" and "mixer.correlation" were on here in steps 2-4; round 190ro put them back off:
+    // they shorten every FL Mixer fader and meter by 19 px and cost +1.6 % a playhead column, EXTRAS-2.md OFF-1)
     // rollup 0.1.32 step 3, the owner's decisions: #287 (FL ignores a .mid dropped on its Playlist, so no FL gesture
     // changes; on since 0.1.31.2's new profiles, here for every profile that kept 0.1.31's off), #238's track colors
     // (kept in the theme) and round 190qi's LYNX-only plugin / Browser lists, which were always on
