@@ -661,6 +661,16 @@ namespace flmexport
 std::string checksum (const std::vector<std::uint8_t>& bytes);
 }
 
+namespace
+{
+// (round 190rm) a muted Playlist track's clips don't play in LYNX (nor in FL); FLM's tracks are per channel and its
+// pattern clips have no mute, so they are left out (audio clips: written muted) instead of playing in the copy
+bool onMutedRow (const Song& song, const Clip& clip) noexcept
+{
+    return clip.track >= 0 && clip.track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) clip.track].muted;
+}
+} // namespace
+
 FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
 {
     FlmExportResult result;
@@ -1107,6 +1117,11 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
     {
         if (clip.pattern < 0 || clip.pattern >= (int) song.patterns.size() || clip.muted)
             continue;
+        if (onMutedRow (song, clip))
+        {
+            ctx.losses.add ("Clips on muted Playlist tracks (left out: FL Studio Mobile's clips can't be muted)", {}, false);
+            continue;
+        }
         const auto& pat = song.patterns[(std::size_t) clip.pattern];
         const auto patLength = pat.effectiveLength (song.meter());
         // the notes per FLM channel
@@ -1224,7 +1239,7 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
             s.params[sp::level] = flmFaderValue (gain);
             s.params[sp::pan] = std::clamp ((clip.pan + c.pan + 1.0f) * 0.5f, 0.0f, 1.0f);
             s.params[sp::speed] = flmSpeedValue ((int) std::lround (c.sampler.keepPitch ? 0.0f : c.sampler.pitch));
-            s.params[sp::mute] = clip.muted ? 1.0f : 0.0f;
+            s.params[sp::mute] = clip.muted || onMutedRow (song, clip) ? 1.0f : 0.0f;
             s.reverse = clip.reversed != c.sampler.reverse;
             s.pitch = std::round (clip.pitch + (c.sampler.keepPitch ? c.sampler.pitch : 0.0f));
             if (std::abs (clip.stretch - 1.0) > 1.0e-6)
@@ -1344,7 +1359,8 @@ FlmExportResult exportFlm (const Song& song, const FlmExportOptions& options)
         std::map<std::tuple<int, int, int>, std::size_t> laneIndex;
         for (const auto& clip : song.playlist)
         {
-            if (clip.kind != ClipKind::automation || clip.automation < 0 || clip.automation >= (int) song.automations.size() || clip.muted)
+            if (clip.kind != ClipKind::automation || clip.automation < 0 || clip.automation >= (int) song.automations.size() || clip.muted
+                || onMutedRow (song, clip))
                 continue;
             const auto& a = song.automations[(std::size_t) clip.automation];
             const auto l = laneOf (a.target);
