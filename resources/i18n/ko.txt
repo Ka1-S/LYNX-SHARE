@@ -13096,3 +13096,7 @@ countries: kr
 "Writing {0}..." = "{0} 쓰는 중..."
 "Open backup without third-party plugins" = "서드파티 플러그인 없이 백업 열기"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "{0} 창이 열려 있는 동안 지난 세션이 예기치 않게 종료되었습니다. 저장된 최신 백업을 서드파티 플러그인 없이 열까요? 플러그인은 설정이 유지된 채 꺼진 상태로 프로젝트에 남습니다. 서드파티 플러그인 창의 \"모두 켜기\"로 다시 켤 수 있습니다.\n{1}  ({2})"
+"The audio device {0} stopped" = "오디오 장치 {0}이(가) 중지되었습니다"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "녹음이 중지되었고 테이크는 보존되었습니다. {0}이(가) 다시 연결되면 LYNX SHARE가 다시 엽니다."
+"LYNX SHARE opens {0} again when it is back." = "{0}이(가) 다시 연결되면 LYNX SHARE가 다시 엽니다."
+"{0} is back: LYNX SHARE uses it again" = "{0}이(가) 다시 연결됨: LYNX SHARE가 다시 사용합니다"

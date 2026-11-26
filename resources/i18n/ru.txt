@@ -13096,3 +13096,7 @@ countries: ru by kz
 "Writing {0}..." = "Запись {0}..."
 "Open backup without third-party plugins" = "Открыть копию без сторонних плагинов"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "Последний сеанс завершился неожиданно, когда было открыто окно {0}. Открыть самую свежую резервную копию без сторонних плагинов? Они останутся в проекте, выключенными и с сохранёнными настройками; «Включить все» в окне «Сторонние плагины» снова включает их.\n{1}  ({2})"
+"The audio device {0} stopped" = "Аудиоустройство {0} остановилось"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Запись остановлена, дубль сохранён. LYNX SHARE снова откроет {0}, когда оно вернётся."
+"LYNX SHARE opens {0} again when it is back." = "LYNX SHARE снова откроет {0}, когда оно вернётся."
+"{0} is back: LYNX SHARE uses it again" = "{0} снова доступно: LYNX SHARE использует его"

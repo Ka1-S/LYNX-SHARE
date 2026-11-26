@@ -22,6 +22,38 @@ TEST (stab190rp_recovery_never_offers_a_half_written_save)
     CHECK (crashRecoveryCandidate (files, 101).empty()); // (only half-written files since then: nothing to offer)
 }
 
+// The audio device in use went away (decision O-4): JUCE opens the default device (or none) in its place; LYNX must
+// tell a loss from a switch, reopen the lost one when it is listed again, and keep a device chosen meanwhile.
+TEST (stab190rp_device_loss_rules)
+{
+    using namespace lynx::deviceloss;
+    std::set<std::string> listed { "Interface", "Speakers" };
+    auto isListed = [&] (const Device& d) { return listed.count (d.name) > 0; };
+    Watch w;
+    CHECK (w.update ({ "ALSA", "Interface" }, isListed) == Event::none);
+    // a switch in Settings › Audio (the old one still there): not a loss
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::none && w.current().name == "Speakers");
+    CHECK (w.update ({ "ALSA", "Interface" }, isListed) == Event::none);
+    // unplugged: JUCE opened the speakers instead
+    listed.erase ("Interface");
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::lost);
+    CHECK (w.lost().name == "Interface" && w.fallback().name == "Speakers");
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::none); // (still away)
+    listed.insert ("Interface");
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::reopen);
+    w.reopened ({ "ALSA", "Interface" });
+    CHECK (w.lost().empty() && w.current().name == "Interface");
+    // unplugged with nothing left, then another device chosen before it is back: that choice stays
+    listed.erase ("Interface");
+    CHECK (w.update ({}, isListed) == Event::lost && w.fallback().empty());
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::none && w.lost().empty());
+    listed.insert ("Interface");
+    CHECK (w.update ({ "ALSA", "Speakers" }, isListed) == Event::none);
+    // a device that never opened (none at the start) is no loss
+    Watch fresh;
+    CHECK (fresh.update ({}, isListed) == Event::none);
+}
+
 // The recovery box (decision O-2 (a)): "Open backup without third-party plugins" always there, the default (Return)
 // when the session ended while a plugin's window was open; the plugin's name comes from Main.cpp's uncleanCause.
 TEST (stab190rp_recovery_box_offers_plugins_off)

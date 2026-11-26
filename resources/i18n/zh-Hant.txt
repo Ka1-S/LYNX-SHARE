@@ -13096,3 +13096,7 @@ countries: tw hk mo
 "Writing {0}..." = "正在寫入 {0}..."
 "Open backup without third-party plugins" = "不載入第三方外掛開啟備份"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "上次工作階段在 {0} 的視窗開啟時意外結束。是否不載入第三方外掛開啟它儲存的最新備份？外掛會保留在專案中，處於關閉狀態並保留設定；在「第三方外掛」視窗中按「全部開啟」即可重新開啟。\n{1}  （{2}）"
+"The audio device {0} stopped" = "音訊裝置 {0} 已停止"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "錄音已停止，錄音片段已保留。{0} 恢復後 LYNX SHARE 會重新開啟它。"
+"LYNX SHARE opens {0} again when it is back." = "{0} 恢復後 LYNX SHARE 會重新開啟它。"
+"{0} is back: LYNX SHARE uses it again" = "{0} 已恢復：LYNX SHARE 重新使用它"

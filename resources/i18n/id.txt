@@ -13096,3 +13096,7 @@ countries: id
 "Writing {0}..." = "Menulis {0}..."
 "Open backup without third-party plugins" = "Buka cadangan tanpa plugin pihak ketiga"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "Sesi terakhir berakhir secara tak terduga saat jendela {0} terbuka. Buka cadangan terbaru yang disimpannya tanpa plugin pihak ketiga? Plugin tetap ada di proyek, dalam keadaan mati dengan pengaturannya tersimpan; \"Nyalakan semua\" di jendela Plugin pihak ketiga menyalakannya kembali.\n{1}  ({2})"
+"The audio device {0} stopped" = "Perangkat audio {0} berhenti"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Perekaman berhenti dan take tetap disimpan. LYNX SHARE membuka {0} lagi saat perangkat itu kembali."
+"LYNX SHARE opens {0} again when it is back." = "LYNX SHARE membuka {0} lagi saat perangkat itu kembali."
+"{0} is back: LYNX SHARE uses it again" = "{0} sudah kembali: LYNX SHARE memakainya lagi"

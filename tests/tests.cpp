@@ -16628,6 +16628,7 @@ TEST (flp_pattern_events_import)
 
 #include "PrefsTests.inc"
 #include "core/ProjectSafety.h"
+#include "core/DeviceLoss.h" // round 190rp
 #include "core/SearchIndex.h"
 #include "core/PluginCatalog.h"
 #include "SafetyTests118.inc"

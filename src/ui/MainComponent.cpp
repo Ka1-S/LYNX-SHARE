@@ -1194,6 +1194,27 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             lines.add (tr ("MIDI device disconnected: {0}", { removed.joinIntoString (", ") }));
         ui::postNotice ({ lines.joinIntoString ("  ·  "), {} }, 5000);
     };
+    // round 190rp (0.1.32 Q4, decision O-4 (a)): the audio device in use went away / came back (AudioEngine::watchAudioDevice).
+    // FL shows nothing; LYNX says so, as a notice that stays (a recording that stopped must not go unnoticed)
+    engine.onAudioDeviceLost = [] (const juce::String& device, bool recordingStopped) {
+        platform::testModeLog ("audio device lost: " + device + (recordingStopped ? " (recording stopped)" : ""));
+        ui::Notice n;
+        n.kind = ui::Notice::Kind::problem;
+        n.id = "audio.deviceLost";
+        n.text = tr ("The audio device {0} stopped", { device });
+        n.detail = recordingStopped ? tr ("Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back.", { device })
+                                    : tr ("LYNX SHARE opens {0} again when it is back.", { device });
+        n.holdMs = recordingStopped ? 10 * 60 * 1000 : 0;
+        ui::notify (std::move (n));
+    };
+    engine.onAudioDeviceBack = [] (const juce::String& device) {
+        platform::testModeLog ("audio device back: " + device);
+        ui::Notice n;
+        n.kind = ui::Notice::Kind::done;
+        n.id = "audio.deviceLost"; // (replaces the notice of its loss)
+        n.text = tr ("{0} is back: LYNX SHARE uses it again", { device });
+        ui::notify (std::move (n));
+    };
     if (startStyle.style != layoutstyle::Style::pattern)
         setLayoutStyle (startStyle.style, false); // (the saved workspace layout is already this style's)
     updateGamepad(); // (round 184a, S16: only when the option is on)
@@ -1268,6 +1289,8 @@ MainComponent::~MainComponent()
     workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     engine.onMidiDevicesChanged = nullptr;
+    engine.onAudioDeviceLost = nullptr;
+    engine.onAudioDeviceBack = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     liveui::setRemoteSession (nullptr, nullptr);

@@ -577,4 +577,113 @@ juce::String AudioEngine::deviceChangeSelfTest (int switches, bool everyUnit, co
     engine.rackDisposer.flush();
     return failures.isEmpty() ? "OK (" + juce::String (done) + " device changes)" : "ERROR " + failures;
 }
+// Round 190rp (0.1.32 Q4, decision O-4 (a)): the device in use is unplugged while recording, while playing and while
+// stopped (AudioEngine::watchAudioDevice). A recording stops with the transport and the notice says so; the device is
+// opened again when it is back, unless another one was chosen meanwhile; with no device left, it reopens as well.
+juce::String AudioEngine::deviceLostSelfTest()
+{
+    auto& state = standInState();
+    {
+        const juce::ScopedLock sl (state.lock);
+        state.plugged = { "Speakers", "Interface" };
+        state.refuses = {};
+    }
+    state.reset();
+    AudioEngine engine (false);
+    auto typeOwner = std::make_unique<StandInType>();
+    auto* type = typeOwner.get();
+    auto& devices = engine.deviceManager;
+    engine.player.setProcessor (&engine.graph);
+    devices.addAudioDeviceType (std::move (typeOwner));
+    if (const auto error = devices.initialise (0, 2, nullptr, true); error.isNotEmpty())
+        return "ERROR open: " + error;
+    devices.addAudioCallback (&engine);
+    auto song = Song::makeDefault();
+    engine.setSong (std::move (song));
+
+    juce::StringArray lost, back;
+    bool stoppedRecording = false;
+    engine.onAudioDeviceLost = [&] (const juce::String& d, bool rec) {
+        lost.add (d);
+        stoppedRecording = rec;
+    };
+    engine.onAudioDeviceBack = [&] (const juce::String& d) { back.add (d); };
+    auto name = [&devices] { return devices.getCurrentAudioDevice() != nullptr ? devices.getCurrentAudioDevice()->getName() : juce::String ("none"); };
+    // the message loop's part: the engine's timer (30 times a second) for up to `ms`, until `done`
+    auto run = [&engine] (int ms, const std::function<bool()>& done) {
+        const auto start = juce::Time::getMillisecondCounter();
+        while (juce::Time::getMillisecondCounter() - start < (juce::uint32) ms)
+        {
+            engine.timerCallback();
+            engine.rackDisposer.flush();
+            if (done && done())
+                return true;
+            juce::Thread::sleep (5);
+        }
+        return done == nullptr;
+    };
+    auto choose = [&devices] (const juce::String& out) {
+        auto setup = devices.getAudioDeviceSetup();
+        setup.outputDeviceName = out;
+        return devices.setAudioDeviceSetup (setup, true);
+    };
+    juce::StringArray problems;
+    auto expect = [&problems] (bool ok, const juce::String& what) {
+        if (! ok)
+            problems.add (what);
+    };
+
+    // 1. recording on the interface; it is unplugged: the recording and the transport stop, the notice names it
+    expect (choose ("Interface").isEmpty(), "Interface did not open");
+    run (700, {});
+    engine.play();
+    engine.setRecording (true);
+    run (700, {});
+    type->setPlugged ("Interface", false);
+    expect (run (3000, [&] { return ! lost.isEmpty(); }), "the loss while recording was not seen (device " + name() + ")");
+    expect (lost.size() == 1 && lost[0] == "Interface" && stoppedRecording, "lost: " + lost.joinIntoString (",") + (stoppedRecording ? " (recording stopped)" : ""));
+    expect (! engine.isRecording() && ! engine.transport.playing.load(), "still recording / playing after the loss");
+    // ... plugged in again: opened again with its settings
+    type->setPlugged ("Interface", true);
+    expect (run (6000, [&] { return ! back.isEmpty(); }) && name() == "Interface", "not reopened (device " + name() + ", back: " + back.joinIntoString (",") + ")");
+
+    // 2. playing only: the transport goes on (on the device JUCE opened instead), the notice says nothing was stopped;
+    // another device chosen while the interface is away stays when it comes back
+    lost.clear();
+    back.clear();
+    engine.play();
+    run (700, {});
+    type->setPlugged ("Interface", false);
+    expect (run (3000, [&] { return ! lost.isEmpty(); }) && ! stoppedRecording, "the loss while playing: " + lost.joinIntoString (","));
+    expect (engine.transport.playing.load(), "playback stopped by a loss without recording");
+    expect (choose ("Speakers").isEmpty(), "Speakers did not open");
+    run (700, {});
+    type->setPlugged ("Monitor", true);
+    expect (choose ("Monitor").isEmpty(), "Monitor did not open");
+    run (700, {});
+    type->setPlugged ("Interface", true);
+    run (3500, {});
+    expect (back.isEmpty() && name() == "Monitor", "the chosen device was replaced (device " + name() + ")");
+    engine.stop();
+
+    // 3. stopped, and no device left at all: nothing open, then the interface again when it is back
+    lost.clear();
+    back.clear();
+    expect (choose ("Interface").isEmpty(), "Interface did not open (3)");
+    run (700, {});
+    type->setPlugged ("Speakers", false);
+    type->setPlugged ("Monitor", false);
+    run (700, {});
+    type->setPlugged ("Interface", false);
+    expect (run (3000, [&] { return ! lost.isEmpty(); }) && ! stoppedRecording && name() == "none", "the loss with no device left: " + lost.joinIntoString (",") + ", device " + name());
+    type->setPlugged ("Interface", true);
+    expect (run (6000, [&] { return ! back.isEmpty(); }) && name() == "Interface", "not reopened with no device left (device " + name() + ")");
+
+    engine.onAudioDeviceLost = nullptr;
+    engine.onAudioDeviceBack = nullptr;
+    engine.stop();
+    devices.closeAudioDevice();
+    engine.rackDisposer.flush();
+    return problems.isEmpty() ? juce::String ("OK (3 losses, 2 reopened, 1 kept the chosen device)") : "ERROR " + problems.joinIntoString ("; ");
+}
 } // namespace lynx

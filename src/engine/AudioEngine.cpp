@@ -6535,6 +6535,12 @@ void AudioEngine::timerCallback()
         enableAllMidiInputs();
     }
 
+    if (++deviceWatchTicks >= 15) // (twice a second)
+    {
+        deviceWatchTicks = 0;
+        watchAudioDevice();
+    }
+
     updateRealtimeStats();
     // round 190gn (A1): the racks' pitch-shifter stocks back to their reserve (a voice took one: a live keyboard on a
     // keep-pitch channel); nothing to do, and no allocation, when none was taken
@@ -6590,6 +6596,73 @@ void AudioEngine::timerCallback()
                 }
         ++latencyRepublishes;
         publishSong();
+    }
+}
+
+// Round 190rp (0.1.32 Q4, decision O-4 (a)): the device in use went away or came back (core/DeviceLoss.h). FL shows
+// nothing here; LYNX stops the recording it can no longer feed (the take up to that moment is kept), says so, and opens
+// the device again when it is back, so a cable pulled out by mistake doesn't leave the session on the laptop speakers.
+void AudioEngine::watchAudioDevice()
+{
+    auto* device = deviceManager.getCurrentAudioDevice();
+    const deviceloss::Device now { device != nullptr ? device->getTypeName().toStdString() : std::string(),
+                                   device != nullptr ? device->getName().toStdString() : std::string() };
+    auto listed = [this] (const deviceloss::Device& d) {
+        for (auto* type : deviceManager.getAvailableDeviceTypes())
+            if (type->getTypeName().toStdString() == d.type)
+            {
+                const auto name = juce::String::fromUTF8 (d.name.c_str());
+                return type->getDeviceNames (false).contains (name) || type->getDeviceNames (true).contains (name);
+            }
+        return false;
+    };
+    switch (deviceWatch.update (now, listed))
+    {
+        case deviceloss::Event::none:
+            if (! now.empty() && deviceWatch.lost().empty())
+                runningDeviceSetup = deviceManager.getAudioDeviceSetup(); // (what to reopen it with if it goes)
+            return;
+        case deviceloss::Event::lost:
+        {
+            lostDeviceSetup = runningDeviceSetup;
+            deviceReopenTries = 0;
+            deviceReopenMs = juce::Time::getMillisecondCounter();
+            const auto name = juce::String::fromUTF8 (deviceWatch.lost().name.c_str());
+            const auto recordingStopped = transport.recording.load();
+            if (recordingStopped)
+            {
+                setRecording (false); // (the takes close with what reached them: kept, as the record button keeps them)
+                stop();
+            }
+            if (onAudioDeviceLost)
+                onAudioDeviceLost (name, recordingStopped);
+            return;
+        }
+        case deviceloss::Event::reopen:
+        {
+            const auto ms = juce::Time::getMillisecondCounter();
+            if (ms - deviceReopenMs < 2000) // (listed again: give the driver a moment, then one try every 2 s)
+                return;
+            deviceReopenMs = ms;
+            const auto wanted = deviceWatch.lost();
+            const auto name = juce::String::fromUTF8 (wanted.name.c_str());
+            if (deviceManager.getCurrentAudioDeviceType().toStdString() != wanted.type)
+                deviceManager.setCurrentAudioDeviceType (juce::String::fromUTF8 (wanted.type.c_str()), true);
+            const auto error = deviceManager.setAudioDeviceSetup (lostDeviceSetup, true);
+            auto* opened = deviceManager.getCurrentAudioDevice();
+            const deviceloss::Device after { opened != nullptr ? opened->getTypeName().toStdString() : std::string(),
+                                             opened != nullptr ? opened->getName().toStdString() : std::string() };
+            if (error.isEmpty() && after == wanted)
+            {
+                deviceWatch.reopened (after);
+                runningDeviceSetup = deviceManager.getAudioDeviceSetup();
+                if (onAudioDeviceBack)
+                    onAudioDeviceBack (name);
+            }
+            else if (++deviceReopenTries >= 10)
+                deviceWatch.reopened (after); // (listed but it won't open: given up after 20 s; Settings › Audio)
+            return;
+        }
     }
 }
 

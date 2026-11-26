@@ -13096,3 +13096,7 @@ countries: tr
 "Writing {0}..." = "{0} yazılıyor..."
 "Open backup without third-party plugins" = "Yedeği üçüncü taraf plugin'ler olmadan aç"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "Son oturum, {0} penceresi açıkken beklenmedik şekilde sona erdi. Kaydettiği en yeni yedek üçüncü taraf plugin'ler olmadan açılsın mı? Projede kalırlar, ayarları korunarak kapalı olurlar; Üçüncü taraf plugin'ler penceresindeki \"Tümünü aç\" onları yeniden açar.\n{1}  ({2})"
+"The audio device {0} stopped" = "{0} ses aygıtı durdu"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Kayıt durdu ve kayıt alınan take korundu. LYNX SHARE, {0} geri geldiğinde onu yeniden açar."
+"LYNX SHARE opens {0} again when it is back." = "LYNX SHARE, {0} geri geldiğinde onu yeniden açar."
+"{0} is back: LYNX SHARE uses it again" = "{0} geri geldi: LYNX SHARE onu yeniden kullanıyor"

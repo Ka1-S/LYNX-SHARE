@@ -13096,3 +13096,7 @@ countries: nl be
 "Writing {0}..." = "{0} wordt geschreven..."
 "Open backup without third-party plugins" = "Back-up openen zonder plugins van derden"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "De laatste sessie is onverwacht beëindigd terwijl het venster van {0} open was. De nieuwste back-up openen zonder plugins van derden? Ze blijven in het project, uitgeschakeld en met hun instellingen; \"Alles inschakelen\" in het venster Plugins van derden schakelt ze weer in.\n{1}  ({2})"
+"The audio device {0} stopped" = "Het audioapparaat {0} is gestopt"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "De opname is gestopt en de take is bewaard. LYNX SHARE opent {0} weer zodra het terug is."
+"LYNX SHARE opens {0} again when it is back." = "LYNX SHARE opent {0} weer zodra het terug is."
+"{0} is back: LYNX SHARE uses it again" = "{0} is terug: LYNX SHARE gebruikt het weer"

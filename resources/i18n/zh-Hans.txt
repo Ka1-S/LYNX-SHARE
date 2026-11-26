@@ -13096,3 +13096,7 @@ countries: cn sg
 "Writing {0}..." = "正在写入 {0}..."
 "Open backup without third-party plugins" = "不加载第三方插件打开备份"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "上次会话在 {0} 的窗口打开时意外结束。是否不加载第三方插件打开它保存的最新备份？插件会保留在工程中，处于关闭状态并保留设置；在“第三方插件”窗口中点击“全部开启”即可重新开启。\n{1}  （{2}）"
+"The audio device {0} stopped" = "音频设备 {0} 已停止"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "录音已停止，录音片段已保留。{0} 恢复后 LYNX SHARE 会重新打开它。"
+"LYNX SHARE opens {0} again when it is back." = "{0} 恢复后 LYNX SHARE 会重新打开它。"
+"{0} is back: LYNX SHARE uses it again" = "{0} 已恢复：LYNX SHARE 重新使用它"

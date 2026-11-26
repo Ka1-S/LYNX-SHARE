@@ -13096,3 +13096,7 @@ countries: it ch sm
 "Writing {0}..." = "Scrittura di {0}..."
 "Open backup without third-party plugins" = "Apri il backup senza plugin di terze parti"
 "The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "L'ultima sessione è terminata in modo anomalo con la finestra di {0} aperta. Aprire il backup più recente senza plugin di terze parti? Restano nel progetto, spenti e con le loro impostazioni; \"Riattiva tutti\" nella finestra Plugin di terze parti li riaccende.\n{1}  ({2})"
+"The audio device {0} stopped" = "Il dispositivo audio {0} si è fermato"
+"Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "La registrazione si è fermata e la take è conservata. LYNX SHARE riapre {0} quando torna disponibile."
+"LYNX SHARE opens {0} again when it is back." = "LYNX SHARE riapre {0} quando torna disponibile."
+"{0} is back: LYNX SHARE uses it again" = "{0} è tornato: LYNX SHARE lo usa di nuovo"
