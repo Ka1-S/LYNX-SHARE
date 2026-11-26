@@ -112,6 +112,34 @@ bool writeWavForLive (const juce::File& source, const juce::File& target)
 }
 } // namespace
 
+bool sampleNeedsWavForOtherApps (const juce::File& file) { return needsWavForLive (file); }
+
+juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& seconds, int& sampleRate, int& channels)
+{
+    juce::MemoryBlock out;
+    SampleLibrary library;
+    const auto data = library.load (file.getFullPathName());
+    if (data == nullptr || data->frames() <= 0 || data->sampleRate <= 0.0)
+        return out;
+    channels = data->isStereo() ? 2 : 1;
+    sampleRate = juce::roundToInt (data->sampleRate);
+    seconds = (double) data->frames() / data->sampleRate;
+    {
+        auto* stream = new juce::MemoryOutputStream (out, false);
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream, data->sampleRate, (unsigned int) channels, 32, {}, 0));
+        if (writer == nullptr)
+        {
+            delete stream;
+            return {};
+        }
+        const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
+        if (! writer->writeFromFloatArrays (planes, channels, (int) data->frames()))
+            return {};
+    }
+    return out;
+}
+
 // Writes "<folder>/<name> Project/<name>.als"; the samples are copied into "Samples/Imported" when `collect` is set.
 // Returns the .als written, or an empty File with `error` set.
 juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion version, bool collect, const juce::File& folder, const juce::String& name,

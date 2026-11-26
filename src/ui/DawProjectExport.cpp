@@ -7,6 +7,7 @@
 #include "engine/ProjectFile.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
+#include "ui/AlsExportDialog.h" // (round 190rm: samples other apps cannot read, as WAV)
 
 namespace lynx
 {
@@ -27,20 +28,60 @@ bool writeDawProjectFile (const Song& song, PluginHost* host, const juce::File& 
     DawProjectExportOptions options;
     options.application = "LYNX SHARE";
     options.version = JUCE_APPLICATION_VERSION_STRING;
-    options.readFile = [] (const std::string& path) {
+    // (round 190rm) a sample other apps cannot read (FL's Ogg-in-WAV and WavPack samples, a raw Ogg named .wav...) goes in
+    // as the 32-bit float WAV LYNX plays from it, under "<name>.wav": Bitwig, Studio One and Cubase read PCM / float WAV,
+    // AIFF, FLAC, MP3 and Ogg files, not those. Before, it went in as it was, with 0 Hz / 0 channels / 0 s on its Audio
+    // element when JUCE's readers could not open it either (401 of Thief's 1,351 clips), and stretched ones unstretched.
+    struct Decoded
+    {
+        bool needs = false;
+        juce::MemoryBlock wav;
+        double seconds = 0.0;
+        int rate = 0, channels = 0;
+    };
+    std::map<std::string, Decoded> decoded;
+    const auto decodedFor = [&decoded] (const std::string& path) -> Decoded& {
+        auto it = decoded.find (path);
+        if (it == decoded.end())
+        {
+            Decoded d;
+            const juce::File file (fromUtf8 (path));
+            d.needs = file.existsAsFile() && sampleNeedsWavForOtherApps (file);
+            if (d.needs)
+                d.wav = decodedWavForOtherApps (file, d.seconds, d.rate, d.channels);
+            it = decoded.emplace (path, std::move (d)).first;
+        }
+        return it->second;
+    };
+    options.readFile = [decodedFor] (const std::string& path) {
         const juce::File file (fromUtf8 (path));
+        if (auto& d = decodedFor (path); d.needs)
+        {
+            if (d.wav.getSize() == 0 || (juce::int64) d.wav.getSize() > maxEmbeddedBytes)
+                return std::vector<std::uint8_t> {};
+            const auto* bytes = static_cast<const std::uint8_t*> (d.wav.getData());
+            std::vector<std::uint8_t> out (bytes, bytes + d.wav.getSize());
+            d.wav.reset(); // (embedded once: the export keeps the entry's path)
+            return out;
+        }
         juce::MemoryBlock data;
         if (! file.existsAsFile() || file.getSize() > maxEmbeddedBytes || ! file.loadFileAsData (data))
             return std::vector<std::uint8_t> {};
         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
         return std::vector<std::uint8_t> (bytes, bytes + data.getSize());
     };
-    options.sampleFormat = [&formats, &seen] (const std::string& path, double& seconds, int& sampleRate, int& channels) {
+    options.embeddedName = [decodedFor] (const std::string& path) {
+        const juce::File file (fromUtf8 (path));
+        return (decodedFor (path).needs ? file.getFileNameWithoutExtension() + ".wav" : file.getFileName()).toStdString();
+    };
+    options.sampleFormat = [&formats, &seen, decodedFor] (const std::string& path, double& seconds, int& sampleRate, int& channels) {
         auto it = seen.find (path);
         if (it == seen.end())
         {
             std::tuple<double, int, int> f { 0.0, 0, 0 };
-            if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (juce::File (fromUtf8 (path))) }; reader != nullptr && reader->sampleRate > 0)
+            if (const auto& d = decodedFor (path); d.needs && d.rate > 0)
+                f = { d.seconds, d.rate, d.channels };
+            else if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (juce::File (fromUtf8 (path))) }; reader != nullptr && reader->sampleRate > 0)
                 f = { (double) reader->lengthInSamples / reader->sampleRate, (int) reader->sampleRate, (int) reader->numChannels };
             it = seen.emplace (path, f).first;
         }

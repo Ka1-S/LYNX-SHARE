@@ -3111,9 +3111,15 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
         int rate = 44100, channels = 2;
         if (missing || ! opt.sampleFormat || ! opt.sampleFormat (ch.samplePath, seconds, rate, channels))
         {
+            // (round 190rm: the reader may have left 0 Hz / 0 channels there; Audio needs real ones: Project.xsd's
+            // sampleRate and channels, which other apps take as the file's format)
             seconds = 0.0;
+            rate = 44100;
+            channels = 2;
             x.note ("Audio files whose length was not known (written as 0 s)");
         }
+        rate = rate > 0 ? rate : 44100;
+        channels = channels > 0 ? channels : 2;
         // the file: embedded, else referenced where it is
         Node audio ("Audio");
         audio.set ("id", x.newId()).set ("channels", std::to_string (channels)).set ("sampleRate", std::to_string (rate)).set ("duration", numText (seconds));
@@ -3128,7 +3134,8 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
             auto bytes = opt.readFile && ! missing ? opt.readFile (ch.samplePath) : std::vector<std::uint8_t> {};
             if (! bytes.empty())
             {
-                const auto path = x.addFile ("audio/", pathFileName (ch.samplePath), std::move (bytes));
+                auto name = opt.embeddedName ? opt.embeddedName (ch.samplePath) : std::string();
+                const auto path = x.addFile ("audio/", name.empty() ? pathFileName (ch.samplePath) : name, std::move (bytes));
                 x.embeddedPath[ch.samplePath] = path;
                 file.set ("path", path);
             }
