@@ -40,7 +40,8 @@ inline constexpr std::string_view onSince0132[] = {
     "simple.projectName",       // the project's name at the top of the Simple layout (BandLab)
     "controlBar.liveScale",     // Live 12's scale switch, root and mode in the Clip-launch control bar (Live)
     // rollup 0.1.32 step 2 (the owner's policy 11-23): visual only, on from the start
-    "playlist.dimUnselectedTracks", // PR #267: the other tracks step back while tracks are selected
+    // (PR #267's "playlist.dimUnselectedTracks" was on here in steps 2-4; round 190ro put it back off: with a track selected
+    // its veil cost +17.7 % / +24.5 % a Playlist frame. On again in 0.1.33 once it is drawn into the cached picture)
     "playlist.darkenMutedTracks",   // PR #268: a switched-off track's whole row steps back
     // (round 190qh's "mixer.peakValues" and "mixer.correlation" were on here in steps 2-4; round 190ro put them back off:
     // they shorten every FL Mixer fader and meter by 19 px and cost +1.6 % a playhead column, EXTRAS-2.md OFF-1)

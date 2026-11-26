@@ -49,8 +49,9 @@
         const auto bar = (std::int64_t) 4 * ppq;
 
         // --- the defaults of a new profile ----------------------------------------------------------------------------------
-        check ("new profile: the gain handle stays in view (on), the Clip-launch strips (on), the Mixer's peak values and correlation bars (off)",
+        check ("new profile: the gain handle stays in view (on), the Clip-launch strips (on), the Mixer's peak values and correlation bars and the dim veil (off)",
                cliphandle::gainFollowsView() && newProjectDefaults().clipLaunchStrips && ! MixerStrips::showPeakValues && ! MixerStrips::showCorrelation
+                   && ! PlaylistComponent::dimUnselectedTracks && ! extras::defaultOn ("playlist.dimUnselectedTracks")
                    && extras::defaultOn ("playlist.gainHandleFollowsView") && extras::defaultOn ("project.clipLaunchStrips")
                    && ! extras::defaultOn ("mixer.peakValues") && ! extras::defaultOn ("mixer.correlation"));
         check ("FL-exact turns the four off", ! extras::flExactOn ("playlist.gainHandleFollowsView") && ! extras::flExactOn ("project.clipLaunchStrips")
