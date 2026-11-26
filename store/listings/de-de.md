@@ -49,7 +49,7 @@ LYNX SHARE befindet sich im Alpha-Stadium: Rechne mit Ecken und Kanten und melde
 
 ## What's new
 
-LYNX SHARE 0.1.31.2 behebt eine wahrscheinliche Ursache eines Absturzes der Startseite, die Tastatureinstellung „LYNX zuerst“ über angedockten VST3-Plugins, gedehnte Clips, die ihren ersten Takt wiederholten, aus FL-Projekten erstellte Automationsspuren, exportierte .flp-Dateien, die FL ablehnte, Presets der FL-Synths im Browser und einige kleinere Probleme.
+LYNX SHARE 0.1.31.3 behebt zwei Sicherheitsprobleme: .flp-Exporte, die FL Studio als konstantes Signal mit voller Aussteuerung abspielen konnte, und Speichern auf einem vollen Datenträger, das die Datei durch eine abgeschnittene Kopie ersetzte. Exportiere .flp-Dateien aus 0.1.31 bis 0.1.31.2 neu, die Startwerte für Plugin-Regler nutzen.
 
 LYNX SHARE 0.1.31: ein eingebauter Tracker, der auch Tracker-Module (.mod, .xm, .s3m, .it) öffnet; LYNX Model,
 physikalische Modelle von Marimba, Vibraphon, Xylophon, Glockenspiel, Röhrenglocken und Kalimba; JSFX-Effekt- und
