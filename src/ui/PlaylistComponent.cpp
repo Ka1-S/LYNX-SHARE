@@ -7075,8 +7075,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         // on the clip menu icon (top left): the clip menu; anywhere else on a clip: delete, as in FL
-        // (press and hold on empty space: Knife)
-        if (hit >= 0 && clipMenuButton (hit).contains (e.getPosition()))
+        // (press and hold on empty space: Knife). Round 190rw (Q1): in the Clip-launch layout (Live 12: a right-click on
+        // an Arrangement clip opens its context menu) and the Simple layout (BandLab: a region's context menu) the whole
+        // clip opens its menu (Delete is in it); FL's right-click delete stays in the Pattern layout
+        if (hit >= 0 && (clipMenuButton (hit).contains (e.getPosition()) || layoutstyle::current() != layoutstyle::Style::pattern))
         {
             showClipMenu (hit);
             return;

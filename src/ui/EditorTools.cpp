@@ -1,3 +1,4 @@
+#include "core/LayoutStyle.h"
 #include "ui/Motion.h"
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
@@ -378,7 +379,9 @@ juce::String actionHint (gesture::Action action, bool playlist)
             return (playlist ? tr ("[LMB] drag paints clips end to end") : tr ("[LMB] drag paints a run of notes  [Shift] one at a time"))
                    + "  " + common;
         case A::move:
-            return (playlist ? tr ("Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] deletes")
+            // (round 190rw: in the Clip-launch and Simple layouts a right-click on a clip opens its menu, as Live and BandLab)
+            return (playlist ? (layoutstyle::current() == layoutstyle::Style::pattern ? tr ("Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] deletes")
+                                                                                      : tr ("Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu"))
                              : tr ("Note: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] properties  [RMB] deletes  [Alt][Wheel] velocity"));
         case A::copyMove: return playlist ? tr ("[Shift][LMB] drags a copy of the clip (selection)") : tr ("[Shift][LMB] drags a copy of the note (selection)");
         case A::resizeRight:
