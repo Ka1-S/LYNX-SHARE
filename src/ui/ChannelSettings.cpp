@@ -22,6 +22,7 @@
 #include "ui/BrowserComponent.h"
 
 #include "core/MixerOps.h"
+#include "ui/PluginHeader.h"
 #include "core/ClipOps.h"
 #include "core/TempoDetect.h"
 #include "ui/AudioClipboard.h"
@@ -6887,6 +6888,83 @@ private:
     std::vector<std::unique_ptr<FrameKnob>> header;
 };
 
+// Issue #321 (round 190rv): FL's ON and MIX LEVEL at the right end of an effect's wrapper strip (FL 2026, an effect
+// window's "Detailed settings": raw/fl9onc.png of round 190rv; ON = the mixer slot's LED, "Mute / solo"; MIX LEVEL = the
+// slot's mix knob, "Mix level: 100%"). The same edits as the Mixer slot's LED (pluginheader::clickLed) and mix knob.
+class EffectHeaderControls final : public juce::Component,
+                                   private juce::ChangeListener
+{
+public:
+    static constexpr int preferredWidth = 82;
+
+    EffectHeaderControls (AudioEngine& e, int t, int sl) : engine (e), track (t), slot (sl)
+    {
+        on.setTooltip (pluginheader::ledHint());
+        on.setClickingTogglesState (false);
+        on.onClick = [this] {
+            if (fx() != nullptr)
+                pluginheader::clickLed (engine, track, slot, juce::ModifierKeys::currentModifiers);
+        };
+        addAndMakeVisible (on);
+        mix = std::make_unique<FrameKnob> (
+            engine,
+            [this] {
+                const auto& song = engine.getSong();
+                const auto* f = fx();
+                const auto insert = track < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) track].name.c_str()) : juce::String();
+                auto spec = ui::percentSpec (insert + " - " + (f != nullptr ? juce::String::fromUTF8 (effectInfo (f->kind).name) : juce::String()) + " - "
+                                                 + tr ("Mix level"),
+                                             1.0);
+                spec.target = AutomationTarget { AutomationTargetKind::effectMix, track, slot };
+                return spec;
+            },
+            [this] { const auto* f = fx(); return f != nullptr ? (double) f->mix : 1.0; },
+            [this] (double v) {
+                engine.editSong ([t = track, sl = slot, v] (Song& s) {
+                    if (t < (int) s.mixer.size() && sl < (int) s.mixer[(std::size_t) t].effects.size())
+                        s.mixer[(std::size_t) t].effects[(std::size_t) sl].mix = (float) juce::jlimit (0.0, 1.0, v);
+                });
+            },
+            tr ("Mix level"));
+        mix->headerLook = true;
+        mix->restArc = juce::Colour (0xffffa830); // FL's orange MIX LEVEL ring (raw/fl9on.png: 255, 168, 48)
+        addAndMakeVisible (*mix);
+        refresh();
+        engine.addChangeListener (this);
+    }
+
+    ~EffectHeaderControls() override { engine.removeChangeListener (this); }
+
+    void resized() override
+    {
+        // FL's places from the right edge (round 190rv raw/fl9onc.png: ON's LED 65 px, MIX LEVEL's knob 30 px to the centre)
+        const auto w = getWidth(), h = getHeight();
+        on.setBounds (w - 80, 0, 30, h);
+        mix->setBounds (w - 50, 0, 40, h);
+    }
+
+private:
+    const EffectSlot* fx() const
+    {
+        const auto& m = engine.getSong().mixer;
+        if (track < 0 || track >= (int) m.size() || slot < 0 || slot >= (int) m[(std::size_t) track].effects.size())
+            return nullptr;
+        return &m[(std::size_t) track].effects[(std::size_t) slot];
+    }
+    void refresh()
+    {
+        const auto* f = fx();
+        on.setToggleState (f != nullptr && f->enabled, juce::dontSendNotification);
+        mix->repaint();
+    }
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
+
+    AudioEngine& engine;
+    int track, slot;
+    OnLed on;
+    std::unique_ptr<FrameKnob> mix;
+};
+
 // The frame: header strip (tabs on the left; ON, PAN, VOL, TRACK on the right) over the page of the selected tab.
 // Round 190in (design190ia FW-1, FW-5): FL's 46 px strip — the tabs are FL's 44 px icon tabs flush at the left (the
 // shown one raised, its icon green), the preset ◀ name ▶ and FL's ▸ menu go to the window's title bar when the window
@@ -7997,6 +8075,18 @@ std::unique_ptr<juce::Component> makeChannelHeaderControls (AudioEngine& engine,
 int channelHeaderControlsWidth() noexcept
 {
     return ChannelHeaderControls::preferredWidth;
+}
+
+std::unique_ptr<juce::Component> makeEffectHeaderControls (AudioEngine& engine, int track, int slot)
+{
+    if (track < 0 || track >= (int) engine.getSong().mixer.size() || slot < 0)
+        return nullptr;
+    return std::make_unique<EffectHeaderControls> (engine, track, slot);
+}
+
+int effectHeaderControlsWidth() noexcept
+{
+    return EffectHeaderControls::preferredWidth;
 }
 
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)

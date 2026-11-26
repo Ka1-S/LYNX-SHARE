@@ -1151,6 +1151,10 @@ public:
             if (const auto index = page.channelIndex(); index >= 0)
                 if ((channelControls = makeChannelHeaderControls (engine, index)) != nullptr)
                     addAndMakeVisible (*channelControls);
+        // issue #321 (round 190rv): a mixer slot's plugin shows FL's ON / MIX LEVEL at the right, as FL's effect wrapper does
+        if (! channel && scTrack >= 0 && scSlot >= 0)
+            if ((effectControls = makeEffectHeaderControls (engine, scTrack, scSlot)) != nullptr)
+                addAndMakeVisible (*effectControls);
         pluginTab.onClick = [this] { show (false); };
         settingsTab.onClick = [this] { show (true); };
         addAndMakeVisible (editor.get());
@@ -1191,6 +1195,8 @@ public:
         menuArrow.setVisible (visible && ! presetsInTitle);
         if (channelControls != nullptr)
             channelControls->setVisible (visible);
+        if (effectControls != nullptr)
+            effectControls->setVisible (visible);
         pin.setVisible (visible && onPin != nullptr);
         sidechain.setVisible (visible && hasSidechain);
         keyboardPriority.setVisible (visible);
@@ -1326,6 +1332,11 @@ public:
                 channelControls->setBounds (header.removeFromRight (channelHeaderControlsWidth()));
                 header.removeFromRight (4);
             }
+            if (effectControls != nullptr) // (FL's right end; LYNX's pin and side-chain picker go left of it)
+            {
+                effectControls->setBounds (header.removeFromRight (effectHeaderControlsWidth()));
+                header.removeFromRight (2);
+            }
             header = header.withSizeKeepingCentre (header.getWidth(), 26);
             if (pin.isVisible())
             {
@@ -1368,7 +1379,7 @@ private:
     // round 190in (FW-5 / FW-7): FL's 46 px strip; ▸, two 44 px tabs, the keyboard button, the presets
     // round 190qw (queue item 67): an effect's strip is 36 px in the Soft look (Options › Theme › Appearance); a channel's keeps
     // FL's 46 px, where its ON / PAN / VOL / PITCH / TRACK captions sit under the knobs
-    int headerHeight() const noexcept { return theme::soft() && channelControls == nullptr ? 36 : 46; }
+    int headerHeight() const noexcept { return theme::soft() && channelControls == nullptr && effectControls == nullptr ? 36 : 46; }
     // the window is at least as wide as its strip needs (round 190pw, PR #259: only what the strip shows: a docked
     // frame's title strip holds the ▸ and the presets, and a strip hidden by the gear needs nothing), so a small editor
     // never squeezes the tabs, the keyboard button or a channel's ON / PAN / VOL ... TRACK
@@ -1381,6 +1392,8 @@ private:
             width += 20 + 250 + 4;
         if (channelControls != nullptr)
             width += channelHeaderControlsWidth() + 4;
+        if (effectControls != nullptr)
+            width += effectHeaderControlsWidth() + 2;
         return width;
     }
     AudioEngine& engineRef;
@@ -1459,6 +1472,7 @@ private:
     IconButton pluginTab { tr ("Plugin"), Icon::pluginPicker }, settingsTab { tr ("Wrapper settings"), Icon::wrench };
     wrappermenu::MenuArrow menuArrow;
     std::unique_ptr<juce::Component> channelControls; // (a channel's plugin: FL's ON / PAN / VOL / PITCH / RANGE / TRACK)
+    std::unique_ptr<juce::Component> effectControls;  // (a mixer slot's plugin: FL's ON / MIX LEVEL, issue #321)
     bool settings = false, laying = false, down = false, presetsInTitle = false;
     bool headerCollapsed = false, hasSidechain = false;
     ResizeStorm resizeStorm; // (round 190rk: see childBoundsChanged)

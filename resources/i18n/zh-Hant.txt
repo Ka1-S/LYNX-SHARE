@@ -13108,3 +13108,4 @@ countries: tw hk mo
 "On by default." = "預設開啟。"
 "Zoom keys: LYNX's anchor, and Shift+5 again goes back (LYNX)" = "縮放鍵：LYNX 的錨點，再按 Shift+5 返回 (LYNX)"
 "PgUp and PgDn zoom the Playlist and the Piano roll around the playhead while it plays on screen, else around the selected clips or notes, else around the view's centre, and the zoom-to-selection key (Shift+5) pressed again goes back to the view before. Off, as in FL Studio: the keys zoom around the mouse pointer (or keep the view's left edge when the pointer is elsewhere) and Shift+5 pressed again changes nothing. Always on in the Clip-launch and Simple layouts. Also in the Playlist ruler's right-click menu › Zoom." = "PgUp 和 PgDn 在播放頭於螢幕上播放時圍繞播放頭縮放播放清單和鋼琴卷簾，否則圍繞所選片段或音符，再否則圍繞檢視中心；再次按下縮放到所選內容的鍵（Shift+5）會回到之前的檢視。關閉時與 FL Studio 相同：按鍵圍繞滑鼠指標縮放（指標在別處時保持檢視左邊緣），再次按 Shift+5 不會改變任何東西。在 Clip-launch 和 Simple 版面中始終開啟。也在播放清單尺規的右鍵選單 › 縮放中。"
+"Mix level" = "混合電平"
