@@ -1,5 +1,6 @@
 // Hotfix 0.1.31.3 (round 190rj, regression sweep 2 of 0.1.32): Online Sessions and the PipeWire channel order. Kept in a
 // file of its own so the same commits apply to main (0.1.31.x) and to the 0.1.32 rollup. Needs Live169bTests.inc above.
+#include "core/PipeWireOrder.h"
 
 // Online Sessions: each copy dates itself (Project info › Created) when it is saved. The date was part of the shared
 // project settings, so a guest whose copy had another date than the host's kept his own settings against the host's: a
@@ -109,4 +110,33 @@ TEST (hotfix01313_session_settings_compare_and_copy_the_same_fields)
     for (const auto& f : copied)
         if (compared.count (f) == 0)
             std::printf ("  copyGlobals copies %s, sameGlobals does not compare it\n", f.c_str());
+}
+
+// PipeWire: a device's channels came in the order of the registry's ids, which PipeWire hands out as it likes. A stereo
+// sink whose FR port had a lower id than FL played LYNX's left channel on the right (released 0.1.31.2, 2 / 2 runs); a
+// 16-channel source recorded In 1 = AUX8... The node's own port order (port.id) decides.
+TEST (hotfix01313_pipewire_channels_in_port_order)
+{
+    using namespace lynx;
+    std::vector<pwchannels::Port> stereo { { 1, 139, "FR" }, { 0, 190, "FL" } };
+    auto byId = stereo; // (the order before the fix)
+    std::sort (byId.begin(), byId.end(), [] (const auto& a, const auto& b) { return a.id < b.id; });
+    CHECK (byId.front().channel == "FR");
+    CHECK ((pwchannels::inPortOrder (stereo) == std::vector<std::string> { "FL", "FR" }));
+    // the 16-channel source of the sweep: ids out of order, ports 0..15
+    const std::uint32_t ids[16] { 210, 220, 160, 150, 170, 200, 145, 190, 90, 95, 230, 215, 140, 205, 180, 100 };
+    std::vector<pwchannels::Port> aux;
+    for (int i = 0; i < 16; ++i)
+        aux.push_back ({ i, ids[i], "AUX" + std::to_string (i) });
+    std::reverse (aux.begin(), aux.end());
+    const auto order = pwchannels::inPortOrder (aux);
+    CHECK (order.size() == 16);
+    for (int i = 0; i < 16 && i < (int) order.size(); ++i)
+        CHECK (order[(std::size_t) i] == "AUX" + std::to_string (i));
+    // a port without port.id keeps the registry's order among such ports
+    CHECK ((pwchannels::inPortOrder ({ { -1, 9, "B" }, { -1, 3, "A" } }) == std::vector<std::string> { "A", "B" }));
+    // the device uses it for both directions
+    const auto src = i18ntest::readFile ("src/engine/PipeWireDevice.cpp");
+    CHECK (src.find ("return pwchannels::inPortOrder (std::move (found));") != std::string::npos);
+    CHECK (src.find ("lookup (props, \"port.id\")") != std::string::npos);
 }
