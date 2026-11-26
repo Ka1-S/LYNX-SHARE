@@ -270,6 +270,16 @@ public:
                     g.setColour (theme::livelook::raised);
                     g.fillRect (rest.getIntersection ({ lastX, rowY (selectedScene), rest.getWidth(), (int) rowHeight - 1 }).getIntersection (cells));
                 }
+                // round 190rs (G-17, ref/live-l02): Live names this drop area (files make clips, devices make tracks), centred
+                // over the scene rows; cached text, drawn only where the repaint reaches
+                const auto rowsBottom = juce::jmin (cells.getBottom(), rowY (scenes));
+                const juce::Rectangle<int> label (lastX, (int) headerHeight, cells.getRight() - lastX, juce::jmax ((int) rowHeight, rowsBottom - (int) headerHeight));
+                if (label.getWidth() > 160 && (! ui::paintCache() || g.clipRegionIntersects (label)))
+                {
+                    g.setColour (theme::livelook::text);
+                    g.setFont (liveFont());
+                    textcache::drawText (g, tr ("Drop Files and Devices Here"), label, juce::Justification::centred, true);
+                }
             }
         }
 
