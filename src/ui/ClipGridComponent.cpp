@@ -991,6 +991,29 @@ public:
             deleteScene (selectedScene);
             return true;
         }
+        // round 190rs (G-30): Live's Del on a selected track title deletes the track (Clip-launch layout)
+        if (code == juce::KeyPress::deleteKey && titleSelected && ! key.getModifiers().isAnyModifierKeyDown()
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDeleteTrack))
+        {
+            deleteTrackNow (selectedTrack);
+            return true;
+        }
+        // round 190rs (G-30): Live's Insert MIDI Track (Ctrl+Shift+T) and Insert Return Track (Ctrl+Alt+T), right of the
+        // selected track; free keys in this layout (Ctrl+T stays the typing keyboard)
+        if (key.getModifiers().isCommandDown() && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code) == 'T')
+        {
+            const auto shift = key.getModifiers().isShiftDown(), alt = key.getModifiers().isAltDown();
+            if (shift && ! alt && sessionkeys::defaultKeyActs (sessionkeys::Command::gridInsertMidiTrack))
+            {
+                insertMidiTrackNow (juce::jmax (0, selectedTrack));
+                return true;
+            }
+            if (alt && ! shift && sessionkeys::defaultKeyActs (sessionkeys::Command::gridInsertReturnTrack))
+            {
+                insertReturnTrackNow();
+                return true;
+            }
+        }
         if (code == juce::KeyPress::deleteKey)
         {
             if (rangeLive()) // round 190lr (DL-29): every slot of the rectangle, one undo step
@@ -1046,6 +1069,11 @@ public:
             if (! shift && letter == 'V')
             {
                 pasteSlot (selectedTrack, selectedScene);
+                return true;
+            }
+            if (! shift && letter == 'D' && titleSelected && ! sceneSelected && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDuplicateTrack))
+            {
+                duplicateTrackNow (selectedTrack); // round 190rs (G-30): Live's Ctrl+D on a selected track title
                 return true;
             }
             if (! shift && letter == 'D')
@@ -2974,6 +3002,56 @@ public:
         });
     }
 
+    // round 190rs (G-30): Live's track commands, from the header menu and their keys (core/SessionKeys.h), one undo step each
+    void duplicateTrackNow (int track)
+    {
+        engine.editSong ([track] (Song& s) { session::duplicateTrack (s, track); });
+        repaint();
+    }
+    void deleteTrackNow (int track)
+    {
+        engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
+        selectedTrack = juce::jmax (0, juce::jmin (selectedTrack, track - 1));
+        clearRange();
+        repaint();
+        notify (GridPick::select);
+    }
+    void insertAudioTrackNow (int track)
+    {
+        auto trial = engine.getSong(); // (no free mixer track: nothing changes, no undo step)
+        noteedit::insertTrack (trial, track + 1);
+        if (! trackmodes::makeAudioTrack (trial, track + 1))
+            return;
+        engine.editSong ([track] (Song& s) {
+            noteedit::insertTrack (s, track + 1);
+            trackmodes::makeAudioTrack (s, track + 1);
+        });
+        selectedTrack = track + 1;
+        clearRange();
+        repaint();
+        notify (GridPick::select);
+    }
+    void insertMidiTrackNow (int track)
+    {
+        engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track + 1); });
+        selectedTrack = track + 1;
+        clearRange();
+        repaint();
+        notify (GridPick::select);
+    }
+    void insertReturnTrackNow()
+    {
+        if ((int) sessionmixer::returnsOf (engine.getSong()).size() >= sessionmixer::maxReturns)
+            return;
+        engine.editSong ([] (Song& s) {
+            launcher::ensureGrid (s);
+            sessionmixer::insertReturn (s, "Return");
+        });
+        if (auto* parent = getParentComponent())
+            parent->resized();
+        repaint();
+    }
+
 public:
     // A column title's menu: Rename and the colour (round 190ef, the reference's track title menu); the reference's
     // Freeze Track / Unfreeze Track and Bounce Track in Place (round 190ff; round 190ay had the channel freeze here).
@@ -2992,18 +3070,10 @@ public:
             const auto* info = track < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) track] : nullptr;
             const auto canDuplicate = (info != nullptr && (! info->name.empty() || info->colour != 0 || info->mode != PlaylistTrackMode::unassigned))
                                       || std::any_of (song.playlist.begin(), song.playlist.end(), [track] (const Clip& c) { return c.track == track; });
-            menu.addItem (tr ("Duplicate"), canDuplicate, false, [this, track] {
-                engine.editSong ([track] (Song& s) { session::duplicateTrack (s, track); });
-                repaint();
-            });
+            menu.addItem (tr ("Duplicate") + sessionkeys::menuKey (sessionkeys::Command::gridDuplicateTrack), canDuplicate, false,
+                          [this, track] { duplicateTrackNow (track); });
         }
-        menu.addItem (tr ("Delete"), [this, track] {
-            engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
-            selectedTrack = juce::jmax (0, juce::jmin (selectedTrack, track - 1));
-            clearRange();
-            repaint();
-            notify (GridPick::select);
-        });
+        menu.addItem (tr ("Delete") + sessionkeys::menuKey (sessionkeys::Command::gridDeleteTrack), [this, track] { deleteTrackNow (track); });
         menu.addSeparator();
         menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track] { renameTrack (track); });
         menu.addSeparator();
@@ -3027,37 +3097,11 @@ public:
         // MIDI track says; a return after the others)
         menu.addSeparator();
         {
-            menu.addItem (tr ("Insert Audio Track"), [this, track] {
-                auto trial = engine.getSong(); // (no free mixer track: nothing changes, no undo step)
-                noteedit::insertTrack (trial, track + 1);
-                if (! trackmodes::makeAudioTrack (trial, track + 1))
-                    return;
-                engine.editSong ([track] (Song& s) {
-                    noteedit::insertTrack (s, track + 1);
-                    trackmodes::makeAudioTrack (s, track + 1);
-                });
-                selectedTrack = track + 1;
-                clearRange();
-                repaint();
-                notify (GridPick::select);
-            });
+            menu.addItem (tr ("Insert Audio Track"), [this, track] { insertAudioTrackNow (track); }); // (Live's Ctrl+T is LYNX's typing keyboard)
         }
-        menu.addItem (tr ("Insert MIDI Track"), [this, track] {
-            engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track + 1); });
-            selectedTrack = track + 1;
-            clearRange();
-            repaint();
-            notify (GridPick::select);
-        });
-        menu.addItem (tr ("Insert Return Track"), (int) sessionmixer::returnsOf (song).size() < sessionmixer::maxReturns, false, [this] {
-            engine.editSong ([] (Song& s) {
-                launcher::ensureGrid (s);
-                sessionmixer::insertReturn (s, "Return");
-            });
-            if (auto* parent = getParentComponent())
-                parent->resized();
-            repaint();
-        });
+        menu.addItem (tr ("Insert MIDI Track") + sessionkeys::menuKey (sessionkeys::Command::gridInsertMidiTrack), [this, track] { insertMidiTrackNow (track); });
+        menu.addItem (tr ("Insert Return Track") + sessionkeys::menuKey (sessionkeys::Command::gridInsertReturnTrack),
+                      (int) sessionmixer::returnsOf (song).size() < sessionmixer::maxReturns, false, [this] { insertReturnTrackNow(); });
         menu.addSeparator();
         // Live's Select Track Content: every slot of the column (the grid's rectangle selection)
         menu.addItem (tr ("Select Track Content"), rowCount() > 0, false, [this, track] {

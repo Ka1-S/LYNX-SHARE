@@ -236,3 +236,26 @@ TEST (q5fix190rs_new_channel_goes_to_the_master_in_the_pattern_layout)
     auto simple = expected;
     CHECK (newChannelInsert (simple, layoutstyle::Style::simple) > 0);
 }
+
+// G-30 (coordinator 11-26): Live's track keys in the clip grid, Clip-launch layout only; the two new chords are free in
+// the key map (every context), Ctrl+T stays the typing keyboard
+#include "core/SessionKeys.h"
+TEST (q5fix190rs_clip_launch_track_keys)
+{
+    using namespace lynx;
+    using sessionkeys::Command;
+    using layoutstyle::Style;
+    CHECK (std::string (sessionkeys::menuKey (Command::gridDuplicateTrack, Style::clipLaunch)) == "\tCtrl+D");
+    CHECK (std::string (sessionkeys::menuKey (Command::gridDeleteTrack, Style::clipLaunch)) == "\tDel");
+    CHECK (std::string (sessionkeys::menuKey (Command::gridInsertMidiTrack, Style::clipLaunch)) == "\tCtrl+Shift+T");
+    CHECK (std::string (sessionkeys::menuKey (Command::gridInsertReturnTrack, Style::clipLaunch)) == "\tCtrl+Alt+T");
+    for (const auto c : { Command::gridDuplicateTrack, Command::gridDeleteTrack, Command::gridInsertMidiTrack, Command::gridInsertReturnTrack })
+        CHECK (std::string (sessionkeys::menuKey (c, Style::pattern)).empty() && std::string (sessionkeys::menuKey (c, Style::simple)).empty());
+    keys::KeyMap map;
+    for (const auto context : { keys::Context::global, keys::Context::channelRack, keys::Context::pianoRoll, keys::Context::playlist, keys::Context::mixer, keys::Context::browser })
+    {
+        CHECK (map.actionsWith ({ 'T', (std::uint8_t) (keys::ctrl | keys::shift) }, context).empty());
+        CHECK (map.actionsWith ({ 'T', (std::uint8_t) (keys::ctrl | keys::alt) }, context).empty());
+    }
+    CHECK (map.find ({ 'T', keys::ctrl }, keys::Context::global, false) == "view.typingPiano");
+}
