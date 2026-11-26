@@ -9623,20 +9623,63 @@ void MainComponent::exportPackage()
                               });
 }
 
+namespace
+{
+// Round 190rm (import / export sweep): the zipped loop package is written on a worker behind a progress window. Every
+// sample is copied into the .zip: a project with a gigabyte of audio froze the window for seconds with nothing on screen,
+// as the DAWproject export did (round 190ri). Its file is written beside the target and moved over it at the end, so a
+// failure leaves the old file as it was; the failure says why.
+class PackageThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    PackageThread (Song s, juce::File z)
+        : juce::ThreadWithProgressWindow (tr ("Zipped loop package"), true, false), song (std::move (s)), zip (std::move (z))
+    {
+        setStatusMessage (tr ("Writing the package..."));
+    }
+
+    void run() override
+    {
+        setProgress (-1.0); // (the copy has no steps to show: a moving bar)
+        try
+        {
+            ok = ProjectPackage::exportZip (song, zip.getFileNameWithoutExtension(), zip, result, error);
+        }
+        catch (const std::exception& e)
+        {
+            ok = false;
+            error = juce::String::fromUTF8 (e.what());
+        }
+    }
+
+    void threadComplete (bool) override
+    {
+        if (! ok)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                    error.isNotEmpty() ? error : tr ("Could not write {0}", { zip.getFullPathName() }));
+        else
+        {
+            auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
+            if (! result.missing.isEmpty())
+                text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Zipped loop package"), text);
+        }
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    Song song;
+    juce::File zip;
+    ProjectPackage::Result result;
+    juce::String error;
+    bool ok = false;
+};
+} // namespace
+
 void MainComponent::writePackage (const juce::File& zip)
 {
     engine.capturePluginStates();
-    ProjectPackage::Result result;
-    juce::String error;
-    if (! ProjectPackage::exportZip (engine.getSong(), zip.getFileNameWithoutExtension(), zip, result, error))
-    {
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
-        return;
-    }
-    auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
-    if (! result.missing.isEmpty())
-        text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
-    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Zipped loop package"), text);
+    (new PackageThread (engine.getSong(), zip))->launchThread();
 }
 
 void MainComponent::exportDataFiles()
