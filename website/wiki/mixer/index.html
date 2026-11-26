@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="57ff71a6";
+window.LYNX_LANG=lang;window.LYNX_V="4afac86d";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=57ff71a6">
+<link rel="stylesheet" href="/assets/site.css?v=4afac86d">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -127,7 +127,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p><code>Ctrl+L</code> and <code>Ctrl+Shift+L</code> have this meaning only while the Mixer has focus.</p>
 <div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Link channels</td><td><code>Ctrl+L</code></td><td>Links the selected channels to the selected insert</td></tr><tr><td>Link to consecutive inserts</td><td><code>Ctrl+Shift+L</code></td><td>Links the selected channels to inserts starting from the selected one</td></tr><tr><td>Move inserts</td><td><code>Alt+Left</code> / <code>Alt+Right</code></td><td>Moves the selected inserts</td></tr><tr><td>Rename and colour</td><td><code>F2</code></td><td>Renames and colours the selected insert</td></tr><tr><td>Solo</td><td><code>S</code></td><td>Solos the selected inserts</td></tr><tr><td>Solo with sources</td><td><code>Alt+S</code></td><td>Solos the selected inserts and the inserts that feed them</td></tr><tr><td>Delete inserts</td><td><code>Del</code></td><td>Deletes the selected inserts, after a question</td></tr><tr><td>Arm and record</td><td><code>Shift+R</code></td><td>Arms the selected insert and starts recording</td></tr><tr><td>Open audio editor</td><td><code>Ctrl+E</code></td><td>Loads Edison into the insert's first empty slot and opens it</td></tr><tr><td>Open audio editor and record</td><td><code>Shift+E</code></td><td>The same, ready to record when the song plays</td></tr></tbody></table></div>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li><code>Loudness meter beside the Master (LYNX)</code>, in <code>Options › Mixer</code>, shows the short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a <code>Reset</code> button.</li><li>An instrument plugin with several outputs can play each output on its own insert. See <a href="/wiki/plugins/">Third-party plugins</a>.</li><li><code>Ctrl+L</code> does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.</li><li>The route switches appear on the other strips, not on the selected one.</li><li>The limit is 500 inserts per project and up to 25 effect slots per insert (FL Studio's default is 10). <code>.flp</code> and <code>.flm</code> files carry FL's 10 slots, so a <code>.flp</code> export lists effects past slot 10 as dropped.</li><li><code>Number of effect slots on new mixer tracks</code>, in <code>Options › General settings</code>, sets how many slots (1 to 25, default 10) the inserts you add start with.</li><li>Edison's recording is kept as a WAV file in the project's folder, not inside the project file.</li><li>The Session mixer under the clip grid belongs to the Clip-launch layout only. It shows the same inserts as this Mixer. See <a href="/wiki/layouts/">Layouts</a>.</li></ul>
+<ul><li><code>Loudness meter beside the Master (LYNX)</code>, in <code>Options › Mixer</code>, shows the short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a <code>Reset</code> button.</li><li><code>Compensate fader and route automations too (LYNX)</code>, under <code>Plugin delay compensation</code> in the insert menu, is on in new projects. It is one setting for the whole project. With plugins that add latency, it plays the automation of faders, pans, sends and VCA faders as late as the audio they act on. FL Studio delays only the automation of plugin knobs, so the same project sounds slightly different there. Projects from FL Studio and older projects keep it off, and <code>FL-exact</code> doesn't change it.</li><li>An instrument plugin with several outputs can play each output on its own insert. See <a href="/wiki/plugins/">Third-party plugins</a>.</li><li><code>Ctrl+L</code> does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.</li><li>The route switches appear on the other strips, not on the selected one.</li><li>The limit is 500 inserts per project and up to 25 effect slots per insert (FL Studio's default is 10). <code>.flp</code> and <code>.flm</code> files carry FL's 10 slots, so a <code>.flp</code> export lists effects past slot 10 as dropped.</li><li><code>Number of effect slots on new mixer tracks</code>, in <code>Options › General settings</code>, sets how many slots (1 to 25, default 10) the inserts you add start with.</li><li>Edison's recording is kept as a WAV file in the project's folder, not inside the project file.</li><li>The Session mixer under the clip grid belongs to the Clip-launch layout only. It shows the same inserts as this Mixer. See <a href="/wiki/layouts/">Layouts</a>.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="/wiki/channel-rack/">Channel rack</a></li><li><a href="/wiki/recording/">Recording</a></li><li><a href="/wiki/automation/">Automation</a></li><li><a href="/wiki/plugins/">Third-party plugins</a></li><li><a href="/instruments-and-effects/">Instruments and effects</a></li></ul></div></div><nav class="wpn"><a href="/wiki/playlist/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.playlist.t">Playlist</b></a><a href="/wiki/browser/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.browser.t">Browser</b></a></nav></article></div>
 </main>
@@ -139,8 +139,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=57ff71a6" defer></script>
-<script src="/assets/wiki.js?v=57ff71a6" defer></script>
-<script src="/assets/motion.js?v=57ff71a6" defer></script>
+<script src="/assets/site.js?v=4afac86d" defer></script>
+<script src="/assets/wiki.js?v=4afac86d" defer></script>
+<script src="/assets/motion.js?v=4afac86d" defer></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![La pagina Generale della finestra Impostazioni, con le schede delle pagine in alto](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ La finestra Impostazioni ha otto pagine: Audio, MIDI, Generale, Tema, File, LYNX
 
 ## LYNX extras
 
-`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un unico posto. Quelle che cambiano solo l'aspetto sono attive per impostazione predefinita, così come alcune piccole aggiunte: i file MIDI rilasciati sulla Playlist diventano clip di pattern, l'elenco Recenti e una riga per plugin negli elenchi dei plugin, più l'anteprima MIDI e il completamento con Tab nel Browser. Le altre sono disattivate. **Come FL** disattiva tutti gli extra, **Consigliato** riporta ciascuno al suo valore predefinito. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga indica.
+`Opzioni › Extra di LYNX...`. Le aggiunte proprie di LYNX SHARE in un solo posto. Alcune che cambiano solo l'aspetto sono attive per impostazione predefinita, e così poche piccole aggiunte: i file MIDI trascinati sulla Playlist diventano clip di pattern, la maniglia del guadagno della clip resta in vista, i nuovi progetti del layout Clip-launch hanno una traccia del mixer per ogni traccia, l'elenco Recenti e una riga per plugin negli elenchi dei plugin, e l'anteprima MIDI e il completamento con Tab nel Browser. Due di quelle attive cambiano il suono: le clip di pattern allungate ripetono il loro pattern e, nel layout Simple, un loop trascinato prende il tempo e la tonalità trovati nel suo audio. Le altre sono disattivate. **Come FL** disattiva tutti gli extra, **Consigliato** rimette ognuno al suo valore predefinito. Ogni interruttore è la stessa impostazione del menu o della pagina che la sua riga nomina, e la riga di ognuno attivo per impostazione predefinita lo dice.
 
 | Impostazione | Cosa fa |
 |---|---|

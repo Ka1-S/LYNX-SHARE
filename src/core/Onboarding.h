@@ -205,7 +205,8 @@ inline const char* next3Subtitle (Choice c) noexcept
     switch (c)
     {
         case Choice::mobile: return TR_NOOP ("Your starter beat is ready in the Simple layout.");
-        case Choice::fl: return TR_NOOP ("The Pattern layout works like FL Studio.");
+        // (round 190ro, EXTRAS-2.md § 7: where LYNX's own additions are, on the card FL users see first; one line)
+        case Choice::fl: return TR_NOOP ("Works like FL Studio. LYNX's additions: Options › LYNX extras.");
         case Choice::live: return TR_NOOP ("The Clip-launch layout: clips and scenes beside the arrangement.");
         case Choice::timeline: return TR_NOOP ("One track per instrument, with the Mixer at hand.");
         default: return "";

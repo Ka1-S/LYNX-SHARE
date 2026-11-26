@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="57ff71a6";
+window.LYNX_LANG=lang;window.LYNX_V="4afac86d";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=57ff71a6">
+<link rel="stylesheet" href="/assets/site.css?v=4afac86d">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -97,7 +97,11 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ol><li>Press <code>Ctrl+F</code> and type part of its name, here &quot;loudness&quot;, then click its switch.</li><li>The change is immediate: the Mixer now shows the loudness of the song beside the Master.</li></ol>
 <h2 id="fl-exact-or-recommended">FL-exact or Recommended</h2>
 <figure><a class="shot" href="/assets/img/learn/lynx-extras-3.webp"><img src="/assets/img/learn/lynx-extras-3.webp" alt="FL-exact and Recommended at the top of the page" loading="lazy" width="690" height="685"></a></figure>
-<ol><li><code>FL-exact</code> turns every extra off, so LYNX works exactly like FL Studio.</li><li><code>Recommended</code> turns on the extras that only help: they change how things look, never what FL Studio's keys and clicks do, your files or the sound.</li></ol>
+<ol><li><code>FL-exact</code> turns every extra off, so LYNX works exactly like FL Studio.</li><li><code>Recommended</code> puts each extra back at its default. Most of the ones on by default change how things look or add something FL Studio doesn't have, and none changes what FL Studio's keys and clicks do. Four of them change the sound or your files, and their lines say so.</li></ol>
+<ul><li><code>Stretched pattern clips loop their pattern (LYNX)</code> plays the pattern again where FL Studio is silent after it.</li><li><code>Dropped loops take the tempo and key found in their audio</code>, in the Simple layout, changes how a dropped loop plays.</li><li><code>MIDI files dropped on the Playlist become pattern clips</code> adds a pattern to the song when you drop a file (FL Studio refuses the drop).</li><li><code>One row per plugin installed in several formats</code> picks the format a new plugin loads in, and the project keeps that format.</li></ul>
+<h2 id="one-more-that-changes-the-sound">One more that changes the sound</h2>
+<p><code>Compensate fader and route automations too (LYNX)</code>, under <code>Plugin delay compensation</code> in a mixer insert's menu, is on in every new project. It is not on the LYNX extras page, so <code>FL-exact</code> leaves it on.</p>
+<ol><li>With plugins that add latency (a linear-phase EQ, a lookahead limiter), it plays the automation of faders, pans, sends and VCA faders as late as the audio they act on, so a fade lands where you hear it.</li><li>FL Studio delays only the automation of plugin knobs, so there the same fader move is heard a little early. Projects opened from FL Studio, and projects made before, keep it off.</li><li>For FL Studio's timing, switch it off in that menu: it is one setting for the whole project.</li></ol>
 <p>See also <a href="/wiki/settings/">Settings</a> and <a href="/learn/settings-tour/">A tour of Settings</a>.</p></div><nav class="wpn"><a href="/learn/settings-tour/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.settings-tour.t">A tour of Settings</b></a><a href="/learn/audio-setup/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.audio-setup.t">Set up your audio</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
@@ -108,8 +112,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=57ff71a6" defer></script>
-<script src="/assets/learn.js?v=57ff71a6" defer></script>
-<script src="/assets/motion.js?v=57ff71a6" defer></script>
+<script src="/assets/site.js?v=4afac86d" defer></script>
+<script src="/assets/learn.js?v=4afac86d" defer></script>
+<script src="/assets/motion.js?v=4afac86d" defer></script>
 </body>
 </html>

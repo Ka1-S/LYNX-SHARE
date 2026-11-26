@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![La página General de la ventana Configuración, con las pestañas de página arriba](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ La ventana Configuración tiene ocho páginas: Audio, MIDI, General, Tema, Archi
 
 ## LYNX extras
 
-`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Las que solo cambian el aspecto están activadas por defecto, igual que unas pocas pequeñas incorporaciones: los archivos MIDI soltados en la Playlist se convierten en clips de pattern, la lista Recientes y una fila por plugin en las listas de plugins, y la vista previa MIDI y la completación con Tab en el Browser. El resto está desactivado. **Igual que FL** desactiva todos los extras, **Recomendado** devuelve cada uno a su valor por defecto. Cada interruptor es el mismo ajuste que está en el menú o la página que nombra su línea.
+`Opciones › Extras de LYNX...`. Las incorporaciones propias de LYNX SHARE en un solo lugar. Algunas que solo cambian el aspecto están activadas por defecto, y también unas pocas incorporaciones pequeñas: los archivos MIDI soltados en la Playlist se convierten en clips de patrón, el control de ganancia del clip sigue a la vista, los proyectos nuevos del diseño Clip-launch tienen una pista de mezclador para cada pista, la lista Recientes y una fila por plugin en las listas de plugins, y la vista previa de MIDI y el autocompletado con Tab en el Browser. Dos de las activadas cambian el sonido: los clips de patrón estirados repiten su patrón y, en el diseño Simple, un loop soltado toma el tempo y la tonalidad hallados en su audio. Las demás están desactivadas. **Igual que FL** desactiva todos los extras, **Recomendado** devuelve cada uno a su valor por defecto. Cada interruptor es el mismo ajuste que el del menú o la página que nombra su línea, y la línea de cada uno activado por defecto lo dice.
 
 | Ajuste | Qué hace |
 |---|---|

@@ -43,6 +43,10 @@ The short version of each release. The full notes, with measurements, known issu
   yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
 - The Mixer's peak values and correlation bars (*Mixer › View*) are off by default: with them on, every fader and meter is
   19 px shorter than FL Studio's. If you switched them on yourself, they stay on.
+- Two more LYNX extras are on by default: an audio clip's gain handle stays in view while the clip's middle is scrolled
+  away (FL Studio then shows none; a press beside it still moves the clip), and a new project made in the Clip-launch
+  layout gets a mixer track for every track, as a new Live set. *Settings › LYNX extras* now says which extras are on by
+  default and names the two that change the sound; the first start's card for FL Studio users points to the page.
 - Export to FL Studio keeps FL Studio's trial-save mark: a project that came from a trial save (also after a .lynx save,
   imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
 

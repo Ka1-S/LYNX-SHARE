@@ -231,6 +231,41 @@
             check ("ON-2: a new Pattern-layout project is FL's (no links)", patternLinked == 0 && ! engine.getSong().linkTracksToMixer);
         }
 
+        // --- the extras page: its intro and the "On by default." of the switches on by default (EXTRAS-2.md § 7) ---------------
+        {
+            auto page = makeExtrasPage (engine, {}, false);
+            page->setSize (760, 5200);
+            pump (100);
+            juce::Label* intro = nullptr;
+            juce::String gainNote, wheelNote;
+            std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+                if (auto* label = dynamic_cast<juce::Label*> (&c))
+                {
+                    const auto text = label->getText();
+                    if (intro == nullptr && text.contains (tr ("Two that are on by default change the sound: stretched pattern clips loop their pattern, and in the Simple "
+                                                               "layout a dropped loop takes the tempo and key found in its audio.")))
+                        intro = label;
+                    if (text.contains ("gain handle (the half circle on its bottom edge)"))
+                        gainNote = text;
+                    if (text.contains ("The plain mouse wheel scrolls the tracks over the track headers"))
+                        wheelNote = text;
+                }
+                for (auto* child : c.getChildren())
+                    walk (*child);
+            };
+            walk (*page);
+            check ("the extras page's intro names the two on by default that change the sound", intro != nullptr);
+            check ("an extra on by default says so on its line (the gain handle), one off by default doesn't (the wheel zones)",
+                   gainNote.endsWith (tr ("On by default.")) && wheelNote.isNotEmpty() && ! wheelNote.contains (tr ("On by default.")));
+            if (intro != nullptr)
+                both (*page, juce::Rectangle<int> (0, 0, page->getWidth(), intro->getBottom() + 90), "page-intro");
+            // the first start's card for FL users names the page, on its one line
+            const auto line = tr ("Works like FL Studio. LYNX's additions: Options › LYNX extras.");
+            const auto lineWidth = juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), line);
+            check ("the FL card's line fits its one line (" + juce::String (lineWidth, 0) + " px of " + juce::String ((Next3Card::width - 36) / 0.85, 0) + ")",
+                   lineWidth <= (float) (Next3Card::width - 36) / 0.85f);
+        }
+
         ui::motion::enabled() = motionBefore;
         if (prefix.isNotEmpty())
             juce::File (prefix + "-checks.txt").replaceWithText (checks.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");

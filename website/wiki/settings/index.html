@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="57ff71a6";
+window.LYNX_LANG=lang;window.LYNX_V="4afac86d";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=57ff71a6">
+<link rel="stylesheet" href="/assets/site.css?v=4afac86d">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -110,7 +110,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p><code>Options › File settings (search folders)...</code></p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td>Search folders for missing samples</td><td>The Missing files window looks in these folders and their sub-folders by itself</td></tr><tr><td>Browser folders</td><td>Shown in the Browser's folder list, and also searched for missing samples</td></tr><tr><td>Plugin folders</td><td>Scanned for plugins by <code>Options › Scan for plugins</code></td></tr></tbody></table></div>
 <h2 id="lynx-extras">LYNX extras</h2>
-<p><code>Options › LYNX extras...</code>. LYNX SHARE's own additions in one place. The ones that only change the look are on by default, and so are a few small additions: MIDI files dropped on the Playlist become pattern clips, the Recent list and one row per plugin in the plugin lists, and the MIDI preview and the Tab completion in the Browser. The rest are off. <strong>FL-exact</strong> turns every extra off, <strong>Recommended</strong> puts each one back at its default. Each switch is the same setting as in the menu or page its line names.</p>
+<p><code>Options › LYNX extras...</code>. LYNX SHARE's own additions in one place. Some that only change the look are on by default, and so are a few small additions: MIDI files dropped on the Playlist become pattern clips, the clip gain handle stays in view, new Clip-launch projects get a mixer track for every track, the Recent list and one row per plugin in the plugin lists, and the MIDI preview and the Tab completion in the Browser. Two that are on change the sound: stretched pattern clips loop their pattern, and in the Simple layout a dropped loop takes the tempo and key found in its audio. The rest are off. <strong>FL-exact</strong> turns every extra off, <strong>Recommended</strong> puts each one back at its default. Each switch is the same setting as in the menu or page its line names, and the line of each one on by default says so.</p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Loudness meter beside the Master (LYNX)</code></td><td>Short-term and integrated loudness (LUFS) and the true peak of the Master, with a Reset button</td></tr><tr><td><code>Show only used inserts</code></td><td>Hides the Mixer inserts nothing uses</td></tr><tr><td><code>Keep links to deleted inserts, greyed (LYNX)</code></td><td>Deleting an insert keeps the links that went into it, so they can be connected again</td></tr><tr><td><code>Mixer groups follow the Playlist (LYNX)</code></td><td>The Mixer's groups mirror the Playlist's track groups</td></tr><tr><td><code>Automation lanes</code></td><td>Automation can sit in lanes under a Playlist track</td></tr><tr><td><code>Ruler: song bars (LYNX)</code></td><td>The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays</td></tr><tr><td><code>Show a control's value next to the mouse when hovering over it (LYNX)</code></td><td>The value shows beside the cursor, not only in the hint bar</td></tr><tr><td><code>After loop recording, only the last pass plays</code></td><td>The earlier passes stay under it, muted</td></tr><tr><td><code>W shows or hides the selected device's window</code></td><td>A key for the Device view</td></tr><tr><td><code>Selecting a device selects its insert in the Mixer</code></td><td>The Mixer follows the device picked in the Device view</td></tr><tr><td><code>Use a game controller</code></td><td>The same switch as on the MIDI page</td></tr></tbody></table></div>
 <h2 id="project">Project</h2>
 <figure><a class="shot" href="/assets/img/wiki/settings-project.webp"><img src="/assets/img/wiki/settings-project.webp" srcset="/assets/img/wiki/settings-project.webp 1x, /assets/img/wiki/settings-project@2x.webp 2x" alt="The Project page: time settings, groove and tuning, timebase and Playlist options" loading="lazy" width="680" height="656"></a></figure>
@@ -131,8 +131,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=57ff71a6" defer></script>
-<script src="/assets/wiki.js?v=57ff71a6" defer></script>
-<script src="/assets/motion.js?v=57ff71a6" defer></script>
+<script src="/assets/site.js?v=4afac86d" defer></script>
+<script src="/assets/wiki.js?v=4afac86d" defer></script>
+<script src="/assets/motion.js?v=4afac86d" defer></script>
 </body>
 </html>

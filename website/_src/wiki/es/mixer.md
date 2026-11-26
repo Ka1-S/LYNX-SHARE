@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
@@ -59,7 +59,7 @@ Edison, el editor y grabador de audio, puede estar en cualquier ranura de efecto
 
 - `Abrir editor de audio` (`Ctrl+E`) en el menú del insert carga Edison en la primera ranura vacía del insert y lo abre. `Abrir el editor de audio y grabar` (`Shift+E`) lo carga listo para grabar cuando suena la canción.
 - Los modos de grabación son `Ahora`, `Con entrada` (el predeterminado: espera a que la entrada supere un umbral), `Entrada` y `Al reproducir`. `Anexar` pone una grabación nueva después del audio que ya hay. El tiempo máximo de grabación es `Sin límite` o 1, 3, 5, 10, 30 o 60 minutos: una ranura nueva empieza en 30, `Abrir el editor de audio y grabar` fija 5.
-- `Sync` reproduce el audio de Edison al tiempo de la canción mientras esta suena.
+- `Sinc` reproduce el audio de Edison al tiempo de la canción mientras esta suena.
 - Edison sigue grabando después de cerrar su ventana.
 - `Herram. › Macros › Quitar todas las instancias de Edison` vacía todas las ranuras Edison del proyecto, tras una pregunta.
 - Las ranuras Edison de los proyectos de FL Studio (.flp) se abren con su audio.
@@ -112,6 +112,7 @@ Cuando eliges una entrada externa para un insert que también graba otro audio, 
 ## Conviene saber
 
 - `Medidor de sonoridad junto al Master (LYNX)`, en `Opciones › Mixer`, muestra la sonoridad a corto plazo e integrada (LUFS) y el true peak de la salida del Master, con un botón `Reset`.
+- `Compensar también las automatizaciones de fader y de ruta (LYNX)`, en `Compensación de retardo de plugins` del menú del insert, está activado en los proyectos nuevos. Es un ajuste de todo el proyecto. Con plugins que añaden latencia, reproduce la automatización de faders, panoramas, envíos y faders VCA tan tarde como el audio sobre el que actúa. FL Studio retrasa solo la automatización de los controles de los plugins, así que allí el mismo proyecto suena algo distinto. Los proyectos que vienen de FL Studio y los proyectos anteriores lo tienen desactivado, y `Igual que FL` no lo cambia.
 - Un plugin de instrumento con varias salidas puede reproducir cada salida en su propio insert. Consulta [Plugins de terceros](/wiki/plugins/).
 - `Ctrl+L` hace cosas distintas en el Channel Rack y en el Mixer. En el rack elige inserts libres. En el Mixer usa el insert seleccionado.
 - Los interruptores de ruta aparecen en las demás franjas, no en la seleccionada.
