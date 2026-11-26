@@ -18146,3 +18146,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Community190riTests.inc" // round 190ri (0.1.32): clone names, transpose, rendered mixer tracks, imported data folders
 #include "Sweep190reTests.inc" // round 190re (0.1.32 regression sweep): the defects it found and fixed
 #include "Sweep190rjTests.inc" // round 190rj (0.1.32 regression sweep 2): the defects it found and fixed
+#include "Plugsweep190rkTests.inc" // round 190rk (0.1.32 hosted plugin sweep): the defects it found and fixed

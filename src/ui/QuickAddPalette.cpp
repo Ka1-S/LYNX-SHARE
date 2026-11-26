@@ -235,7 +235,7 @@ public:
                                          [this, entry] { targets.addEffect (makeSubstituteSlot (entry)); } });
 
         // plugins: favourites (Plugin manager) first, each group by name; round 190qi: none hidden in the Plugin manager,
-        // and one entry per plugin installed in several formats (core/PluginPicks.h: CLAP › VST3 › VST2), its other
+        // and one entry per plugin installed in several formats (core/PluginPicks.h: VST3 › CLAP › VST2), its other
         // formats named in the detail
         auto& host = engine.getPluginHost();
         juce::Array<juce::PluginDescription> types, otherBuilds;
