@@ -112,6 +112,99 @@ TEST (hotfix01313_session_settings_compare_and_copy_the_same_fields)
             std::printf ("  copyGlobals copies %s, sameGlobals does not compare it\n", f.c_str());
 }
 
+// The song-level things a session does not share yet were rebuilt from the shared state on every commit: a change of
+// any of them was lost at the next edit anyone made (round 190rj). One check per item: a guest's own change survives a
+// host's commit; and what the guest got at join stays after the host's edits.
+namespace
+{
+void hotfix01313KeptLocal (const char* what, const std::function<void (lynx::Song&)>& change,
+                          const std::function<bool (const lynx::Song&, const lynx::Song&)>& same)
+{
+    using namespace lynx;
+    auto base = live169bSong();
+    live::Authority authority (base, {});
+    live::Replica hostCopy (base, 0, session::hostTag, {}), guestCopy (base, 0, 2, {});
+    auto host = base;
+    host.patterns[0].name = "Renamed by the host";
+    const auto proposal = hostCopy.poll (host);
+    CHECK (proposal.has_value());
+    if (! proposal)
+        return;
+    const auto commit = authority.propose (session::hostTag, *proposal);
+    auto guest = base;
+    change (guest);
+    const auto update = guestCopy.onCommit (commit, guest);
+    CHECK (update.working.has_value());
+    if (! update.working)
+        return;
+    const auto& now = *update.working;
+    if (! same (now, guest))
+        std::printf ("  %s: the guest's own change was put back by the host's commit\n", what);
+    CHECK (same (now, guest));
+    CHECK (now.patterns[0].name == "Renamed by the host");
+    CHECK (live::keptLocalChanges (now, guest).empty());
+}
+} // namespace
+
+TEST (hotfix01313_session_keeps_local_vcas)
+{
+    hotfix01313KeptLocal ("VCAs", [] (lynx::Song& s) { s.vcas.emplace_back().name = "VCA 1"; s.vcas.back().level = 0.5f; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.vcas == b.vcas; });
+}
+TEST (hotfix01313_session_keeps_local_main_volume)
+{
+    hotfix01313KeptLocal ("main volume", [] (lynx::Song& s) { s.mainVolume = 0.5f; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.mainVolume == b.mainVolume; });
+}
+TEST (hotfix01313_session_keeps_local_modulators)
+{
+    hotfix01313KeptLocal ("modulators", [] (lynx::Song& s) { s.modulators.emplace_back().name = "LFO 1"; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.modulators == b.modulators; });
+}
+TEST (hotfix01313_session_keeps_local_clip_grid)
+{
+    hotfix01313KeptLocal ("clip grid", [] (lynx::Song& s) { s.clipGrid.emplace(); s.clipGrid->scenes.emplace_back().name = "S1"; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.clipGrid == b.clipGrid; });
+}
+TEST (hotfix01313_session_keeps_local_grooves)
+{
+    hotfix01313KeptLocal ("grooves", [] (lynx::Song& s) { s.grooves.amount = 0.5f; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.grooves == b.grooves; });
+}
+TEST (hotfix01313_session_keeps_local_mix_snapshots)
+{
+    hotfix01313KeptLocal ("mix snapshots", [] (lynx::Song& s) { s.mixSnapshots.emplace_back().name = "Mix A"; s.mixSnapshotCurrent = 0; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.mixSnapshots == b.mixSnapshots && a.mixSnapshotCurrent == b.mixSnapshotCurrent; });
+}
+TEST (hotfix01313_session_keeps_local_master_look)
+{
+    hotfix01313KeptLocal ("Master look", [] (lynx::Song& s) { s.masterLook.intensity = 0.25f; },
+                         [] (const lynx::Song& a, const lynx::Song& b) { return a.masterLook == b.masterLook; });
+}
+
+TEST (hotfix01313_session_join_values_stay)
+{
+    using namespace lynx;
+    auto base = live169bSong();
+    base.vcas.emplace_back().name = "From the host";
+    base.mainVolume = 0.7f;
+    live::Authority authority (base, {});
+    live::Replica hostCopy (base, 0, session::hostTag, {}), guestCopy (base, 0, 2, {}); // (the guest's copy: the join snapshot)
+    auto host = base;
+    host.bpm = 150.0;
+    const auto proposal = hostCopy.poll (host);
+    CHECK (proposal.has_value());
+    if (! proposal)
+        return;
+    const auto update = guestCopy.onCommit (authority.propose (session::hostTag, *proposal), base);
+    CHECK (update.working.has_value());
+    if (update.working)
+        CHECK (update.working->bpm == 150.0 && update.working->vcas == base.vcas && update.working->mainVolume == 0.7f);
+    // the join snapshot carries the host's current values, not the session start's
+    const auto src = i18ntest::readFile ("src/engine/LiveSessions.cpp");
+    const auto snap = src.find ("void LiveSessionManager::sendSnapshot (int to, bool resumed)");
+    CHECK (snap != std::string::npos && src.find ("live::copyKeptLocal (engine.getSong(), song);", snap) < src.find ("\n}\n", snap));
+}
 // PipeWire: a device's channels came in the order of the registry's ids, which PipeWire hands out as it likes. A stereo
 // sink whose FR port had a lower id than FL played LYNX's left channel on the right (released 0.1.31.2, 2 / 2 runs); a
 // 16-channel source recorded In 1 = AUX8... The node's own port order (port.id) decides.

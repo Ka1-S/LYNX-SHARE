@@ -992,6 +992,7 @@ void apply (Song& target, const Patch& patch, const std::function<bool (const Ke
 
 void copyLocalView (const Song& from, Song& to)
 {
+    copyKeptLocal (from, to); // (round 190rj: not shared yet: each copy keeps its own)
     // the current arrangement (by uid), its clips into the playlist
     if (! from.arrangements.empty() && ! to.arrangements.empty())
     {
@@ -1536,4 +1537,32 @@ std::vector<Key> toRender (const Song& song, const std::set<Key>& needed, std::u
     }
     return out;
 }
+// round 190rj: the song-level things a session does not share yet (LiveSession.h)
+void copyKeptLocal (const Song& from, Song& to)
+{
+    to.vcas = from.vcas;
+    to.mainVolume = from.mainVolume;
+    to.modulators = from.modulators;
+    to.clipGrid = from.clipGrid;
+    to.grooves = from.grooves;
+    to.mixSnapshots = from.mixSnapshots;
+    to.mixSnapshotCurrent = from.mixSnapshotCurrent;
+    to.mixSnapshotPrevious = from.mixSnapshotPrevious;
+    to.masterLook = from.masterLook;
+}
+
+std::vector<KeptLocal> keptLocalChanges (const Song& a, const Song& b)
+{
+    std::vector<KeptLocal> out;
+    if (a.vcas != b.vcas) out.push_back (KeptLocal::vcas);
+    if (a.mainVolume != b.mainVolume) out.push_back (KeptLocal::mainVolume);
+    if (a.modulators != b.modulators) out.push_back (KeptLocal::modulators);
+    if (a.clipGrid != b.clipGrid) out.push_back (KeptLocal::clipGrid);
+    if (a.grooves != b.grooves) out.push_back (KeptLocal::grooves);
+    if (a.mixSnapshots != b.mixSnapshots || a.mixSnapshotCurrent != b.mixSnapshotCurrent || a.mixSnapshotPrevious != b.mixSnapshotPrevious)
+        out.push_back (KeptLocal::mixSnapshots);
+    if (a.masterLook != b.masterLook) out.push_back (KeptLocal::masterLook);
+    return out;
+}
+
 } // namespace lynx::live
