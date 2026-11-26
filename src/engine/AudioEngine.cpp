@@ -701,6 +701,9 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    // round 190rn: with LYNX_TRACE_STARTUP the engine's part of a quit is in startup.log (where a slow quit's time goes)
+    static const bool traceQuit = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
+    const auto mark = [] (const char* step) { if (traceQuit && startupMark != nullptr) startupMark (step); };
     if (rackProcessor != nullptr) // (round 190gq: the render-ahead thread stops before the snapshots are freed)
         rackProcessor->haltRenderAhead();
     if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
@@ -738,13 +741,24 @@ AudioEngine::~AudioEngine()
     openTakes.clear();
 
     recordThread.stopThread (2000);
+    mark ("quit:   engine: previews, racks, takes, record thread");
     prefetcher = nullptr;
     midiDevicesChanged = {};
     deviceStateSaver = nullptr;
     deviceManager.removeMidiInputDeviceCallback ({}, this);
     deviceManager.removeAudioCallback (this);
     player.setProcessor (nullptr);
+    mark ("quit:   engine: prefetcher, device callbacks");
     graph.clear(); // the nodes reference rackExchange and transport
+    mark ("quit:   engine: audio graph (plugins, renderers)");
+    if (traceQuit) // (the history's memory, measured apart from the rest of the members)
+    {
+        undoStack.clear();
+        redoStack.clear();
+        sessionUndo.clear();
+        sessionRedo.clear();
+        mark ("quit:   engine: undo history freed");
+    }
 }
 
 void AudioEngine::buildInitialGraph()

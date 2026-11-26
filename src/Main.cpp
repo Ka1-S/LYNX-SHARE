@@ -5415,6 +5415,9 @@ public:
             return; // the copy that ran owns the session (its crash notes stay for the next start)
 
         lynx::crashguard::note ("closing");
+        // round 190rn: with LYNX_TRACE_STARTUP the quit's steps go to startup.log too (where a slow quit's time goes)
+        const auto quitMark = [] (const char* step) { if (startupTrace.eachStep) startupTrace.mark (step); };
+        quitMark ("quit: starts");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
@@ -5423,11 +5426,14 @@ public:
             mainWindow->saveState();
         lynx::remoteui::shutdown();
         remoteControl = nullptr; // cancels queued control work before its engine and UI go
+        quitMark ("quit: window state saved, remote control closed");
         mainWindow = nullptr; // the UI goes before the engine
+        quitMark ("quit: main window deleted");
         graphicsDeviceJob = {}; // (round 190hd: the graphics device's holder, after every window)
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
         engine = nullptr;
+        quitMark ("quit: engine deleted");
         // separate-process plugins end on threads of their own (issue #159): a moment for them, never the 10 s a dead
         // child's pipe can take
         lynx::finishSandboxTeardowns (2000);
@@ -5439,6 +5445,7 @@ public:
         lynx::crashguard::stopHangWatch();
         lynx::crashguard::stopMainProfiler();
         lynx::crashguard::endSession(); // a clean exit: no breadcrumb left behind
+        quitMark ("quit: done");
 
         // everything is saved and closed: a process that loaded third-party plugins ends here, before the DLLs' own
         // teardown runs (some crash in it at exit, round 111)
