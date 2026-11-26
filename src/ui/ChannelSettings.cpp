@@ -6823,7 +6823,16 @@ public:
         // next insert, double-click shows the insert in the Mixer, the menu has "Assign to free mixer track"
         headerKnob ([this, name] {
                         return ui::digitWheel (countSpec (name() + " - " + tr ("Target mixer track"), maxMixerTracks - 1, 0,
-                                                          [] (int t) { return t == 0 ? tr ("Master") : juce::String (t); }));
+                                                          [this] (int t) {
+                                                              if (t == 0)
+                                                                  return tr ("Master");
+                                                              // round 190rs (G-04): the insert's own name after its number
+                                                              const auto& mixer = engine.getSong().mixer;
+                                                              const auto own = t < (int) mixer.size() ? juce::String (juce::CharPointer_UTF8 (mixer[(std::size_t) t].name.c_str())).trim()
+                                                                                                      : juce::String();
+                                                              return own.isEmpty() || own == "Insert " + juce::String (t) ? juce::String (t)
+                                                                                                                          : juce::String (t) + " · " + own;
+                                                          }));
                     },
                     [] (const ChannelDef& d) { return (double) d.mixerTrack; },
                     [] (Song& s, int ch, double v) {

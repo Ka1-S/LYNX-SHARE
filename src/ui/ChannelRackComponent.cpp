@@ -1333,12 +1333,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                                  automated.shown ({ AutomationTargetKind::channelVolume, row }, channel.volume), false,
                                  touched && knobDrag == Area::volume ? accent : knobArc, hovered (Area::volume) || (touched && knobDrag == Area::volume));
 
-                // small box with the mixer insert ("-" = straight to Master)
+                // small box with the mixer insert ("---" = straight to Master, as FL 2026 shows it; round 190rs G-04)
                 const auto routeArea = controlBounds (Area::route, row).toFloat();
                 g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
                                                       channel.mixerTrack <= 0));
                 g.setFont (theme::font (theme::type::caption, true));
-                textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
+                textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("---"), routeArea.toNearestInt(),
                             juce::Justification::centred);
                 g.setFont (theme::font (theme::type::body));
 
@@ -2061,7 +2061,16 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
     spec.name = name + " - " + tr ("Target mixer track");
     spec.maximum = maxMixerTracks - 1; // every insert, like FL (round 162: the inserts past the mixer's last one are added)
     spec.interval = 1.0;
-    spec.toText = [] (double v) { return v < 0.5 ? tr ("Master") : tr ("Insert {0}", { juce::String (juce::roundToInt (v)) }); };
+    // round 190rs (G-04, queue item 92): the insert's name after its number, so the hint says where the sound goes
+    spec.toText = [this] (double v) {
+        if (v < 0.5)
+            return tr ("Master");
+        const auto t = juce::roundToInt (v);
+        const auto& mixer = engine.getSong().mixer;
+        const auto own = t < (int) mixer.size() ? juce::String (juce::CharPointer_UTF8 (mixer[(std::size_t) t].name.c_str())).trim() : juce::String();
+        const auto number = tr ("Insert {0}", { juce::String (t) });
+        return own.isEmpty() || own == "Insert " + juce::String (t) || own == number ? number : tr ("Insert {0} · {1}", { juce::String (t), own });
+    };
     spec.fromText = [] (const juce::String& t) -> std::optional<double> {
         if (t.trim().startsWithIgnoreCase ("m"))
             return 0.0;
@@ -3769,7 +3778,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
         const auto shownArea = active ? knobDrag : area;
         const auto shownRow = active ? knobRow : row;
         h = ui::valueHint (specFor (shownArea, shownRow), valueOf (shownArea, shownRow),
-                           shownArea == Area::route ? tr ("[LMB] drag or [Wheel] routes  [2xLMB] show in the Mixer  [RMB] next free insert")
+                           shownArea == Area::route ? tr ("[LMB] drag or [Wheel] routes  [2xLMB] show in the Mixer  [RMB] menu (next free insert)")
                                                     : ui::valueGestures());
         return h;
     }
