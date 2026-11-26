@@ -29725,6 +29725,181 @@ private:
             flush();
             return false;
         }
+        // round 190rp (coordinator: Thief's frozen mix doesn't null against live, -2.8 dB): "perchannel" = each target
+        // alone (the others muted), live and frozen, nulled; the lag where the frozen one matches best and the residual
+        // there say whether it is a time offset (latency) or a different sound
+        if (mode == "perchannel")
+        {
+            const auto solo = [] (lynx::Song s, int keep) {
+                for (int k = 0; k < (int) s.channels.size(); ++k)
+                    s.channels[(std::size_t) k].muted = k != keep;
+                return s;
+            };
+            for (const auto c : targets)
+            {
+                offline.setSong (before);
+                offline.dispatchPendingMessages();
+                const auto liveSong = solo (offline.getSong(), c);
+                const auto liveC = renderMix ("solo-live", &liveSong);
+                const auto error = lynx::freezeChannelNow (offline, c);
+                offline.dispatchPendingMessages();
+                const auto frozenSong = solo (offline.getSong(), c);
+                const auto frozenC = renderMix ("solo-frozen", &frozenSong);
+                float peak = 0.0f;
+                const auto direct = residual (liveC, frozenC, peak);
+                // the lag (frozen behind live, samples) with the smallest difference over the loudest 2 s
+                const auto n = juce::jmin (liveC.audio.getNumSamples(), frozenC.audio.getNumSamples());
+                int loudAt = 0;
+                float loud = 0.0f;
+                for (int i = 0; i < n; i += 256)
+                    if (const auto v = std::abs (liveC.audio.getSample (0, i)); v > loud)
+                    {
+                        loud = v;
+                        loudAt = i;
+                    }
+                const auto from = juce::jmax (0, loudAt - 48000), to = juce::jmin (n - 8192, loudAt + 48000);
+                int bestLag = 0;
+                double best = -1.0;
+                for (int lag = -4096; lag <= 4096; ++lag)
+                {
+                    double sum = 0.0;
+                    for (int i = from; i < to; i += 4)
+                    {
+                        const auto j = i + lag;
+                        if (j < 0 || j >= frozenC.audio.getNumSamples())
+                            continue;
+                        const auto d = (double) frozenC.audio.getSample (0, j) - (double) liveC.audio.getSample (0, i);
+                        sum += d * d;
+                    }
+                    if (best < 0.0 || sum < best)
+                    {
+                        best = sum;
+                        bestLag = lag;
+                    }
+                }
+                double energy = 0.0;
+                for (int i = from; i < to; i += 4)
+                    energy += (double) liveC.audio.getSample (0, i) * liveC.audio.getSample (0, i);
+                const auto atLag = energy > 0.0 ? 10.0 * std::log10 (juce::jmax (best, 1.0e-30) / energy) : -200.0;
+                // where they part: the first sample 60 dB under the peak apart, and the largest difference (seconds, bars)
+                int firstApart = -1, worstAt = 0;
+                float worst = 0.0f;
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < n; ++i)
+                        if (const auto d = std::abs (liveC.audio.getSample (ch, i) - frozenC.audio.getSample (ch, i)); d > 0.0f)
+                        {
+                            if (d > peak * 1.0e-3f && (firstApart < 0 || i < firstApart))
+                                firstApart = i;
+                            if (d > worst)
+                            {
+                                worst = d;
+                                worstAt = i;
+                            }
+                        }
+                const auto rate = offline.getTransport().sampleRate.load();
+                const auto bars = [&before, rate] (int sample) {
+                    const auto beats = sample / rate * before.bpm / 60.0;
+                    return juce::String (beats / juce::jmax (1, before.beatsPerBar) + 1.0, 2);
+                };
+                report << "    apart from " << (firstApart < 0 ? juce::String ("nowhere") : juce::String (firstApart / rate, 3) + " s (bar " + bars (firstApart) + ")")
+                       << ", largest difference at " << juce::String (worstAt / rate, 3) << " s (bar " << bars (worstAt) << "): live "
+                       << juce::String (liveC.audio.getSample (0, worstAt), 4) << ", frozen " << juce::String (frozenC.audio.getSample (0, worstAt), 4) << "\n";
+                if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_FREEZETEST_KEEP", {}); juce::File::isAbsolutePath (keep))
+                {
+                    const juce::File dir (keep);
+                    dir.createDirectory();
+                    for (const auto* m : { &liveC, &frozenC })
+                    {
+                        const auto out = dir.getChildFile ("ch" + juce::String (c + 1) + (m == &liveC ? "-live.wav" : "-frozen.wav"));
+                        out.deleteFile();
+                        juce::WavAudioFormat wav;
+                        if (std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (out.createOutputStream().release(), rate, 2, 32, {}, 0)); w != nullptr)
+                            w->writeFromAudioSampleBuffer (m->audio, 0, m->audio.getNumSamples());
+                    }
+                }
+                report << "channel " << (c + 1) << " '" << juce::String::fromUTF8 (before.channels[(std::size_t) c].name.c_str()) << "' instrument "
+                       << (int) before.channels[(std::size_t) c].instrument << (error.isEmpty() ? juce::String() : " (freeze: " + error + ")")
+                       << ": null " << juce::String (direct, 1) << " dB (peak " << juce::String (peak, 3) << "), best lag " << bestLag
+                       << " samples, residual there " << juce::String (atLag, 1) << " dB of its energy, lengths " << liveC.audio.getNumSamples() << " / "
+                       << frozenC.audio.getNumSamples() << "\n";
+                // the same with the channel's volume and pan neutral on both sides (the freeze renders its stem so and
+                // applies them after): a null here and none above = the level / pan reach the instrument itself
+                if (direct >= -90.0)
+                {
+                    const auto neutral = [&solo, c] (lynx::Song s) {
+                        auto& ch = s.channels[(std::size_t) c];
+                        ch.volume = 1.0f;
+                        ch.pan = 0.0f;
+                        ch.misc.levels.volume = 1.0f;
+                        ch.misc.levels.pan = 0.0f;
+                        return solo (std::move (s), c);
+                    };
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto liveNSong = neutral (offline.getSong());
+                    const auto liveN = renderMix ("solo-live-neutral", &liveNSong);
+                    lynx::freezeChannelNow (offline, c);
+                    offline.dispatchPendingMessages();
+                    const auto frozenNSong = neutral (offline.getSong());
+                    const auto frozenN = renderMix ("solo-frozen-neutral", &frozenNSong);
+                    float peakN = 0.0f;
+                    const auto nullN = residual (liveN, frozenN, peakN);
+                    report << "    volume " << before.channels[(std::size_t) c].volume << ", pan " << before.channels[(std::size_t) c].pan
+                           << "; with both neutral: null " << juce::String (nullN, 1) << " dB\n";
+                    // and live against itself (a second live render from the same start): what does not null there is
+                    // the instrument's own randomness (by design), not the freeze
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto againSong = solo (offline.getSong(), c);
+                    const auto again = renderMix ("solo-live-again", &againSong);
+                    float peakA = 0.0f;
+                    const auto nullA = residual (liveC, again, peakA);
+                    report << "    live against live: null " << juce::String (nullA, 1) << " dB\n";
+                    // and live with the other channels taken out as the freeze's render takes them out (freeze::lighten):
+                    // a null here = what differs comes from the others being there (their events splitting the blocks)
+                    auto lightSong = solo (before, c);
+                    lynx::freeze::lighten (lightSong, c, before.channels[(std::size_t) c].mixerTrack); // (its own insert kept: it plays through it)
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto light = renderMix ("solo-live-lightened", &lightSong);
+                    float peakL = 0.0f;
+                    report << "    live with the others taken out against live: null " << juce::String (residual (liveC, light, peakL), 1)
+                           << " dB, against frozen: " << juce::String (residual (light, frozenC, peakL), 1) << " dB\n";
+                    // and live in the chunks a stem's render uses (neutralise: Song::automationChunks on when automation plays)
+                    auto chunked = solo (before, c);
+                    chunked.automationChunks = true;
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto inChunks = renderMix ("solo-live-chunked", &chunked);
+                    report << "    automationChunks " << (before.automationChunks ? "on" : "off") << "; live in automation chunks against frozen: null "
+                           << juce::String (residual (inChunks, frozenC, peakL), 1) << " dB, against live: " << juce::String (residual (liveC, inChunks, peakL), 1) << " dB\n";
+                    // and both raw, straight to the Master with every insert's effects off (no latency anywhere in the
+                    // render): a null here = the difference comes from the insert's path (its delay compensation moves
+                    // where the blocks fall, and the instrument rounds per block)
+                    const auto raw = [c] (lynx::Song s) {
+                        s.channels[(std::size_t) c].mixerTrack = 0;
+                        lynx::freeze::lighten (s, c, -1);
+                        return s;
+                    };
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto rawLiveSong = raw (solo (before, c));
+                    const auto rawLive = renderMix ("solo-live-raw", &rawLiveSong);
+                    lynx::freezeChannelNow (offline, c);
+                    offline.dispatchPendingMessages();
+                    const auto rawFrozenSong = raw (solo (offline.getSong(), c));
+                    const auto rawFrozen = renderMix ("solo-frozen-raw", &rawFrozenSong);
+                    report << "    both raw to the Master, no insert effects: null " << juce::String (residual (rawLive, rawFrozen, peakL), 1) << " dB (insert "
+                           << before.channels[(std::size_t) c].mixerTrack << ", " << (int) before.mixer[(std::size_t) juce::jlimit (0, (int) before.mixer.size() - 1, before.channels[(std::size_t) c].mixerTrack)].effects.size() << " effects)\n";
+                }
+                report << "    levels in the stems: " << (offline.getSong().channels[(std::size_t) c].freeze.levels ? "yes" : "no") << "\n";
+                check (direct < -90.0, "channel " + juce::String (c + 1) + " frozen alone nulls against it live (" + juce::String (direct, 1) + " dB)");
+                flush();
+            }
+            flush();
+            return failures == 0;
+        }
+
         const auto first = targets.front();
         offline.setSelectedChannel (first);
         ui.selectTabForSnapshot (0);
