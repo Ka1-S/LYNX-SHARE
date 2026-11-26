@@ -152,6 +152,7 @@
 #include "ui/TiltViewport.h"
 #if JUCE_LINUX
  #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
+namespace juce { void* lynxX11Display(); } // (JUCE fix 41's accessor of its X11 display; round 190rv's #319 check)
  #include <sys/prctl.h> // (round 190ou: --multieditor255test LYNX_ME_PTRACE=1)
  #include <sys/socket.h> // (round 190rf: --qa190rfchild display)
  #include <unistd.h>
@@ -2236,6 +2237,18 @@ public:
                 }
            #endif
             std::_Exit (2); // (not reached when the display part ran)
+        }
+        if (args.contains ("--bugs190rvtest"))
+        {
+            // LYNX --bugs190rvtest report.txt [shot prefix] (round 190rv, the 0.1.32 open bug issues; also in --selftest): src/Bugs190rvCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto i = args.indexOf ("--bugs190rvtest");
+            const auto result = bugs190rvCheck (log, i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            juce::File (args[i + 1].unquoted()).replaceWithText (log + "bugs190rv=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
         }
         if (args.contains ("--community190ritest"))
         {
@@ -10380,6 +10393,9 @@ private:
         // UI monkey test (src/Qa190rbCheck.inc)
         juce::String qa190rbLog;
         const auto qa190rbResult = qa190rbCheck (qa190rbLog);
+        // round 190rv (0.1.32 open bug issues): #317 the native editors' header LED, #319 the pin keeps the window (src/Bugs190rvCheck.inc)
+        juce::String bugs190rvLog;
+        const auto bugs190rvResult = bugs190rvCheck (bugs190rvLog);
 
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
@@ -11801,7 +11817,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11931,6 +11947,7 @@ private:
                << "iox190rm=" << iox190rmResult << "\n"
                << "perf190rn=" << perf190rnResult << "\n"
                << "qa190rb=" << qa190rbResult << "\n"
+               << "bugs190rv=" << bugs190rvResult << (bugs190rvResult == "OK" ? juce::String() : " | " + bugs190rvLog.replace ("\n", "; ")) << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
@@ -13675,7 +13692,7 @@ private:
                                                         return channelIndex < 0 || channelIndex >= (int) song.channels.size()
                                                                    ? nullptr : &song.channels[(size_t) channelIndex].plugin;
                                                     return song.mixer.size() < 2 || song.mixer[1].effects.empty() ? nullptr : &song.mixer[1].effects[0].plugin;
-                                                }, instrument });
+                                                }, instrument, instrument ? -1 : 1, instrument ? -1 : 0 }); // (round 190rv: an effect's insert / slot, as the Mixer opens it)
                     owner.reset();
                     step ("window_open=" + juce::String ((int) lynx::PluginWindows::isOpen (*instance)));
                     phase = 1;
@@ -22069,6 +22086,7 @@ private:
 #include "Community190riCheck.inc" // round 190ri: the 0.1.32 community batch
 #include "Perf190rnCheck.inc" // round 190rn: the undo history's memory cap
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
+#include "Bugs190rvCheck.inc" // round 190rv: 0.1.32 open bug issues (#317 header LED, #319 pin)
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "Iox190rmCheck.inc" // round 190rm: the 0.1.32 import / export sweep (--convert190rm)
 #include "DetailsShot190mr.inc" // round 190mr
