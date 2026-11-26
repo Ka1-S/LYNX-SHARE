@@ -3,6 +3,23 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
+## 0.1.31.3 alpha — fixes
+
+A third hotfix for 0.1.31. If you use Online sessions, everyone in the session should update: a 0.1.31.2 guest still
+misses the host's tempo with a 0.1.31.3 host.
+
+- Fixed: on Linux with LYNX's own PipeWire driver, a device's channels were put in the order of PipeWire's internal ids
+  instead of the device's own port order. When those ids were out of order, left and right were swapped, or the inputs
+  of a multichannel device came in the wrong order (In 1 = AUX8...). Measured with loopback devices; on a real card it
+  needs out-of-order ids, which can happen when PipeWire reuses them.
+- Fixed: in an Online session, a guest whose copy of the project had another "Created" date than the host's stopped
+  receiving the host's tempo and project settings.
+- Fixed: in an Online session, a change of VCAs, the main volume, modulators, the clip grid, grooves, mix snapshots or
+  the Master look went back to its old value at the next edit anyone made, and was lost from the saved project too.
+  These aren't shared with the others yet: each computer keeps its own, a new guest starts from the host's, and LYNX
+  says once per item when a change stays on your computer.
+- Fixed: Remote Control's project.edit refused every edit of a new project made with 0.1.31 or later.
+
 ## 0.1.31.2 alpha — fixes
 
 A second hotfix for 0.1.31.
