@@ -4509,8 +4509,9 @@ void MainComponent::playStop()
         notePlayStart (transportPaused);
         transportPaused = false;
         engine.startPlayback();
-        // round 190np: Play in Song mode with an empty Playlist (the Pattern layout) is a confusion signal: one tip
-        if (onboardingOn && onboarding::songModeEmptySignal (engine.getSong().mode == PlayMode::song, engine.getSong(), layoutStyle))
+        // round 190np: Play in Song mode with an empty Playlist (the Pattern layout) is a confusion signal: one tip. Not while
+        // recording (round 190rj): a first take into an empty Playlist is what Song mode is for
+        if (onboardingOn && ! engine.isRecording() && onboarding::songModeEmptySignal (engine.getSong().mode == PlayMode::song, engine.getSong(), layoutStyle))
             maybeShowTip (onboarding::Tip::songModeEmpty, &songModeButton);
     }
 }

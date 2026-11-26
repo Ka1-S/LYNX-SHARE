@@ -19645,6 +19645,7 @@ private:
         {
             song.mixer[1].name = "Loop In";
             song.mixer[1].monitor = lynx::InputMonitor::off; // (the loopback must not hear itself)
+            song.mixer[1].recordSource = lynx::RecordSource::externalInput; // (round 190rj: FL's Post EQ records what the insert hears: nothing with the monitor off)
         }
         engine->setSong (std::move (song));
         engine->setInsertInput (1, 0, false);

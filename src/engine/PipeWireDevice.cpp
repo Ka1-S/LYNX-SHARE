@@ -3,6 +3,7 @@
 #if JUCE_LINUX
 
  #include "core/Preferences.h"
+ #include "core/PipeWireOrder.h"
 
  #include <algorithm>
  #include <array>
@@ -159,6 +160,7 @@ struct Connection
         std::uint32_t node = 0;
         bool input = false, monitor = false;
         std::string channel;
+        int index = -1; // port.id: the port's place on its node (the registry ids can come in any order)
     };
 
     Api& api;
@@ -315,6 +317,8 @@ struct Connection
             p.input = text (lookup (props, PW_KEY_PORT_DIRECTION)) == "in";
             p.monitor = text (lookup (props, PW_KEY_PORT_MONITOR)) == "true";
             p.channel = text (lookup (props, PW_KEY_AUDIO_CHANNEL));
+            if (const auto index = text (lookup (props, "port.id")); ! index.empty())
+                p.index = std::atoi (index.c_str());
             ports[id] = p;
         }
         else if (std::strcmp (type, PW_TYPE_INTERFACE_Metadata) == 0)
@@ -384,15 +388,11 @@ struct Connection
     // the channel positions of a node's ports in one direction (playback: the sink's inputs; capture: the source's outputs)
     std::vector<std::string> channelsOf (std::uint32_t node, bool sinkInputs) const
     {
-        std::vector<std::pair<std::uint32_t, std::string>> found;
+        std::vector<pwchannels::Port> found;
         for (const auto& [id, p] : ports)
             if (p.node == node && p.input == sinkInputs && ! p.monitor)
-                found.emplace_back (id, p.channel);
-        std::sort (found.begin(), found.end());
-        std::vector<std::string> out;
-        for (auto& f : found)
-            out.push_back (f.second);
-        return out;
+                found.push_back ({ p.index, id, p.channel });
+        return pwchannels::inPortOrder (std::move (found)); // (the node's port order, not the registry's: round 190rj)
     }
 };
 

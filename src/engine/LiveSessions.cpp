@@ -379,6 +379,11 @@ void LiveSessionManager::setState (State s, const juce::String& text)
 {
     state = s;
     status = text;
+    if (s == State::live && ! keptSeen) // (round 190rj: what this copy has when it goes live is no change of its own)
+    {
+        keptSeen.emplace();
+        live::copyKeptLocal (engine.getSong(), *keptSeen);
+    }
     if (onChange)
         onChange();
 }
@@ -390,6 +395,8 @@ juce::String LiveSessionManager::hostName() const
 
 void LiveSessionManager::start (const Options& o)
 {
+    keptSeen.reset();
+    keptHinted.clear();
     if (isActive())
         return;
     options = o;
@@ -507,6 +514,8 @@ void LiveSessionManager::onRoomCreated (const juce::String& room, const juce::St
 
 void LiveSessionManager::join (const juce::String& code, const Options& o)
 {
+    keptSeen.reset();
+    keptHinted.clear();
     if (isActive())
         return;
     options = o;
@@ -1448,7 +1457,11 @@ void LiveSessionManager::accept (int from)
     peer.accepted = true;
     sendSnapshot (from);
     sendPeople (true);
-    if (onHint)
+    // round 190rj: a guest of 0.1.31.x keeps his own tempo and project settings against the host's: say who should update
+    // (in place of the "joined" hint, which would replace it at once in the one hint line)
+    if (onHint && live::keepsOwnSettings (utf8 (peer.version), JUCE_APPLICATION_VERSION_STRING))
+        onHint (tr ("{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync", { name, peer.version }));
+    else if (onHint)
         onHint (tr ("{0} joined the live session", { name }));
     setState (State::live, tr ("Live"));
 }
@@ -1459,6 +1472,7 @@ void LiveSessionManager::sendSnapshot (int to, bool resumed)
     if (it == peers.end())
         return;
     Song song = authority->confirmed();
+    live::copyKeptLocal (engine.getSong(), song); // (round 190rj: not shared yet, but a guest starts from the host's)
     if (! ensureHashed (song))
     {
         pendingSnapshots[to] = resumed; // (a big sample is still being hashed: in a moment)
@@ -1766,6 +1780,7 @@ void LiveSessionManager::pollLocal()
         return;
     lastStamp = engine.getSongStamp();
     lastLocalChangeMs = juce::Time::currentTimeMillis();
+    noteKeptLocal();
     auto p = replica->poll (engine.getSong());
     if (! p)
         return;
@@ -1782,6 +1797,22 @@ void LiveSessionManager::pollLocal()
     set (m, "base", (juce::int64) p->baseRev);
     set (m, "patch", patchToVar (p->patch));
     sendJson (hostPeer, m);
+}
+
+void LiveSessionManager::noteKeptLocal()
+{
+    // round 190rj: a change of something the session does not share yet stays on this computer: say so, once per item
+    const auto& now = engine.getSong();
+    if (! keptSeen)
+    {
+        keptSeen.emplace();
+        live::copyKeptLocal (now, *keptSeen);
+        return;
+    }
+    for (const auto item : live::keptLocalChanges (*keptSeen, now))
+        if (keptHinted.insert ((int) item).second && onHint)
+            onHint (tr ("{0} isn't shared in Online sessions yet: the others won't hear this change", { tr (live::keptLocalName (item)) }));
+    live::copyKeptLocal (now, *keptSeen);
 }
 
 void LiveSessionManager::sendPresence()

@@ -689,7 +689,8 @@ juce::var MainComponent::handleDemoOp (const juce::String& op, const juce::var& 
             // (round 190pl: row 3 the route arrow under the track, 4 the fader's cap where it is now, 5 the pan knob, 6 solo, 7 its header)
             r = row == 0 ? strips.faderRailForSnapshot (column) : row == 1 ? strips.muteAreaForSnapshot (column) : row == 2 ? strips.meterAreaForSnapshot (column)
               : row == 3 ? strips.routeArrowForSnapshot (column) : row == 4 ? strips.faderCapForSnapshot (column) : row == 5 ? strips.panAreaForSnapshot (column)
-              : row == 6 ? strips.soloAreaForSnapshot (column) : row == 7 ? strips.headerAreaForSnapshot (column) : juce::Rectangle<int>();
+              : row == 6 ? strips.soloAreaForSnapshot (column) : row == 7 ? strips.headerAreaForSnapshot (column)
+              : row == 8 ? strips.armAreaForSnapshot (column) : juce::Rectangle<int>(); // (8: the disk recording switch, round 190rj)
         }
         else if (detailView != nullptr && &c == detailView.get())
         {

@@ -1,4 +1,5 @@
 #include "core/LiveSession.h"
+#include "core/ProjectSafety.h"
 
 #include <algorithm>
 #include <cmath>
@@ -145,7 +146,7 @@ U canon (const Song& in)
     s.currentArrangement = -1; // (so Song::forEachClipList visits every arrangement's clips here)
     s.mode = PlayMode::pattern;
     s.loopStart = s.loopEnd = 0;
-    s.info.workSeconds = 0.0;
+    s.info.workSeconds = s.info.created = 0.0; // (each copy's own clock: a copy dates itself when it is saved, round 190rj)
     s.nextUid = 0;
     s.session.me = 0;
     for (auto& a : s.arrangements)
@@ -261,9 +262,10 @@ void copyGlobals (const Song& from, Song& to)
     to.swing = from.swing;
     to.channelGroups = from.channelGroups;
     to.masterPitch = from.masterPitch;
-    const auto work = to.info.workSeconds;
+    const auto work = to.info.workSeconds, created = to.info.created;
     to.info = from.info;
     to.info.workSeconds = work;
+    to.info.created = created > 0.0 ? created : from.info.created;
     to.projectId = from.projectId;
     to.performanceMode = from.performanceMode;
     to.substitutesBypassed = from.substitutesBypassed;
@@ -274,6 +276,7 @@ void copyGlobals (const Song& from, Song& to)
     to.playTruncatedNotes = from.playTruncatedNotes;
     to.muteRunsEffects = from.muteRunsEffects;
     to.slideNoteProps = from.slideNoteProps;
+    to.exportMarkers = from.exportMarkers; // (round 190rj: compared above, so a change of it has to arrive)
     to.patternClipTakeover = from.patternClipTakeover;
     to.mutedInsertsSkip = from.mutedInsertsSkip;
     to.fastDeclick = from.fastDeclick;
@@ -990,6 +993,7 @@ void apply (Song& target, const Patch& patch, const std::function<bool (const Ke
 
 void copyLocalView (const Song& from, Song& to)
 {
+    copyKeptLocal (from, to); // (round 190rj: not shared yet: each copy keeps its own)
     // the current arrangement (by uid), its clips into the playlist
     if (! from.arrangements.empty() && ! to.arrangements.empty())
     {
@@ -1024,6 +1028,7 @@ void copyLocalView (const Song& from, Song& to)
     for (std::size_t i = 0; i < to.mixer.size() && i < from.mixer.size(); ++i)
         to.mixer[i].flInput = from.mixer[i].flInput;
     to.info.workSeconds = from.info.workSeconds;
+    to.info.created = from.info.created;
     to.nextUid = std::max (to.nextUid, from.nextUid);
     to.session.me = from.session.me;
 }
@@ -1533,4 +1538,53 @@ std::vector<Key> toRender (const Song& song, const std::set<Key>& needed, std::u
     }
     return out;
 }
+// round 190rj: the song-level things a session does not share yet (LiveSession.h)
+void copyKeptLocal (const Song& from, Song& to)
+{
+    to.vcas = from.vcas;
+    to.mainVolume = from.mainVolume;
+    to.modulators = from.modulators;
+    to.clipGrid = from.clipGrid;
+    to.grooves = from.grooves;
+    to.mixSnapshots = from.mixSnapshots;
+    to.mixSnapshotCurrent = from.mixSnapshotCurrent;
+    to.mixSnapshotPrevious = from.mixSnapshotPrevious;
+    to.masterLook = from.masterLook;
+}
+
+std::vector<KeptLocal> keptLocalChanges (const Song& a, const Song& b)
+{
+    std::vector<KeptLocal> out;
+    if (a.vcas != b.vcas) out.push_back (KeptLocal::vcas);
+    if (a.mainVolume != b.mainVolume) out.push_back (KeptLocal::mainVolume);
+    if (a.modulators != b.modulators) out.push_back (KeptLocal::modulators);
+    if (a.clipGrid != b.clipGrid) out.push_back (KeptLocal::clipGrid);
+    if (a.grooves != b.grooves) out.push_back (KeptLocal::grooves);
+    if (a.mixSnapshots != b.mixSnapshots || a.mixSnapshotCurrent != b.mixSnapshotCurrent || a.mixSnapshotPrevious != b.mixSnapshotPrevious)
+        out.push_back (KeptLocal::mixSnapshots);
+    if (a.masterLook != b.masterLook) out.push_back (KeptLocal::masterLook);
+    return out;
+}
+
+const char* keptLocalName (KeptLocal item)
+{
+    switch (item)
+    {
+        case KeptLocal::vcas: return "VCA";
+        case KeptLocal::mainVolume: return "Main volume";
+        case KeptLocal::modulators: return "Modulators";
+        case KeptLocal::clipGrid: return "Clip grid";
+        case KeptLocal::grooves: return "Grooves";
+        case KeptLocal::mixSnapshots: return "Mix snapshots (LYNX)";
+        case KeptLocal::masterLook: return "Master looks";
+    }
+    return "";
+}
+
+// a guest of a release before settingsSyncSince (round 190rj)
+bool keepsOwnSettings (const std::string& guestVersion, const std::string& hostVersion)
+{
+    return ! guestVersion.empty() && guestVersion != hostVersion && safety::compareVersions (guestVersion, settingsSyncSince) < 0;
+}
+
 } // namespace lynx::live

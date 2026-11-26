@@ -13076,3 +13076,5 @@ countries: pl
 "Tab completes the Browser's search" = "Tab uzupełnia wyszukiwanie w Browser"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Gdy piszesz w wyszukiwarce Browser, reszta tagu (#word) lub nazwy folderu pojawia się szara za tekstem, a Tab ją przyjmuje. Wyłączone: nic nie jest uzupełniane. Jedyny przełącznik jest tutaj."
 "Every LYNX extra at its default" = "Każdy dodatek LYNX na wartości domyślnej"
+"{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync" = "{0} używa LYNX SHARE {1}: zaktualizuj go, aby tempo i ustawienia projektu pozostały zsynchronizowane"
+"{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0} nie jest jeszcze udostępniane w sesjach online: pozostali nie usłyszą tej zmiany"

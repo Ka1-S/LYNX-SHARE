@@ -13076,3 +13076,5 @@ countries: jp
 "Tab completes the Browser's search" = "Tab でブラウザーの検索を補完"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "ブラウザーの検索で入力中、タグ（#word）やフォルダー名の残りが文字の後ろにグレーで表示され、Tab で確定します。オフ：何も補完されません。切り替えはここだけです。"
 "Every LYNX extra at its default" = "LYNX の追加機能をすべて初期設定に"
+"{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync" = "{0} は LYNX SHARE {1} を使っています。テンポとプロジェクト設定を同期させるには更新してください"
+"{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0} はまだオンラインセッションで共有されません。ほかの参加者にはこの変更が聞こえません"

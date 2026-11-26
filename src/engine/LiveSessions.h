@@ -314,6 +314,10 @@ private:
     std::unique_ptr<live::Authority> authority;
     std::unique_ptr<live::Replica> replica;
     std::uint64_t lastStamp = 0;
+    // round 190rj: the kept-local things (live::copyKeptLocal) as last seen, and the ones already explained once
+    std::optional<Song> keptSeen;
+    std::set<int> keptHinted;
+    void noteKeptLocal();
     std::map<int, Peer> peers; // by relay peer number
     std::uint32_t fragmentId = 0;
     std::map<int, std::map<std::uint32_t, std::vector<std::vector<std::uint8_t>>>> fragments;
