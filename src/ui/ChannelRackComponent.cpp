@@ -2425,6 +2425,13 @@ void ChannelRackComponent::cloneSelected()
 void ChannelRackComponent::deleteSelected()
 {
     // round 190ow: the selected automation clip rows go too (FL deletes the selected channels, automation clips included)
+    // round 190rw (Q1): automation rows and channels together are one undo step (they were two)
+    const AudioEngine::UndoGesture deleteStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DeleteEnds
+    {
+        AudioEngine& e;
+        ~DeleteEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } deleteEnds { engine };
     const auto onlyAutomations = autoOnly;
     deleteSelectedAutomations();
     if (onlyAutomations)
@@ -4909,6 +4916,13 @@ void ChannelRackComponent::importMidiOnChannel (int channel, const juce::File& f
 
 void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    // round 190rw (Q1): several files dropped at once are one undo step, not one per file
+    const AudioEngine::UndoGesture dropStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DropEnds
+    {
+        AudioEngine& e;
+        ~DropEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } dropEnds { engine };
     if (fileDropRow != noDrop) // (the drag's mark goes with the drop, even if no exit arrives)
     {
         fileDropRow = noDrop;

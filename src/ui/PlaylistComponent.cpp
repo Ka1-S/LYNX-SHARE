@@ -16090,6 +16090,13 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 
 void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    // round 190rw (Q1): several files dropped at once are one undo step, not one per file
+    const AudioEngine::UndoGesture dropStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DropEnds
+    {
+        AudioEngine& e;
+        ~DropEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } dropEnds { engine };
     setDropLaneHot (false);
     clearDropGhost();
     // round 190iu (issue #191.2, ui/WorkflowExtras.h): MIDI files become pattern clips where they are dropped (on a header:
