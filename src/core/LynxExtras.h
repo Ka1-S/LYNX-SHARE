@@ -249,7 +249,7 @@ inline constexpr Item items[] = {
       TR_NOOP ("The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here."),
       "ui-options.txt:pluginRecent" },
     { "plugins.oneRow", TR_NOOP ("Plugins"), TR_NOOP ("One row per plugin installed in several formats"),
-      TR_NOOP ("A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here."),
+      TR_NOOP ("A plugin installed as VST3, CLAP and VST is one row: a new pick loads VST3, else CLAP, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here."),
       "ui-options.txt:pluginOneRow" },
     { "browser.midiPreview", TR_NOOP ("Browser"), TR_NOOP ("MIDI files play when clicked in the Browser"),
       TR_NOOP ("A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here."),

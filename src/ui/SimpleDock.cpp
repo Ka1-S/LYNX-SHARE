@@ -1524,7 +1524,7 @@ private:
     // the plugin host's scanned instruments (the list the plugin picker shows)
     void takePlugins()
     {
-        // round 190qi (core/PluginPicks.h): none hidden in the Plugin manager, one entry per plugin (CLAP › VST3 › VST2)
+        // round 190qi (core/PluginPicks.h): none hidden in the Plugin manager, one entry per plugin (VST3 › CLAP › VST2)
         std::vector<soundlib::InstalledPlugin> builds, installed;
         std::vector<pluginpicks::Item> items;
         auto& host = engine.getPluginHost();

@@ -150,7 +150,7 @@ public:
                                 bits[(std::size_t) i] });
         }
         // round 190qi (core/PluginPicks.h): a plugin installed as VST2 / VST3 / CLAP is one row, the build a pick loads
-        // (CLAP › VST3 › VST2) standing for the others (a right-click picks another)
+        // (VST3 › CLAP › VST2, round 190rk) standing for the others (a right-click picks another)
         std::vector<pluginpicks::Item> items;
         items.reserve (builds.size());
         for (const auto& b : builds)

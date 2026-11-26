@@ -13070,7 +13070,7 @@ countries: kr
 "Recent plugins in the plugin lists" = "플러그인 목록에 최근 플러그인 표시"
 "The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here." = "최근에 고른 플러그인 8개를 빠른 추가 팔레트, 플러그인 선택기, 빈 슬롯의 믹서 메뉴, Channel rack의 + 메뉴 맨 위에 표시합니다. FL Studio에는 최근 목록이 없습니다. 전환은 여기에서만 할 수 있습니다."
 "One row per plugin installed in several formats" = "여러 형식으로 설치된 플러그인은 한 줄로"
-"A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "CLAP, VST3, VST로 설치된 플러그인은 한 줄이 됩니다. 새로 고르면 CLAP, 없으면 VST3, 없으면 VST를 불러오며, 오른쪽 클릭으로 다른 형식을 고를 수 있습니다. 끔(FL Studio와 같음): 빌드마다 한 줄입니다. 프로젝트는 저장된 형식을 유지합니다. 전환은 여기에서만 할 수 있습니다."
+"A plugin installed as VST3, CLAP and VST is one row: a new pick loads VST3, else CLAP, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "VST3, CLAP, VST로 설치된 플러그인은 한 줄이 됩니다. 새로 고르면 VST3, 없으면 CLAP, 없으면 VST를 불러오며, 오른쪽 클릭으로 다른 형식을 고를 수 있습니다. 끔(FL Studio와 같음): 빌드마다 한 줄입니다. 프로젝트는 저장된 형식을 유지합니다. 전환은 여기에서만 할 수 있습니다."
 "MIDI files play when clicked in the Browser" = "브라우저에서 클릭한 MIDI 파일 재생"
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "브라우저에서 클릭한 .mid 파일(또는 Space / 재생)을 선택한 채널에서 프로젝트 템포로 최대 30초 동안 재생합니다. 끔(FL Studio와 같음): 아무것도 재생되지 않습니다. 전환은 여기에서만 할 수 있습니다."
 "Tab completes the Browser's search" = "Tab으로 브라우저 검색 자동 완성"

@@ -13070,7 +13070,7 @@ countries: tw hk mo
 "Recent plugins in the plugin lists" = "外掛清單中顯示最近使用的外掛"
 "The last 8 plugins you picked, at the top of the Quick-add palette, the Plugin picker, the empty mixer slot's menu and the Channel rack's + menu. FL Studio has no Recent list. Its only switch is here." = "你最近選擇的 8 個外掛，顯示在快速新增面板、外掛選擇器、空混音器插槽的選單和 Channel rack 的 + 選單頂部。FL Studio 沒有最近使用清單。唯一的開關在這裡。"
 "One row per plugin installed in several formats" = "多種格式安裝的外掛只佔一列"
-"A plugin installed as CLAP, VST3 and VST is one row: a new pick loads CLAP, else VST3, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "同時以 CLAP、VST3 和 VST 安裝的外掛只佔一列：新選擇時載入 CLAP，否則 VST3，否則 VST，右鍵可選其他格式。關閉（與 FL Studio 相同）：每個建置一列。專案保留其原有格式。唯一的開關在這裡。"
+"A plugin installed as VST3, CLAP and VST is one row: a new pick loads VST3, else CLAP, else VST, and a right-click picks another. Off, as in FL Studio: one row per build. Projects keep the format they hold. Its only switch is here." = "同時以 VST3、CLAP 和 VST 安裝的外掛只佔一列：新選擇時載入 VST3，否則 CLAP，否則 VST，右鍵可選其他格式。關閉（與 FL Studio 相同）：每個建置一列。專案保留其原有格式。唯一的開關在這裡。"
 "MIDI files play when clicked in the Browser" = "在瀏覽器中點擊 MIDI 檔案即可播放"
 "A .mid file clicked in the Browser (or Space / Play) plays its notes on the selected channel at the project's tempo, up to 30 s. Off, as in FL Studio: nothing plays. Its only switch is here." = "在瀏覽器中點擊的 .mid 檔案（或按空白鍵 / 播放）會在選取的通道上依專案速度播放其音符，最長 30 秒。關閉（與 FL Studio 相同）：不播放任何內容。唯一的開關在這裡。"
 "Tab completes the Browser's search" = "Tab 補全瀏覽器搜尋"
