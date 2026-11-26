@@ -841,15 +841,22 @@ void EmptyHintCard::place (bool force)
     auto* parent = getParentComponent();
     if (parent == nullptr)
         return;
-    // issue #313: a card already laid out for this size of its parent stays where it is
-    if (! force && pinned && placedFor == parent->getLocalBounds())
+    // issue #313: a card already laid out for this size of its parent stays where it is, also when it is shown again (the
+    // area it centres in moved by a lane's height while the view was scrolled, and the card jumped with it)
+    if (pinned && ! placed.isEmpty() && placedFor == parent->getLocalBounds())
+    {
+        if (getBounds() != placed)
+            setBounds (placed);
+        juce::ignoreUnused (force);
         return;
+    }
     placedFor = parent->getLocalBounds();
     auto area = where ? where() : parent->getLocalBounds();
     area = area.getIntersection (parent->getLocalBounds()).reduced (12);
     const auto w = juce::jmin (width, area.getWidth()), h = juce::jmin (idealHeight(), area.getHeight());
     setVisible (w >= 260 && h >= 120); // (a tiny view: no hint)
     setBounds (area.withSizeKeepingCentre (w, h));
+    placed = getBounds();
 }
 
 void EmptyHintCard::paint (juce::Graphics& g)

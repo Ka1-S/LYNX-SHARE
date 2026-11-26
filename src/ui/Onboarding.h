@@ -136,7 +136,7 @@ private:
         if (wasResized)
             place();
     }
-    juce::Rectangle<int> placedFor; // the parent's bounds the card was laid out for
+    juce::Rectangle<int> placedFor, placed; // the parent's bounds the card was laid out for, and where it went
     onboarding::EmptyHint kind;
     std::function<juce::Rectangle<int>()> where;
     juce::OwnedArray<juce::TextButton> buttons;
