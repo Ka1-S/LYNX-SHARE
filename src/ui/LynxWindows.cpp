@@ -1,5 +1,4 @@
 #include "ui/LynxWindows.h"
-#include "engine/SafeWrite.h"
 
 #include <juce_events/juce_events.h>
 
@@ -215,7 +214,7 @@ void deliver (const juce::String& line)
 void writeEntry (const Entry& e)
 {
     if (folder().createDirectory())
-        safewrite::replaceWithText (entryFile (e.pid), juce::JSON::toString (toVar (e)));
+        entryFile (e.pid).replaceWithText (juce::JSON::toString (toVar (e)));
 }
 
 bool deliverTo (const Entry& e, const juce::String& line)

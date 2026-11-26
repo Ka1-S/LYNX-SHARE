@@ -1,5 +1,4 @@
 #include "ui/OtherAppsExport.h"
-#include "engine/SafeWrite.h"
 
 #include <map>
 
@@ -299,7 +298,7 @@ bool write (const Song& original, const juce::String& projectName, const exportb
             written.push_back (w.toStdString());
         for (const auto& f : result.failed)
             failed.push_back (f.toStdString());
-        if (safewrite::replaceWithText (fileOf (plan.readme), fromUtf8 (exportbundle::readme (song, plan, seconds, written, failed))))
+        if (fileOf (plan.readme).replaceWithText (fromUtf8 (exportbundle::readme (song, plan, seconds, written, failed))))
             result.written.add (fromUtf8 (plan.readme));
         else
             result.failed.add (fromUtf8 (plan.readme));

@@ -1,6 +1,4 @@
 #include "engine/MidiFileIo.h"
-#include "ui/I18n.h"
-#include "engine/SafeWrite.h"
 
 #include "core/NoteChance.h"
 
@@ -384,10 +382,12 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
         midi.addTrack (seq);
     }
 
-    // (round 190rm: the checked writer; before, the old file was deleted first and a failed write was not seen)
-    if (juce::String why; ! safewrite::writeWith (file, [&midi] (juce::OutputStream& out) { return midi.writeTo (out); }, why))
+    file.deleteFile();
+    juce::FileOutputStream out (file);
+
+    if (out.failedToOpen() || ! midi.writeTo (out))
     {
-        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
+        error = utf8 ("could not write ") + file.getFullPathName();
         return false;
     }
 

@@ -1,6 +1,4 @@
 #include "engine/ProjectFile.h"
-#include "ui/I18n.h"
-#include "engine/SafeWrite.h"
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/Sections.h"
 #include "core/ChordLane.h"
@@ -5255,14 +5253,13 @@ bool save (const Song& song, const juce::File& file, juce::String& error)
 
 bool save (const Song& song, const juce::File& file, juce::String& error, const WindowLayout& layout)
 {
-    // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project. Round 190rm: through
-    // engine/SafeWrite.h, which checks the write before the swap (JUCE's replaceWithText swapped a truncated file over
-    // the project on a full disk: the project was lost, then the read-back below said so)
+    // Write to a temp file and swap, so a mid-write error doesn't destroy the previous project.
+    juce::TemporaryFile temp (file);
     const auto json = withWindowLayout (toJson (song), layout);
 
-    if (juce::String why; ! safewrite::writeText (file, json, why, false, false, nullptr))
+    if (! temp.getFile().replaceWithText (json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary())
     {
-        error = tr ("Not saved: {0}. Your project file was not changed.", { tr (why) });
+        error = utf8 ("could not write ") + file.getFullPathName();
         return false;
     }
 

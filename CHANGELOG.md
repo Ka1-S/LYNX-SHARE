@@ -3,19 +3,6 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
-## 0.1.31.3 alpha — safety fixes
-
-A third hotfix for 0.1.31, with two safety fixes.
-
-- Fixed: Export to FL Studio (.flp and FL zip) wrote a plugin control's song-start value ("Init song with this
-  position", common in FL projects opened in LYNX) on the wrong scale in 0.1.31 to 0.1.31.2. FL could then play the
-  exported song as a full-scale constant signal: FL 2026 did so with LYNX's export of the demo Thief, loud enough to hurt
-  ears and speakers. Re-export such .flp files, and turn the volume down before opening an older export in FL.
-- Fixed: in every release since 0.1.30, a save on a full disk (or a failing or unplugged drive) replaced the project with
-  a cut-off file; Save as, autosave, backups, every export and the settings files too. LYNX now replaces a file only
-  after the new one is written whole and has reached the disk; otherwise the original stays as it was and LYNX says why
-  ("Not saved: the disk is full. Your project file was not changed.").
-
 ## 0.1.31.2 alpha — fixes
 
 A second hotfix for 0.1.31.

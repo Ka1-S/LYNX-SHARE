@@ -1,5 +1,4 @@
 #include "ui/WindowClipboard.h"
-#include "engine/SafeWrite.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -76,7 +75,7 @@ void publish (crossclipboard::Payload payload)
     ownStamp() = payload.stamp;
     juce::SystemClipboard::copyTextToClipboard (text);
     if (sideFolder().createDirectory())
-        safewrite::replaceWithText (latestFile(), text);
+        latestFile().replaceWithText (text);
 }
 
 std::optional<crossclipboard::Payload> incoming (crossclipboard::Kind kind)

@@ -144,7 +144,7 @@ TEST (flvsti190fw_scan_child_reports_and_the_parent_watches)
     CHECK (host.find ("activityFile (result).deleteFile();") != std::string::npos);
     // the one-time retry of files blacklisted by older scans runs once more
     CHECK (host.find ("retried.loadFileAsString().getIntValue() < 3") != std::string::npos);
-    CHECK (host.find ("safewrite::replaceWithText (retried, \"3\\n\");") != std::string::npos); // (round 190rm: the checked writer)
+    CHECK (host.find ("retried.replaceWithText (\"3\\n\");") != std::string::npos);
     // and a VST2 module can be added by hand
     const auto manager = readFile ("src/ui/PluginManager.cpp");
     CHECK (manager.find ("\"*.vst3;*.clap;*.dll\"") != std::string::npos);

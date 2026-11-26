@@ -1,5 +1,4 @@
 #include "platform/Package.h"
-#include "engine/SafeWrite.h"
 
 #include "core/StorePackage.h"
 #include "platform/Paths.h"
@@ -86,7 +85,7 @@ void migrateFromUnpackaged (const juce::File& target)
                 copied.add (name);
         }
     }
-    safewrite::replaceWithText (marker, "Copied from " + old.getFullPathName() + " on first start of the packaged LYNX SHARE:\n"
+    marker.replaceWithText ("Copied from " + old.getFullPathName() + " on first start of the packaged LYNX SHARE:\n"
                             + copied.joinIntoString ("\n") + "\n");
 }
 } // namespace
@@ -161,7 +160,7 @@ juce::String packageReport()
     // a file written to the settings folder can be read back (the CI step checks it from outside the package too)
     const auto probe = settings.getChildFile ("package-probe.txt");
     const auto stamp = juce::String (juce::Time::currentTimeMillis());
-    const bool wrote = safewrite::replaceWithText (probe, stamp) && probe.loadFileAsString() == stamp;
+    const bool wrote = probe.replaceWithText (stamp) && probe.loadFileAsString() == stamp;
     lines.add ("probe=" + probe.getFullPathName() + (wrote ? " written" : " FAILED"));
     ok = ok && wrote;
     if (! runningPackaged())

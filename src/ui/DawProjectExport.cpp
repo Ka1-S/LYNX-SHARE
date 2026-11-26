@@ -1,5 +1,4 @@
 #include "ui/DawProjectExport.h"
-#include "engine/SafeWrite.h"
 
 #include <map>
 
@@ -63,10 +62,9 @@ bool writeDawProjectFile (const Song& song, PluginHost* host, const juce::File& 
         error = tr ("The DAWproject file could not be written");
         return false;
     }
-    // (round 190rm: the checked writer: a full disk left a cut .dawproject that "exported" before)
-    if (juce::String why; ! safewrite::writeData (target, result.bytes.data(), result.bytes.size(), why))
+    if (! target.replaceWithData (result.bytes.data(), result.bytes.size()))
     {
-        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), target.getFileName() });
+        error = tr ("Could not write {0}", { target.getFullPathName() });
         return false;
     }
     return true;

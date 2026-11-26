@@ -1,5 +1,4 @@
 #include "core/MeterScale.h"
-#include "engine/SafeWrite.h"
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
@@ -3913,7 +3912,7 @@ bool saveMixerTrackState (AudioEngine& engine, int track, const juce::File& file
         return false;
     engine.capturePluginStates(); // the plugins' current settings go into the state
     file.getParentDirectory().createDirectory();
-    return safewrite::replaceWithText (file, ProjectFile::mixerTrackStateToJson (engine.getSong().mixer[(std::size_t) track]));
+    return file.replaceWithText (ProjectFile::mixerTrackStateToJson (engine.getSong().mixer[(std::size_t) track]));
 }
 
 // FL's "Auto-create audio clip" (round 167a [SHOT s28–s37]): the rendered files go on the Playlist, one undo step

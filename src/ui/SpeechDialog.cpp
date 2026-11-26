@@ -1,5 +1,4 @@
 #include "ui/SpeechDialog.h"
-#include "engine/SafeWrite.h"
 
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
@@ -376,7 +375,7 @@ void editThenLoad (AudioEngine& engine, const juce::File& file, std::function<vo
         auto target = folder.getChildFile (juce::String::fromUTF8 (speech::suggestedFileName (edited).c_str()));
         if (target.existsAsFile())
             target = target.getNonexistentSibling (false);
-        if (! safewrite::replaceWithText (target, juce::String::fromUTF8 (speech::write (edited).c_str()), false, false, "\r\n"))
+        if (! target.replaceWithText (juce::String::fromUTF8 (speech::write (edited).c_str()), false, false, "\r\n"))
             return then (file);
         then (target);
     });

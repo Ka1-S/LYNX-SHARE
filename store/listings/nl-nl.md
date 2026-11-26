@@ -49,7 +49,7 @@ LYNX SHARE is in alfa: verwacht nog wat ruwe randjes en meld problemen alsjeblie
 
 ## What's new
 
-LYNX SHARE 0.1.31.3 verhelpt twee veiligheidsproblemen: .flp-exports die FL Studio kon afspelen als een constant signaal op volle schaal, en opslaan op een volle schijf dat het bestand verving door een afgekapte kopie. Exporteer .flp-bestanden die met 0.1.31 tot en met 0.1.31.2 zijn gemaakt en startwaarden op plugin-regelaars gebruiken opnieuw.
+LYNX SHARE 0.1.31.2 repareert een waarschijnlijke oorzaak van een crash op de startpagina, de toetsenbordinstelling "LYNX eerst" boven gedockte VST3-plugins, uitgerekte clips die hun eerste maat herhaalden, automatiseringsbanen gemaakt van FL-projecten, geëxporteerde .flp-bestanden die FL weigerde, presets van FL's eigen synths in de Browser en een paar kleinere problemen.
 
 LYNX SHARE 0.1.31: een ingebouwde Tracker die ook trackermodules (.mod, .xm, .s3m, .it) opent; LYNX Model, fysieke
 modellen van marimba, vibrafoon, xylofoon, glockenspiel, buisklokken en kalimba; JSFX-effect- en instrumentscripts;

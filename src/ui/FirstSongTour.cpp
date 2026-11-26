@@ -1,5 +1,4 @@
 #include "ui/FirstSongTour.h"
-#include "engine/SafeWrite.h"
 
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
@@ -529,7 +528,7 @@ juce::File FirstSongTour::stateFile() { return platform::settingsFile ("simple-t
 void FirstSongTour::save()
 {
     if (persistent)
-        safewrite::replaceWithText (stateFile(), tour::serialize (machine.state()));
+        stateFile().replaceWithText (tour::serialize (machine.state()));
 }
 
 bool FirstSongTour::shouldOfferWelcome() const { return ! machine.state().welcomeSeen && ! machine.state().done && ! machine.canContinue(); }

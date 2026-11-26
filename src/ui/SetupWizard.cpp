@@ -1,5 +1,4 @@
 #include "ui/SetupWizard.h"
-#include "engine/SafeWrite.h"
 
 #include <array>
 
@@ -610,7 +609,7 @@ bool setupWizardDone()
 void markSetupWizardDone()
 {
     if (! setupFile().existsAsFile())
-        safewrite::replaceWithText (setupFile(), juce::Time::getCurrentTime().toISO8601 (true));
+        setupFile().replaceWithText (juce::Time::getCurrentTime().toISO8601 (true));
 }
 
 bool backgroundScanAtStart()
@@ -620,6 +619,6 @@ bool backgroundScanAtStart()
 
 void setBackgroundScanAtStart (bool on)
 {
-    safewrite::replaceWithText (scanAtStartFile(), on ? "1" : "0");
+    scanAtStartFile().replaceWithText (on ? "1" : "0");
 }
 } // namespace lynx

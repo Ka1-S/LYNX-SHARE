@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="67070337";
+window.LYNX_LANG=lang;window.LYNX_V="be29b165";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=67070337">
+<link rel="stylesheet" href="/assets/site.css?v=be29b165">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -91,11 +91,11 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <main>
 <section class="hero" id="top">
   <div class="wrap">
-    <a class="pill" href="/updates/"><b class="ver-tag">0.1.31.3-ALPHA</b><span data-i18n="hero.pill">Free &amp; open source · Windows · macOS · Linux</span></a>
+    <a class="pill" href="/updates/"><b class="ver-tag">0.1.31.2-ALPHA</b><span data-i18n="hero.pill">Free &amp; open source · Windows · macOS · Linux</span></a>
     <h1 data-i18n-words="hero.title"><span class="w" style="--i:0">A</span> <span class="w" style="--i:1">lightweight</span> <span class="w" style="--i:2">DAW,</span> <span class="grad w" style="--i:3">fully open source.</span></h1>
     <p class="lead" data-i18n="home.lead">LYNX SHARE is a DAW with three layouts in one program: by default it works the way FL Studio does, with the Channel rack, Piano roll, Playlist and Mixer and the same shortcuts; a Clip-launch layout launches clips and scenes in the style of Ableton Live; and a Simple layout mixes BandLab's one-window ease with FL Studio Mobile's way of working. It opens FL Studio projects (.flp), Ableton Live sets (.als), FL Studio Mobile projects (.flm) and DAWproject files, and exports all four back. It is free under the AGPL-3.0 and still an alpha.</p>
     <div class="os-btns" id="download"><a class="btn btn-ghost" data-os="win" data-dl="win.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6l7.4-1v7H3zM11.4 4.4L21 3v8.6h-9.6zM3 12.4h7.4v7.1L3 18.4zM11.4 12.4H21V21l-9.6-1.4z"/></svg><span>Windows</span><small data-i18n="dl.fInstaller">Installer</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a><a class="btn btn-ghost" data-os="mac" data-dl="mac.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.6.9-.8 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.7-1-2.7-4zM14.1 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.2-.5 2.8-1.3z"/></svg><span>macOS</span><small data-i18n="dl.fUniversal">Universal</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a><a class="btn btn-ghost" data-os="linux" data-dl="linux.main" href="https://github.com/Ka1-S/LYNX-SHARE/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12 2c-2.3 0-3.7 1.8-3.7 4.3 0 1.3.3 2.2-.6 3.6C6.4 11.7 5 13.9 5 16.4c0 .9.2 1.6.5 2.2-.9.3-1.6.9-1.6 1.6 0 1.1 1.7 1.4 3.3 1.6 1 .1 1.9.6 2.8.6.8 0 1.4-.5 2-.5s1.2.5 2 .5c.9 0 1.8-.5 2.8-.6 1.6-.2 3.3-.5 3.3-1.6 0-.7-.7-1.3-1.6-1.6.3-.6.5-1.3.5-2.2 0-2.5-1.4-4.7-2.7-6.5-.9-1.4-.6-2.3-.6-3.6C15.7 3.8 14.3 2 12 2zm-1.6 3.4a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zm3.2 0a.9 1.1 0 110 2.2.9 1.1 0 010-2.2zM12 11c-2 0-3.4 2.3-3.4 5.2 0 1.5.6 2.6 1.6 3h3.6c1-.4 1.6-1.5 1.6-3 0-2.9-1.4-5.2-3.4-5.2z"/></svg><span>Linux</span><small data-i18n="dl.fAppImage">AppImage</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a></div>
-    <div class="meta"><span class="ver-line">v0.1.31.3-alpha</span> · AGPL-3.0 · <a href="/download/" data-i18n="home.allDl">portable versions and install notes</a></div>
+    <div class="meta"><span class="ver-line">v0.1.31.2-alpha</span> · AGPL-3.0 · <a href="/download/" data-i18n="home.allDl">portable versions and install notes</a></div>
     <div class="stage">
       <div class="screen"><img src="/assets/img/hero.webp?v=0.1.31" srcset="/assets/img/hero.webp?v=0.1.31 1x, /assets/img/hero@2x.webp?v=0.1.31 2x" alt="LYNX SHARE with the Channel Rack, Piano Roll, Playlist and Mixer open" data-i18n-alt="alt.hero" width="1920" height="1080"></div>
     </div>
@@ -128,7 +128,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     </div>
     <dl class="facts">
       <div><dt data-i18n="fact.sys">Systems</dt><dd data-i18n="fact.sysV">Windows 10 / 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel), Linux x86_64 or arm64 with glibc 2.35 or newer</dd></div>
-      <div><dt data-i18n="fact.ver">Version</dt><dd><span class="ver-line">v0.1.31.3-alpha</span> (<a href="/updates/" data-i18n="fact.verL">what changed</a>)</dd></div>
+      <div><dt data-i18n="fact.ver">Version</dt><dd><span class="ver-line">v0.1.31.2-alpha</span> (<a href="/updates/" data-i18n="fact.verL">what changed</a>)</dd></div>
       <div><dt data-i18n="fact.price">Price</dt><dd data-i18n="fact.priceV">Free. No account, no subscription.</dd></div>
       <div><dt data-i18n="fact.lic">Licence</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
       <div><dt data-i18n="fact.opens">Opens</dt><dd data-i18n="fact.opensV">.lynx (its own format), .flp, .als (Live 11 and 12), .flm (partial), .dawproject, GarageBand .band (partial), BandLab .blx (partial), .mid, tracker modules .mod, .xm, .s3m, .it (partial), zipped projects .zip</dd></div>
@@ -163,7 +163,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="latest">
   <div class="wrap">
     <h2 data-i18n="home.latestT">Latest update</h2>
-    <div class="latest"><div><div class="ver">0.1.31.3-alpha</div><time datetime="2026-11-26">2026-11-26</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31.3-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.31.3.t">Two safety fixes for 0.1.31</h3><p class="muted" data-i18n="u.0.1.31.3.s">LYNX SHARE 0.1.31.3 fixes two safety problems: .flp exports that FL Studio could play as a full-scale constant signal, and saves on a full disk that replaced the file with a cut-off copy. Re-export .flp files made with 0.1.31 to 0.1.31.2 that use song-start values on plugin controls.</p><ul style="margin-top:12px"></ul><p class="more"><a class="tlink" href="/updates/#v0.1.31.3-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
+    <div class="latest"><div><div class="ver">0.1.31.2-alpha</div><time datetime="2026-11-25">2026-11-25</time><a class="tlink" href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31.2-alpha" data-i18n="up.gh">Full notes on GitHub</a></div><div><h3 data-i18n="u.0.1.31.2.t">More fixes for 0.1.31</h3><p class="muted" data-i18n="u.0.1.31.2.s">LYNX SHARE 0.1.31.2 fixes a likely cause of a start page crash, the &quot;LYNX first&quot; keyboard setting over docked VST3 plugins, stretched clips that looped their first bar, automation lanes made from FL projects, exported .flp files that FL refused, presets of FL's stock synths in the Browser and a few smaller issues.</p><ul style="margin-top:12px"></ul><p class="more"><a class="tlink" href="/updates/#v0.1.31.2-alpha" data-i18n="home.latestAll">Everything in this release, and earlier ones</a></p></div></div>
   </div>
 </section>
 
@@ -236,7 +236,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=67070337" defer></script>
-<script src="/assets/motion.js?v=67070337" defer></script>
+<script src="/assets/site.js?v=be29b165" defer></script>
+<script src="/assets/motion.js?v=be29b165" defer></script>
 </body>
 </html>

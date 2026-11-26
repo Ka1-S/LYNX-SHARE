@@ -1,5 +1,4 @@
 #include "engine/AudioEngine.h"
-#include "engine/SafeWrite.h"
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/AutoLook.h"
@@ -209,7 +208,7 @@ const natives::FlAccess& flStudioAccess()
                 juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
-            if (! file.existsAsFile() && ! safewrite::replaceWithData (file, wav.data(), wav.size()))
+            if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
                 return {};
             return file.getFullPathName().toStdString();
         };
@@ -507,7 +506,7 @@ struct AudioEngine::DeviceStateSaver final : public juce::ChangeListener
 void AudioEngine::saveAudioDeviceState()
 {
     if (auto xml = deviceManager.createStateXml())
-        fileJobs.post ([text = xml->toString(), file = audioDeviceFile()] { safewrite::replaceWithText (file, text); });
+        fileJobs.post ([text = xml->toString(), file = audioDeviceFile()] { file.replaceWithText (text); });
 }
 
 void AudioEngine::restoreAudioDeviceState (const juce::XmlElement* state)
@@ -515,7 +514,7 @@ void AudioEngine::restoreAudioDeviceState (const juce::XmlElement* state)
     deviceStateSaver = nullptr;
     fileJobs.post ([text = state != nullptr ? state->toString() : juce::String(), restore = state != nullptr, file = audioDeviceFile()] {
         if (restore)
-            safewrite::replaceWithText (file, text);
+            file.replaceWithText (text);
         else
             file.deleteFile();
     });
@@ -2290,7 +2289,7 @@ void AudioEngine::setRecordingSettings (const RecordingSettings& settings)
     for (const auto& [key, samples] : settings.measured)
         text << "measured=" << samples << "\t" << juce::String::fromUTF8 (key.c_str()) << "\n";
     if (deviceStateSaver != nullptr) // (a headless engine — tests, export — keeps the user's file as it is)
-        safewrite::replaceWithText (recordingSettingsFile(), text);
+        recordingSettingsFile().replaceWithText (text);
     sendChangeMessage();
 }
 
@@ -2615,12 +2614,12 @@ void AudioEngine::writeJournals()
         j.playlistTrack = -1;
         j.project = recordingStem.toStdString();
         const auto journal = journalFor (take->file);
-        safewrite::replaceWithText (journal, juce::String::fromUTF8 (takes::journalText (j).c_str()));
+        journal.replaceWithText (juce::String::fromUTF8 (takes::journalText (j).c_str()));
         list.addIfNotAlreadyThere (journal.getFullPathName());
         ++k;
     }
     if (deviceStateSaver != nullptr)
-        safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
+        inProgressFile().replaceWithText (list.joinIntoString ("\n"));
 }
 
 void AudioEngine::finishAudioTake()
@@ -2680,7 +2679,7 @@ void AudioEngine::finishAudioTake()
             if (list.isEmpty())
                 inProgressFile().deleteFile();
             else
-                safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
+                inProgressFile().replaceWithText (list.joinIntoString ("\n"));
         }
     };
 
@@ -2843,7 +2842,7 @@ void AudioEngine::forgetInterruptedTakes (const std::vector<takes::Journal>& rec
         if (list.isEmpty())
             inProgressFile().deleteFile();
         else
-            safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
+            inProgressFile().replaceWithText (list.joinIntoString ("\n"));
     }
 }
 
@@ -3487,7 +3486,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         applyLinkPrefs();
     }
     if (save)
-        safewrite::replaceWithText (midiSettingsFile(), juce::String (p.toText()));
+        midiSettingsFile().replaceWithText (juce::String (p.toText()));
     sendChangeMessage();
 }
 
@@ -4810,7 +4809,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 0x7FFFFFFF));
             const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
 
-            if (! file.existsAsFile() && ! safewrite::replaceWithData (file, wav.data(), wav.size()))
+            if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
                 return {};
 
             return file.getFullPathName().toStdString();
@@ -4899,7 +4898,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     if (target.existsAsFile() && target.loadFileAsData (existing) && existing.getSize() == wav.size()
                         && std::memcmp (existing.getData(), wav.data(), wav.size()) == 0)
                         return target.getFullPathName().toStdString(); // (imported before: the same file)
-                    if (! safewrite::replaceWithData (target, wav.data(), wav.size()))
+                    if (! target.replaceWithData (wav.data(), wav.size()))
                         return {};
                     return target.getFullPathName().toStdString();
                 };

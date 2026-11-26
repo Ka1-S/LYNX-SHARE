@@ -1,7 +1,6 @@
 // The Helix editor (ui/HelixEditor.h): Live's Wavetable layout (round 190ja shots), drawn by LYNX code.
 
 #include "ui/HelixEditor.h"
-#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <array>
@@ -2586,7 +2585,7 @@ private:
                                    return;
                                const auto file = c.getResult().withFileExtension ("wav");
                                const auto bytes = w::userTableWav (safe->table);
-                               const bool ok = safewrite::replaceWithData (file, bytes.data(), bytes.size());
+                               const bool ok = file.replaceWithData (bytes.data(), bytes.size());
                                safe->note = ok ? tr ("Saved {0}", { file.getFullPathName() }) : juce::String();
                                safe->error = ok ? juce::String() : tr ("could not write {0}", { file.getFullPathName() });
                                safe->repaint();

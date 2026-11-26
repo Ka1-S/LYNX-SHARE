@@ -1,5 +1,4 @@
 #include "ui/GeneratorPresetMenu.h"
-#include "engine/SafeWrite.h"
 
 #include "ui/I18n.h"
 #include "ui/PluginPresetMenu.h"
@@ -68,7 +67,7 @@ bool save (const ChannelDef& channel, const juce::String& name, juce::File& writ
         return false;
     }
     const auto file = folder.getChildFile (utf8 (genpresets::fileNameFor (name.toStdString())) + genpresets::extension);
-    if (! safewrite::replaceWithText (file, utf8 (genpresets::toText (name.toStdString(), channel)), false, false, "\n"))
+    if (! file.replaceWithText (utf8 (genpresets::toText (name.toStdString(), channel)), false, false, "\n"))
     {
         error = tr ("The file could not be written.");
         return false;

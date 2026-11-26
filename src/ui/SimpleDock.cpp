@@ -1,5 +1,4 @@
 #include "ui/SimpleDock.h"
-#include "engine/SafeWrite.h"
 #include "ui/TrackerComponent.h"
 #include "ui/DemoMode.h" // (round 190np: the Drum Machine is a demo::CellSource)
 
@@ -1558,7 +1557,7 @@ private:
                                      lines.removeEmptyStrings();
                                      lines.addIfNotAlreadyThere (fc.getResult().getFullPathName());
                                      soundFontFoldersFile().getParentDirectory().createDirectory();
-                                     safewrite::replaceWithText (soundFontFoldersFile(), lines.joinIntoString ("\n") + "\n");
+                                     soundFontFoldersFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
                                      ensureSoundFontIndex (true);
                                      if (safe != nullptr)
                                          safe->refilter();
@@ -2628,7 +2627,7 @@ public:
         auto json = juce::JSON::parse (kitFile.loadFileAsString());
         if (auto* o = json.getDynamicObject())
             o->setProperty ("name", name);
-        return safewrite::replaceWithText (target, juce::JSON::toString (json)) && kitFile.deleteFile();
+        return target.replaceWithText (juce::JSON::toString (json)) && kitFile.deleteFile();
     }
 
     bool saveKit (const juce::String& rawName)
@@ -2666,7 +2665,7 @@ public:
         root->setProperty ("name", name);
         root->setProperty ("pads", pads);
         kitFolder().createDirectory();
-        return safewrite::replaceWithText (kitFolder().getChildFile (name + ".lynxkit"), juce::JSON::toString (juce::var (root.release())));
+        return kitFolder().getChildFile (name + ".lynxkit").replaceWithText (juce::JSON::toString (juce::var (root.release())));
     }
 
     bool openKit (const juce::File& file)
@@ -3748,7 +3747,7 @@ bool SimpleDock::setFavouritePreset (const juce::String& name, bool on)
     else
         lines.removeString (name.trim());
     favouritesFile().getParentDirectory().createDirectory();
-    return safewrite::replaceWithText (favouritesFile(), lines.joinIntoString ("\n") + (lines.isEmpty() ? "" : "\n"));
+    return favouritesFile().replaceWithText (lines.joinIntoString ("\n") + (lines.isEmpty() ? "" : "\n"));
 }
 
 bool SimpleDock::saveUserPreset (AudioEngine& engine, int insert, const juce::String& rawName)
@@ -3760,7 +3759,7 @@ bool SimpleDock::saveUserPreset (AudioEngine& engine, int insert, const juce::St
     const auto file = userPresetFolder().getChildFile (name + ProjectFile::mixerTrackStateExtension);
     file.getParentDirectory().createDirectory();
     const auto state = chains::stateOf (engine.getSong().mixer[(std::size_t) insert], name.toStdString());
-    if (! safewrite::replaceWithText (file, ProjectFile::mixerTrackStateToJson (state)))
+    if (! file.replaceWithText (ProjectFile::mixerTrackStateToJson (state)))
         return false;
     engine.editSong ([insert, n = name.toStdString()] (Song& s) {
         if (insert < (int) s.mixer.size())

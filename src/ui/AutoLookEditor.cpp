@@ -1,5 +1,4 @@
 #include "ui/AutoLookEditor.h"
-#include "engine/SafeWrite.h"
 
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
@@ -24,7 +23,7 @@ void save()
 {
     const auto f = file();
     f.getParentDirectory().createDirectory();
-    safewrite::replaceWithText (f, juce::String::fromUTF8 (autolook::toText (autolook::current()).c_str()));
+    f.replaceWithText (juce::String::fromUTF8 (autolook::toText (autolook::current()).c_str()));
 }
 } // namespace autolookui
 

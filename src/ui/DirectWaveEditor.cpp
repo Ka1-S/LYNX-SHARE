@@ -1,5 +1,4 @@
 #include "ui/DirectWaveEditor.h"
-#include "engine/SafeWrite.h"
 #include "ui/FileChoosers.h"
 
 #include <algorithm>
@@ -1485,7 +1484,7 @@ private:
         dw::setProgram (doc, shown, prog);
         auto program = dw::program (doc, shown);
         const auto bytes = dw::writeProgramFile (doc, shown);
-        const auto ok = safewrite::replaceWithData (file, bytes.data(), bytes.size());
+        const auto ok = file.replaceWithData (bytes.data(), bytes.size());
         if (ok && program.file != file.getFileName().toStdString())
         {
             prog.file = file.getFileName().toStdString();
@@ -1498,7 +1497,7 @@ private:
     bool saveBankTo (const juce::File& file)
     {
         const auto bytes = dw::writeBankFile (doc);
-        return safewrite::replaceWithData (file, bytes.data(), bytes.size());
+        return file.replaceWithData (bytes.data(), bytes.size());
     }
 
     // Open program / bank...: a .dwp into the shown program, a .dwb as the whole bank, an .sfz as a program (LYNX's mapping)

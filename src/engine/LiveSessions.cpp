@@ -1,5 +1,4 @@
 #include "engine/LiveSessions.h"
-#include "engine/SafeWrite.h"
 
 #include "core/LiveRekey.h" // round 190on (removing a guest)
 
@@ -2729,7 +2728,7 @@ void LiveSessionManager::writeJournal (bool now)
     auto write = [file, text]() -> Worker::Done {
         file.getParentDirectory().createDirectory();
         juce::TemporaryFile temp (file);
-        if (safewrite::replaceWithText (temp.getFile(), text))
+        if (temp.getFile().replaceWithText (text))
             temp.overwriteTargetFileWithTemporary();
         return {};
     };
@@ -2934,7 +2933,7 @@ void LiveSessionManager::writeGuestJournal (bool now)
     auto write = [file, text]() -> Worker::Done {
         file.getParentDirectory().createDirectory();
         juce::TemporaryFile temp (file);
-        if (safewrite::replaceWithText (temp.getFile(), text))
+        if (temp.getFile().replaceWithText (text))
             temp.overwriteTargetFileWithTemporary();
         return {};
     };

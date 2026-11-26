@@ -1,5 +1,4 @@
 #include "engine/PluginSandbox.h"
-#include "engine/SafeWrite.h"
 
 #include <array>
 #include <atomic>
@@ -39,7 +38,7 @@ SandboxMode pluginSandboxMode()
 
 void setPluginSandboxMode (SandboxMode mode)
 {
-    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("sandbox.txt"), mode == SandboxMode::perPlugin ? "1"
+    PluginHost::settingsFolder().getChildFile ("sandbox.txt").replaceWithText (mode == SandboxMode::perPlugin ? "1"
                                                                                : mode == SandboxMode::perVendor ? "vendor"
                                                                                : mode == SandboxMode::allTogether ? "all"
                                                                                : mode == SandboxMode::perPluginType ? "type"
@@ -108,7 +107,7 @@ void setPluginAlwaysSeparate (const juce::String& name, bool on)
     list.removeString (name.trim(), true);
     if (on)
         list.add (name.trim());
-    safewrite::replaceWithText (separateListFile(), list.joinIntoString ("\n") + (list.isEmpty() ? "" : "\n"));
+    separateListFile().replaceWithText (list.joinIntoString ("\n") + (list.isEmpty() ? "" : "\n"));
 }
 
 namespace
@@ -267,7 +266,7 @@ struct BitsCache
         juce::String text;
         for (const auto& [path, entry] : entries)
             text << (entry.second ? "1" : "0") << "\t" << juce::String (entry.first) << "\t" << path << "\n";
-        safewrite::replaceWithText (file(), text);
+        file().replaceWithText (text);
     }
 };
 

@@ -1,5 +1,4 @@
 #include "ui/SimpleTuner.h"
-#include "engine/SafeWrite.h"
 
 #include <cmath>
 #include <vector>
@@ -450,6 +449,6 @@ void setReference (double hz)
         return;
     referenceValue() = v;
     referenceFile().getParentDirectory().createDirectory();
-    safewrite::replaceWithText (referenceFile(), juce::String (v, 1));
+    referenceFile().replaceWithText (juce::String (v, 1));
 }
 } // namespace lynx::simpletunerui

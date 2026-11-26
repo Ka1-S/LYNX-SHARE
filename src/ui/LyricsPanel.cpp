@@ -1,5 +1,4 @@
 #include "ui/LyricsPanel.h"
-#include "engine/SafeWrite.h"
 
 #include "engine/AudioEngine.h"
 #include "ui/FileChoosers.h"
@@ -374,7 +373,7 @@ void LyricsPanel::exportAs (lyrics::Stamps stamps)
                            if (! file.hasFileExtension ("txt"))
                                file = file.withFileExtension ("txt");
                            const auto text = lyrics::exportText (engine.getSong(), stamps);
-                           if (! safewrite::replaceWithText (file, juce::String::fromUTF8 (text.c_str()), false, false, "\n"))
+                           if (! file.replaceWithText (juce::String::fromUTF8 (text.c_str()), false, false, "\n"))
                                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Export the notes"),
                                                                        tr ("Could not write {0}", { file.getFileName() }));
                        });

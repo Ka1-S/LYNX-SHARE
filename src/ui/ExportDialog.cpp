@@ -1,5 +1,4 @@
 #include "ui/ExportDialog.h"
-#include "engine/SafeWrite.h"
 
 #include "core/PatternBlocks.h"
 #include "core/ExportNaming.h"
@@ -993,7 +992,7 @@ private:
     void storePresets()
     {
         if (persistent)
-            safewrite::replaceWithText (exportPresetsFile(), juce::String::fromUTF8 (exportopts::presetsToText (presets).c_str()));
+            exportPresetsFile().replaceWithText (juce::String::fromUTF8 (exportopts::presetsToText (presets).c_str()));
     }
 
     void savePreset()
@@ -1477,7 +1476,7 @@ private:
     void renderClip()
     {
         readControls();
-        safewrite::replaceWithText (clipRenderSettingsFile(), juce::String (exportopts::toText (options)));
+        clipRenderSettingsFile().replaceWithText (juce::String (exportopts::toText (options)));
         auto mode = clip;
         const auto o = options;
         close(); // deletes this panel: no `this` after this point
@@ -1503,7 +1502,7 @@ private:
                 remembered.stemsIncludeMaster = beforeMaster.stemsIncludeMaster;
                 remembered.normalize = beforeMaster.normalize;
             }
-            safewrite::replaceWithText (exportSettingsFile(), juce::String (exportopts::toText (remembered)));
+            exportSettingsFile().replaceWithText (juce::String (exportopts::toText (remembered)));
         }
     }
 
@@ -1633,7 +1632,7 @@ private:
         lastFolder = base != juce::File() ? base : file.getParentDirectory();
         // round 190ap: what "Same as last time" repeats (the plain Export window only)
         if (persistent && additions)
-            safewrite::replaceWithText (exportLastFile(), juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));
+            exportLastFile().replaceWithText (juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));
         engineRef.capturePluginStates(); // the copy carries the current plugin state
 
         if (inRealTime) // round 165c: through the device, in real time
@@ -2615,7 +2614,7 @@ int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArra
         if (bone.kind == quickrender::Bone::Kind::mixer)
         {
             file = folder.getChildFile (name + ProjectFile::mixerTrackStateExtension);
-            ok = safewrite::replaceWithText (file, ProjectFile::mixerTrackStateToJson (song.mixer[(std::size_t) bone.track]));
+            ok = file.replaceWithText (ProjectFile::mixerTrackStateToJson (song.mixer[(std::size_t) bone.track]));
         }
         else if (bone.kind == quickrender::Bone::Kind::effect)
         {
@@ -2630,10 +2629,10 @@ int writeProjectBones (const Song& song, const juce::File& dir, juce::StringArra
                 juce::MemoryBlock state;
                 if (state.fromBase64Encoding (juce::String (slot.plugin.state)))
                     preset.state.assign ((const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize());
-                ok = ! preset.state.empty() && safewrite::replaceWithText (file, juce::String::fromUTF8 (pluginpresets::toText (preset).c_str()));
+                ok = ! preset.state.empty() && file.replaceWithText (juce::String::fromUTF8 (pluginpresets::toText (preset).c_str()));
             }
             else
-                ok = safewrite::replaceWithText (file, juce::String::fromUTF8 (presets::toText (slot.kind, bone.name, slot.params).c_str()));
+                ok = file.replaceWithText (juce::String::fromUTF8 (presets::toText (slot.kind, bone.name, slot.params).c_str()));
         }
         else
         {
@@ -2755,7 +2754,7 @@ juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& f
         panel.clickExportForCheck();
         expect ("a second export goes to the same file", started.size() == 2 && started.back() == wanted);
         // the file is there: asked first (Replace / Cancel), nothing started until then
-        safewrite::replaceWithText (wanted, "x");
+        wanted.replaceWithText ("x");
         panel.clickExportForCheck();
         auto* modal = juce::Component::getCurrentlyModalComponent();
         expect ("an existing file asks first", started.size() == 2 && dynamic_cast<juce::AlertWindow*> (modal) != nullptr);

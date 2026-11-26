@@ -1,5 +1,4 @@
 #include "ui/FlExtraEditors.h"
-#include "engine/SafeWrite.h"
 #include "ui/WindowPlaces.h"
 
 #include <algorithm>
@@ -1446,7 +1445,7 @@ bool runFlExtraShots (AudioEngine& engine, const juce::File& folder)
         if (! page.existsAsFile())
         {
             page = folder.getChildFile ("sample-page.html");
-            safewrite::replaceWithText (page, "<html><head><title>Notes</title></head><body><h1>Session notes</h1><p>Lead vocal: <b>take 3</b>, "
+            page.replaceWithText ("<html><head><title>Notes</title></head><body><h1>Session notes</h1><p>Lead vocal: <b>take 3</b>, "
                                   "comp the chorus from <i>take 5</i>.</p><ul><li>Kick: tighten the low end</li><li>Bass: sidechain to the "
                                   "kick</li></ul><hr><p>Reference: <a href=\"https://example.com\">example.com</a></p></body></html>");
         }
@@ -1584,7 +1583,7 @@ bool runFlExtraShots (AudioEngine& engine, const juce::File& folder)
             save (editor, "scratcher-dropped");
         }
     }
-    safewrite::replaceWithText (folder.getChildFile ("report.txt"), report);
+    folder.getChildFile ("report.txt").replaceWithText (report);
     return ok;
 }
 } // namespace lynx

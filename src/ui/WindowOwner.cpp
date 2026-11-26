@@ -1,5 +1,4 @@
 #include "core/EscClose.h"
-#include "engine/SafeWrite.h"
 #include "ui/WindowOwner.h"
 #include "core/HostKeyGate.h"
 #include "ui/NativeChild.h"
@@ -749,7 +748,7 @@ bool gpuRenderingEnabled()
 void setGpuRenderingEnabled (bool on)
 {
     gpuSetting = on ? 1 : 0;
-    safewrite::replaceWithText (platform::settingsFile ("gpu-rendering.txt"), on ? "1" : "0");
+    platform::settingsFile ("gpu-rendering.txt").replaceWithText (on ? "1" : "0");
     for (int i = juce::ComponentPeer::getNumPeers(); --i >= 0;)
         if (auto* peer = juce::ComponentPeer::getPeer (i))
         {

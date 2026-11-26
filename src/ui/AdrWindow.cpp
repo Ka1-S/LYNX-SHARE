@@ -1,5 +1,4 @@
 #include "ui/AdrWindow.h"
-#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <cmath>
@@ -577,7 +576,7 @@ private:
             auto file = fc.getResult();
             if (! file.hasFileExtension ("csv"))
                 file = file.withFileExtension ("csv");
-            safewrite::replaceWithText (file, juce::String::fromUTF8 (adr::toCsv (s.adr.cues, s.video.rate, s.video.startTimecode).c_str()), false, false, "\r\n");
+            file.replaceWithText (juce::String::fromUTF8 (adr::toCsv (s.adr.cues, s.video.rate, s.video.startTimecode).c_str()), false, false, "\r\n");
             self->status.setText (tr ("Saved {0}", { file.getFileName() }), juce::dontSendNotification);
         });
     }

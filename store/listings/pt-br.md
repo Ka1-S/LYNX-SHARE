@@ -56,7 +56,7 @@ O LYNX SHARE está em fase alfa: pode ter arestas; por favor, relate problemas n
 
 ## What's new
 
-O LYNX SHARE 0.1.31.3 corrige dois problemas de segurança: exportações .flp que o FL Studio podia tocar como um sinal constante em escala máxima, e salvamentos num disco cheio que trocavam o arquivo por uma cópia cortada. Exporte de novo os arquivos .flp feitos da 0.1.31 à 0.1.31.2 que usam valores de início da música em controles de plugins.
+O LYNX SHARE 0.1.31.2 corrige uma causa provável de um travamento da página inicial, a opção de teclado "LYNX primeiro" sobre plugins VST3 encaixados, clipes esticados que repetiam só o primeiro compasso, as faixas de automação criadas de projetos do FL, arquivos .flp exportados que o FL recusava, presets dos sintetizadores do FL no Browser e alguns problemas menores.
 
 LYNX SHARE 0.1.31: um Tracker integrado que também abre módulos tracker (.mod, .xm, .s3m, .it); LYNX Model, modelos
 físicos de marimba, vibrafone, xilofone, glockenspiel, sinos tubulares e kalimba; scripts de efeitos e instrumentos

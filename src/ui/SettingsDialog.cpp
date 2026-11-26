@@ -1,5 +1,4 @@
 #include "ui/SettingsDialog.h"
-#include "engine/SafeWrite.h"
 #include "ui/PlaylistComponent.h"
 #include "core/Comping.h"
 #include "ui/FileChoosers.h"
@@ -637,7 +636,7 @@ public:
             [persistent, browserChanged] (const juce::StringArray& list) {
                 if (! persistent)
                     return;
-                safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("browser-folders.txt"), list.joinIntoString ("\n"));
+                PluginHost::settingsFolder().getChildFile ("browser-folders.txt").replaceWithText (list.joinIntoString ("\n"));
                 if (browserChanged)
                     browserChanged();
             }, persistent);
@@ -676,7 +675,7 @@ public:
             },
             [persistent] (const juce::StringArray& list) {
                 if (persistent)
-                    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("flm-resources.txt"), list.joinIntoString ("\n"));
+                    PluginHost::settingsFolder().getChildFile ("flm-resources.txt").replaceWithText (list.joinIntoString ("\n"));
             }, persistent);
 
         // Round 190pj (issue #241): JSFX scripts. Documents/LYNX/JSFX, the bundled pack and REAPER's Effects folder are

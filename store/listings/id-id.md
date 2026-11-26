@@ -49,7 +49,9 @@ LYNX SHARE masih dalam tahap alfa: mungkin masih ada kekurangan di sana-sini, ja
 
 ## What's new
 
-LYNX SHARE 0.1.31.3 memperbaiki dua masalah keamanan: ekspor .flp yang bisa diputar FL Studio sebagai sinyal konstan berskala penuh, dan penyimpanan di disk penuh yang mengganti file dengan salinan terpotong. Ekspor ulang file .flp yang dibuat dengan 0.1.31 sampai 0.1.31.2 yang memakai nilai awal lagu pada kontrol plugin.
+LYNX SHARE 0.1.31.2 memperbaiki kemungkinan penyebab crash di halaman awal, setelan keyboard "LYNX dulu" di atas plugin VST3 yang di-dock, klip yang direntangkan yang mengulang bar pertamanya, lajur otomasi dari proyek FL, file .flp hasil ekspor yang ditolak FL, preset synth bawaan FL di Browser, dan beberapa masalah kecil.
+
+LYNX SHARE 0.1.31.1 memperbaiki yang kamu laporkan di 0.1.31: automasi proyek FL pada kontrol, jendela plugin yang berhenti terbuka, tampilan Device, ekspor dengan folder di nama file, klip di track instrumen, crash di bilah petunjuk, dan memori saat mulai.
 
 LYNX SHARE 0.1.31: Tracker bawaan yang juga membuka modul tracker (.mod, .xm, .s3m, .it); LYNX Model, model fisik
 marimba, vibraphone, xylophone, glockenspiel, tubular bells, dan kalimba; skrip efek dan instrumen JSFX; kartu

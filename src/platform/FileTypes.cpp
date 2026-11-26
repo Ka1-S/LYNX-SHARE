@@ -1,5 +1,4 @@
 #include "platform/FileTypes.h"
-#include "engine/SafeWrite.h"
 #include "core/DesktopEntries.h"
 #include "platform/Package.h"
 #include "platform/Paths.h"
@@ -102,7 +101,7 @@ bool writeEntry (const juce::File& appImage)
     lines.insert (2, "TryExec=" + appImage.getFullPathName());
     lines.add (marker);
 
-    const auto ok = entryFile().getParentDirectory().createDirectory() && safewrite::replaceWithText (entryFile(), lines.joinIntoString ("\n") + "\n");
+    const auto ok = entryFile().getParentDirectory().createDirectory() && entryFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
     if (const auto icon = appDir().getChildFile ("lynx.png"); icon.existsAsFile() && iconFile().getParentDirectory().createDirectory())
         icon.copyFileTo (iconFile());
     if (const auto mime = appDir().getChildFile ("usr/share/mime/packages/lynx-mime.xml"); mime.existsAsFile() && mimeFile().getParentDirectory().createDirectory())

@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.31.3 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.31.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -890,8 +890,7 @@ if(LYNX_BUILD_APP)
     add_executable(lynx_remote_project_tests
         tests/RemoteProjectControlTests.cpp
         src/engine/RemoteProjectDocument.cpp
-        src/engine/ProjectFile.cpp
-        tests/I18nTrForTests.cpp) # round 190ru: tr() for ProjectFile.cpp (the checked writer's save message)
+        src/engine/ProjectFile.cpp)
     target_include_directories(lynx_remote_project_tests PRIVATE src)
     target_compile_definitions(lynx_remote_project_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
         JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")
@@ -904,8 +903,7 @@ if(LYNX_BUILD_APP)
     add_executable(lynx_crossclipboard_tests
         tests/CrossClipboardTests.cpp
         src/engine/CrossClipboard.cpp
-        src/engine/ProjectFile.cpp
-        tests/I18nTrForTests.cpp) # round 190ru: tr() for ProjectFile.cpp (the checked writer's save message)
+        src/engine/ProjectFile.cpp)
     target_include_directories(lynx_crossclipboard_tests PRIVATE src)
     target_compile_definitions(lynx_crossclipboard_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
         JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")

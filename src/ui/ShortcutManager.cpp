@@ -1,5 +1,4 @@
 #include "ui/ShortcutManager.h"
-#include "engine/SafeWrite.h"
 
 #include "core/SearchQuery.h"
 #include "engine/PluginHost.h"
@@ -514,7 +513,7 @@ private:
     {
         if (! persistent)
             return;
-        safewrite::replaceWithText (keyMapFile(), juce::String (map.overridesJson()));
+        keyMapFile().replaceWithText (juce::String (map.overridesJson()));
         if (onChanged)
             onChanged();
     }

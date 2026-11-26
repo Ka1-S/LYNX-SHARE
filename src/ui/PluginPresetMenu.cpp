@@ -1,5 +1,4 @@
 #include "ui/PluginPresetMenu.h"
-#include "engine/SafeWrite.h"
 
 #include "core/FlWrapper.h"
 #include "core/PresetCycle.h"
@@ -336,7 +335,7 @@ bool save (juce::AudioPluginInstance& plugin, const juce::File& file, const juce
         bytes.assign (text.begin(), text.end());
     }
     file.getParentDirectory().createDirectory();
-    if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
+    if (! file.replaceWithData (bytes.data(), bytes.size()))
     {
         error = tr ("The file could not be written.");
         return false;
@@ -490,7 +489,7 @@ bool auditionOnLoad()
 void setAuditionOnLoad (bool on)
 {
     auditionCache() = on ? 1 : 0;
-    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("preset-audition.txt"), on ? "1" : "0");
+    PluginHost::settingsFolder().getChildFile ("preset-audition.txt").replaceWithText (on ? "1" : "0");
 }
 
 // --- the bar ---------------------------------------------------------------------------------------------------------

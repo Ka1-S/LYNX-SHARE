@@ -1,5 +1,4 @@
 #include "ui/VersionsPanel.h"
-#include "engine/SafeWrite.h"
 
 #include "ui/DemoMode.h"
 #include "ui/I18n.h"
@@ -382,7 +381,7 @@ bool setVersionLabel (const VersionsContext& c, const safety::versions::Entry& e
     const auto text = safety::versions::labelsToText (labels);
     if (text.empty())
         return ! file.existsAsFile() || file.deleteFile();
-    return safewrite::replaceWithText (file, juce::String::fromUTF8 (text.c_str()), false, false, "\n");
+    return file.replaceWithText (juce::String::fromUTF8 (text.c_str()), false, false, "\n");
 }
 
 safety::versions::Labels backupLabels (const juce::File& backupFolder, const juce::String& projectStem)
@@ -415,7 +414,7 @@ juce::String versionsSelfTest()
     std::map<juce::String, juce::String> contents;
     const auto write = [&contents] (const juce::File& f, const juce::String& text) {
         contents[f.getFullPathName()] = text;
-        return safewrite::replaceWithText (f, text);
+        return f.replaceWithText (text);
     };
     auto ok = write (project.getChildFile ("Song.lynx"), "one") && write (project.getChildFile ("Song_2.lynx"), "two two")
               && write (project.getChildFile ("Song_3.lynx"), "three") && write (project.getChildFile ("Other.lynx"), "other")

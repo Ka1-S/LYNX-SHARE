@@ -1,5 +1,4 @@
 #include "platform/LinuxRealtime.h"
-#include "engine/SafeWrite.h"
 
 #if JUCE_LINUX
 
@@ -348,7 +347,7 @@ bool shouldShowHint (const juce::File& flagFile)
 {
     if (deviceStatus.load() != Status::denied || flagFile.existsAsFile())
         return false;
-    safewrite::replaceWithText (flagFile, "shown\n");
+    flagFile.replaceWithText ("shown\n");
     return true;
 }
 } // namespace lynx::rt

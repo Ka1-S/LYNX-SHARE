@@ -1,5 +1,4 @@
 #include "ui/StemExtract.h"
-#include "engine/SafeWrite.h"
 
 #include <array>
 #include <atomic>
@@ -53,7 +52,7 @@ bool installed (const stemsplit::ModelFile& m) { return fileOf (m).getSize() == 
 // the options of the last extraction (round 190jr): kept in the settings folder
 juce::File optionsFile() { return platform::settingsFile ("stem-options.txt"); }
 stemsplit::Options savedOptions() { return stemsplit::optionsFromText (optionsFile().loadFileAsString().trim().toStdString()); }
-void saveOptions (const stemsplit::Options& o) { safewrite::replaceWithText (optionsFile(), juce::String (stemsplit::toText (o)) + "\n"); }
+void saveOptions (const stemsplit::Options& o) { optionsFile().replaceWithText (juce::String (stemsplit::toText (o)) + "\n"); }
 
 juce::String runtimeLoadError()
 {

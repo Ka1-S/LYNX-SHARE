@@ -1,5 +1,4 @@
 #include "ui/LoopInfo.h"
-#include "engine/SafeWrite.h"
 
 #include "core/SampleFiles.h"
 #include "engine/AudioEngine.h"
@@ -75,7 +74,7 @@ Shared::~Shared()
     {
         const auto f = cacheFile();
         const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
-        if (safewrite::replaceWithText (temp, text))
+        if (temp.replaceWithText (text))
             temp.moveFileTo (f);
     }
 }

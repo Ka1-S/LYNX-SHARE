@@ -1,5 +1,4 @@
 #include "ui/Theme.h"
-#include "engine/SafeWrite.h"
 #include "ui/ModRing.h"
 #include "ui/LiveLook.h"
 #include "ui/TextCache.h"
@@ -153,7 +152,7 @@ bool savedCondensedLabels() { return condensedFile().loadFileAsString().trim() =
 void saveCondensedLabels (bool on)
 {
     if (on)
-        safewrite::replaceWithText (condensedFile(), "1");
+        condensedFile().replaceWithText ("1");
     else
         condensedFile().deleteFile();
 }
@@ -1622,7 +1621,7 @@ void saveTextSize (int percent)
     if (textsize::clamp (percent) == textsize::standard)
         textSizeFile().deleteFile();
     else
-        safewrite::replaceWithText (textSizeFile(), juce::String (textsize::clamp (percent)));
+        textSizeFile().replaceWithText (juce::String (textsize::clamp (percent)));
 }
 
 // --- Settings › General › Bold text (round 190jp) ------------------------------------------------------------
@@ -1646,7 +1645,7 @@ void saveBoldText (int setting)
     if (juce::jlimit (0, 2, setting) == 0)
         boldTextFile().deleteFile();
     else
-        safewrite::replaceWithText (boldTextFile(), juce::String (juce::jlimit (0, 2, setting)));
+        boldTextFile().replaceWithText (juce::String (juce::jlimit (0, 2, setting)));
 }
 
 juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
@@ -1656,7 +1655,7 @@ void saveUiFont (const juce::String& family)
     if (family.isEmpty())
         uiFontFile().deleteFile();
     else
-        safewrite::replaceWithText (uiFontFile(), family);
+        uiFontFile().replaceWithText (family);
 }
 
 juce::String LookAndFeel::applyInterfaceFont (const juce::String& languageId, const juce::String& runOverride)

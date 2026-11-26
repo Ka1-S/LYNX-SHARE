@@ -3,7 +3,6 @@
 // Part of MainComponent (its members are defined here to keep MainComponent.cpp's hooks short).
 
 #include "ui/MainComponent.h"
-#include "engine/SafeWrite.h"
 
 #include "core/ClipLauncher.h"
 #include "core/DemoSongs.h"
@@ -38,7 +37,7 @@ void markSimpleWelcomeSeen (SimpleWorkflow* simple, bool persistent)
     if (! state.welcomeSeen)
     {
         state.welcomeSeen = true;
-        safewrite::replaceWithText (file, juce::String (tour::serialize (state)));
+        file.replaceWithText (juce::String (tour::serialize (state)));
     }
 }
 } // namespace
@@ -51,7 +50,7 @@ void MainComponent::loadOnboarding()
 void MainComponent::saveOnboarding()
 {
     if (persistent)
-        safewrite::replaceWithText (onboardingFile(), juce::String (onboarding::serialize (onboard)));
+        onboardingFile().replaceWithText (juce::String (onboarding::serialize (onboard)));
 }
 
 void MainComponent::setOnboardingForSnapshot (bool on)

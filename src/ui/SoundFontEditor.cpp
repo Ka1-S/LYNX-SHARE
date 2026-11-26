@@ -1,5 +1,4 @@
 #include "ui/SoundFontEditor.h"
-#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <atomic>
@@ -834,7 +833,7 @@ private:
                                       lines.removeEmptyStrings();
                                       lines.addIfNotAlreadyThere (fc.getResult().getFullPathName());
                                       soundFontFoldersFile().getParentDirectory().createDirectory();
-                                      safewrite::replaceWithText (soundFontFoldersFile(), lines.joinIntoString ("\n") + "\n");
+                                      soundFontFoldersFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
                                       ensureSoundFontIndex (true);
                                   });
         });
@@ -845,7 +844,7 @@ private:
                     auto lines = juce::StringArray::fromLines (soundFontFoldersFile().loadFileAsString());
                     lines.removeString (line);
                     lines.removeEmptyStrings();
-                    safewrite::replaceWithText (soundFontFoldersFile(), lines.joinIntoString ("\n") + "\n");
+                    soundFontFoldersFile().replaceWithText (lines.joinIntoString ("\n") + "\n");
                     ensureSoundFontIndex (true);
                 });
         menu.addSubMenu (tr ("Remove folder"), remove, remove.getNumItems() > 0);
