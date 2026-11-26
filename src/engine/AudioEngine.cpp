@@ -110,6 +110,23 @@ namespace lynx
 {
 namespace
 {
+// (round 190rm) the name an embedded sample is saved under: "<name>-<hash>" plus the extension its name gives when it is an
+// audio type (a DAWproject embeds FLAC, AIFF, MP3...: "x.flac" was saved as "x.flac-<hash>.wav", a FLAC file named .wav
+// that other apps, and a collected copy, could not open); else ".wav" (FL's embedded samples have no extension)
+juce::String embeddedSampleFileName (const std::string& name, const juce::String& hash)
+{
+    auto stem = juce::String::fromUTF8 (name.c_str());
+    juce::String ext (".wav");
+    const auto dot = stem.lastIndexOfChar ('.');
+    if (dot > 0)
+        if (const auto e = stem.substring (dot).toLowerCase(); juce::StringArray { ".wav", ".wave", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".wv", ".m4a", ".opus" }.contains (e))
+        {
+            stem = stem.substring (0, dot);
+            ext = e == ".wave" ? juce::String (".wav") : e;
+        }
+    return juce::File::createLegalFileName (stem) + "-" + hash + ext;
+}
+
 std::unordered_set<std::uint64_t> remoteFreshTargets (const Song& before, const Song& after)
 {
     std::unordered_set<std::uint64_t> existing, fresh;
@@ -208,7 +225,7 @@ const natives::FlAccess& flStudioAccess()
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
                 juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
-            const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
+            const auto file = folder.getChildFile (embeddedSampleFileName (name, hash));
             if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
                 return {};
             return file.getFullPathName().toStdString();
@@ -4820,7 +4837,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
                 juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
-            const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
+            const auto file = folder.getChildFile (embeddedSampleFileName (name, hash));
 
             if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
                 return {};
