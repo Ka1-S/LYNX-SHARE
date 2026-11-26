@@ -312,6 +312,35 @@
                     if (card != nullptr && card->isVisible())
                         saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-0.png");
                     auto& view = ui.getPlaylistForSnapshot();
+                    // (#313's video: copies of the card left in the view's cached picture) frame by frame, the card's own
+                    // pixels stay those of the first frame and no card text is anywhere else in the view
+                    const auto frame = [&ui] { return ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f); };
+                    const auto frame0 = card != nullptr && card->isVisible() ? frame() : juce::Image();
+                    const auto inner = first.reduced (3);
+                    const auto viewArea = ui.getLocalArea (&view, view.gridAreaForHints());
+                    int changedFrames = 0, strayFrames = 0;
+                    const auto compare = [&] {
+                        if (frame0.isNull())
+                            return;
+                        const auto now = frame();
+                        const juce::Image::BitmapData a (frame0, juce::Image::BitmapData::readOnly), b (now, juce::Image::BitmapData::readOnly);
+                        int changed = 0, stray = 0;
+                        for (int y = inner.getY(); y < inner.getBottom(); ++y)
+                            for (int x = inner.getX(); x < inner.getRight(); ++x)
+                            {
+                                const auto p = a.getPixelColour (x, y), q = b.getPixelColour (x, y);
+                                changed += std::abs ((int) p.getRed() - q.getRed()) + std::abs ((int) p.getGreen() - q.getGreen()) + std::abs ((int) p.getBlue() - q.getBlue()) > 12;
+                            }
+                        for (int y = viewArea.getY(); y < viewArea.getBottom(); ++y)
+                            for (int x = viewArea.getX(); x < viewArea.getRight(); ++x)
+                                if (! first.expanded (4).contains (x, y))
+                                {
+                                    const auto q = b.getPixelColour (x, y);
+                                    stray += juce::jmin (q.getRed(), q.getGreen(), q.getBlue()) > 200;
+                                }
+                        changedFrames += changed > 0;
+                        strayFrames += stray > 0;
+                    };
                     for (int k = 0; k < 9; ++k)
                     {
                         // Ctrl+wheel (FL's zoom), Alt+wheel (rows), the plain wheel (#313: "scroll with the mouse")
@@ -322,13 +351,25 @@
                             wheel (*grid, mods, 0.25f);
                         settle();
                         seen.addIfNotAlreadyThere (where().toString());
+                        compare();
+                    }
+                    for (int k = 0; k < 20; ++k) // (twenty more Ctrl+wheel zoom steps, the frames compared)
+                    {
+                        wheel (view, juce::ModifierKeys (juce::ModifierKeys::ctrlModifier), k < 12 ? 0.25f : -0.25f);
+                        settle();
+                        seen.addIfNotAlreadyThere (where().toString());
+                        compare();
                     }
                     if (card != nullptr && card->isVisible())
                         saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-8.png");
                     line (tag + ": card " + (card != nullptr ? juce::String (card->isVisible() ? "shown" : "hidden") : "none") + ", positions over 9 wheel steps: "
                           + seen.joinIntoString (" | "));
+                    line (tag + ": frames whose card pixels changed " + juce::String (changedFrames) + ", frames with card text outside it " + juce::String (strayFrames));
                     if (pinned)
+                    {
                         check (tag + ": the card stays put while the view zooms", seen.size() == 1);
+                        check (tag + ": one card, whole, and no copies of it in the view over 29 wheel steps", changedFrames == 0 && strayFrames == 0);
+                    }
                 }
         }
         onboardui::EmptyHintCard::pinned = true;
