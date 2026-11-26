@@ -1272,6 +1272,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     followButton.setTooltip (tr ("Follow: the Playlist scrolls along with the playhead while the song plays; off, you can look around freely"));
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("playlist.follow"); };
+    followButton.onRightClick = [this] { showFollowMenu(); };
     followButton.setWantsKeyboardFocus (false);
     followButton.setMouseClickGrabsKeyboardFocus (false);
     addAndMakeVisible (followButton);
@@ -11306,10 +11307,15 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
     return menu;
 }
 
-void PlaylistComponent::showRulerMenu (int x, int y)
+void PlaylistComponent::showRulerMenu()
 {
-    rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    juce::PopupMenu menu;
+    menu.addItem (tr("Continuous scrolling"), true, EditorGlobals::get().isContinuousScroll(), [this] {
+        EditorGlobals::get().isContinuousScroll (! EditorGlobals::get().isContinuousScroll());
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&followButton));
 }
+void PlaylistComponent::showRulerMenu (int x)
 
 // Round 190ol (P6): the Simple layout's "Change time signature here...": numerator 1-16, denominator 2 / 4 / 8 / 16, the
 // signature in force at that bar to start with; on bar 1 it is the song's own (the top bar's box shows it)
@@ -15467,8 +15473,10 @@ bool PlaylistComponent::liveFrame (double nowMs)
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
         const auto grid = gridArea();
-        const auto newStart = transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
-                                                              20.0 / pixelsPerTick);
+        const auto newStart = EditorGlobals::get().isContinuousScroll()
+                                    ? transportedit::followViewStartContinuous (tick, 120.0 / pixelsPerTick)
+                                    : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
+                                                                        20.0 / pixelsPerTick);
 
         if (EditorGlobals::get().followsNow (EditorGlobals::FollowView::playlist) && playing && newStart != scrollTicks)
         {
