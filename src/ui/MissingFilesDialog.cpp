@@ -1,4 +1,5 @@
 #include "ui/MissingFilesDialog.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <atomic>
@@ -718,7 +719,7 @@ std::vector<std::string> loadSearchFolders()
 
 void saveSearchFolders (const std::vector<std::string>& folders)
 {
-    searchFoldersFile().replaceWithText (u8 (folderListText (folders)));
+    safewrite::replaceWithText (searchFoldersFile(), u8 (folderListText (folders)));
 }
 
 juce::StringArray browserSearchFolders()

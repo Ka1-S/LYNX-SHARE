@@ -1,4 +1,5 @@
 #include "ui/I18n.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <atomic>
@@ -202,7 +203,7 @@ juce::String saved()
 void save (const juce::String& id)
 {
     if (isKnown (id))
-        settingsFile().replaceWithText (id);
+        safewrite::replaceWithText (settingsFile(), id);
 }
 
 bool hasTable (const juce::String& id)

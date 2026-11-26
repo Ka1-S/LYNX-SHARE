@@ -1,4 +1,5 @@
 #include "ui/PluginThumbs.h"
+#include "engine/SafeWrite.h"
 
 #include "core/NativeEngines.h"
 #include "engine/AudioEngine.h"
@@ -151,7 +152,7 @@ juce::Image demoVideoFrame()
 juce::File demoPage (const juce::File& folder)
 {
     auto file = folder.getChildFile ("notes.html");
-    file.replaceWithText ("<html><head><title>Session notes</title></head><body>"
+    safewrite::replaceWithText (file, "<html><head><title>Session notes</title></head><body>"
                           "<h1>Session notes</h1>"
                           "<p><b>Song:</b> Night Drive &mdash; 124 BPM, A minor</p>"
                           "<h2>To do</h2><ul>"

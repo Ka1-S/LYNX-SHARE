@@ -8,6 +8,7 @@
 #include "core/NoteRepeat.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
+#include "core/FlpImport.h" // (round 190rm: flRawRange, the song-start values' ranges)
 #include "core/TrackVersions.h"
 #include "core/RackAutomation.h" // round 190ow (PAT-7: FL's channel order)
 #include "core/ModulatorExport.h"
@@ -1613,8 +1614,35 @@ struct Converter
         if (! automationChannel.empty())
             report.exact.push_back (std::to_string (automationChannel.size()) + " automation clips (points, curves, links)");
         for (const auto& v : song.initialValues)
-            if (const auto id = controlFor (v.target))
-                out.initControls.push_back ({ 0, *id, rawValue (v.target, v.value, &song) });
+        {
+            std::function<float (float)> map;
+            if (const auto id = controlFor (v.target, &map))
+            {
+                auto raw = rawValue (v.target, v.value, &song);
+                // (round 190rm) a plugin parameter's song-start value is the plugin's own integer (the import's
+                // flRawRange), not 0..65536: Thief's Fruity Balance volume went back as 52429 instead of 256 (205 times
+                // the level: FL rendered the exported song as full-scale noise / DC from its first sample)
+                if ((v.target.kind == AutomationTargetKind::effectParam || v.target.kind == AutomationTargetKind::channelParam)
+                    && id->param() >= flp::ControlId::pluginParamBase)
+                {
+                    std::string plugin;
+                    if (v.target.kind == AutomationTargetKind::effectParam)
+                    {
+                        if (const auto it = slotPlugin.find ({ v.target.index, v.target.slot }); it != slotPlugin.end())
+                            plugin = it->second;
+                    }
+                    else if (v.target.index >= 0 && v.target.index < (int) out.channels.size())
+                        plugin = out.channels[(std::size_t) v.target.index].pluginName;
+                    const auto grossBeat = plugin == "Gross Beat"; // (its own raw law, in rawValue)
+                    if (const auto range = flRawRange (*id, plugin); range && ! grossBeat && range->second > range->first)
+                    {
+                        const auto fl = std::clamp ((double) (map ? map (v.value) : v.value), 0.0, 1.0);
+                        raw = (std::int32_t) std::lround ((double) range->first + fl * (double) (range->second - range->first));
+                    }
+                }
+                out.initControls.push_back ({ 0, *id, raw });
+            }
+        }
         if (! song.midiLinks.empty())
             report.notes.push_back ("MIDI controller links stay in LYNX (FL keeps them per machine)");
         // round 190om: a note's own pitch / timbre / pressure curves (MPE, an imported module's slides, vibrato and

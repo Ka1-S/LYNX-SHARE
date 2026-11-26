@@ -1,4 +1,5 @@
 #include "ui/RackEditor.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <cmath>
@@ -3984,7 +3985,7 @@ void saveLivePreset (AudioEngine& engine, RackLocator locate, const juce::String
         auto& host = engine.getPluginHost();
         options.pluginRecord = [&host] (const PluginRef& ref, bool instrument) { return host.flWrapperRecord (ref, instrument); };
         const auto result = exportLiveRackPreset (*doc, name.toStdString(), options);
-        if (result.bytes.empty() || ! file.replaceWithData (result.bytes.data(), result.bytes.size()))
+        if (result.bytes.empty() || ! safewrite::replaceWithData (file, result.bytes.data(), result.bytes.size()))
         {
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save as Live rack preset (.adg)..."),
                                                     tr ("The rack preset could not be written"));

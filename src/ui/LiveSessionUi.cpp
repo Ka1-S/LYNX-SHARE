@@ -1,4 +1,5 @@
 #include "ui/LiveSessionUi.h"
+#include "engine/SafeWrite.h"
 
 #include <memory>
 
@@ -25,7 +26,7 @@ juce::File nameFile() { return platform::settingsFile ("session-name.txt"); }
 void rememberName (const juce::String& name)
 {
     nameFile().getParentDirectory().createDirectory();
-    nameFile().replaceWithText (name.trim());
+    safewrite::replaceWithText (nameFile(), name.trim());
 }
 
 juce::String offlineText()

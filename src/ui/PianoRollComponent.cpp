@@ -1,4 +1,5 @@
 #include "ui/ShotShowing.h"
+#include "engine/SafeWrite.h"
 #include "ui/WorkflowExtras.h" // round 190pf (the chord highlight switch)
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
@@ -910,7 +911,7 @@ evpane::State& PianoRollComponent::eventPaneState()
 
 void PianoRollComponent::saveEventPaneState()
 {
-    eventPaneFile().replaceWithText (juce::String (evpane::toText (eventPaneState())));
+    safewrite::replaceWithText (eventPaneFile(), juce::String (evpane::toText (eventPaneState())));
 }
 
 juce::Rectangle<int> PianoRollComponent::eventPaneBarArea() const
@@ -7391,10 +7392,10 @@ bool PianoRollComponent::saveScore (const juce::File& file) const
         const auto& song = engine.getSong();
         const auto c = engine.getSelectedChannel();
         const auto smf = MidiFileIo::writeNotes (song, mine, c >= 0 && c < (int) song.channels.size() ? song.channels[(std::size_t) c].name : std::string());
-        return file.replaceWithData (smf.getData(), smf.getSize());
+        return safewrite::replaceWithData (file, smf.getData(), smf.getSize());
     }
     const auto bytes = prtools::writeScore (mine);
-    return file.replaceWithData (bytes.data(), bytes.size());
+    return safewrite::replaceWithData (file, bytes.data(), bytes.size());
 }
 
 void PianoRollComponent::setNoteClipboard (std::vector<Note> notes)

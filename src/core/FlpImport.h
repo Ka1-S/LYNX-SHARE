@@ -150,6 +150,11 @@ std::string canonicalFlEffectName (const std::string& name);
 // from the VST2 parameter floats (empty when the effect or its state is not known; REA_rodada170i §1)
 std::vector<std::uint8_t> wrappedFruityState (const ForeignPlugin& plugin);
 
+// The range of an FL parameter's raw value (what pattern events 0xDF and the song-start values 0xD8 hold): FL's
+// normalised value is (raw - lo) / (hi - lo). `plugin` = the FL plugin of the target slot or channel; nullopt = unknown.
+// (Round 190rm: also the .flp export's, which wrote every plugin parameter's song-start value on 0..65536.)
+std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::string& plugin);
+
 // Our target for an FL controlID (channel/mixer). `channelMap` = FL channel -> ours.
 AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int>& channelMap, int mixerTracks);
 } // namespace lynx

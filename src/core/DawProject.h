@@ -70,6 +70,9 @@ struct DawProjectExportOptions
     std::string application = "LYNX SHARE", version = "0.1.30";
     // A sample's bytes, to embed it under audio/ (empty = the file is referenced where it is, external="true").
     std::function<std::vector<std::uint8_t> (const std::string& path)> readFile;
+    // The name a sample is embedded under (empty function = its own file name). Round 190rm: a sample other apps cannot
+    // read (FL's Ogg-in-WAV, WavPack...) is embedded as the WAV `readFile` decoded it to, under "<name>.wav".
+    std::function<std::string (const std::string& path)> embeddedName;
     // A sample's length in seconds, rate and channels (Audio's required attributes, and the end warp marker of a
     // stretched clip); false = unknown (written as 0 s, 44100 Hz, 2 channels and listed in the notes).
     std::function<bool (const std::string& path, double& seconds, int& sampleRate, int& channels)> sampleFormat;

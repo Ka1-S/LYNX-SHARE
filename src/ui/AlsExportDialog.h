@@ -15,6 +15,12 @@ void showAlsExportDialog (AudioEngine& engine, const juce::File& suggestedFolder
 juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion version, bool collect, const juce::File& folder, const juce::String& name,
                             juce::StringArray& notes, juce::String& error);
 
+// Round 190rm: a sample other apps cannot read as it is (FL's WavPack .wv, Ogg Vorbis inside a WAV or named .wav, any
+// other type only LYNX decodes; core alsSampleNeedsWav), and the file LYNX plays from it as a 32-bit float WAV in memory
+// (empty when it cannot be decoded), with its length, rate and channels. Used by the Live set and DAWproject exports.
+bool sampleNeedsWavForOtherApps (const juce::File& file);
+juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& seconds, int& sampleRate, int& channels);
+
 // The panel only (--snapshot); nothing is written.
 std::unique_ptr<juce::Component> makeAlsExportPanel (AudioEngine& engine);
 } // namespace lynx

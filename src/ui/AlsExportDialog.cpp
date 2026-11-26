@@ -1,4 +1,5 @@
 #include "ui/AlsExportDialog.h"
+#include "engine/SafeWrite.h"
 
 #include <map>
 
@@ -99,18 +100,57 @@ bool writeWavForLive (const juce::File& source, const juce::File& target)
     if (data == nullptr || data->frames() <= 0 || data->sampleRate <= 0.0)
         return false;
     const auto channels = data->isStereo() ? 2 : 1;
-    std::unique_ptr<juce::OutputStream> stream (target.createOutputStream().release());
-    if (stream == nullptr)
+    // (round 190rm: a stream that remembers a failed write, checked once the writer has written its header and gone)
+    auto state = std::make_shared<safewrite::StreamState>();
+    auto stream = std::make_unique<safewrite::CheckedFileStream> (target, state);
+    if (! stream->openedOk())
         return false;
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 32, {}, 0));
-    if (writer == nullptr)
+    auto ok = false;
+    {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 32, {}, 0));
+        if (writer == nullptr)
+            return false;
+        stream.release(); // the writer owns it now
+        const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
+        ok = writer->writeFromFloatArrays (planes, channels, (int) data->frames());
+    }
+    if (! ok || state->failed)
+    {
+        target.deleteFile();
         return false;
-    stream.release(); // the writer owns it now
-    const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
-    return writer->writeFromFloatArrays (planes, channels, (int) data->frames());
+    }
+    return true;
 }
 } // namespace
+
+bool sampleNeedsWavForOtherApps (const juce::File& file) { return needsWavForLive (file); }
+
+juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& seconds, int& sampleRate, int& channels)
+{
+    juce::MemoryBlock out;
+    SampleLibrary library;
+    const auto data = library.load (file.getFullPathName());
+    if (data == nullptr || data->frames() <= 0 || data->sampleRate <= 0.0)
+        return out;
+    channels = data->isStereo() ? 2 : 1;
+    sampleRate = juce::roundToInt (data->sampleRate);
+    seconds = (double) data->frames() / data->sampleRate;
+    {
+        auto* stream = new juce::MemoryOutputStream (out, false);
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream, data->sampleRate, (unsigned int) channels, 32, {}, 0));
+        if (writer == nullptr)
+        {
+            delete stream;
+            return {};
+        }
+        const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
+        if (! writer->writeFromFloatArrays (planes, channels, (int) data->frames()))
+            return {};
+    }
+    return out;
+}
 
 // Writes "<folder>/<name> Project/<name>.als"; the samples are copied into "Samples/Imported" when `collect` is set.
 // Returns the .als written, or an empty File with `error` set.
@@ -188,7 +228,7 @@ juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion versi
         auto target = samples.getChildFile (source.getFileName());
         if (target.existsAsFile() && target.getSize() != source.getSize())
             target = samples.getNonexistentChildFile (source.getFileNameWithoutExtension(), source.getFileExtension(), false);
-        if (! target.existsAsFile() && ! source.copyFileTo (target))
+        if (juce::String why; ! target.existsAsFile() && ! safewrite::copyFile (source, target, why)) // (round 190rm: checked)
         {
             notes.add (tr ("Could not copy {0}; the set refers to it where it is", { source.getFullPathName() }));
             return path;
@@ -210,9 +250,9 @@ juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion versi
         return {};
     }
     const auto als = project.getChildFile (stem + ".als");
-    if (! als.replaceWithData (result.bytes.data(), result.bytes.size()))
+    if (juce::String why; ! safewrite::writeData (als, result.bytes.data(), result.bytes.size(), why)) // (round 190rm: checked)
     {
-        error = tr ("Could not write {0}", { als.getFullPathName() });
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), als.getFileName() });
         return {};
     }
     return als;

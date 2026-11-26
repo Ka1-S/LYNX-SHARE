@@ -1,4 +1,5 @@
 #include "ui/PluginHeader.h"
+#include "engine/SafeWrite.h"
 
 #include <map>
 
@@ -667,7 +668,7 @@ void PresetBar::saveAs (juce::Component& owner)
         const auto folder = userFolder (kind);
         folder.createDirectory();
         const auto file = folder.getChildFile (utf8 (presets::fileNameFor (name.toStdString()).c_str()) + ".lynxpreset");
-        file.replaceWithText (utf8 (presets::toText (kind, name.toStdString(), slotNow->params, &slotNow->state).c_str()));
+        safewrite::replaceWithText (file, utf8 (presets::toText (kind, name.toStdString(), slotNow->params, &slotNow->state).c_str()));
         engine.editSong ([t = track, s = slot, n = name.toStdString()] (Song& song) { song.mixer[(std::size_t) t].effects[(std::size_t) s].presetName = n; }, false);
         safe->repaint();
     }), true);

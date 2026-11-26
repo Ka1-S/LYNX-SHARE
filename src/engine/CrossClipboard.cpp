@@ -1,4 +1,5 @@
 #include "engine/CrossClipboard.h"
+#include "engine/SafeWrite.h"
 
 #include "engine/ProjectFile.h"
 
@@ -224,7 +225,7 @@ juce::String clipboardText (const Payload& payload, const juce::File& sideFolder
         return {};
     const auto file = sideFolder.getChildFile (juce::File::createLegalFileName (payload.stamp) + ".json");
     const auto temporary = file.withFileExtension (".part");
-    if (! temporary.replaceWithText (document, false, false, "\n") || ! temporary.moveFileTo (file))
+    if (! safewrite::replaceWithText (temporary, document, false, false, "\n") || ! temporary.moveFileTo (file))
     {
         temporary.deleteFile();
         return {};

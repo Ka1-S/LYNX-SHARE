@@ -1,4 +1,5 @@
 #include "core/EscClose.h"
+#include "engine/SafeWrite.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginWindow.h"
 #include "ui/PluginPicker.h"
@@ -2470,7 +2471,7 @@ void onEditorFault (const crashguard::WindowFault& fault)
     const auto folder = platform::settingsFile ("autosave");
     folder.createDirectory();
     const auto traceFile = folder.getChildFile ("editor-crash " + stamp + ".txt");
-    traceFile.replaceWithText ("LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
+    safewrite::replaceWithText (traceFile, "LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
                                + juce::String::fromUTF8 (fault.trace.c_str()));
     crashguard::note ((juce::String (crashreport::editorCrashStepPrefix) + name + " (" + crashguard::describe (fault.code) + " at "
                        + juce::String::fromUTF8 (fault.where.c_str()) + "), trace in autosave\\" + traceFile.getFileName())
