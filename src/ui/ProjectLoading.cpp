@@ -1,4 +1,5 @@
 #include "ui/ProjectLoading.h"
+#include "engine/SafeWrite.h"
 
 #include <atomic>
 #include <thread>
@@ -386,6 +387,6 @@ void writeLoadLog()
         text << ", of them mapped " << use.stretchedMapped << " (" << mb (use.stretchedMappedBytes) << " MB, locked "
              << mb (SampleLibrary::lockedStretchedBytes()) << " MB)";
     text << ")\n\n";
-    log.replaceWithText (text);
+    safewrite::replaceWithText (log, text);
 }
 } // namespace lynx

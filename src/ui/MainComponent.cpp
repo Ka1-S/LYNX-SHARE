@@ -1,4 +1,5 @@
 #include "ui/AutoLookEditor.h"
+#include "engine/SafeWrite.h"
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
@@ -4516,7 +4517,7 @@ void MainComponent::saveUiSettings()
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
     // round 190qk (core/ExtrasDefaults.h): the LYNX extras the user set, so the others follow a new default
-    uiSettingsFile().replaceWithText (text + juce::String (extras::noteUserChoices (text.toStdString())));
+    safewrite::replaceWithText (uiSettingsFile(), text + juce::String (extras::noteUserChoices (text.toStdString())));
 }
 
 // --- transport -----------------------------------------------------------------------------------
@@ -4752,7 +4753,7 @@ void MainComponent::showWindowsTip()
     const auto shown = counter.existsAsFile() ? counter.loadFileAsString().trim().getIntValue() : 0;
     if (shown >= 3)
         return;
-    counter.replaceWithText (juce::String (shown + 1));
+    safewrite::replaceWithText (counter, juce::String (shown + 1));
 
     auto key = [this] (Panel p) {
         const auto chords = keyMap.chordsFor (panelAction (p));
@@ -5225,7 +5226,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     const auto layoutFile = [] (Style s) { return platform::settingsFile (layoutstyle::workspaceFile (s)); };
     if (persistent && swapLayout && style != from)
     {
-        layoutFile (from).replaceWithText (workspace.getLayoutText());
+        safewrite::replaceWithText (layoutFile (from), workspace.getLayoutText());
         if (const auto saved = layoutFile (style); saved.existsAsFile())
             workspace.applyLayoutText (saved.loadFileAsString());
         else
@@ -9346,7 +9347,8 @@ void MainComponent::keepOverwrittenCopy (const juce::File& file)
         return;
     folder.createDirectory();
     const auto stem = projectStem (file.getFileNameWithoutExtension());
-    if (file.copyFileTo (newBackupFile (folder, stem, safety::BackupKind::overwritten)))
+    // (round 190rm: a checked copy; the rotation, which deletes the oldest backups, runs only after a good one)
+    if (juce::String why; safewrite::copyFile (file, newBackupFile (folder, stem, safety::BackupKind::overwritten), why))
         rotateBackups (stem);
 }
 
@@ -9566,14 +9568,14 @@ void MainComponent::startLiveFromCommandLine()
             if (safe == nullptr)
                 return;
             if (safe->live->getState() == LiveSessionManager::State::live)
-                return (void) juce::File (codeFile).replaceWithText (safe->live->getInviteCode());
+                return (void) safewrite::replaceWithText (juce::File (codeFile), safe->live->getInviteCode());
             if (safe->live->isActive() && left > 0)
                 juce::Timer::callAfterDelay (200, [poll = weak.lock(), left] {
                     if (poll != nullptr)
                         (*poll) (left - 1);
                 });
             else
-                juce::File (codeFile).replaceWithText ("ERROR " + safe->live->getStatus());
+                safewrite::replaceWithText (juce::File (codeFile), "ERROR " + safe->live->getStatus());
         };
         (*poll) (150);
         // round 190ai: --live-share file.vst3 — once live, the host shares that plugin and shows its list
@@ -9670,20 +9672,63 @@ void MainComponent::exportPackage()
                               });
 }
 
+namespace
+{
+// Round 190rm (import / export sweep): the zipped loop package is written on a worker behind a progress window. Every
+// sample is copied into the .zip: a project with a gigabyte of audio froze the window for seconds with nothing on screen,
+// as the DAWproject export did (round 190ri). Its file is written beside the target and moved over it at the end, so a
+// failure leaves the old file as it was; the failure says why.
+class PackageThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    PackageThread (Song s, juce::File z)
+        : juce::ThreadWithProgressWindow (tr ("Zipped loop package"), true, false), song (std::move (s)), zip (std::move (z))
+    {
+        setStatusMessage (tr ("Writing the package..."));
+    }
+
+    void run() override
+    {
+        setProgress (-1.0); // (the copy has no steps to show: a moving bar)
+        try
+        {
+            ok = ProjectPackage::exportZip (song, zip.getFileNameWithoutExtension(), zip, result, error);
+        }
+        catch (const std::exception& e)
+        {
+            ok = false;
+            error = juce::String::fromUTF8 (e.what());
+        }
+    }
+
+    void threadComplete (bool) override
+    {
+        if (! ok)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                    error.isNotEmpty() ? error : tr ("Could not write {0}", { zip.getFullPathName() }));
+        else
+        {
+            auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
+            if (! result.missing.isEmpty())
+                text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Zipped loop package"), text);
+        }
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    Song song;
+    juce::File zip;
+    ProjectPackage::Result result;
+    juce::String error;
+    bool ok = false;
+};
+} // namespace
+
 void MainComponent::writePackage (const juce::File& zip)
 {
     engine.capturePluginStates();
-    ProjectPackage::Result result;
-    juce::String error;
-    if (! ProjectPackage::exportZip (engine.getSong(), zip.getFileNameWithoutExtension(), zip, result, error))
-    {
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"), error);
-        return;
-    }
-    auto text = tr ("{0} saved with {1} samples.", { zip.getFileName(), juce::String (result.files) });
-    if (! result.missing.isEmpty())
-        text << "\n\n" << tr ("Not on this PC (left out):") << "\n" << result.missing.joinIntoString ("\n");
-    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Zipped loop package"), text);
+    (new PackageThread (engine.getSong(), zip))->launchThread();
 }
 
 void MainComponent::exportDataFiles()
@@ -9856,7 +9901,7 @@ void MainComponent::startSession()
         });
     }
     sessionMarker.getParentDirectory().createDirectory();
-    sessionMarker.replaceWithText (juce::String (juce::Time::getCurrentTime().toMilliseconds()));
+    safewrite::replaceWithText (sessionMarker, juce::String (juce::Time::getCurrentTime().toMilliseconds()));
     // takes that were recording when LYNX stopped (crash, power loss, closed while recording): after the backup offer
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
@@ -10031,7 +10076,7 @@ void MainComponent::openStartupProject()
     startNewProject (std::move (song), {});
 }
 
-// Round 190oo (design review CS O-2, a LYNX extra, off by default): a new, empty project made while the Clip-launch
+// Round 190oo (design review CS O-2, a LYNX extra, on by default since round 190ro): a new, empty project made while the Clip-launch
 // layout shows links Track N to insert N (core/Templates.h linkClipLaunchStrips), so the Session mixer shows a strip on
 // every column as a new Live set does. Demos and starter songs (they have clips) and the other layouts are unchanged.
 Song MainComponent::withClipLaunchStrips (Song song)
@@ -10222,12 +10267,14 @@ void MainComponent::saveCopyForOlder()
                                           return;
                                       file = ProjectFile::withProjectExtension (file);
                                       const auto copy = olderlynx::forRelease (json, release);
-                                      juce::TemporaryFile temp (file);
-                                      if (! copy.ok || ! temp.getFile().replaceWithText (copy.json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary()
-                                          || file.loadFileAsString() != copy.json)
+                                      // (round 190rm: the checked writer; an existing file is left as it was on a failure)
+                                      juce::String why;
+                                      if (! copy.ok || ! safewrite::writeText (file, copy.json, why, false, false, nullptr) || file.loadFileAsString() != copy.json)
                                       {
                                           juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
-                                                                                  copy.ok ? file.getFullPathName() : copy.error);
+                                                                                  ! copy.ok ? copy.error
+                                                                                  : why.isNotEmpty() ? tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() })
+                                                                                                     : file.getFullPathName());
                                           return;
                                       }
                                       ui::savedFile (tr ("Saved a copy for LYNX SHARE {0}", { release }), file); // (round 190qx)
@@ -10570,7 +10617,7 @@ void MainComponent::showWhatsNewNotice()
     const juce::String version (JUCE_APPLICATION_VERSION_STRING);
     if (file.loadFileAsString().trim() == version)
         return;
-    file.replaceWithText (version);
+    safewrite::replaceWithText (file, version);
     ui::Notice n;
     n.kind = ui::Notice::Kind::info;
     n.id = "whatsNew";
@@ -11094,7 +11141,7 @@ void MainComponent::showSmartDisableTip (int off, int total, bool firstTimeNotic
     const auto shown = PluginHost::settingsFolder().getChildFile ("smart-disable-tip.txt");
     if (shown.existsAsFile())
         return;
-    shown.replaceWithText ("1");
+    safewrite::replaceWithText (shown, "1");
     ui::postNotice ({ text }, 20000);
 }
 
@@ -12581,7 +12628,7 @@ void MainComponent::openRecent (int index)
 void MainComponent::rememberRecent (const juce::File& file)
 {
     recent.addFile (file);
-    PluginHost::settingsFolder().getChildFile ("recentes.txt").replaceWithText (recent.toString());
+    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("recentes.txt"), recent.toString());
     menuItemsChanged();
 }
 

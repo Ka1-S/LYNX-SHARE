@@ -1,4 +1,5 @@
 #include "core/EscClose.h"
+#include "engine/SafeWrite.h"
 #include "ui/WindowOwner.h"
 #include "ui/PluginWindow.h"
 #include "ui/PluginPicker.h"
@@ -17,6 +18,7 @@
 #include "core/MidiControls.h"
 #include "core/EditorLimit.h"
 #include "core/PinOnTop.h"
+#include "core/ResizeStorm.h"
 #include "core/Preferences.h"
 #include "core/FlWrapper.h"
 #include "core/MixerOps.h"
@@ -1354,7 +1356,11 @@ public:
 
     void childBoundsChanged (juce::Component* child) override
     {
-        if (child == editor.get() && ! laying && ! settings && ! down)
+        // round 190rk: a resizable editor that answers every fit with a slightly different size of its own (LSP at a UI
+        // scale of 150 %, Linux) kept the window and the editor resizing each other for ever: past a burst, the window
+        // stops following until the editor is quiet again (core/ResizeStorm.h)
+        if (child == editor.get() && ! laying && ! settings && ! down
+            && (! editor->isResizable() || resizeStorm.allow (juce::Time::getMillisecondCounterHiRes())))
             fitEditor();
     }
 
@@ -1455,6 +1461,7 @@ private:
     std::unique_ptr<juce::Component> channelControls; // (a channel's plugin: FL's ON / PAN / VOL / PITCH / RANGE / TRACK)
     bool settings = false, laying = false, down = false, presetsInTitle = false;
     bool headerCollapsed = false, hasSidechain = false;
+    ResizeStorm resizeStorm; // (round 190rk: see childBoundsChanged)
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -2499,7 +2506,7 @@ void onEditorFault (const crashguard::WindowFault& fault)
     const auto folder = platform::settingsFile ("autosave");
     folder.createDirectory();
     const auto traceFile = folder.getChildFile ("editor-crash " + stamp + ".txt");
-    traceFile.replaceWithText ("LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
+    safewrite::replaceWithText (traceFile, "LYNX: the editor of " + name + " crashed in its own window; LYNX closed the editor and went on\n"
                                + juce::String::fromUTF8 (fault.trace.c_str()));
     crashguard::note ((juce::String (crashreport::editorCrashStepPrefix) + name + " (" + crashguard::describe (fault.code) + " at "
                        + juce::String::fromUTF8 (fault.where.c_str()) + "), trace in autosave\\" + traceFile.getFileName())

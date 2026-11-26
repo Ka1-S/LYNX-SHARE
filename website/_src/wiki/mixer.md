@@ -114,6 +114,7 @@ When you pick an external input for an insert that also records other audio, LYN
 ## Good to know
 
 - `Loudness meter beside the Master (LYNX)`, in `Options › Mixer`, shows the short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a `Reset` button.
+- `Compensate fader and route automations too (LYNX)`, under `Plugin delay compensation` in the insert menu, is on in new projects. It is one setting for the whole project. With plugins that add latency, it plays the automation of faders, pans, sends and VCA faders as late as the audio they act on. FL Studio delays only the automation of plugin knobs, so the same project sounds slightly different there. Projects from FL Studio and older projects keep it off, and `FL-exact` doesn't change it.
 - An instrument plugin with several outputs can play each output on its own insert. See [Third-party plugins](/wiki/plugins/).
 - `Ctrl+L` does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.
 - The route switches appear on the other strips, not on the selected one.

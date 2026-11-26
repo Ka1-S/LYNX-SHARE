@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'
 ## Bon à savoir
 
 - `Mesure de sonie à côté du Master (LYNX)`, dans `Options › Mixer`, affiche la sonie à court terme et intégrée (LUFS) et le true peak de la sortie du Master, avec un bouton `Réinitialiser`.
+- `Compenser aussi les automations de fader et de routage (LYNX)`, dans `Compensation de latence des plugins` du menu de l'insert, est activé dans les nouveaux projets. C'est un réglage du projet entier. Avec des plugins qui ajoutent de la latence, il joue l'automation des faders, panoramiques, envois et faders VCA aussi tard que l'audio sur lequel elle agit. FL Studio ne retarde que l'automation des boutons des plugins, donc le même projet sonne un peu différemment là-bas. Les projets venus de FL Studio et les projets plus anciens l'ont désactivé, et `Comme FL` ne le change pas.
 - Un plugin instrument à plusieurs sorties peut jouer chaque sortie sur son propre insert. Voir [Plugins tiers](/wiki/plugins/).
 - `Ctrl+L` ne fait pas la même chose dans le Channel Rack et dans le Mixer. Dans le Channel Rack, il choisit des inserts libres. Dans le Mixer, il utilise l'insert sélectionné.
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.

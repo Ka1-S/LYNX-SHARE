@@ -17814,6 +17814,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "UsedOnly190amTests.inc"
 #include "Extras190amTests.inc"
 #include "Extras190qkTests.inc" // round 190qk: the extras on by default, the user-set list
+#include "Extras190roTests.inc" // round 190ro: Clip-launch strips on (the .flp export unchanged), one-row picks into .als
 #include "Workflow190iuTests.inc" // round 190iu: issues #186 and #191
 #include "Reload190aoTests.inc"
 #include "Pin190aoTests.inc"
@@ -18017,6 +18018,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
 #include "Folders190jfTests.inc" // round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Alt+drag)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
+#include "Iox190rmTests.inc" // round 190rm: the 0.1.32 import / export sweep (DAWproject audio formats)
 #include "Polish190jpTests.inc" // round 190jp: Theme Adjustments and colour dots, bold interface text, Simple follow-ups
 #include "LiveLook190jnTests.inc" // round 190jn: the Clip-launch layout in Live's look (the Info View key)
 #include "Playlist190jqTests.inc" // round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
@@ -18147,3 +18149,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sweep190reTests.inc" // round 190re (0.1.32 regression sweep): the defects it found and fixed
 #include "Sweep190rjTests.inc" // round 190rj (0.1.32 regression sweep 2): the defects it found and fixed
 #include "Stab190rpTests.inc" // round 190rp (0.1.32 Q4 stability): recovery, device loss
+#include "Plugsweep190rkTests.inc" // round 190rk (0.1.32 hosted plugin sweep): the defects it found and fixed

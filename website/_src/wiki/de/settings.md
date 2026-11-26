@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![Die Seite Allgemein des Einstellungsfensters, mit den Seitenreitern oben](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Das Einstellungsfenster hat acht Seiten: Audio, MIDI, Allgemein, Theme, Dateien,
 
 ## LYNX extras
 
-`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Die, die nur das Aussehen ändern, sind standardmäßig an, ebenso ein paar kleine Ergänzungen: auf die Playlist gezogene MIDI-Dateien werden zu Pattern-Clips, die Liste „Zuletzt verwendet“ und eine Zeile pro Plugin in den Plugin-Listen sowie die MIDI-Vorschau und die Tab-Vervollständigung im Browser. Die übrigen sind aus. **Wie FL** schaltet alle Extras aus, **Empfohlen** setzt jedes auf seinen Standard zurück. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt.
+`Optionen › LYNX-Extras...`. Die eigenen Zusätze von LYNX SHARE an einem Ort. Einige, die nur das Aussehen ändern, sind standardmäßig an, ebenso ein paar kleine Ergänzungen: auf die Playlist gezogene MIDI-Dateien werden zu Pattern-Clips, der Gain-Griff eines Clips bleibt im Blick, neue Projekte im Clip-launch-Layout bekommen für jede Spur eine Mixerspur, die Liste „Zuletzt verwendet“ und eine Zeile pro Plugin in den Plugin-Listen sowie die MIDI-Vorschau und die Tab-Vervollständigung im Browser. Zwei der eingeschalteten ändern den Klang: Gedehnte Pattern-Clips wiederholen ihr Pattern, und im Simple-Layout übernimmt ein abgelegter Loop Tempo und Tonart aus seinem Audio. Die übrigen sind aus. **Wie FL** schaltet alle Extras aus, **Empfohlen** setzt jedes auf seinen Standard zurück. Jeder Schalter ist dieselbe Einstellung wie im Menü oder auf der Seite, die seine Zeile nennt, und die Zeile jedes standardmäßig eingeschalteten sagt es.
 
 | Einstellung | Was sie macht |
 |---|---|

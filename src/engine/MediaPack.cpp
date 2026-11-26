@@ -1,4 +1,5 @@
 #include "engine/MediaPack.h"
+#include "engine/SafeWrite.h"
 
 #include <cstring>
 #include <vector>
@@ -192,7 +193,7 @@ bool pack (const juce::File& wav, const juce::File& packFile)
     if (! decode (out.getData(), out.getDataSize(), back) || back != bytes)
         return false;
     packFile.getParentDirectory().createDirectory();
-    return packFile.replaceWithData (out.getData(), out.getDataSize());
+    return safewrite::replaceWithData (packFile, out.getData(), out.getDataSize());
 }
 
 bool unpack (const juce::File& packFile, const juce::File& outFile)
@@ -200,7 +201,7 @@ bool unpack (const juce::File& packFile, const juce::File& outFile)
     juce::MemoryBlock packed, original;
     if (packFile.getSize() > maxSize || ! packFile.loadFileAsData (packed) || ! decode (packed.getData(), packed.getSize(), original))
         return false;
-    return outFile.replaceWithData (original.getData(), original.getSize());
+    return safewrite::replaceWithData (outFile, original.getData(), original.getSize());
 }
 
 bool isPack (const juce::File& file)

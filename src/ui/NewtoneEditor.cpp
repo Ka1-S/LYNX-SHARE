@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "engine/SafeWrite.h"
 #include "ui/WindowPlaces.h"
 #include "ui/FileChoosers.h"
 #include "ui/NewtoneEditor.h"
@@ -1172,7 +1173,7 @@ private:
         {
             // FL sends the audio with the note boundaries as markers (round 190kj)
             const auto bytes = audioedit::encodeWav (newtonefx::regionsDocument (*out, notes, true));
-            if (! file.replaceWithData (bytes.data(), bytes.size()))
+            if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
                 return;
         }
         const auto& song = engine.getSong();
@@ -1245,7 +1246,7 @@ private:
                                   if (safe->flLook() && safe->exportRegionsOnSave) // (FL's File › Export regions: the notes as regions)
                                   {
                                       const auto bytes = audioedit::encodeWav (newtonefx::regionsDocument (*out, safe->notes));
-                                      target.replaceWithData (bytes.data(), bytes.size());
+                                      safewrite::replaceWithData (target, bytes.data(), bytes.size());
                                   }
                                   else
                                       writeWav (*out, target);

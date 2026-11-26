@@ -449,7 +449,7 @@
                 engine.dispatchPendingMessages();
                 const auto x = juce::jlimit (0, pl.getWidth() - 1, (int) pl.xOfTickForSnapshot (5.0 * bar) + 8);
                 const auto brightness = [&] (const juce::Image& image, int t) { return image.getPixelAt (x, pl.trackRowForSnapshot (t).getCentreY()).getBrightness(); };
-                // the LYNX extra, on by default (owner 2026-11-23; Playlist › View › Dim unselected tracks): the others step back
+                // the LYNX extra (Playlist › View › Dim unselected tracks; off by default since round 190ro): the others step back
                 PlaylistComponent::dimUnselectedTracks = true;
                 pl.repaint();
                 {
@@ -468,7 +468,7 @@
                            juce::String (brightness (image, selected), 4) + " / " + juce::String (brightness (image, other), 4));
                     savePng (image, prefix + "-playlist-selected-track-fl.png");
                 }
-                PlaylistComponent::dimUnselectedTracks = true;
+                PlaylistComponent::dimUnselectedTracks = false; // (its default since round 190ro)
             }
         }
 

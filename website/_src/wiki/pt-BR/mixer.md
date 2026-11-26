@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![O Mixer](/assets/img/mixer.webp)
 
@@ -59,7 +59,7 @@ O Edison, o editor e gravador de áudio, pode ficar em qualquer slot de efeito, 
 
 - `Abrir editor de áudio` (`Ctrl+E`) no menu do insert carrega o Edison no primeiro slot vazio do insert e o abre. `Abrir editor de áudio e gravar` (`Shift+E`) o carrega pronto para gravar quando a música toca.
 - Os modos de gravação são `Agora`, `Na entrada` (o padrão: espera a entrada passar de um limiar), `Entrada` e `Ao tocar`. `Anexar` põe uma gravação nova depois do áudio que já está lá. O tempo máximo de gravação é `Sem limite` ou 1, 3, 5, 10, 30 ou 60 minutos: um slot novo começa em 30, `Abrir editor de áudio e gravar` define 5.
-- `Sync` toca o áudio do Edison no tempo da música enquanto a música toca.
+- `Sincronia` toca o áudio do Edison no tempo da música enquanto a música toca.
 - O Edison continua gravando depois de você fechar a janela dele.
 - `Ferramentas › Macros › Remover todas as instâncias do Edison` esvazia todos os slots do Edison do projeto, depois de uma pergunta.
 - Slots do Edison em projetos do FL Studio (.flp) abrem com o áudio deles.
@@ -112,6 +112,7 @@ Quando você escolhe uma entrada externa para um insert que também grava outro 
 ## Bom saber
 
 - `Medidor de loudness ao lado do Master (LYNX)`, em `Opções › Mixer`, mostra o loudness de curto prazo e integrado (LUFS) e o true peak da saída do Master, com um botão `Restaurar`.
+- `Compensar também as automações de fader e de rota (LYNX)`, em `Compensação de latência de plugins` no menu do insert, vem ligado em projetos novos. É uma configuração do projeto inteiro. Com plugins que adicionam latência, ele toca a automação de faders, pan, envios e faders VCA tão tarde quanto o áudio em que ela age. O FL Studio atrasa só a automação dos knobs de plugins, então o mesmo projeto soa um pouco diferente lá. Projetos vindos do FL Studio e projetos antigos ficam com ele desligado, e `Igual ao FL` não o muda.
 - Um plugin de instrumento com várias saídas pode tocar cada saída em um insert próprio. Veja [Plugins de terceiros](/wiki/plugins/).
 - `Ctrl+L` faz coisas diferentes no Channel Rack e no Mixer. No rack, ele escolhe inserts livres. No Mixer, usa o insert selecionado.
 - Os interruptores de rota aparecem nas outras faixas, não na selecionada.

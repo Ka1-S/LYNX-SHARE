@@ -1,4 +1,5 @@
 #include "ui/FruitySlicerEditor.h"
+#include "engine/SafeWrite.h"
 
 #include <optional>
 #include <utility>
@@ -689,7 +690,7 @@ private:
         const auto base = samplePath.empty() ? juce::String ("Slice") : fileName (samplePath).upToLastOccurrenceOf (".", false, false);
         const auto file = folder.getNonexistentChildFile (base + " (slice " + juce::String (selected + 1) + ")", ".wav");
         const auto bytes = audioedit::encodeWav (part, audioedit::WavFormat::float32);
-        if (! file.replaceWithData (bytes.data(), bytes.size()))
+        if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
             return;
         engine.getSampleLibrary().forget (file.getFullPathName());
         container->startDragging (juce::String (BrowserComponent::dragDescription) + "|" + file.getFullPathName(), &sliceView, juce::ScaledImage(), true);

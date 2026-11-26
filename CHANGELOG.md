@@ -38,13 +38,36 @@ The short version of each release. The full notes, with measurements, known issu
 - Opening a plugin or instrument window on Linux takes about half the work, and long paints of the Playlist (audio clips whose
   sample was not loaded) are gone.
 - LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
-  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, the Mixer's
-  peak values and correlation bars, dimmed unselected and darkened switched-off Playlist tracks); extras you switched
+  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, darkened
+  switched-off Playlist tracks); extras you switched
   yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
+- The Mixer's peak values and correlation bars (*Mixer › View*) are off by default: with them on, every fader and meter is
+  19 px shorter than FL Studio's. *Dim unselected tracks* (*Playlist › View*) is off by default too, until it draws for
+  less. If you switched them on yourself, they stay on.
+- Two more LYNX extras are on by default: an audio clip's gain handle stays in view while the clip's middle is scrolled
+  away (FL Studio then shows none; a press beside it still moves the clip), and a new project made in the Clip-launch
+  layout gets a mixer track for every track, as a new Live set. *Settings › LYNX extras* now says which extras are on by
+  default and names the two that change the sound; the first start's card for FL Studio users points to the page.
+- The zoom keys work as in FL Studio 2026 in the Pattern layout: PgUp / PgDn zoom around the mouse pointer and Shift+5
+  pressed again leaves the view as it is. LYNX's own way (around the playhead or the selection, Shift+5 again goes back)
+  is the LYNX extra *Zoom keys: LYNX's anchor, and Shift+5 again goes back*, always on in the Clip-launch and Simple layouts.
 - Export to FL Studio keeps FL Studio's trial-save mark: a project that came from a trial save (also after a .lynx save,
   imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
 
 **Fixed**
+- **Saving on a full disk no longer destroys the project.** Since 0.1.30 a save (and Save as, autosave, every export and
+  settings file) could replace the project with a cut file when the disk filled up, and only said so afterwards. Every file
+  LYNX writes now goes through one checked writer: if anything fails, the old file is left as it was and LYNX says why
+  ("Not saved: the disk is full. Your project file was not changed.").
+- Export to FL Studio: plugin values at the song's start are written on the plugin's own range (FL rendered LYNX's export of
+  Thief as silence with a DC offset). DAWproject: every sample gets its real format (FL's Ogg-in-WAV and .wv are written as
+  WAV), clip gain and pitch are kept. MIDI files carry the tempo map, time signatures and the name; File › Open takes the
+  meter. FL Studio Mobile export lists tempo and signature changes and markers, and leaves out clips of muted tracks.
+- Hosted plugins: a plugin window resizing itself in a loop no longer freezes LYNX; CLAP plugins get a buffer per audio port
+  (FabFilter's CLAP effects crashed), a Sidechain input and the transport; a plugin installed in several formats loads VST3,
+  then CLAP, then VST2.
+- The undo history is capped at 1 GB as well as its step count (a big project's 100 steps reached ~1 GB); the splash goes at
+  the logo drop on Linux and macOS.
 - Track-only mode and the Simple layout: a clip moved or copied onto another instrument's track plays that instrument (Discord).
 - Undo and redo keep the project's working time; Export to FL Studio's report names each mixer slot it left out; audio clips of
   GarageBand and BandLab imports keep their exact start after a save.
@@ -79,7 +102,7 @@ A second hotfix for 0.1.31.
   projects; each lane now plays exactly what its clips played (FL's clip range and mapped controls, the value held
   between clips, muted and overlapping clips) and stays within the engine's automation slots (Discord).
 - Fixed: "Manage shortcuts" and the other search windows opened without the caret in their search box on desktops that
-  activate a new window late (Linux, Wayland) (#244).
+  activate a new window late (Linux, Wayland) (#244). They should now open with it; tested by simulation only.
 - New: Options › *Typing keyboard settings* (and the same in the View menu): the typing keyboard button's right-click
   menu (Root note, Octave, Layout), also for windows of 1280-1440 px whose toolbar has no room for that button (#270).
 - Fixed: Export to FL Studio wrote back the project data folder of an .flp made on another computer; FL 2026 stopped

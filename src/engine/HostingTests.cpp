@@ -545,6 +545,9 @@ int runClapExtTest (const juce::String& pluginPath, const juce::String& reportPa
         check (log.contains ("save context=0"), "plugin log: the project's state without a context (clap.state)");
         check (log.contains ("render offline") && log.contains ("render realtime"), "plugin log: render mode offline, then real-time");
         check (log.contains ("preset high level=0.75"), "plugin log: preset loaded through preset-load");
+        // round 190rk: one buffer per declared audio port (FabFilter's CLAP effects crashed without), and a transport
+        check (log.contains ("ports in=2 out=2 side_channels=2 aux_writable=1"), "plugin log: process() got a buffer for each of its 2 + 2 ports");
+        check (log.contains ("transport=1"), "plugin log: process() got the host's transport");
     }
     report << "--- plugin log ---\n" << log;
     report << "result=" << (failures == 0 ? "OK" : "FAILED") << "\n";

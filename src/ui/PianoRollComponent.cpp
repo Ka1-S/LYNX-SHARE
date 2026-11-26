@@ -1,4 +1,5 @@
 #include "ui/ShotShowing.h"
+#include "engine/SafeWrite.h"
 #include "ui/WorkflowExtras.h" // round 190pf (the chord highlight switch)
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
@@ -910,7 +911,7 @@ evpane::State& PianoRollComponent::eventPaneState()
 
 void PianoRollComponent::saveEventPaneState()
 {
-    eventPaneFile().replaceWithText (juce::String (evpane::toText (eventPaneState())));
+    safewrite::replaceWithText (eventPaneFile(), juce::String (evpane::toText (eventPaneState())));
 }
 
 juce::Rectangle<int> PianoRollComponent::eventPaneBarArea() const
@@ -5420,7 +5421,9 @@ void PianoRollComponent::zoomToSelection()
         view.scroll = t0;
     }
     view.scrollY = juce::jmax (0, rowFor ((low + high) / 2) * rowHeight - gridArea().getHeight() / 2);
-    showView (viewStack.toggle (before, clampedView (view)));
+    // (round 190ro, D-2: pressed again, FL's view stays; LYNX's extra goes back)
+    const auto lynxKeys = zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern);
+    showView (lynxKeys ? viewStack.toggle (before, clampedView (view)) : viewStack.push (before, clampedView (view)));
 }
 
 // --- round 190qe (TOP-NEXT R1): edge scroll, view stack, zoom glide, selection history ---------------------------------
@@ -5554,6 +5557,13 @@ void PianoRollComponent::settleViewGlide()
 double PianoRollComponent::keyZoomAnchorPx() const
 {
     const auto grid = gridArea();
+    // round 190ro (D-2): FL's anchor unless the LYNX extra "editing.zoomKeysLynx" is on (always outside the Pattern layout)
+    if (! zoomanchor::lynxKeysNow (layoutstyle::current() == layoutstyle::Style::pattern))
+    {
+        const auto mouse = getMouseXYRelative();
+        return zoomanchor::flKeyAnchorPx (isMouseOver (true) && grid.contains (mouse) ? std::optional<double> ((double) (mouse.x - grid.getX())) : std::nullopt,
+                                          (double) grid.getWidth());
+    }
     const auto& song = engine.getSong();
     const auto playing = engine.getTransport().playing.load();
     std::optional<double> playhead, selected;
@@ -7391,10 +7401,10 @@ bool PianoRollComponent::saveScore (const juce::File& file) const
         const auto& song = engine.getSong();
         const auto c = engine.getSelectedChannel();
         const auto smf = MidiFileIo::writeNotes (song, mine, c >= 0 && c < (int) song.channels.size() ? song.channels[(std::size_t) c].name : std::string());
-        return file.replaceWithData (smf.getData(), smf.getSize());
+        return safewrite::replaceWithData (file, smf.getData(), smf.getSize());
     }
     const auto bytes = prtools::writeScore (mine);
-    return file.replaceWithData (bytes.data(), bytes.size());
+    return safewrite::replaceWithData (file, bytes.data(), bytes.size());
 }
 
 void PianoRollComponent::setNoteClipboard (std::vector<Note> notes)

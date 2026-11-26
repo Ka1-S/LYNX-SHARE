@@ -1,4 +1,5 @@
 #include "ui/VisualGl.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <chrono>
@@ -58,7 +59,7 @@ bool enabled()
 void setEnabled (bool on)
 {
     setting = on ? 1 : 0;
-    platform::settingsFile ("visualizer-gpu.txt").replaceWithText (on ? "1" : "0");
+    safewrite::replaceWithText (platform::settingsFile ("visualizer-gpu.txt"), on ? "1" : "0");
     if (on)
         failed = false; // (the user asks for it again: try once more)
 }

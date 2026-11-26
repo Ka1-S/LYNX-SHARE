@@ -1,4 +1,6 @@
 #include "core/StandIns.h"
+#include "ui/I18n.h"
+#include "engine/SafeWrite.h"
 #include "engine/FlStudioExport.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -214,16 +216,18 @@ bool write (const Song& song, flpexport::Options options, const juce::File& targ
         return false;
     }
 
-    juce::TemporaryFile temp (target);
+    // (round 190rm: engine/SafeWrite.h: every write checked before the swap; a full disk left a cut .flp / .zip that
+    // "exported" before, FL then opened a broken project)
+    juce::String why;
     if (! zip)
     {
-        if (! temp.getFile().replaceWithData (bytes.data(), bytes.size()))
+        if (! safewrite::writeData (target, bytes.data(), bytes.size(), why))
         {
-            error = "could not write " + target.getFullPathName();
+            error = tr ("Not written: {0}. {1} was not changed.", { tr (why), target.getFileName() });
             return false;
         }
+        return true;
     }
-    else
     {
         juce::ZipFile::Builder builder;
         for (const auto& [original, name] : inside)
@@ -233,17 +237,11 @@ bool write (const Song& song, flpexport::Options options, const juce::File& targ
         }
         const auto flp = juce::File::createLegalFileName (target.getFileNameWithoutExtension()) + ".flp";
         builder.addEntry (new juce::MemoryInputStream (bytes.data(), bytes.size(), true), 9, flp, juce::Time::getCurrentTime());
-        juce::FileOutputStream out (temp.getFile());
-        if (! out.openedOk() || ! builder.writeToStream (out, nullptr))
+        if (! safewrite::writeWith (target, [&builder] (juce::OutputStream& out) { return builder.writeToStream (out, nullptr); }, why))
         {
-            error = "could not write " + target.getFullPathName();
+            error = tr ("Not written: {0}. {1} was not changed.", { tr (why), target.getFileName() });
             return false;
         }
-    }
-    if (! temp.overwriteTargetFileWithTemporary())
-    {
-        error = "could not write " + target.getFullPathName();
-        return false;
     }
     return true;
 }

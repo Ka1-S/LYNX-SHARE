@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![Settings penceresinin General sayfası, üstte sayfa sekmeleri](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Ayarlar penceresinin sekiz sayfası vardır: Audio, MIDI, General, Theme, Files,
 
 ## LYNX extras
 
-`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek yerde. Yalnızca görünümü değiştirenler varsayılan olarak açıktır; birkaç küçük ek de öyle: Playlist'e bırakılan MIDI dosyaları pattern klipleri olur, Son kullanılanlar listesi ve plugin listelerinde plugin başına tek satır, ayrıca Browser'da MIDI önizlemesi ve Tab ile tamamlama. Diğerleri kapalıdır. **FL ile aynı** tüm ekstraları kapatır, **Önerilen** her birini varsayılanına döndürür. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır.
+`Seçenekler › LYNX ekstraları...`. LYNX SHARE'in kendi eklemeleri tek bir yerde. Yalnızca görünümü değiştirenlerin bazıları varsayılan olarak açıktır, birkaç küçük ekleme de öyle: Playlist'e bırakılan MIDI dosyaları pattern klibi olur, klibin kazanç tutamacı görünür kalır, Clip-launch düzenindeki yeni projelerde her parça için bir mikser parçası olur, eklenti listelerinde Son kullanılanlar listesi ve eklenti başına tek satır, Browser'da MIDI önizlemesi ve Tab ile tamamlama. Açık olanlardan ikisi sesi değiştirir: uzatılmış pattern klipleri pattern'lerini tekrarlar ve Simple düzeninde bırakılan bir döngü, sesinde bulunan tempoyu ve tonu alır. Diğerleri kapalıdır. **FL ile aynı** tüm ekstraları kapatır, **Önerilen** her birini varsayılanına döndürür. Her anahtar, satırının adını verdiği menüdeki veya sayfadaki ayarın aynısıdır ve varsayılan olarak açık olan her birinin satırı bunu söyler.
 
 | Ayar | Ne yapar |
 |---|---|

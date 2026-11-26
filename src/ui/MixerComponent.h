@@ -208,13 +208,14 @@ public:
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
     static inline bool showLoudness = false;
     void setShowLoudness (bool on);
-    // Round 190qh (LYNX extras, on by default since rollup 0.1.32 step 2 — the owner's policy 11-23, visual only;
-    // ui-options.txt "mixerPeakValues" / "mixerCorrelation"): View › "Peak
+    // Round 190qh (LYNX extras, off by default: on in rollup 0.1.32 steps 2-4, off again since round 190ro — together
+    // they make every strip's fader and meter 19 px shorter, so FL's 0 dB spot and dB per pixel move, and the bars cost
+    // +1.6 % a playhead column; ui-options.txt "mixerPeakValues" / "mixerCorrelation"): View › "Peak
     // values under meters" (D2-VF5: each strip's highest peak since a reset, in dBFS, in a box under its meter; a click
     // resets it, Alt+click every one) and View › "Correlation bars" (D2-MX3: the stereo correlation of each strip's
     // output, −1 … +1, a thin bar under its meter; summed from the meters' tap only while shown)
-    static inline bool showPeakValues = true;
-    static inline bool showCorrelation = true;
+    static inline bool showPeakValues = false;
+    static inline bool showCorrelation = false;
     static constexpr int correlationRowHeight = 6, peakRowHeight = 13;
     static int extrasHeight() noexcept { return (showCorrelation ? correlationRowHeight : 0) + (showPeakValues ? peakRowHeight : 0); }
     void setShowPeakValues (bool on);

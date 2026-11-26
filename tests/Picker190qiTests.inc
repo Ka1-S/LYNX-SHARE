@@ -33,9 +33,9 @@ TEST (picker190qi_recent_list)
 TEST (picker190qi_one_row_per_plugin_across_formats)
 {
     using namespace lynx::pluginpicks;
-    // the preference: CLAP › VST3 › VST2 (JUCE's "VST") › anything else
-    CHECK (formatRank ("CLAP") < formatRank ("VST3"));
-    CHECK (formatRank ("VST3") < formatRank ("VST"));
+    // the preference: VST3 › CLAP › VST2 (JUCE's "VST") › anything else (round 190rk: VST3 first)
+    CHECK (formatRank ("VST3") < formatRank ("CLAP"));
+    CHECK (formatRank ("CLAP") < formatRank ("VST"));
     CHECK (formatRank ("vst") == formatRank ("VST2"));
     CHECK (formatRank ("LV2") > formatRank ("VST"));
     // the same plugin: name and vendor without case, spaces or punctuation; a VST2 build's "x64" suffix dropped
@@ -56,8 +56,8 @@ TEST (picker190qi_one_row_per_plugin_across_formats)
     };
     const auto groups = groupByFormat (items);
     CHECK ((int) groups.size() == 6);
-    CHECK ((groups[0].members == std::vector<int> { 3, 1, 0 })); // CLAP first, then VST3, VST2
-    CHECK (groups[0].preferred() == 3);
+    CHECK ((groups[0].members == std::vector<int> { 1, 3, 0 })); // VST3 first, then CLAP, VST2 (round 190rk)
+    CHECK (groups[0].preferred() == 1);
     CHECK ((groups[1].members == std::vector<int> { 2 }));
     CHECK ((groups[2].members == std::vector<int> { 4 }));
     CHECK ((groups[3].members == std::vector<int> { 5 }));

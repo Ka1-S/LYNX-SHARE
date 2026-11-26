@@ -2888,7 +2888,10 @@ public:
         // (round 190qx, OPTIONS.md: since 190qk most visual extras stay off for their CPU, so the intro says "some")
         styleNote (intro, tr ("LYNX's own improvements, grouped by area. The ones that change what a key, a click or a drag does are off, so "
                               "LYNX SHARE works like FL Studio until you switch one on; some that only change what you see are on. Each switch "
-                              "is the same setting as in the place its line names, and the picture beside a visual one shows what it adds."));
+                              "is the same setting as in the place its line names, and the picture beside a visual one shows what it adds.")
+                              // round 190ro (EXTRAS-2.md § 7): the two on by default that change the sound, named
+                              + " " + tr ("Two that are on by default change the sound: stretched pattern clips loop their pattern, and in the Simple "
+                                          "layout a dropped loop takes the tempo and key found in its audio."));
         intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         addFixed (intro);
         // round 190qk (owner's policy 11-23): every extra off at once, or each back at its default (core/ExtrasDefaults.h)
@@ -2931,8 +2934,12 @@ public:
                 refresh(); // (what the app really did, e.g. an action that was refused)
             };
             // (round 190qx: the hint bar and the tooltip say it too, and whether it is FL's behaviour or LYNX's)
-            row.toggle.setTooltip (tr (std::string (item.note).c_str()));
-            styleNote (row.note, tr (std::string (item.note).c_str()));
+            // (round 190ro, EXTRAS-2.md § 7: every extra that is on by default says so on its line; three notes say it already)
+            auto note = tr (std::string (item.note).c_str());
+            if (extras::defaultOn (item.id) && ! juce::String (std::string (item.note)).containsIgnoreCase ("on by default"))
+                note << " " << tr ("On by default.");
+            row.toggle.setTooltip (note);
+            styleNote (row.note, note);
             row.note.setMinimumHorizontalScale (1.0f); // (round 190iu: a long note wraps instead of being squeezed onto one line)
             add (row.toggle);
             add (row.note);

@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -112,6 +112,7 @@ Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio,
 ## Warto wiedzieć
 
 - `Miernik głośności obok Mastera (LYNX)` w `Opcje › Mixer` pokazuje głośność krótkoterminową i zintegrowaną (LUFS) oraz true peak wyjścia Mastera, z przyciskiem `Resetuj`.
+- `Kompensuj też automatykę suwaka i routingu (LYNX)` w `Kompensacja opóźnień pluginów` w menu insertu jest włączone w nowych projektach. To ustawienie całego projektu. Przy wtyczkach dodających opóźnienie odtwarza automatykę suwaków, panoramy, wysyłek i suwaków VCA tak późno jak audio, na które działa. FL Studio opóźnia tylko automatykę pokręteł wtyczek, więc tam ten sam projekt brzmi trochę inaczej. Projekty z FL Studio i starsze projekty mają je wyłączone, a `Jak w FL` go nie zmienia.
 - Plugin instrumentu z kilkoma wyjściami może grać każde wyjście na własnym insercie. Zobacz [Pluginy innych producentów](/wiki/plugins/).
 - `Ctrl+L` robi co innego w Channel Racku i w Mixerze. W racku wybiera wolne inserty. W Mixerze używa zaznaczonego insertu.
 - Przełączniki tras pojawiają się na innych paskach, nie na zaznaczonym.

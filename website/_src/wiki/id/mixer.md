@@ -1,5 +1,5 @@
 ---
-source: 4ea98272fd
+source: c943e134a7
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -59,7 +59,7 @@ Edison, editor dan perekam audio, bisa berada di slot efek mana pun, beberapa pe
 
 - `Buka editor audio` (`Ctrl+E`) di menu insert memuat Edison ke slot kosong pertama insert dan membukanya. `Buka editor audio dan rekam` (`Shift+E`) memuatnya siap merekam saat lagu diputar.
 - Mode rekam adalah `Sekarang`, `Saat input` (bawaan: ia menunggu input melewati threshold), `Input`, dan `Saat putar`. `Tambahkan` menaruh rekaman baru setelah audio yang sudah ada. Waktu rekam maksimum adalah `Selamanya` atau 1, 3, 5, 10, 30, atau 60 menit: slot baru dimulai pada 30, `Buka editor audio dan rekam` mengaturnya ke 5.
-- `Sync` memutar audio Edison pada waktu lagu selama lagu diputar.
+- `Sinkron` memutar audio Edison pada waktu lagu selama lagu diputar.
 - Edison terus merekam setelah kamu menutup jendelanya.
 - `Alat › Makro › Hapus semua instance Edison` mengosongkan setiap slot Edison di proyek, setelah ada pertanyaan.
 - Slot Edison di proyek FL Studio (.flp) terbuka bersama audionya.
@@ -112,6 +112,7 @@ Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYN
 ## Baik diketahui
 
 - `Pengukur loudness di samping Master (LYNX)`, di `Opsi › Mixer`, menampilkan loudness jangka pendek dan terintegrasi (LUFS) serta true peak dari output Master, dengan tombol `Reset`.
+- `Kompensasi juga otomasi fader dan rute (LYNX)`, di `Kompensasi delay plugin` pada menu insert, menyala di proyek baru. Ini pengaturan untuk seluruh proyek. Dengan plugin yang menambah latensi, ini memutar otomasi fader, pan, send, dan fader VCA selambat audio yang dipengaruhinya. FL Studio hanya menunda otomasi kenop plugin, jadi proyek yang sama terdengar sedikit berbeda di sana. Proyek dari FL Studio dan proyek lama mematikannya, dan `Sama seperti FL` tidak mengubahnya.
 - Plugin instrumen dengan beberapa output bisa memutar tiap output di insert-nya sendiri. Lihat [Plugin pihak ketiga](/wiki/plugins/).
 - `Ctrl+L` melakukan hal berbeda di Channel Rack dan di Mixer. Di rack ia memilih insert kosong. Di Mixer ia memakai insert terpilih.
 - Sakelar rute muncul di strip lain, bukan di strip yang terpilih.

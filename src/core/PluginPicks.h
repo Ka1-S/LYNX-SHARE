@@ -7,7 +7,7 @@
 //   - Hidden: plugins the user hid in the Plugin manager leave the pickers; projects still load them, and the Plugin
 //     manager's "Hidden" filter shows them again (plugin-hidden.txt, the favourites' format).
 //   - One row per plugin installed in several formats: VST2 / VST3 / CLAP builds of one plugin (same name and vendor,
-//     same kind) are one row whose chip says the format a new pick loads, CLAP › VST3 › VST2; a right-click picks
+//     same kind) are one row whose chip says the format a new pick loads, VST3 › CLAP › VST2 (round 190rk); a right-click picks
 //     another. A project keeps the exact format it holds (the plugin's identifier): only new picks are concerned.
 // No JUCE here (tests/Picker190qiTests.inc).
 
@@ -73,15 +73,18 @@ inline std::string formatRecent (const std::vector<std::string>& keys)
     return out;
 }
 
-// The preference among the formats of one plugin: CLAP (0) › VST3 (1) › VST2 (JUCE's "VST", 2) › anything else (3).
+// The preference among the formats of one plugin: VST3 (0) › CLAP (1) › VST2 (JUCE's "VST", 2) › anything else (3).
+// Round 190rk (coordinator, 0.1.32 quality release): VST3 first. LYNX's CLAP hosting has had far less use than its VST3
+// hosting (FabFilter's CLAP effects crashed on their first block until round 190rk), so a new pick of a plugin installed
+// in both formats loads the VST3 build; a right-click still picks the CLAP one, and projects keep the build they hold.
 inline int formatRank (const std::string& format)
 {
     std::string f;
     for (const auto c : format)
         f += (char) std::toupper ((unsigned char) c);
-    if (f == "CLAP")
-        return 0;
     if (f == "VST3")
+        return 0;
+    if (f == "CLAP")
         return 1;
     if (f == "VST" || f == "VST2")
         return 2;

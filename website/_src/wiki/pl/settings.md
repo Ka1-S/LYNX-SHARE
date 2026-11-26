@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![Strona Ogólne okna Ustawienia, z kartami stron na górze](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Okno Ustawienia ma osiem stron: Audio, MIDI, Ogólne, Motyw, Pliki, Dodatki LYNX
 
 ## Dodatki LYNX
 
-`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Te, które zmieniają tylko wygląd, są domyślnie włączone, podobnie jak kilka drobnych dodatków: pliki MIDI upuszczone na Playlist stają się klipami patternów, lista Ostatnie i jeden wiersz na plugin w listach pluginów oraz podgląd MIDI i uzupełnianie klawiszem Tab w Browser. Pozostałe są wyłączone. **Jak w FL** wyłącza wszystkie dodatki, **Zalecane** przywraca każdy do ustawienia domyślnego. Każdy przełącznik to to samo ustawienie, co w menu lub na stronie, którą wymienia jego wiersz.
+`Opcje › Dodatki LYNX...`. Własne dodatki LYNX SHARE w jednym miejscu. Niektóre, które zmieniają tylko wygląd, są domyślnie włączone, podobnie jak kilka małych dodatków: pliki MIDI upuszczone na Playlist stają się klipami patternu, uchwyt wzmocnienia klipu zostaje w widoku, nowe projekty w układzie Clip-launch dostają ścieżkę miksera dla każdej ścieżki, lista Ostatnie i jeden wiersz na wtyczkę na listach wtyczek oraz podgląd MIDI i uzupełnianie klawiszem Tab w Browserze. Dwa z włączonych zmieniają brzmienie: rozciągnięte klipy patternu powtarzają swój pattern, a w układzie Simple upuszczona pętla przyjmuje tempo i tonację znalezione w jej audio. Pozostałe są wyłączone. **Jak w FL** wyłącza wszystkie dodatki, **Zalecane** przywraca każdemu wartość domyślną. Każdy przełącznik to to samo ustawienie co w menu lub na stronie, które wymienia jego wiersz, a wiersz każdego domyślnie włączonego to mówi.
 
 | Ustawienie | Co robi |
 |---|---|

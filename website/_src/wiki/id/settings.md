@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![Halaman Umum di jendela Pengaturan, dengan tab halaman di bagian atas](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Jendela Pengaturan punya delapan halaman: Audio, MIDI, Umum, Tema, File, Ekstra 
 
 ## Ekstra LYNX
 
-`Opsi › Ekstra LYNX...`. Tambahan khas LYNX SHARE di satu tempat. Yang hanya mengubah tampilan menyala secara bawaan, begitu juga beberapa tambahan kecil: file MIDI yang dijatuhkan ke Playlist menjadi klip pattern, daftar Terbaru dan satu baris per plugin di daftar plugin, serta pratinjau MIDI dan pelengkapan dengan Tab di Browser. Sisanya mati. **Sama seperti FL** mematikan semua ekstra, **Direkomendasikan** mengembalikan tiap ekstra ke nilai bawaannya. Tiap sakelar adalah pengaturan yang sama dengan yang ada di menu atau halaman yang disebut barisnya.
+`Opsi › Ekstra LYNX...`. Tambahan milik LYNX SHARE sendiri di satu tempat. Beberapa yang hanya mengubah tampilan menyala secara bawaan, begitu pula beberapa tambahan kecil: file MIDI yang dijatuhkan ke Playlist menjadi clip pattern, pegangan gain clip tetap terlihat, proyek baru di tata letak Clip-launch mendapat satu track mixer untuk setiap track, daftar Terbaru dan satu baris per plugin di daftar plugin, serta pratinjau MIDI dan pelengkapan dengan Tab di Browser. Dua yang menyala mengubah suara: clip pattern yang diregangkan mengulang pattern-nya, dan di tata letak Simple loop yang dijatuhkan mengambil tempo dan kunci yang ditemukan di audionya. Sisanya mati. **Sama seperti FL** mematikan semua ekstra, **Direkomendasikan** mengembalikan masing-masing ke bawaannya. Setiap sakelar adalah pengaturan yang sama dengan di menu atau halaman yang disebut barisnya, dan baris setiap yang menyala secara bawaan menyebutkannya.
 
 | Pengaturan | Fungsinya |
 |---|---|

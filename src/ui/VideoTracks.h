@@ -72,6 +72,7 @@ public:
     static int contentHeight (const Song& song);
 
     void paint (juce::Graphics& g) override;
+    void visibilityChanged() override; // (round 190rn: the timer only while shown)
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;

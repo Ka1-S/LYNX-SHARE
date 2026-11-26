@@ -19,6 +19,7 @@
 #include "core/AlsDevices.h"
 #include "core/AlsImport.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipOps.h"
 #include "core/ApexLimiter.h"
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
@@ -2627,6 +2628,26 @@ struct Exp
             pan = m->pan;
             muted = m->muted;
         }
+        // (round 190rm) an audio track: its clips' own level, folded in when every clip on the row has the same one — the
+        // clip's gain (DAWproject's clips have none) times its channel's volume (FL's sample channel level, unity at FL's
+        // 10000 / 12800, as the import writes it back). Before, both were left out (Thief: its risers +7.8 dB, the vocal
+        // +3.9 dB, 176 drum clips +1.9 dB after a round trip)
+        if (c == nullptr && t.kind == TNode::Kind::audio && t.row >= 0)
+        {
+            std::optional<double> level;
+            auto mixed = false;
+            for (const auto& clip : song.playlist)
+                if (clip.kind == ClipKind::audio && clip.track == t.row && clip.channel >= 0 && clip.channel < (int) song.channels.size())
+                {
+                    const auto v = (double) clip.gain * channelGain (song.channels[(std::size_t) clip.channel].volume) / channelGain (audioClipUnityVolume);
+                    mixed = mixed || (level && std::abs (*level - v) > 1.0e-6 * std::max (1.0, v));
+                    level = v;
+                }
+            if (level && ! mixed)
+                gain *= *level;
+            else if (mixed)
+                note ("Audio clips at different levels (clip gain, channel volume) on one track: their levels (not written)");
+        }
         if (c != nullptr)
         {
             gain *= channelGain (c->volume);
@@ -3111,14 +3132,25 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
         int rate = 44100, channels = 2;
         if (missing || ! opt.sampleFormat || ! opt.sampleFormat (ch.samplePath, seconds, rate, channels))
         {
+            // (round 190rm: the reader may have left 0 Hz / 0 channels there; Audio needs real ones: Project.xsd's
+            // sampleRate and channels, which other apps take as the file's format)
             seconds = 0.0;
+            rate = 44100;
+            channels = 2;
             x.note ("Audio files whose length was not known (written as 0 s)");
         }
+        rate = rate > 0 ? rate : 44100;
+        channels = channels > 0 ? channels : 2;
         // the file: embedded, else referenced where it is
         Node audio ("Audio");
         audio.set ("id", x.newId()).set ("channels", std::to_string (channels)).set ("sampleRate", std::to_string (rate)).set ("duration", numText (seconds));
         const auto& s = ch.sampler;
-        const auto warped = s.warp.size() >= 2 || (s.stretchBeats > 0.0f && seconds > 0.0) || (c->stretch != 1.0 && seconds > 0.0);
+        // (round 190rm) the channel's pitch on a channel that resamples (FL's sample channels: Thief's drums are +6 st in
+        // 741 of its 1,351 clips) reads the file faster or slower: written as the warp it is (DAWproject "repitch"),
+        // where before the clip played at the file's own pitch and speed. With "keep pitch" it is a pitch shift that
+        // keeps the length, which DAWproject has no place for (in the notes).
+        const auto speed = clipops::clipSpeed (ch);
+        const auto warped = s.warp.size() >= 2 || (s.stretchBeats > 0.0f && seconds > 0.0) || ((c->stretch != 1.0 || speed != 1.0) && seconds > 0.0);
         audio.set ("algorithm", warped && s.keepPitch ? "stretch" : "repitch");
         auto& file = audio.add ("File");
         if (const auto e = x.embeddedPath.find (samplePath); e != x.embeddedPath.end())
@@ -3128,7 +3160,8 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
             auto bytes = opt.readFile && ! missing ? opt.readFile (ch.samplePath) : std::vector<std::uint8_t> {};
             if (! bytes.empty())
             {
-                const auto path = x.addFile ("audio/", pathFileName (ch.samplePath), std::move (bytes));
+                auto name = opt.embeddedName ? opt.embeddedName (ch.samplePath) : std::string();
+                const auto path = x.addFile ("audio/", name.empty() ? pathFileName (ch.samplePath) : name, std::move (bytes));
                 x.embeddedPath[ch.samplePath] = path;
                 file.set ("path", path);
             }
@@ -3142,7 +3175,8 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
             clip.set ("name", ch.name);
         if (c->muted || rowMuted (c->track))
             clip.set ("enable", "false");
-        clipExtras = clipExtras || c->gain != 1.0f || c->pan != 0.0f || c->pitch != 0.0f || c->reversed || c->envelope >= 0 || s.pitch != 0.0f || s.reverse;
+        clipExtras = clipExtras || c->pan != 0.0f || c->pitch != 0.0f || c->reversed || c->envelope >= 0
+                     || (s.keepPitch && s.pitch != 0.0f) || (! warped && speed != 1.0) || s.reverse;
         if (warped)
         {
             clip.set ("contentTimeUnit", "beats").set ("playStart", numText (offsetBeats));
@@ -3151,15 +3185,20 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
             w.set ("id", x.newId()).set ("timeUnit", "beats").set ("contentTimeUnit", "seconds");
             w.kids.push_back (std::move (audio));
             std::vector<WarpPoint> marks = s.warp;
+            // (round 190rm: FL 2026's clip stretch and the channel's resampling pitch scale the beats every marker lands
+            // on, as core/ClipOps.h clipSpeed plays them; before, the clip stretch of a warped or stretched sample was
+            // left out, and so was the pitch)
+            const auto scale = std::clamp (c->stretch, 0.01, 100.0) / speed;
             if (marks.size() < 2)
             {
-                const auto beats = s.stretchBeats > 0.0f ? (double) s.stretchBeats : seconds * song.bpm / 60.0 * c->stretch;
+                const auto beats = (s.stretchBeats > 0.0f ? (double) s.stretchBeats : seconds * song.bpm / 60.0) * scale;
                 marks = { { 0.0, 0.0 }, { seconds, beats } };
-                if (s.stretchBeats <= 0.0f)
+                if (s.stretchBeats <= 0.0f && c->stretch != 1.0)
                     x.note ("Per-clip stretch written as warp markers");
             }
-            else if (c->stretch != 1.0)
-                x.note ("Per-clip stretch on warped audio (not written)");
+            else
+                for (auto& m : marks)
+                    m.beats *= scale;
             for (const auto& m : marks)
                 w.add ("Warp").set ("time", numText (m.beats)).set ("contentTime", numText (m.seconds));
         }
@@ -3169,12 +3208,12 @@ DawProjectExportResult exportDawProject (const Song& input, const DawProjectExpo
             clip.set ("contentTimeUnit", "seconds").set ("playStart", numText (offsetBeats * 60.0 / song.bpm));
             clip.set ("fadeTimeUnit", "beats").set ("fadeInTime", numText ((double) c->fadeIn / ppq)).set ("fadeOutTime", numText ((double) c->fadeOut / ppq));
             clip.kids.push_back (std::move (audio));
-            if (s.stretchBeats > 0.0f || c->stretch != 1.0)
+            if (s.stretchBeats > 0.0f || c->stretch != 1.0 || speed != 1.0)
                 x.note ("Stretched audio whose file length was not known (written unstretched)");
         }
     }
     if (clipExtras)
-        x.note ("Audio clip gain, pan, pitch, reverse and clip envelopes (not written)");
+        x.note ("Audio clip pan, pitch shifts that keep the length, reverse and clip envelopes (not written)");
 
     // automation: each target's points in song time, from automation clips and lanes
     struct Pt

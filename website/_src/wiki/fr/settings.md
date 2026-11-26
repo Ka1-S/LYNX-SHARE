@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![La page Général de la fenêtre Réglages, avec les onglets de page en haut](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ La fenêtre Réglages a huit pages : Audio, MIDI, Général, Thème, Fichiers, E
 
 ## Extras LYNX
 
-`Options › Extras LYNX...`. Les ajouts propres à LYNX SHARE réunis au même endroit. Ceux qui ne changent que l'apparence sont activés par défaut, tout comme quelques petits ajouts : les fichiers MIDI déposés sur la Playlist deviennent des clips de pattern, la liste Récents et une ligne par plugin dans les listes de plugins, ainsi que l'aperçu MIDI et la complétion avec Tab dans le Browser. Les autres sont désactivés. **Comme FL** désactive tous les extras, **Recommandé** remet chacun à sa valeur par défaut. Chaque interrupteur est le même réglage que dans le menu ou la page que nomme sa ligne.
+`Options › Extras LYNX...`. Les ajouts propres à LYNX SHARE, en un seul endroit. Certains qui ne changent que l'apparence sont activés par défaut, ainsi que quelques petits ajouts : les fichiers MIDI déposés sur la Playlist deviennent des clips de pattern, la poignée de gain du clip reste visible, les nouveaux projets de la disposition Clip-launch ont une piste de mixage pour chaque piste, la liste Récents et une ligne par plugin dans les listes de plugins, et l'aperçu MIDI et la complétion par Tab dans le Browser. Deux de ceux qui sont activés changent le son : les clips de pattern étirés rejouent leur pattern et, dans la disposition Simple, une boucle déposée prend le tempo et la tonalité trouvés dans son audio. Les autres sont désactivés. **Comme FL** désactive tous les extras, **Recommandé** remet chacun à sa valeur par défaut. Chaque interrupteur est le même réglage que dans le menu ou la page que sa ligne nomme, et la ligne de chacun de ceux activés par défaut le dit.
 
 | Réglage | Ce qu'il fait |
 |---|---|

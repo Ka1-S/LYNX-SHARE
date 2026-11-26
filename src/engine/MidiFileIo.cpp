@@ -1,15 +1,19 @@
 #include "engine/MidiFileIo.h"
+#include "ui/I18n.h"
+#include "engine/SafeWrite.h"
 
 #include "core/NoteChance.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <map>
 
 #include "core/ExportOptions.h"
 #include "core/KeyRegions.h"
+#include "core/TempoMap.h"
 #include "core/MidiControls.h"
 #include "engine/Text.h"
 
@@ -85,12 +89,51 @@ void collectTempos (const juce::MidiFile& midi, Out& out, const std::function<st
     std::stable_sort (out.tempos.begin(), out.tempos.end(), [] (const PatternEvent& a, const PatternEvent& b) { return a.tick < b.tick; });
 }
 
+// (round 190rm, sweep 190rj BUGS 9) a Standard MIDI File with only its header and track chunks: the SMF spec has readers
+// skip chunk types they don't know, but JUCE's reader counts every chunk against the header's track count, so an
+// unknown chunk (e.g. an "XFIH" info chunk before the tracks) made it miss the last track or refuse the file. The data
+// is returned as it is when it holds no such chunk (or is no SMF: JUCE then says so as before).
+juce::MemoryBlock smfTrackChunksOnly (juce::MemoryBlock data)
+{
+    const auto* d = static_cast<const std::uint8_t*> (data.getData());
+    const auto size = data.getSize();
+    const auto be32 = [d] (std::size_t at) { return ((std::uint32_t) d[at] << 24) | ((std::uint32_t) d[at + 1] << 16) | ((std::uint32_t) d[at + 2] << 8) | d[at + 3]; };
+    const auto is = [d, size] (std::size_t at, const char* tag) { return at + 4 <= size && std::memcmp (d + at, tag, 4) == 0; };
+    std::size_t head = 0;
+    if (is (0, "RIFF")) // (RMID: JUCE looks for MThd within the first words)
+        for (std::size_t at = 4; at + 4 <= size && at <= 36; at += 4)
+            if (is (at, "MThd"))
+            {
+                head = at;
+                break;
+            }
+    if (! is (head, "MThd") || head + 8 > size)
+        return data;
+    const auto headerEnd = head + 8 + (std::size_t) be32 (head + 4);
+    if (headerEnd > size)
+        return data;
+    juce::MemoryBlock out (d + head, headerEnd - head);
+    auto skipped = false;
+    for (auto at = headerEnd; at + 8 <= size;)
+    {
+        const auto end = std::min (size, at + 8 + (std::size_t) be32 (at + 4));
+        if (is (at, "MTrk"))
+            out.append (d + at, end - at);
+        else
+            skipped = true;
+        at = end;
+    }
+    return skipped ? out : data;
+}
+
 std::optional<Parsed> parse (const juce::File& file, juce::String& error)
 {
-    juce::FileInputStream in (file);
+    juce::MemoryBlock bytes;
+    const auto read = file.loadFileAsData (bytes);
+    juce::MemoryInputStream in (smfTrackChunksOnly (std::move (bytes)), true);
     juce::MidiFile midi;
 
-    if (! in.openedOk() || ! midi.readFrom (in))
+    if (! read || ! midi.readFrom (in))
     {
         error = utf8 ("not a valid MIDI file");
         return std::nullopt;
@@ -183,6 +226,13 @@ std::optional<Song> loadSong (const juce::File& file, juce::String& error)
 
     Song song;
     song.bpm = parsed->bpm;
+    // (round 190rm, sweep 190rj BUGS 9) the file's first time signature, as File › Import › MIDI file's "Import time
+    // signatures" (on by default, core/MidiImport.cpp) does for a new project: a 3/4 file opened as 4/4 before
+    if (parsed->numerator > 0 && meterUnit (parsed->denominator) == parsed->denominator)
+    {
+        song.beatsPerBar = std::clamp (parsed->numerator, 1, 16);
+        song.beatUnit = parsed->denominator;
+    }
     song.mixer = Song::defaultMixer();
     auto& pattern = song.patterns.emplace_back();
     pattern.name = file.getFileNameWithoutExtension().toStdString();
@@ -217,8 +267,12 @@ std::optional<Song> loadSong (const juce::File& file, juce::String& error)
     return song;
 }
 
-static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& in, bool opened, juce::String& error)
+static std::optional<midiimport::ParsedMidi> parseStream (juce::InputStream& source, bool opened, juce::String& error)
 {
+    juce::MemoryBlock bytes;
+    if (opened)
+        source.readIntoMemoryBlock (bytes, 200 * 1024 * 1024);
+    juce::MemoryInputStream in (smfTrackChunksOnly (std::move (bytes)), true);
     juce::MidiFile midi;
     if (! opened || ! midi.readFrom (in))
     {
@@ -344,7 +398,28 @@ std::optional<std::vector<Note>> loadNotes (const juce::File& file, int channel,
     return notes;
 }
 
+namespace
+{
+// (round 190rm) the song's tempo changes and time signature changes, for FL's File › Export › MIDI file: before, only the
+// tempo and signature at the start were written, so a song with a tempo automation (Thief slows to 60 BPM at its end)
+// or a signature marker played at one tempo / meter in every other app. Tempo ramps are written as steps every 1/32 note.
+struct SongTimeMap
+{
+    std::vector<std::pair<std::int64_t, double>> tempos;  // tick, BPM (after the start)
+    std::vector<std::pair<std::int64_t, std::pair<int, int>>> signatures; // tick, numerator / denominator
+};
+
+bool writeMidi (const Song& song, int patternIndex, const juce::File& file, juce::String& error, const SongTimeMap* map);
+} // namespace
+
 bool savePattern (const Song& song, int patternIndex, const juce::File& file, juce::String& error)
+{
+    return writeMidi (song, patternIndex, file, error, nullptr);
+}
+
+namespace
+{
+bool writeMidi (const Song& song, int patternIndex, const juce::File& file, juce::String& error, const SongTimeMap* map)
 {
     if (patternIndex < 0 || patternIndex >= (int) song.patterns.size())
     {
@@ -358,6 +433,11 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
     for (const auto& n : chance::realised (pattern.notes, song.chanceSeed))
     {
         auto& seq = byChannel[n.channel];
+        if (seq.getNumEvents() == 0) // (round 190rm: the track's name first, before its notes at tick 0, as SMF readers expect)
+        {
+            const auto name = n.channel >= 0 && n.channel < (int) song.channels.size() ? song.channels[(std::size_t) n.channel].name : std::string ("Channel");
+            seq.addEvent (juce::MidiMessage::textMetaEvent (3, juce::String::fromUTF8 (name.c_str())), 0.0);
+        }
         const auto velocity = (juce::uint8) juce::jlimit (1, 127, juce::roundToInt (n.velocity * 127.0f));
         const auto midiChannel = juce::jlimit (1, 16, n.colour + 1); // FL: the note colour is the MIDI channel
         seq.addEvent (juce::MidiMessage::noteOn (midiChannel, n.key, velocity), (double) n.start);
@@ -370,29 +450,33 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
     juce::MidiMessageSequence tempo;
     tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / song.bpm)), 0.0);
     tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (song.beatsPerBar, meterUnit (song.beatUnit)), 0.0);
+    if (map != nullptr)
+    {
+        for (const auto& [tick, bpm] : map->tempos)
+            tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / bpm)), (double) tick);
+        for (const auto& [tick, sig] : map->signatures)
+            tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (sig.first, meterUnit (sig.second)), (double) tick);
+    }
     addKeySignatures (tempo, pattern, projectkey::get (song), pattern.effectiveLength (song.meter())); // (round 190nu)
     midi.addTrack (tempo);
 
     for (auto& [channel, seq] : byChannel)
     {
-        const auto name = channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].name : std::string ("Channel");
-        seq.addEvent (juce::MidiMessage::textMetaEvent (3, juce::String::fromUTF8 (name.c_str())), 0.0);
         seq.sort();
         seq.updateMatchedPairs();
         midi.addTrack (seq);
     }
 
-    file.deleteFile();
-    juce::FileOutputStream out (file);
-
-    if (out.failedToOpen() || ! midi.writeTo (out))
+    // (round 190rm: the checked writer; before, the old file was deleted first and a failed write was not seen)
+    if (juce::String why; ! safewrite::writeWith (file, [&midi] (juce::OutputStream& out) { return midi.writeTo (out); }, why))
     {
-        error = utf8 ("could not write ") + file.getFullPathName();
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
         return false;
     }
 
     return true;
 }
+} // namespace
 
 bool saveSong (const Song& song, const juce::File& file, juce::String& error)
 {
@@ -406,6 +490,31 @@ bool saveSong (const Song& song, const juce::File& file, juce::String& error)
     flat.patterns[0].notes = exportopts::midiExportNotes (song);
     flat.scaleHighlight = song.scaleHighlight; // round 190nu: the project key, and the key markers where they play
     flat.patterns[0].markers = keyregions::songKeyMarkers (song);
-    return savePattern (flat, 0, file, error);
+    SongTimeMap map;
+    if (song.mode == PlayMode::song)
+    {
+        std::int64_t end = 0;
+        for (const auto& n : flat.patterns[0].notes)
+            end = std::max (end, n.start + n.length);
+        for (const auto& c : song.playlist)
+            end = std::max (end, c.end());
+        if (tempomap::active (song))
+        {
+            auto last = song.bpm;
+            for (std::int64_t t = 0; t <= end; t += ppq / 8)
+                if (const auto bpm = tempomap::tempoAt (song, (double) t); std::abs (bpm - last) >= 0.005)
+                {
+                    if (t == 0)
+                        flat.bpm = bpm; // (the start's tempo event)
+                    else
+                        map.tempos.push_back ({ t, bpm });
+                    last = bpm;
+                }
+        }
+        for (const auto& m : song.markers())
+            if (m.isSignature() && m.tick > 0 && m.numerator > 0 && m.denominator > 0)
+                map.signatures.push_back ({ m.tick, { m.numerator, m.denominator } });
+    }
+    return writeMidi (flat, 0, file, error, &map);
 }
 } // namespace lynx::MidiFileIo

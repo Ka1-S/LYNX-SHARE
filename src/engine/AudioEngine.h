@@ -983,6 +983,9 @@ public:
     // How many undo steps are kept (Settings › General).
     void setUndoLevels (int levels);
     int getUndoLevels() const noexcept { return (int) maxUndoSteps; }
+    // round 190rn: the history's memory cap (1 GB; core/SongBytes.h's estimate of each step), another one for checks
+    void setUndoBytesForTest (std::size_t bytes) { maxUndoBytes = bytes; trimUndoHistory(); }
+    std::size_t getUndoBytes() const noexcept;
 
     // Document (UI thread)
     const Song& getSong() const noexcept { return song; }
@@ -1921,8 +1924,12 @@ private:
     std::unique_ptr<StreamPrefetcher> prefetcher; // only with an audio device (playing live)
 
     std::size_t maxUndoSteps = prefs::defaultUndoLevels;
-    struct HistoryEntry { Song song; bool remote = false; juce::String deviceHash; };
+    // round 190rn: the history is also capped by its memory (core/SongBytes.h's estimate of each step's copy): a big
+    // project's 100 steps reached 1 GB (Patience, 7.4 MB a step). The oldest steps go first; one step always stays.
+    std::size_t maxUndoBytes = std::size_t (1) << 30; // (1 GB; setUndoBytesForTest)
+    struct HistoryEntry { Song song; bool remote = false; juce::String deviceHash; std::size_t bytes = 0; };
     std::deque<HistoryEntry> undoStack, redoStack;
+    void trimUndoHistory(); // to maxUndoSteps and maxUndoBytes (the oldest undo steps go)
     // undo per user (round 169b): each local step as (before, after); `sessionAfterOpen` = the last step's "after" is
     // still the song (it is taken when the next step starts, a remote change comes in, or undo is used)
     bool sessionHistory = false, sessionAfterOpen = false;

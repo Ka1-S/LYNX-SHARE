@@ -1,8 +1,10 @@
 #include "engine/AudioEngine.h"
 #include "platform/CrashGuard.h" // round 190rp: session steps around the device open
+#include "engine/SafeWrite.h"
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/History.h" // (keepProjectClock: round 190re)
+#include "core/SongBytes.h" // round 190rn: the undo history's byte cap
 #include "core/AutoLook.h"
 #include "core/NewClipColours.h"
 #include "core/SessionMixer.h"
@@ -111,6 +113,38 @@ namespace lynx
 {
 namespace
 {
+// (round 190rm) the name an embedded sample is saved under: "<name>-<hash>" plus the extension its name gives when it is an
+// audio type (a DAWproject embeds FLAC, AIFF, MP3...: "x.flac" was saved as "x.flac-<hash>.wav", a FLAC file named .wav
+// that other apps, and a collected copy, could not open); else ".wav" (FL's embedded samples have no extension)
+juce::String embeddedSampleFileName (const std::string& name, const juce::String& hash)
+{
+    auto stem = juce::String::fromUTF8 (name.c_str());
+    juce::String ext (".wav");
+    const auto dot = stem.lastIndexOfChar ('.');
+    if (dot > 0)
+        if (const auto e = stem.substring (dot).toLowerCase(); juce::StringArray { ".wav", ".wave", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".wv", ".m4a", ".opus" }.contains (e))
+        {
+            stem = stem.substring (0, dot);
+            ext = e == ".wave" ? juce::String (".wav") : e;
+        }
+    // a sample that came from an earlier import keeps one hash, not one more per export → import cycle
+    // ("Loop 90.wav-1012f59c-1012f59c" in round 190rj's corpus): an earlier "-<8 hex digits>" (and a type before it) goes
+    for (auto again = true; again;)
+    {
+        again = false;
+        const auto dash = stem.lastIndexOfChar ('-');
+        if (dash > 0 && stem.length() - dash == 9 && stem.substring (dash + 1).containsOnly ("0123456789abcdef"))
+        {
+            stem = stem.substring (0, dash);
+            again = true;
+            const auto inner = stem.lastIndexOfChar ('.');
+            if (inner > 0 && juce::StringArray { ".wav", ".wave", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".wv", ".m4a", ".opus" }.contains (stem.substring (inner).toLowerCase()))
+                stem = stem.substring (0, inner);
+        }
+    }
+    return juce::File::createLegalFileName (stem) + "-" + hash + ext;
+}
+
 std::unordered_set<std::uint64_t> remoteFreshTargets (const Song& before, const Song& after)
 {
     std::unordered_set<std::uint64_t> existing, fresh;
@@ -209,8 +243,8 @@ const natives::FlAccess& flStudioAccess()
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
                 juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
-            const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
-            if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
+            const auto file = folder.getChildFile (embeddedSampleFileName (name, hash));
+            if (! file.existsAsFile() && ! safewrite::replaceWithData (file, wav.data(), wav.size()))
                 return {};
             return file.getFullPathName().toStdString();
         };
@@ -508,7 +542,7 @@ struct AudioEngine::DeviceStateSaver final : public juce::ChangeListener
 void AudioEngine::saveAudioDeviceState()
 {
     if (auto xml = deviceManager.createStateXml())
-        fileJobs.post ([text = xml->toString(), file = audioDeviceFile()] { file.replaceWithText (text); });
+        fileJobs.post ([text = xml->toString(), file = audioDeviceFile()] { safewrite::replaceWithText (file, text); });
 }
 
 void AudioEngine::restoreAudioDeviceState (const juce::XmlElement* state)
@@ -516,7 +550,7 @@ void AudioEngine::restoreAudioDeviceState (const juce::XmlElement* state)
     deviceStateSaver = nullptr;
     fileJobs.post ([text = state != nullptr ? state->toString() : juce::String(), restore = state != nullptr, file = audioDeviceFile()] {
         if (restore)
-            file.replaceWithText (text);
+            safewrite::replaceWithText (file, text);
         else
             file.deleteFile();
     });
@@ -712,6 +746,9 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    // round 190rn: with LYNX_TRACE_STARTUP the engine's part of a quit is in startup.log (where a slow quit's time goes)
+    static const bool traceQuit = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
+    const auto mark = [] (const char* step) { if (traceQuit && startupMark != nullptr) startupMark (step); };
     if (rackProcessor != nullptr) // (round 190gq: the render-ahead thread stops before the snapshots are freed)
         rackProcessor->haltRenderAhead();
     if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
@@ -749,13 +786,24 @@ AudioEngine::~AudioEngine()
     openTakes.clear();
 
     recordThread.stopThread (2000);
+    mark ("quit:   engine: previews, racks, takes, record thread");
     prefetcher = nullptr;
     midiDevicesChanged = {};
     deviceStateSaver = nullptr;
     deviceManager.removeMidiInputDeviceCallback ({}, this);
     deviceManager.removeAudioCallback (this);
     player.setProcessor (nullptr);
+    mark ("quit:   engine: prefetcher, device callbacks");
     graph.clear(); // the nodes reference rackExchange and transport
+    mark ("quit:   engine: audio graph (plugins, renderers)");
+    if (traceQuit) // (the history's memory, measured apart from the rest of the members)
+    {
+        undoStack.clear();
+        redoStack.clear();
+        sessionUndo.clear();
+        sessionRedo.clear();
+        mark ("quit:   engine: undo history freed");
+    }
 }
 
 void AudioEngine::buildInitialGraph()
@@ -2304,7 +2352,7 @@ void AudioEngine::setRecordingSettings (const RecordingSettings& settings)
     for (const auto& [key, samples] : settings.measured)
         text << "measured=" << samples << "\t" << juce::String::fromUTF8 (key.c_str()) << "\n";
     if (deviceStateSaver != nullptr) // (a headless engine — tests, export — keeps the user's file as it is)
-        recordingSettingsFile().replaceWithText (text);
+        safewrite::replaceWithText (recordingSettingsFile(), text);
     sendChangeMessage();
 }
 
@@ -2636,12 +2684,12 @@ void AudioEngine::writeJournals()
         j.playlistTrack = -1;
         j.project = recordingStem.toStdString();
         const auto journal = journalFor (take->file);
-        journal.replaceWithText (juce::String::fromUTF8 (takes::journalText (j).c_str()));
+        safewrite::replaceWithText (journal, juce::String::fromUTF8 (takes::journalText (j).c_str()));
         list.addIfNotAlreadyThere (journal.getFullPathName());
         ++k;
     }
     if (deviceStateSaver != nullptr)
-        inProgressFile().replaceWithText (list.joinIntoString ("\n"));
+        safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
 }
 
 void AudioEngine::finishAudioTake()
@@ -2702,7 +2750,7 @@ void AudioEngine::finishAudioTake()
             if (list.isEmpty())
                 inProgressFile().deleteFile();
             else
-                inProgressFile().replaceWithText (list.joinIntoString ("\n"));
+                safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
         }
     };
 
@@ -2865,7 +2913,7 @@ void AudioEngine::forgetInterruptedTakes (const std::vector<takes::Journal>& rec
         if (list.isEmpty())
             inProgressFile().deleteFile();
         else
-            inProgressFile().replaceWithText (list.joinIntoString ("\n"));
+            safewrite::replaceWithText (inProgressFile(), list.joinIntoString ("\n"));
     }
 }
 
@@ -3509,7 +3557,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         applyLinkPrefs();
     }
     if (save)
-        midiSettingsFile().replaceWithText (juce::String (p.toText()));
+        safewrite::replaceWithText (midiSettingsFile(), juce::String (p.toText()));
     sendChangeMessage();
 }
 
@@ -4042,18 +4090,12 @@ void AudioEngine::saveUndoStep()
 
     if (! samePress)
     {
-        undoStack.push_back ({ song, remote });
+        undoStack.push_back ({ song, remote, {}, songbytes::song (song) });
+        redoStack.clear();
+        trimUndoHistory();
         lastPushSize = undoStack.size();
         lastPushMs = nowMs;
         lastPushPress = buttonDown ? juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime() : juce::Time();
-        redoStack.clear();
-
-        if (undoStack.size() > maxUndoSteps)
-        {
-            undoStack.pop_front();
-            if (recordPassMarked)
-                ++recordPassTrimmed;
-        }
         if (sessionHistory)
         {
             closeSessionStep();
@@ -4065,6 +4107,27 @@ void AudioEngine::saveUndoStep()
     }
     if (sessionHistory)
         sessionAfterOpen = true;
+}
+
+std::size_t AudioEngine::getUndoBytes() const noexcept
+{
+    std::size_t bytes = 0;
+    for (const auto* stack : { &undoStack, &redoStack })
+        for (const auto& entry : *stack)
+            bytes += entry.bytes;
+    return bytes;
+}
+
+void AudioEngine::trimUndoHistory()
+{
+    auto bytes = getUndoBytes();
+    while (undoStack.size() > maxUndoSteps || (bytes > maxUndoBytes && undoStack.size() > 1))
+    {
+        bytes -= undoStack.front().bytes;
+        undoStack.pop_front();
+        if (recordPassMarked)
+            ++recordPassTrimmed;
+    }
 }
 
 // round 190mv (DF-134): FL's "Undo knob tweaks" off. The tweak and its edit come within one press (a drag) or one
@@ -4363,7 +4426,7 @@ void AudioEngine::historyStep (bool redo)
         // The model's saved blob can differ from the running vendor's normalized blob. Redo must restore the
         // actual state we are leaving, captured before any history movement, rather than the stale model bytes.
         std::optional<HistoryEntry> inverse;
-        if (remote) inverse.emplace (HistoryEntry { *before, true });
+        if (remote) inverse.emplace (HistoryEntry { *before, true, {}, songbytes::song (*before) });
         const auto fresh = remote ? remoteFreshTargets (*before, from.back().song) : std::unordered_set<std::uint64_t>();
         const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
         if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
@@ -4376,7 +4439,11 @@ void AudioEngine::historyStep (bool redo)
         movementMayHaveBegun = true;
         const auto clock = song.info;
         if (remote) to.push_back (std::move (*inverse));
-        else to.push_back ({ std::move (song), false });
+        else
+        {
+            const auto bytes = songbytes::song (song);
+            to.push_back ({ std::move (song), false, {}, bytes });
+        }
         song = std::move (from.back().song);
         from.pop_back();
         keepProjectClock (song.info, clock); // (round 190re: undo no longer turns the working time back)
@@ -4485,14 +4552,16 @@ void AudioEngine::jumpToHistory (int index)
     // move through the stacks, then publish once
     while (getHistoryPosition() > index && ! undoStack.empty())
     {
-        redoStack.push_back ({ std::move (song), undoStack.back().remote });
+        const auto bytes = songbytes::song (song);
+        redoStack.push_back ({ std::move (song), undoStack.back().remote, {}, bytes });
         song = std::move (undoStack.back().song);
         undoStack.pop_back();
     }
 
     while (getHistoryPosition() < index && ! redoStack.empty())
     {
-        undoStack.push_back ({ std::move (song), redoStack.back().remote });
+        const auto bytes = songbytes::song (song);
+        undoStack.push_back ({ std::move (song), redoStack.back().remote, {}, bytes });
         song = std::move (redoStack.back().song);
         redoStack.pop_back();
     }
@@ -4833,9 +4902,9 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             const auto hash = juce::String::toHexString ((juce::int64) juce::DefaultHashFunctions::generateHash (
                 juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
                 0x7FFFFFFF));
-            const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())) + "-" + hash + ".wav");
+            const auto file = folder.getChildFile (embeddedSampleFileName (name, hash));
 
-            if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
+            if (! file.existsAsFile() && ! safewrite::replaceWithData (file, wav.data(), wav.size()))
                 return {};
 
             return file.getFullPathName().toStdString();
@@ -4924,7 +4993,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     if (target.existsAsFile() && target.loadFileAsData (existing) && existing.getSize() == wav.size()
                         && std::memcmp (existing.getData(), wav.data(), wav.size()) == 0)
                         return target.getFullPathName().toStdString(); // (imported before: the same file)
-                    if (! target.replaceWithData (wav.data(), wav.size()))
+                    if (! safewrite::replaceWithData (target, wav.data(), wav.size()))
                         return {};
                     return target.getFullPathName().toStdString();
                 };

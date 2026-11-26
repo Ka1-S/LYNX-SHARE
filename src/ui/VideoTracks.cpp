@@ -549,10 +549,22 @@ VideoLanesView::VideoLanesView (AudioEngine& e, PlaylistComponent& p) : engine (
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
     refresh();
-    startTimerHz (30);
+    // (round 190rn: the timer runs only while the lanes are shown — the Playlist hides the view when the song has no
+    // video track, where its 30 wake-ups a second did nothing)
 }
 
 VideoLanesView::~VideoLanesView() = default;
+
+void VideoLanesView::visibilityChanged()
+{
+    if (isVisible())
+    {
+        startTimerHz (30);
+        timerCallback();
+    }
+    else
+        stopTimer();
+}
 
 int VideoLanesView::contentHeight (const Song& song)
 {

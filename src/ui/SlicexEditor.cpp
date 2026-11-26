@@ -1,4 +1,5 @@
 #include "ui/SlicexEditor.h"
+#include "engine/SafeWrite.h"
 
 #include <optional>
 #include <utility>
@@ -2277,7 +2278,7 @@ public:
         else if (cmd == "savewav")
         {
             const auto& wav = state.decks[(std::size_t) deck].wav;
-            return juce::File (w[1]).replaceWithData (wav.data(), wav.size()) ? "saved " + juce::String ((int) wav.size()) + " bytes" : juce::String ("NOT saved");
+            return safewrite::replaceWithData (juce::File (w[1]), wav.data(), wav.size()) ? "saved " + juce::String ((int) wav.size()) + " bytes" : juce::String ("NOT saved");
         }
         else if (cmd != "state")
             return "unknown command";
@@ -2384,7 +2385,7 @@ public:
         folder.createDirectory();
         const auto base = juce::File (juce::String::fromUTF8 (paths[(std::size_t) deck].c_str())).getFileNameWithoutExtension();
         const auto file = folder.getNonexistentChildFile ((base.isNotEmpty() ? base : juce::String ("Slicex")) + " (appended)", ".wav");
-        if (! file.replaceWithData (wav.data(), wav.size()))
+        if (! safewrite::replaceWithData (file, wav.data(), wav.size()))
             return false;
         engine.getSampleLibrary().forget (file.getFullPathName());
         auto records = state.decks[(std::size_t) deck].regions;
@@ -3414,7 +3415,7 @@ private:
                                       return;
                                   const auto wav = self->deckWav (deck);
                                   if (! wav.empty())
-                                      fc.getResult().withFileExtension ("wav").replaceWithData (wav.data(), wav.size());
+                                      safewrite::replaceWithData (fc.getResult().withFileExtension ("wav"), wav.data(), wav.size());
                               });
     }
 

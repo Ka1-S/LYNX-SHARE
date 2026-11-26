@@ -129,7 +129,8 @@
                 errors.add ("hidden plugin in Recent");
         host.setHidden (proq, false);
 
-        // 3. One row per plugin: the scanned builds of Pro-Q 3 (VST, VST3, CLAP) are one row that loads the CLAP build
+        // 3. One row per plugin: the scanned builds of Pro-Q 3 (VST, VST3, CLAP) are one row that loads the VST3 build
+        // (round 190rk: VST3 › CLAP › VST2)
         std::vector<pluginpicks::Item> builds;
         std::vector<juce::String> ids;
         for (const auto& t : host.getKnownPlugins().getTypes())
@@ -143,7 +144,7 @@
             if (builds[(std::size_t) g.preferred()].name == "Pro-Q 3")
             {
                 ++proqRows;
-                if (g.members.size() != 3 || ids[(std::size_t) g.preferred()] != "CLAP")
+                if (g.members.size() != 3 || ids[(std::size_t) g.preferred()] != "VST3")
                     errors.add ("Pro-Q 3 row");
             }
         if (proqRows != 1 || groups.size() != 9) // (Pro-Q 3, OTT, Nova, Serum, Kontakt 7, Valhalla, Vital, Decapitator, Surge XT)

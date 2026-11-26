@@ -150,10 +150,11 @@ public:
     // FL 2026 draws only the curve (and the fade preview). Kept with the UI settings ("shadeFadedAudio").
     static inline bool shadeFadedAudio = false; // (round 190qk: stays off — +1.3 % Playlist paint on Thief, over the 1 % gate)
     // PR #267 (round 190qj, a LYNX extra: FL 2026 marks a selected track with a strip at its lane's start only): with tracks selected, the
-    // other tracks' rows step back under a light dark veil in the Pattern layout. On by default (owner, 2026-11-23: a
-    // visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras
-    // ("dimUnselectedTracks").
-    static inline bool dimUnselectedTracks = true;
+    // other tracks' rows step back under a light dark veil in the Pattern layout. Off by default since round 190ro (on in the
+    // 0.1.32 rollup until then): with a track selected the veil, drawn over the cached picture every frame, cost +17.7 %
+    // (Thief) / +24.5 % (Patience) a Playlist frame. A cheaper veil drawn into the cached picture, then on again, is queued
+    // for 0.1.33. Off = FL-exact. Playlist › View and Settings › LYNX extras ("dimUnselectedTracks").
+    static inline bool dimUnselectedTracks = false;
     // PR #268 (round 190qm, a LYNX extra: FL 2026 greys a switched-off track's clips and header, its lane unchanged): a
     // switched-off track's whole row steps back under a dark veil in the Pattern layout. On by default (owner, 2026-11-23:
     // a visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras

@@ -1,5 +1,5 @@
 ---
-source: db97618390
+source: 3574c0cb84
 ---
 ![De pagina Algemeen van het venster Instellingen, met de paginatabs bovenaan](/assets/img/wiki/settings-general.webp)
 
@@ -95,7 +95,7 @@ Het venster Instellingen heeft acht pagina's: Audio, MIDI, Algemeen, Thema, Best
 
 ## LYNX extras
 
-`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. De extra's die alleen het uiterlijk veranderen staan standaard aan, net als een paar kleine toevoegingen: MIDI-bestanden die op de Playlist vallen worden patternclips, de lijst Recent en één rij per plugin in de pluginlijsten, en de MIDI-voorvertoning en de Tab-aanvulling in de Browser. De rest staat uit. **Als FL** zet elk extra uit, **Aanbevolen** zet ze allemaal terug op hun standaard. Elke schakelaar is dezelfde instelling als in het menu of de pagina die zijn regel noemt.
+`Opties › LYNX-extra's...`. De eigen toevoegingen van LYNX SHARE op één plek. Enkele die alleen het uiterlijk veranderen staan standaard aan, net als een paar kleine toevoegingen: MIDI-bestanden die op de Playlist worden neergezet worden patternclips, de gain-greep van een clip blijft in beeld, nieuwe projecten in de Clip-launch-indeling krijgen een mixertrack voor elke track, de lijst Recent en één rij per plug-in in de plug-inlijsten, en de MIDI-voorbeluistering en het aanvullen met Tab in de Browser. Twee die aan staan veranderen het geluid: uitgerekte patternclips herhalen hun pattern, en in de Simple-indeling neemt een neergezette loop het tempo en de toonsoort uit zijn audio over. De rest staat uit. **Als FL** zet alle extra's uit, **Aanbevolen** zet elk terug op zijn standaard. Elke schakelaar is dezelfde instelling als in het menu of op de pagina die zijn regel noemt, en de regel van elke die standaard aan staat zegt dat.
 
 | Instelling | Wat het doet |
 |---|---|
