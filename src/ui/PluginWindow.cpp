@@ -2386,7 +2386,7 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, boo
     auto keep = it->second->keepAlive();
     const auto title = it->second->hostTitle();
     const auto context = it->second->getContext();
-    open.erase (it);
+    destroyHost (&plugin); // (round 190rp: inside the plugin guard)
     if (store && context.engine != nullptr && context.find)
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
@@ -2414,8 +2414,12 @@ public:
             juce::MessageManager::callAsync ([this] {
                 reaping = false;
                 auto& all = windows();
-                for (auto it = all.begin(); it != all.end();)
-                    it = it->second->orphaned() ? all.erase (it) : std::next (it);
+                std::vector<juce::AudioPluginInstance*> gone; // (round 190rp: each teardown inside the plugin guard)
+                for (const auto& [key, window] : all)
+                    if (window->orphaned())
+                        gone.push_back (key);
+                for (auto* key : gone)
+                    destroyHost (key);
                 if (all.empty())
                     stopTimer();
             });
@@ -2764,7 +2768,11 @@ void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned)
 
 void closeAll()
 {
-    windows().clear();
+    std::vector<juce::AudioPluginInstance*> keys; // (round 190rp: each window's teardown inside the plugin guard)
+    for (const auto& [key, window] : windows())
+        keys.push_back (key);
+    for (auto* key : keys)
+        destroyHost (key);
     reaper().stopTimer();
 }
 
