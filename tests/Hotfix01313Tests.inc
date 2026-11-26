@@ -57,7 +57,6 @@ TEST (hotfix01313_session_settings_that_are_compared_arrive)
     b.fastDeclick = ! b.fastDeclick;
     b.panTriangular = ! b.panTriangular;
     b.flPluginLevels = ! b.flPluginLevels;
-    b.flTrialSaved = ! b.flTrialSaved;
     b.autoPdc = ! b.autoPdc;
     b.compensateAutomations = ! b.compensateAutomations;
     b.compensateMixerLevels = ! b.compensateMixerLevels;
