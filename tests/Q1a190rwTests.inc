@@ -171,3 +171,25 @@ TEST (q1a190rw_history_labels_channel_moves)
     renamed.channels[0].name = "Renamed";
     CHECK (std::string (lynx::describeChange (bare, renamed).text) != std::string ("Move channels"));
 }
+
+// Fill each N / Rotate / Euclidean fill in a 3/4 or 7/8 pattern: the rack shows one bar (12 / 14 steps, issue #279) but
+// the fills worked on at least 16 steps, so steps landed past the bar and an empty pattern became two bars long.
+TEST (q1a190rw_rack_fill_follows_the_time_signature)
+{
+    for (const auto& [beats, unit, shown] : { std::tuple { 3, 4, 12 }, std::tuple { 7, 8, 14 }, std::tuple { 4, 4, 16 } })
+    {
+        auto song = lynx::Song::makeDefault();
+        song.beatsPerBar = beats;
+        song.beatUnit = unit;
+        auto& p = song.patterns.front();
+        p.notes.clear();
+        p.lengthTicks = 0; // (no set length: one bar of the meter)
+        CHECK (lynx::patternSteps (song, p) == shown);
+        lynx::fillEverySteps (p, 0, 2, lynx::patternSteps (song, p));
+        CHECK ((int) p.notes.size() == shown / 2);
+        CHECK (std::all_of (p.notes.begin(), p.notes.end(), [shown] (const lynx::Note& n) { return n.start < shown * lynx::ticksPerStep; }));
+        CHECK (p.effectiveLength (song.meter()) == (std::int64_t) shown * lynx::ticksPerStep);
+        lynx::rotateSteps (p, 0, 1, lynx::patternSteps (song, p));
+        CHECK (std::all_of (p.notes.begin(), p.notes.end(), [shown] (const lynx::Note& n) { return n.start < shown * lynx::ticksPerStep; }));
+    }
+}

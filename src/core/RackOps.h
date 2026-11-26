@@ -145,7 +145,7 @@ int mergeIdenticalPatterns (Song& song);
 
 // --- step sequencer (docs/WORKFLOW_FL.md P2: fill, Euclidean fill, rotate, graph lanes) --------------
 
-// Steps the pattern shows in the rack (its length in sixteenths, at least 16).
+// Steps the pattern shows in the rack (its length in sixteenths; an empty pattern: one bar of the time signature).
 int patternSteps (const Song& song, const Pattern& pattern) noexcept;
 
 // True when the channel's notes in the pattern cannot be shown as step buttons: a note starts off the step
