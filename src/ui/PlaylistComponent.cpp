@@ -2168,6 +2168,15 @@ void PlaylistComponent::paint (juce::Graphics& g)
             for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
                                                    juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
             {
+                // FL's Playlist: the bars come in groups of 4 and every other group is a shade darker (with the lanes'
+                // alternating shades that is FL's light/dark plaid); the Clip-launch layout has Live's own lane groups
+                if (fl && ((b.number - 1) / 4) % 2 == 1)
+                {
+                    const auto x0 = (float) tickToX ((double) b.tick);
+                    const auto x1 = (float) tickToX ((double) (b.tick + b.length));
+                    g.setColour (ink (colour::bg0.withAlpha (0.30f)));
+                    g.fillRect (juce::Rectangle<float> (x0, (float) grid.getY(), x1 - x0, (float) grid.getHeight()));
+                }
                 if (barEvery > 1 && (b.number - 1) % barEvery != 0)
                     continue;
                 g.setColour (ink (colour::gridBar));
