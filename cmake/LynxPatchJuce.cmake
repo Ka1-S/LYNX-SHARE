@@ -379,6 +379,21 @@
 #    SolidColour::handleEdgeTableRectangle(Full) are forcedinline (as their neighbours): with the bigger drawGlyph the compiler
 #    stopped inlining it into the rectangle iterators. Same pixels.
 #
+# 54. ("fix 54b" in round qa2_190rf's branch; round 190rf, the 0.1.32 quality release, rollup 0.1.32 step 4) Linux (and wherever
+#    LV2 is hosted), juce_audio_processors/format_types/juce_LV2PluginFormat.cpp: a UI (or plugin) that lists an extension in
+#    its .ttl but whose extension_data() gives NULL for it (DrumGizmo's UI, ui:resize) had the extension's struct read through
+#    the null pointer: six 0.1.29 / 0.1.30 reports ("making the editor of DrumGizmo"). Such an extension counts as absent now.
+#    tools/testplugin/lynx_test_lv2ui.c.
+# 55. ("fix 54c" in round qa2_190rf's branch; round 190rf) Linux/BSD, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp:
+#    the run loop (IRunLoop) a VST3 plugin asks its editor's frame for was the editor window itself, which JUCE deletes with the
+#    editor whatever references the plugin holds. u-he's plugins keep it and release it when they terminate: a call through the
+#    freed window when the plugin goes after its editor. The run loop handed out is a counted object of its own now (the same
+#    shared timers and descriptors). tools/testplugin/lynx_test_crash_vst3.cpp, mode "runloop".
+#    (Round 190rf's "fix 54a", the glyph cache handing out a reference after its lock, is not applied: fix 53 already draws the
+#    cached layers while the cache's lock is held, and drawGlyph, for the software and the OpenGL renderers, is the cache's
+#    only reader; 54a's text would also undo fix 53's accessor. Its check, text drawn on another thread while the caches are
+#    emptied, runs against fix 53 in --qa190rbtest.)
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -692,6 +707,9 @@ function(lynx_patch_juce_file file)
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL||NL|        // LYNX patch (issue #134): shared mode never answers with more channels than its mix format, so the|NL|        // 434+ IsFormatSupported round trips below only cost time (85 s on a Realtek), on the message thread|NL|        if (! isExclusiveMode (deviceMode))|NL|            return fallbackNumChannels;|NL|")
     elseif(file MATCHES "juce_VST3PluginFormat.cpp$")
+        lynx_juce_fix("VST3 run loop the plugin holds outlives the editor (fix 55)" "LYNX patch (fix 55): the run loop a plugin asks"
+            "        view = nullptr;|NL|    }|NL||NL|    tresult PLUGIN_API queryInterface (const TUID queryIid, void** obj) override|NL|    {|NL|        return testForMultiple (*this,|NL|                                queryIid,|NL|                               #if JUCE_LINUX || JUCE_BSD|NL|                                UniqueBase<Linux::IRunLoop>{},|NL|                               #endif|NL|                                UniqueBase<IPlugFrame>{}).extract (obj);|NL|    }"
+            "        view = nullptr;|NL||NL|       #if JUCE_LINUX || JUCE_BSD|NL|        if (lynxRunLoop != nullptr) // LYNX patch (fix 55): the plugin may still hold it (released when it does)|NL|            lynxRunLoop->release();|NL|       #endif|NL|    }|NL||NL|    tresult PLUGIN_API queryInterface (const TUID queryIid, void** obj) override|NL|    {|NL|       #if JUCE_LINUX || JUCE_BSD|NL|        // LYNX patch (fix 55): the run loop a plugin asks its frame for is an object of its own, counted, that lives|NL|        // as long as the plugin holds it. JUCE gave the window itself, which it deletes with the editor whatever the plugin|NL|        // holds: u-he's plugins keep it and release it when they terminate, through the freed window (a call to 0)|NL|        if (doUIDsMatch (queryIid, Linux::IRunLoop::iid))|NL|        {|NL|            if (lynxRunLoop == nullptr)|NL|                lynxRunLoop = new LynxRunLoop();|NL|            lynxRunLoop->addRef();|NL|            *obj = static_cast<Linux::IRunLoop*> (lynxRunLoop);|NL|            return kResultOk;|NL|        }|NL|       #endif|NL|        return testForMultiple (*this,|NL|                                queryIid,|NL|                                UniqueBase<IPlugFrame>{}).extract (obj);|NL|    }|NL||NL|   #if JUCE_LINUX || JUCE_BSD|NL|    struct LynxRunLoop final : public RunLoop|NL|    {|NL|        tresult PLUGIN_API queryInterface (const TUID iid, void** obj) override|NL|        {|NL|            if (doUIDsMatch (iid, Linux::IRunLoop::iid) || doUIDsMatch (iid, FUnknown::iid))|NL|            {|NL|                addRef();|NL|                *obj = static_cast<Linux::IRunLoop*> (this);|NL|                return kResultOk;|NL|            }|NL||NL|            *obj = nullptr;|NL|            return kNoInterface;|NL|        }|NL||NL|        JUCE_DECLARE_VST3_COM_REF_METHODS|NL|        Atomic<int> refCount { 1 };|NL|    };|NL||NL|    LynxRunLoop* lynxRunLoop = nullptr;|NL|   #endif")
         lynx_juce_fix("VST3 inactive bus silence: block size" "LYNX patch (issue #155): the block size"
             "        inputBusMap .prepare (createChannelMappings (true));|NL|        outputBusMap.prepare (createChannelMappings (false));|NL||NL|        setStateForAllMidiBuses (true);|NL|"
             "        // LYNX patch (issue #155): the block size, for the silence behind inactive buses|NL|        inputBusMap .prepare (createChannelMappings (true), estimatedSamplesPerBlock);|NL|        outputBusMap.prepare (createChannelMappings (false), estimatedSamplesPerBlock);|NL||NL|        setStateForAllMidiBuses (true);|NL|")
@@ -882,6 +900,13 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("vertical blanks only while needed: attachment joins" "LYNX patch (round 190gv): the window's vertical blanks start"
             "            peer->addVBlankListener (this);|NL|"
             "            peer->addVBlankListener (this);|NL|           #if JUCE_WINDOWS|NL|            lynxVBlankListenerAdded (*peer); // LYNX patch (round 190gv): the window's vertical blanks start again|NL|           #endif|NL|")
+    elseif(file MATCHES "juce_LV2PluginFormat.cpp$")
+        lynx_juce_fix("LV2 UI extension a UI lists but does not give (fix 54)" "LYNX patch (fix 54): a UI that lists"
+            "        if (auto* lv2Descriptor = get())|NL|            if (auto* extension = lv2Descriptor->extension_data)|NL|                return OptionalExtension<Extension> (readUnaligned<Extension> (extension (uid)));"
+            "        if (auto* lv2Descriptor = get())|NL|            if (auto* extension = lv2Descriptor->extension_data)|NL|                if (const auto* data = extension (uid)) // LYNX patch (fix 54): a UI that lists an extension may still give none|NL|                    return OptionalExtension<Extension> (readUnaligned<Extension> (data));")
+        lynx_juce_fix("LV2 plugin extension a plugin lists but does not give (fix 54)" "LYNX patch (fix 54): a plugin that lists"
+            "        return OptionalExtension<Extension> { readUnaligned<Extension> (lilv_instance_get_extension_data (instance.get(), uri.getTyped())) };"
+            "        // LYNX patch (fix 54): a plugin that lists an extension may still give none (its struct is not read from null)|NL|        const auto* data = lilv_instance_get_extension_data (instance.get(), uri.getTyped());|NL|        return data != nullptr ? OptionalExtension<Extension> { readUnaligned<Extension> (data) } : OptionalExtension<Extension> {};")
     elseif(file MATCHES "juce_Messaging_linux.cpp$")
         lynx_juce_fix("unregistered descriptor callbacks are not called (fix 52)" "LYNX patch (fix 52)"
             "        // CriticalSection should be available during the callback|NL|        for (auto& fn : callbackStorage)|NL|            (*fn)();|NL||NL|        return ! callbackStorage.empty();|NL|    }"
@@ -956,6 +981,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_linux.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_LV2PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_plugin_client/juce_audio_plugin_client_LV2.cpp")
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)

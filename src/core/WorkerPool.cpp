@@ -494,7 +494,13 @@ bool WorkerPool::work (bool isWorker) noexcept
             return;
         if (isWorker)
             byWorkers.fetch_add ((std::uint64_t) ran, std::memory_order_relaxed);
-        if (done.fetch_add (ran, std::memory_order_acq_rel) + ran == target && callerWaiting.exchange (false, std::memory_order_acq_rel))
+        // round 190rf (ThreadSanitizer): the round's count is read before the add; after it the round can end and the caller
+        // write the next one's. A worker held up right here can still take the flag of a later wait: run() checks `done`
+        const auto goal = target;
+        const auto sum = done.fetch_add (ran, std::memory_order_acq_rel) + ran;
+        if (const auto stall = isWorker ? testStallMicros.load (std::memory_order_relaxed) : 0; stall > 0) // (tests only)
+            std::this_thread::sleep_for (std::chrono::microseconds (stall));
+        if (sum == goal && callerWaiting.exchange (false, std::memory_order_acq_rel))
             finished->release(); // (the last of the round: the caller sleeps)
         ran = 0;
     };
@@ -547,8 +553,9 @@ void WorkerPool::run (int n, void* ctx, Call fn) noexcept
     call = fn;
     target = n;
     done.store (0, std::memory_order_relaxed);
-    ++generation;
-    const auto base = generation << (2 * indexBits);
+    const auto round = generation.load (std::memory_order_relaxed) + 1;
+    generation.store (round, std::memory_order_relaxed);
+    const auto base = round << (2 * indexBits);
     ticket.store (base | ((std::uint64_t) n << indexBits), std::memory_order_seq_cst); // from here on the workers may take indices
 
     // wake only the sleepers that are needed (spinning workers already see the ticket)
@@ -586,16 +593,22 @@ void WorkerPool::run (int n, void* ctx, Call fn) noexcept
             cpuRelax();
             if ((spins & 63) == 63 && std::chrono::steady_clock::now() > spinUntil)
             {
-                callerWaiting.store (true, std::memory_order_seq_cst);
-                if (done.load (std::memory_order_seq_cst) >= n)
+                // round 190rf: until the round has ended. A worker of an earlier round that was held up between its last
+                // add and its wake can take this wait's flag and wake it early; the round was then left with indices
+                // still running (the caller's context gone under them). One wake per flag set, so none is left over.
+                do
                 {
-                    // finished meanwhile: take back the flag, or the wake already sent for it
-                    if (! callerWaiting.exchange (false, std::memory_order_acq_rel))
-                        finished->acquire();
-                    break;
-                }
-                finished->acquire();
-                bump (lane.callerSleeps, 1);
+                    callerWaiting.store (true, std::memory_order_seq_cst);
+                    if (done.load (std::memory_order_seq_cst) >= n)
+                    {
+                        // finished meanwhile: take back the flag, or the wake already sent for it
+                        if (! callerWaiting.exchange (false, std::memory_order_acq_rel))
+                            finished->acquire();
+                        break;
+                    }
+                    finished->acquire();
+                    bump (lane.callerSleeps, 1);
+                } while (done.load (std::memory_order_acquire) < n);
                 break;
             }
         }

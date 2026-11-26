@@ -1063,6 +1063,8 @@ LRESULT CALLBACK pluginKeyProc (int code, WPARAM removal, LPARAM data)
 } // namespace
 #endif
 
+void closeModalWindows() { juce::ModalComponentManager::deleteInstance(); }
+
 bool modalDialogOpen()
 {
     return juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0;

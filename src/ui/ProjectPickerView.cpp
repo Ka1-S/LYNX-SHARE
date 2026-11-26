@@ -683,6 +683,13 @@ private:
         const auto& song = engine.getSong();
         g.setColour (bodyOf (t.colour));
         g.fillRect (box);
+        // round 190rf (UI monkey on Windows, seed 2009): the song can change under the open picker (another project opened,
+        // a pattern deleted by a remote edit): a pattern it no longer has shows its title only
+        if (! juce::isPositiveAndBelow (t.index, (int) song.patterns.size()))
+        {
+            paintTitle (g, box.withHeight (titleBand), t.colour, t.name, false);
+            return;
+        }
         const auto& notes = song.patterns[(std::size_t) t.index].notes;
         paintTitle (g, box.withHeight (titleBand), t.colour, t.name, ! notes.empty());
         auto body = box.withTrimmedTop (titleBand).reduced (1.0f, 3.0f);

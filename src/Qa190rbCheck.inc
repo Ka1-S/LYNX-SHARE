@@ -487,5 +487,121 @@
                     ::close (fd);
         }
        #endif
+
+        // ---- round 190rf, crash report e107bcb1 (0.1.30, Windows): inside JUCE's glyph cache on the visualizer's OpenGL
+        //      thread. The cache (one for the process, behind a lock) returned a reference to a cached glyph after its
+        //      lock was gone and the caller copied it afterwards; another thread could free the entry in between (an
+        //      eviction, or a font change emptying the cache). JUCE fix 53 draws the cached glyph under the cache's lock (round 190rf's "54a" is not applied: 53 covers it). Here a
+        //      thread draws big glyphs (their edge tables are big blocks, freed back to the system) into a software image
+        //      while this thread empties the caches as a font change does: the old code read the freed blocks
+        {
+            std::atomic<bool> stop { false };
+            std::atomic<int> drawn { 0 };
+            std::thread painter ([&] {
+                juce::Image image (juce::Image::ARGB, 96, 96, true, juce::SoftwareImageType());
+                for (int k = 0; ! stop.load(); ++k)
+                {
+                    juce::Graphics g (image);
+                    g.setColour (juce::Colours::white);
+                    g.setFont (juce::FontOptions (700.0f + (float) (k % 40)));
+                    g.drawSingleLineText ("W", 0, 90);
+                    drawn.fetch_add (1);
+                }
+            });
+            const auto until = juce::Time::getMillisecondCounterHiRes() + 1500.0;
+            int cleared = 0;
+            while (juce::Time::getMillisecondCounterHiRes() < until || drawn.load() < 20)
+            {
+                juce::Typeface::clearTypefaceCache();
+                ++cleared;
+                juce::Thread::yield();
+                if (juce::Time::getMillisecondCounterHiRes() > until + 20000.0)
+                    break; // (a stuck painter is reported below, never waited for forever)
+            }
+            stop = true;
+            painter.join();
+            check ("Glyph cache: text drawn on another thread while the caches are emptied (" + juce::String (drawn.load()) + " drawings, "
+                       + juce::String (cleared) + " clears)",
+                   drawn.load() >= 20);
+        }
+        // ---- round 190rf, UI monkey on Windows (seed 2012): a call-out box still open when LYNX quits was deleted by JUCE's
+        //      DeletedAtShutdown, after the UI and the engine its content uses (the Simple layout's tuner)
+        {
+            struct Content final : juce::Component
+            {
+                explicit Content (bool& f) : gone (f) { setSize (60, 40); }
+                ~Content() override { gone = true; }
+                bool& gone;
+            };
+            bool gone = false;
+            juce::Component host;
+            host.setSize (400, 300);
+            juce::CallOutBox::launchAsynchronously (std::make_unique<Content> (gone), { 100, 100, 20, 20 }, &host);
+            const auto openBefore = ! gone && modalDialogOpen();
+            closeModalWindows();
+            check ("Quit: a call-out box still open is deleted before the UI and the engine", openBefore && gone && ! modalDialogOpen());
+        }
+
+        // ---- round 190rf, UI monkey on Windows (seed 2009): the Project picker painted a pattern the song no longer has
+        //      (another project opened under it)
+        {
+            AudioEngine offline (false);
+            auto song = Song::makeDefault();
+            while (song.patterns.size() < 12)
+                song.patterns.push_back (song.patterns.front());
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            ProjectPickerTargets targets;
+            targets.close = [] {};
+            auto view = makeProjectPickerView (offline, targets);
+            view->setBounds (0, 0, 1280, 800);
+            view->setAlpha (1.0f);
+            auto small = Song::makeDefault();
+            small.patterns.resize (1);
+            offline.setSong (std::move (small));
+            offline.dispatchPendingMessages();
+            juce::Image image (juce::Image::ARGB, 1280, 800, true, juce::SoftwareImageType());
+            juce::Graphics g (image);
+            view->paintEntireComponent (g, true);
+            check ("Project picker: paints while the song under it has fewer patterns", true);
+        }
+
+       #if JUCE_LINUX
+        // ---- round 190rf, crash reports 81399325 / 335428f3 / e45746ce (0.1.29 / 0.1.30 / 0.1.31, Linux): an abort
+        //      ("terminate called") at exit after the X server went away. Xlib calls exit(), the static hang watch's
+        //      destructor ran with its thread still running (std::terminate). A child process of this LYNX: ends through
+        //      exit() with the hang watch running (exit code 3, no abort), and loses its display connection (exit code 1
+        //      through LYNX's handler, the session names it)
+        {
+            const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName();
+            const auto folder = juce::File::createTempFile ("qa190rf-child");
+            const auto runChild = [&] (const juce::String& mode) {
+                juce::ChildProcess child;
+                if (! child.start (juce::StringArray { exe, "--qa190rfchild", mode, folder.getFullPathName() }, 0))
+                    return -1000;
+                if (! child.waitForProcessToFinish (60000))
+                {
+                    child.kill();
+                    return -1001;
+                }
+                return (int) child.getExitCode();
+            };
+            const auto exitCode = runChild ("exit");
+           #if defined(LYNX_SANITIZER_BUILD)
+            const auto exitOk = exitCode == 3 || exitCode == 23; // (23: LeakSanitizer's code, the child skips the shutdown)
+           #else
+            const auto exitOk = exitCode == 3;
+           #endif
+            check ("Exit with the hang watch running: exit code 3, no abort (" + juce::String (exitCode) + ")", exitOk);
+            if (juce::SystemStats::getEnvironmentVariable ("DISPLAY", {}).isNotEmpty())
+            {
+                const auto displayCode = runChild ("display");
+                const auto session = folder.getChildFile ("session.txt").loadFileAsString();
+                check ("Display connection lost: exit code 1, the session names it (" + juce::String (displayCode) + ")",
+                       displayCode == 1 && session.contains ("the display connection was lost"));
+            }
+            folder.deleteRecursively();
+        }
+       #endif
         return result;
     }

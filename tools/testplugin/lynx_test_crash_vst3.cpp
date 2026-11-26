@@ -9,6 +9,11 @@
 //   "state"   - a null-pointer write when a saved state is loaded into it (IComponent::setState)
 //   "thread"  - (Linux / macOS; round 190gg) in the Nth process() call it starts a thread of its own that writes to a
 //               null pointer: a fault outside every call the host makes (LYNX --crashguardtest ... thread)
+//   "runloop" - (Linux; round 190rf) it has an editor (an empty X11 view) that asks its frame for the host's run loop
+//               (Linux::IRunLoop), keeps it, and releases it when the plugin terminates, as u-he's plugins do. JUCE
+//               handed out the editor window itself, deleted with the editor: the release went through freed memory
+//               (LYNX_TEST_CRASH=runloop LYNX --plugwintest "LYNX Test Crash.vst3" report.txt 2: the window opens, the
+//               plugin is removed, it must not crash)
 //
 //   V=<JUCE>/modules/juce_audio_processors/format_types/VST3_SDK
 //   Linux:   B="LYNX Test Crash.vst3/Contents/x86_64-linux"; mkdir -p "$B"
@@ -160,7 +165,13 @@ public:
 
     // IPluginBase
     tresult PLUGIN_API initialize (FUnknown*) override { return kResultOk; }
-    tresult PLUGIN_API terminate() override { return kResultOk; }
+    tresult PLUGIN_API terminate() override
+    {
+#if defined(__linux__)
+        keepRunLoop (nullptr); // ("runloop": the run loop the view got from its frame, released only now)
+#endif
+        return kResultOk;
+    }
 
     // IComponent: one stereo main input and output
     tresult PLUGIN_API getControllerClassId (TUID) override { return kNotImplemented; } // single component
@@ -259,11 +270,98 @@ public:
     ParamValue PLUGIN_API getParamNormalized (ParamID) override { return 0.0; }
     tresult PLUGIN_API setParamNormalized (ParamID, ParamValue) override { return kResultOk; }
     tresult PLUGIN_API setComponentHandler (IComponentHandler*) override { return kResultOk; }
-    IPlugView* PLUGIN_API createView (FIDString) override { return nullptr; }
+    IPlugView* PLUGIN_API createView (FIDString) override;
+
+#if defined(__linux__)
+    void keepRunLoop (Linux::IRunLoop* loop)
+    {
+        if (heldLoop != nullptr)
+            heldLoop->release();
+        heldLoop = loop;
+    }
+#endif
 
 private:
     std::atomic<uint32> refs { 1 };
+#if defined(__linux__)
+    Linux::IRunLoop* heldLoop = nullptr;
+#endif
 };
+
+#if defined(__linux__)
+// "runloop": an empty X11 view that keeps its frame's run loop (held by the plugin until it terminates)
+class RunLoopView final : public IPlugView
+{
+public:
+    explicit RunLoopView (TestCrash& o) : owner (o) { owner.addRef(); }
+    ~RunLoopView() { owner.release(); }
+
+    tresult PLUGIN_API queryInterface (const TUID iid, void** obj) override
+    {
+        if (FUnknownPrivate::iidEqual (iid, FUnknown::iid) || FUnknownPrivate::iidEqual (iid, IPlugView::iid))
+        {
+            addRef();
+            *obj = static_cast<IPlugView*> (this);
+            return kResultOk;
+        }
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    uint32 PLUGIN_API addRef() override { return ++refs; }
+    uint32 PLUGIN_API release() override
+    {
+        const auto r = --refs;
+        if (r == 0)
+            delete this;
+        return r;
+    }
+
+    tresult PLUGIN_API isPlatformTypeSupported (FIDString type) override
+    {
+        return type != nullptr && std::strcmp (type, kPlatformTypeX11EmbedWindowID) == 0 ? kResultTrue : kResultFalse;
+    }
+    tresult PLUGIN_API attached (void*, FIDString) override { return kResultOk; }
+    tresult PLUGIN_API removed() override { return kResultOk; }
+    tresult PLUGIN_API onWheel (float) override { return kResultFalse; }
+    tresult PLUGIN_API onKeyDown (char16, int16, int16) override { return kResultFalse; }
+    tresult PLUGIN_API onKeyUp (char16, int16, int16) override { return kResultFalse; }
+    tresult PLUGIN_API getSize (ViewRect* size) override
+    {
+        if (size == nullptr)
+            return kInvalidArgument;
+        *size = ViewRect (0, 0, 240, 120);
+        return kResultOk;
+    }
+    tresult PLUGIN_API onSize (ViewRect*) override { return kResultOk; }
+    tresult PLUGIN_API onFocus (TBool) override { return kResultOk; }
+    tresult PLUGIN_API setFrame (IPlugFrame* frame) override
+    {
+        Linux::IRunLoop* loop = nullptr;
+        if (frame != nullptr && frame->queryInterface (Linux::IRunLoop::iid, (void**) &loop) == kResultOk && loop != nullptr)
+            owner.keepRunLoop (loop);
+        return kResultOk;
+    }
+    tresult PLUGIN_API canResize() override { return kResultFalse; }
+    tresult PLUGIN_API checkSizeConstraint (ViewRect*) override { return kResultOk; }
+
+private:
+    TestCrash& owner;
+    std::atomic<uint32> refs { 1 };
+};
+#endif
+
+IPlugView* PLUGIN_API TestCrash::createView (FIDString name)
+{
+#if defined(__linux__)
+    char buffer[32];
+    const auto* mode = environment ("LYNX_TEST_CRASH", buffer);
+    if (mode != nullptr && std::strcmp (mode, "runloop") == 0 && name != nullptr && std::strcmp (name, ViewType::kEditor) == 0)
+        return new RunLoopView (*this);
+#else
+    (void) name;
+#endif
+    return nullptr;
+}
 
 class Factory final : public IPluginFactory2
 {

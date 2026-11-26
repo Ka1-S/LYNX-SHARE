@@ -149,6 +149,7 @@
             const auto& fx = engine.getSong().mixer[1].effects;
             check ("206_effect_lands_in_the_slot", fx.size() == 1 && juce::String (effectInfo (fx[0].kind).name).containsIgnoreCase ("limit"),
                    fx.empty() ? juce::String() : juce::String (effectInfo (fx[0].kind).name));
+            NativeEffectWindows::closeAll(); // (round 190rf, ASan: the new effect's editor lives on this block's engine)
         }
 
         // ================= #207: automation points =================

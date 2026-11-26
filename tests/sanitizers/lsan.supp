@@ -32,3 +32,8 @@ leak:lilv_world_load_plugin_classes
 # LYNX's intentional caches (kept for the process' life: the audio thread may hold them; their index is a function-local
 # static vector that is destroyed at exit, after which LSan no longer sees the pointers)
 leak:lynx::wt::table
+# JUCE's asynchronous message boxes (AlertWindow::showMessageBoxAsync / showAsync) own themselves until they are
+# dismissed (juce::detail::ConcreteScopedMessageBoxImpl keeps a shared_ptr to itself): one still open when the process
+# quits (a check route that ends with an import report on screen) is reported at exit, ~0.4 KB. Nothing is lost while
+# LYNX runs (round 190rf; 190rb listed it as exit-only)
+leak:juce::detail::ConcreteScopedMessageBoxImpl::runAsync

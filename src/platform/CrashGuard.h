@@ -233,6 +233,12 @@ void startHangWatch (const std::string& folderUtf8, int stallMs = 2000) noexcept
 void hardenSignals() noexcept;
 void heartbeat() noexcept;
 void stopHangWatch() noexcept;
+// Round 190rf (Linux / BSD; nothing elsewhere): the X server went away (the session ended, Xwayland crashed). Xlib calls
+// its I/O error handler and then exit(), which ran the static destructors while LYNX's threads still ran (an abort with
+// "terminate called without an active exception", three crash reports). Call once the display is open (after the main
+// window is made, JUCE's handler installed): the session gets the step "the display connection was lost", `lost` runs
+// (the emergency save; may be null), and the process ends at once with exit code 1, no static destructor run.
+void watchDisplayConnection (void (*lost)()) noexcept;
 // --symbolize: the "LYNX.exe+0x…" frames of a crash / hang file named with this very build's symbols (LYNX.pdb of
 // the same build next to LYNX.exe; CI keeps it as the "LYNX-symbols" artifact). Other lines unchanged.
 std::string symbolizeOwnFrames (const std::string& text);

@@ -14,6 +14,12 @@ API stopped answering for --hang-seconds: SIGABRT, so ASan prints the main threa
 
   ui_monkey.py --app LYNX --display :190 --seed 7 --minutes 5 --layout pattern --project song.flp --out runs/s7
   ui_monkey.py --app LYNX --display :190 --replay runs/s7/actions.jsonl --out runs/s7-replay
+
+Windows (round 190rf): `--windows` (with the embeddable Python for Windows; --display is then unused) starts LYNX.exe on
+a desktop of its own that is never shown, as a low-integrity process that can write only to the run folder
+(tools/winsandbox.py), and drives it with the Remote Control / --demo operations only (no operating-system input at
+all: --api-only, which Linux runs may use too). A hang is ended by the harness after LYNX's own hang watch has written
+the main thread's stack to <out>/profile/.../autosave/hang *.txt.
 """
 import argparse
 import json
@@ -26,6 +32,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # (tools/winsandbox.py; the embeddable Python adds no script folder)
 from remote_control import Client  # noqa: E402  (the repo's standard-library client)
 
 LAYOUTS = ["pattern", "clipLaunch", "simple"]
@@ -52,8 +59,9 @@ class Monkey:
         self.out.mkdir(parents=True, exist_ok=True)
         self.profile = self.out / "profile"
         self.profile.mkdir(exist_ok=True)
-        (self.profile / "control").mkdir(mode=0o700, exist_ok=True)  # (the discovery folder must be private)
-        os.chmod(self.profile / "control", 0o700)
+        if not a.windows:  # (Windows: LYNX makes it with its private, protected access list itself)
+            (self.profile / "control").mkdir(mode=0o700, exist_ok=True)  # (the discovery folder must be private)
+            os.chmod(self.profile / "control", 0o700)
         self.log = open(self.out / "actions.jsonl", "a", buffering=1)
         self.proc = None
         self.client = None
@@ -67,6 +75,25 @@ class Monkey:
     # --- process ---------------------------------------------------------------------------------------------------
     def env(self):
         e = dict(os.environ)
+        e["LYNX_OFFLINE"] = "1"  # (no update check, no crash report upload, no live session: nothing leaves the machine)
+        if self.a.windows:
+            tmp = self.out / "tmp"
+            tmp.mkdir(exist_ok=True)
+            # no audio device (the real one would sound on the user's speakers): a saved setup that names none
+            dev = self.profile / "LYNX/audio-device.xml"
+            dev.parent.mkdir(parents=True, exist_ok=True)
+            if not dev.exists():
+                dev.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<DEVICESETUP deviceType="Windows Audio" audioOutputDeviceName=""'
+                               ' audioInputDeviceName="" audioDeviceRate="48000.0" audioDeviceBufferSize="512"/>\n')
+            # the plugin scan looks in an empty folder: no installed plugin is loaded (licence windows on a desktop nobody sees)
+            empty = self.out / "no-plugins"
+            empty.mkdir(exist_ok=True)
+            folders = dev.parent / "plugin-folders.txt"
+            if not folders.exists():
+                folders.write_text(str(empty) + "\n")
+            e.update({"LYNX_PROFILE_DIR": str(self.profile), "LYNX_CONTROL_ENABLED": "1",
+                      "LYNX_CONTROL_DISCOVERY": str(self.profile / "control/connection.json"), "TEMP": str(tmp), "TMP": str(tmp)})
+            return e
         san = str(self.out / "san")
         e.update({
             "DISPLAY": self.a.display, "LYNX_PROFILE_DIR": str(self.profile), "XDG_CONFIG_HOME": str(self.profile / "config"),
@@ -80,9 +107,14 @@ class Monkey:
 
     def start(self, project):
         args = [self.a.app, "--demo"] + ([project] if project else [])
-        self.stdout = open(self.out / "lynx.out", "ab")
-        self.proc = subprocess.Popen(args, env=self.env(), stdin=subprocess.DEVNULL, stdout=self.stdout, stderr=subprocess.STDOUT,
-                                     cwd=str(self.out))
+        if self.a.windows:
+            import winsandbox
+            winsandbox.label_low(self.out)
+            self.proc = winsandbox.start_sandboxed(args, self.env(), self.out, f"lynx-monkey-{os.getpid()}", self.out / "lynx.out")
+        else:
+            self.stdout = open(self.out / "lynx.out", "ab")
+            self.proc = subprocess.Popen(args, env=self.env(), stdin=subprocess.DEVNULL, stdout=self.stdout, stderr=subprocess.STDOUT,
+                                         cwd=str(self.out))
         disc = self.profile / "control/connection.json"
         deadline = time.time() + self.a.start_seconds
         while time.time() < deadline:
@@ -145,7 +177,8 @@ class Monkey:
 
     # --- one random action, resolved to a replayable record --------------------------------------------------------
     def plan(self, rng):
-        kind = rng.choices(list(WEIGHTS), weights=list(WEIGHTS.values()))[0]
+        weights = {k: (0 if self.a.api_only and (k.startswith("x_") or k == "escape") else v) for k, v in WEIGHTS.items()}
+        kind = rng.choices(list(weights), weights=list(weights.values()))[0]
         if kind == "api_click":
             c = self.control(rng)
             if c is None:
@@ -225,7 +258,10 @@ class Monkey:
         elif k == "x_key":
             self.xdo("key", "--clearmodifiers", act["key"])
         elif k == "escape":
-            self.xdo("key", "Escape")
+            if self.a.api_only:
+                self.call("ui.window")  # (no operating-system input in an API-only run)
+            else:
+                self.xdo("key", "Escape")
         elif k == "action":
             self.call("ui.action", {"id": act["id"]})
         elif k == "show":
@@ -269,18 +305,30 @@ class Monkey:
 
     def finish(self, status, detail=""):
         rc = self.proc.poll() if self.proc else None
-        if status == "hang" and self.alive():
+        if status == "hang" and self.alive() and self.a.windows:
+            time.sleep(15)  # (LYNX's hang watch writes the main thread's stack to its autosave folder)
+            self.proc.kill()
+            rc = self.proc.poll()
+        elif status == "hang" and self.alive():
             os.kill(self.proc.pid, signal.SIGABRT)  # ASan (handle_abort=1) prints where the main thread is
             try:
                 self.proc.wait(30)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
             rc = self.proc.poll()
+        elif status == "timeout" and not self.alive():
+            status, detail = "crash", "died before quitting (after the last action)"
         elif status == "timeout" and self.alive():
             # the app's own shutdown (engine, plugins, windows torn down in order) is part of the test
             self.log.write(json.dumps({"k": "quit", "n": self.count, "t": round(time.time() - self.t0, 2)}) + "\n")
             answer = self.call("app.quit", {"discard": True})
             terminated = not (isinstance(answer, dict) and answer.get("quitting"))
+            if terminated and isinstance(answer, dict) and "oserror" in answer:
+                try:
+                    self.proc.wait(10)  # (a crash closes the connection a moment before the process is gone)
+                    status, detail = "crash", "died while asked to quit"
+                except subprocess.TimeoutExpired:
+                    pass
             if terminated:
                 self.proc.terminate()  # (an older build without app.quit)
             try:
@@ -289,24 +337,37 @@ class Monkey:
                     status, detail = "quit-crash", f"exit code {rc} on quit"
             except subprocess.TimeoutExpired:
                 status, detail = "exit-hang", f"did not quit within {self.a.quit_seconds} s of app.quit"
-                os.kill(self.proc.pid, signal.SIGABRT)
+                if self.a.windows:
+                    self.proc.kill()
+                else:
+                    os.kill(self.proc.pid, signal.SIGABRT)
                 try:
                     self.proc.wait(30)
                 except subprocess.TimeoutExpired:
                     self.proc.kill()
                 rc = self.proc.poll()
         reports = sorted(p.name for p in self.out.glob("san.*"))
+        if self.a.windows:  # LYNX's own crash and hang files (its crash guard; no sanitizer there)
+            reports += sorted(str(p.relative_to(self.out)) for p in self.profile.rglob("crash *.txt"))
+            if hasattr(self.proc, "close"):
+                self.proc.close()
         result = {"status": status, "detail": detail, "actions": self.count, "rc": rc, "seed": self.a.seed,
                   "layout": self.a.layout, "project": self.a.project, "sanitizer_reports": reports,
                   "seconds": round(time.time() - self.t0, 1)}
         (self.out / "result.json").write_text(json.dumps(result, indent=1))
+        if self.a.windows:  # (the run's caches, hundreds of MB on the system drive: the logs and crash files stay)
+            import shutil
+            shutil.rmtree(self.profile / "cache", ignore_errors=True)
         print(json.dumps(result))
         return 0 if status == "timeout" and not reports else 1  # (a quit that crashed or hung is a failure too)
 
     def main(self):
         self.t0 = time.time()
         if not self.start(self.a.project):
-            return self.finish("start-failed" if self.alive() else "crash", "no API answer after start")
+            if self.alive():
+                self.proc.kill()  # (a start that never answered: ended, its files kept)
+                return self.finish("start-failed", "no API answer after start")
+            return self.finish("crash", "no API answer after start")
         replay = None
         if self.a.replay:
             replay = [json.loads(l) for l in open(self.a.replay) if l.strip()]
@@ -340,7 +401,9 @@ class Monkey:
 def parse():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--app", required=True)
-    p.add_argument("--display", required=True)
+    p.add_argument("--display", default="")
+    p.add_argument("--windows", action="store_true", help="LYNX.exe on a hidden desktop, low integrity (tools/winsandbox.py)")
+    p.add_argument("--api-only", action="store_true", help="Remote Control / --demo operations only, no OS input")
     p.add_argument("--out", required=True)
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--minutes", type=float, default=5)
@@ -353,7 +416,11 @@ def parse():
     p.add_argument("--start-seconds", type=float, default=240)
     p.add_argument("--quit-seconds", type=float, default=120)
     p.add_argument("--xdotool", default="xdotool")
-    return p.parse_args()
+    a = p.parse_args()
+    a.api_only = a.api_only or a.windows
+    if not a.windows and not a.display:
+        p.error("--display is needed (or --windows)")
+    return a
 
 
 if __name__ == "__main__":

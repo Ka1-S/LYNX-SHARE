@@ -9,6 +9,7 @@
 // Plugins/Fruity/Generators/Harmless/Data/Compression/<type>.fst, whose processed/original band mix is the rack's
 // "Mix" knob. The preset files are read at run time from the user's FL installation; nothing of them is stored here.
 
+#include <atomic>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -60,6 +61,9 @@ public:
 private:
     std::unique_ptr<Maximus> engine;
     bool metering = false;
+    // round 190rf (ThreadSanitizer): the engine's latency, published: the UI thread asks while the audio thread makes a new
+    // engine for another device rate (the old one was read after it was freed)
+    std::atomic<int> latency { 0 };
 };
 
 // parameter 5 (band mix) stored in the state

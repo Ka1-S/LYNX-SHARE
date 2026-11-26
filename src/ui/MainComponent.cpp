@@ -6102,7 +6102,7 @@ void MainComponent::toggleProjectPicker()
     ProjectPickerTargets targets;
     auto safe = juce::Component::SafePointer<MainComponent> (this);
     targets.pickPattern = [safe] (int index) {
-        if (safe == nullptr)
+        if (safe == nullptr || index >= (int) safe->engine.getSong().patterns.size()) // (round 190rf: a tile of the song before)
             return;
         if (index < 0)
             safe->newPatternButton.onClick();
@@ -6110,13 +6110,13 @@ void MainComponent::toggleProjectPicker()
             safe->selectPattern (index);
     };
     targets.pickChannel = [safe] (int channel) {
-        if (safe == nullptr)
+        if (safe == nullptr || ! juce::isPositiveAndBelow (channel, (int) safe->engine.getSong().channels.size()))
             return;
         safe->engine.setSelectedChannel (channel); // (FL, capture 190my A4: the channel's window opens)
         safe->rack.showEditor (channel);
     };
     targets.revealPattern = [safe] (int pattern) {
-        if (safe == nullptr)
+        if (safe == nullptr || ! juce::isPositiveAndBelow (pattern, (int) safe->engine.getSong().patterns.size()))
             return;
         safe->showPanel (Panel::browser);
         safe->browser.revealProjectPattern (pattern);

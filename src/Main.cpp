@@ -151,6 +151,7 @@
 #if JUCE_LINUX
  #include <dlfcn.h> // (round 190ou: --hwheel254test presses X11 buttons through XTest)
  #include <sys/prctl.h> // (round 190ou: --multieditor255test LYNX_ME_PTRACE=1)
+ #include <sys/socket.h> // (round 190rf: --qa190rfchild display)
  #include <unistd.h>
 #endif
 #include "engine/HostingTests.h"
@@ -492,6 +493,19 @@ void onCrash (void* exceptionPointers)
         lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
     }
 }
+// Round 190rf (Linux): the X server went away (crashguard::watchDisplayConnection): the project in memory is saved as a
+// recovered project, as after a crash, before the process ends (it cannot go on without a display)
+void onDisplayLost()
+{
+    if (crashEngine == nullptr)
+        return;
+    const auto folder = lynx::platform::settingsFile ("autosave");
+    folder.createDirectory();
+    juce::String error;
+    lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S")
+                                                                         + lynx::ProjectFile::extension), error);
+}
+
 juce::File sessionsFolder()
 {
     return lynx::PluginHost::settingsFolder().getChildFile ("sessions");
@@ -2114,6 +2128,40 @@ public:
             setApplicationReturnValue (result == "OK" ? 0 : 1);
             quit();
             return;
+        }
+        if (args.contains ("--qa190rfchild"))
+        {
+            // LYNX --qa190rfchild exit|display <folder> (round 190rf; --qa190rbtest starts it): a process with the hang
+            // watch's thread running that ends through exit() ("exit": exit code 3 expected; the static hang watch's
+            // destructor called std::terminate before) or whose display connection breaks ("display", Linux: exit code 1
+            // through crashguard::watchDisplayConnection, its session file names the lost display)
+            const auto i = args.indexOf ("--qa190rfchild");
+            const auto mode = args[i + 1];
+            const juce::File folder (args[i + 2].unquoted());
+            folder.createDirectory();
+            lynx::crashguard::beginSession (folder.getChildFile ("session.txt").getFullPathName().toStdString(), "LYNX session\n");
+            lynx::crashguard::startHangWatch (folder.getFullPathName().toStdString());
+            if (mode == "exit")
+                std::exit (3);
+           #if JUCE_LINUX
+            if (mode == "display")
+                if (auto* xlib = dlopen ("libX11.so.6", RTLD_LAZY | RTLD_LOCAL))
+                {
+                    using OpenDisplay = void* (*) (const char*);
+                    using ConnectionNumber = int (*) (void*);
+                    using Sync = int (*) (void*, int);
+                    const auto open = (OpenDisplay) dlsym (xlib, "XOpenDisplay");
+                    const auto number = (ConnectionNumber) dlsym (xlib, "XConnectionNumber");
+                    const auto sync = (Sync) dlsym (xlib, "XSync");
+                    if (auto* display = open != nullptr && number != nullptr && sync != nullptr ? open (nullptr) : nullptr)
+                    {
+                        lynx::crashguard::watchDisplayConnection (nullptr);
+                        ::shutdown (number (display), SHUT_RDWR); // (the server "went away")
+                        sync (display, 0);
+                    }
+                }
+           #endif
+            std::_Exit (2); // (not reached when the display part ran)
         }
         if (args.contains ("--qa190rbtest"))
         {
@@ -5166,6 +5214,7 @@ public:
         bindExportDoneSound(); // (round 190qr, #280)
         mainWindow = std::make_unique<MainWindow> ("LYNX SHARE", *engine); // the brand; getApplicationName() stays "LYNX" (an id: instance lock, X11 WM_CLASS, ALSA client)
         lynx::setMainWindowForOwnership (mainWindow.get());
+        lynx::crashguard::watchDisplayConnection (onDisplayLost); // (round 190rf, Linux: the display is open now)
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
         lynx::startRenderingWatch();
         startupTrace.mark ("main window built");
@@ -5421,6 +5470,7 @@ public:
         if (mainWindow != nullptr && mainWindow->isVisible())
             mainWindow->saveState();
         lynx::remoteui::shutdown();
+        lynx::closeModalWindows(); // (round 190rf: a call-out box or dialog still open goes before the UI and the engine)
         remoteControl = nullptr; // cancels queued control work before its engine and UI go
         mainWindow = nullptr; // the UI goes before the engine
         graphicsDeviceJob = {}; // (round 190hd: the graphics device's holder, after every window)
@@ -12555,7 +12605,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
             {
                 chosen = type;
                 break;
@@ -12900,7 +12951,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if (juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
             {
                 chosen = type;
                 break;
@@ -13583,7 +13635,8 @@ private:
         test->step ("plugins_in_file=" + juce::String (host.addPluginFile (juce::File (pluginPath))));
         std::optional<juce::PluginDescription> chosen;
         for (const auto& type : host.getKnownPlugins().getTypes())
-            if ((juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath)
+            if ((juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName() || type.fileOrIdentifier == pluginPath
+                 || (pluginPath.endsWithIgnoreCase (".lv2") && type.pluginFormatName == "LV2")) // (round 190rf: an LV2 bundle's plugin, known by URI)
                 && (only.isEmpty() || type.name == only))
             {
                 chosen = type;
@@ -18648,13 +18701,16 @@ private:
         };
         // (the recursion through the message loop; written out so each step lets the engine's timer run)
         auto drive = std::make_shared<std::function<void (std::shared_ptr<Pass>)>>();
-        *drive = [this, runPass, drive, device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
+        // (round 190rf: the step holds itself weakly, the timer's call strongly: a strong self-capture never freed the passes'
+        // takes, ~4 MB, LeakSanitizer in the sanitizer sweep)
+        *drive = [this, runPass, weakDrive = std::weak_ptr (drive), device] (std::shared_ptr<Pass> pass) { // (the stand-in lives while the passes run)
             if (engine == nullptr)
                 return;
             (*runPass) (pass);
             if (pass->block < pass->blocks)
             {
-                juce::Timer::callAfterDelay (40, [pass, drive] { (*drive) (pass); });
+                if (auto self = weakDrive.lock())
+                    juce::Timer::callAfterDelay (40, [pass, self] { (*self) (pass); });
                 return;
             }
             engine->stop();
@@ -18686,7 +18742,10 @@ private:
                 return;
             auto first = std::make_shared<Pass>();
             first->blocks = (int) (rate * 18.0 / n); // count-in + 8 bars
-            first->done = [this, first, step, finish, drive, onsets] {
+            first->done = [this, weakFirst = std::weak_ptr (first), step, finish, drive, onsets] { // (round 190rf: not itself)
+                const auto first = weakFirst.lock();
+                if (first == nullptr)
+                    return;
                 const auto clicks = onsets (first->out);
                 juce::String list;
                 for (std::size_t i = 0; i < std::min<std::size_t> (clicks.size(), 8); ++i)
@@ -19124,7 +19183,12 @@ private:
         auto outputs = std::make_shared<std::vector<std::vector<float>>>();
         auto ok = std::make_shared<bool> (true);
         auto run = std::make_shared<std::function<void (std::size_t, int)>>();
-        *run = [this, scenarios, step, outputs, ok, run, block, seconds, report] (std::size_t index, int pass) {
+        // (round 190rf, LeakSanitizer: the step holds itself weakly, what is pending holds it: a strong self-capture kept the
+        // last engine's outputs for good)
+        *run = [this, scenarios, step, outputs, ok, weakRun = std::weak_ptr (run), block, seconds, report] (std::size_t index, int pass) {
+            const auto run = weakRun.lock();
+            if (run == nullptr)
+                return;
             if (index >= scenarios->size())
             {
                 lynx::renderAheadOption().store (true);
@@ -26467,7 +26531,7 @@ private:
         offline.editSong ([] (lynx::Song& s) {
             s.video.startTimecode = 3600.0;
             s.video.burnIn = true;
-            if (s.videoTracks.size() < 2)
+            while (s.videoTracks.size() < 2) // (round 190rf, ASan: no video could be imported at all)
                 s.videoTracks.push_back ({});
             s.videoTracks[0].name = "Picture";
             s.videoTracks[1].name = "Reference";
@@ -28746,6 +28810,7 @@ private:
                 const auto menu = playlist.getTrackMenuForSnapshot (track);
                 juce::StringArray names { "Track " + juce::String (track + 1) };
                 std::vector<juce::PopupMenu> menus { menu };
+                menus.reserve (3); // (round 190rf, ASan: the iterator below walks menus[1] while the third is added)
                 for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
                     if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::theme::mnemonic (lynx::tr ("Track mode"), 'T'))
                     {
@@ -34151,7 +34216,8 @@ private:
         check ("Mapping Browser: 2 project rows, then 3 global ones (" + juce::String ((int) shown.size()) + ")",
                shown.size() == 5 && ! shown[0].global && ! shown[1].global && shown[2].global && shown[4].global);
         {
-            const auto* ticked = find (list->rowMenu (2), everyProject);
+            const auto rowMenu = list->rowMenu (2); // (round 190rf: kept while its item is read; ASan, heap-use-after-free)
+            const auto* ticked = find (rowMenu, everyProject);
             check ("a global row's item is ticked", ticked != nullptr && ticked->isTicked);
         }
         write (*list, "b9-02-mapping-browser-global");

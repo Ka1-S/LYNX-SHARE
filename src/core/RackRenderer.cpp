@@ -5444,9 +5444,11 @@ void RackRenderer::process (const RackState* state,
     {
         const auto moves = state->tempoMap || tempoOverride > 0.0 || playSpeed != 1.0;
         const auto ratio = bpm / std::max (1.0, state->song.bpm);
-        for (auto& instrument : state->instruments)
-            if (instrument != nullptr)
-                instrument->setTempoRatio (ratio, moves);
+        // (round 190rf, ThreadSanitizer: this renderer's own channels only. With render-ahead two renderers run, and each set
+        // every instrument's ratio at its own place in the song: a live and an ahead tempo in turns on the same voices)
+        for (std::size_t c = 0; c < state->instruments.size(); ++c)
+            if (state->instruments[c] != nullptr && ! foreignChannel ((int) c))
+                state->instruments[c]->setTempoRatio (ratio, moves);
     }
 
     const auto tps = ticksPerSample (bpm, sampleRate);

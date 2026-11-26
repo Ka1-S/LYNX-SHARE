@@ -2318,6 +2318,14 @@ struct Engine::Impl
     // of a single cycle (Bend, PWM, Asym, Mirror, Flip, Remap) have no cycle to bend and leave the sample as it is.
     void sampleStep (Voice& v, int n, float* outL, float* outR) noexcept
     {
+        // round 190rf (crash reports 0.1.30 Linux x7 / Windows b230f196: a null sample read on the audio thread): a voice
+        // decides to play the sample at its control steps (every 16 samples, across render calls), but take() can swap
+        // the sample for none in between (a preset without sample data applied while a note sounds): it stops reading
+        if (sample == nullptr)
+        {
+            v.sampleOn = false;
+            return;
+        }
         if (v.sClean) // (round 3's Clean: the band-limited levels; else 190ml's read, unchanged)
             sampleStepClean (v, n, outL, outR);
         else
@@ -2596,6 +2604,12 @@ struct Engine::Impl
 #endif
     void grainStep (Voice& v, int n, float* outL, float* outR) noexcept
     {
+        if (sample == nullptr) // (round 190rf: the sample went while the voice's grains played, see sampleStep)
+        {
+            v.grainOn = false;
+            v.grainCount = 0;
+            return;
+        }
         // the grains due in this step (a quarter of Spray jitters their times too)
         auto t = v.grainNext;
         while (t < (float) n)

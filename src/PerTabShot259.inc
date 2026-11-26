@@ -442,6 +442,7 @@
             juce::File (shot::fileName (st->prefix + "-checks.txt")).replaceWithText (st->checks.joinIntoString ("\n") + "\nresult=" + (st->ok ? "OK" : "FAIL") + "\n");
             juce::File (shot::fileName (st->prefix + "-state.txt")).replaceWithText ("done");
             st->engine.reset();
+            st->steps.clear(); // (round 190rf, LeakSanitizer: the steps hold `st`)
             setApplicationReturnValue (st->ok ? 0 : 1);
             quit();
         };
