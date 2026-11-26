@@ -29,4 +29,13 @@ void uninstall (juce::Component& root);
 
 // --issues190ng: hands the focus back now (no message-loop turn), as the watch would.
 void giveBackNow (juce::Component& root);
+
+// Issue #247, reopened (round 190ri): a text field that loses the keyboard while the user types into it (a page
+// rebuilt or switched under it, a list refreshed) must not let the next letters run shortcuts — his own "A" made an
+// automation clip. When a text field lost the keyboard less than `graceMs` ago without a mouse press, and the focus did
+// not go to another text field, a plain character key (no Ctrl / Alt / Cmd) goes back into that field: it takes the
+// keyboard again and the character is typed at its caret. True when the key was used so.
+bool typeIntoFieldJustLeft (const juce::KeyPress& key, int graceMs = 400);
+// (tests) the field that lost the keyboard last and when (0: none)
+void noteTextFieldLeftForTests (juce::TextEditor* field, double whenMs);
 } // namespace lynx::ui::keyfocus

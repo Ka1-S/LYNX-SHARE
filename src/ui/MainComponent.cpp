@@ -2453,6 +2453,9 @@ bool MainComponent::shouldDropFilesWhenDraggedExternally (const juce::DragAndDro
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    // issue #247, reopened (round 190ri): letters typed while a text field just lost the keyboard go back into it
+    if (ui::keyfocus::typeIntoFieldJustLeft (key))
+        return true;
     const workflowextras::TempToolHold::Scope toolKey (workflowextras::tempTools(), key.getKeyCode()); // round 190iu (issue #191.1)
     if (mapKeyPressed (key)) // round 190ef: the map modes' keys and the key mappings (Clip-launch layout only)
         return true;
@@ -2668,6 +2671,8 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // every press (FL's dialog takes the key and nothing happens).
     if (modalDialogOpen())
         return false;
+    if (ui::keyfocus::typeIntoFieldJustLeft (key)) // (issue #247, round 190ri: the Settings window's search box)
+        return true;
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions. Hotfix 0.1.31.2
     // (round 190ra; 10.net): a key a docked plugin left unused comes here (a detached one's goes to keyFromPluginView), and
     // JUCE may still hold a text field of the main window as focused (the Browser's search, a name box) while the system's

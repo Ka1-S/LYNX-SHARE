@@ -1103,7 +1103,20 @@ private:
         auto& tabs = tabsOf();
         if (tabs.getCurrentTabIndex() != m.page)
         {
+            // issue #247 (reopened, round 190ri): JUCE's tab switch brings the page to the front WITH the keyboard
+            // (TabbedComponent::changeCallback -> toFront (true)), so the letters typed after "rend" went to the page's
+            // controls and to LYNX's shortcuts. The box keeps the keyboard, its caret and its selection
+            const auto typing = box.hasKeyboardFocus (true);
+            const auto caret = box.getCaretPosition();
+            const auto selected = box.getHighlightedRegion();
             tabs.setCurrentTabIndex (m.page);
+            if (typing)
+            {
+                box.grabKeyboardFocus();
+                box.setCaretPosition (caret);
+                if (! selected.isEmpty())
+                    box.setHighlightedRegion (selected);
+            }
             // round 190rb (ASan, UI monkey seed 107: heap-use-after-free): a page that comes into view gets the look and
             // feel again, and a slider makes its +/- buttons anew then, so the match's control can be gone. The search
             // runs again on the page now shown (it stays shown: no second switch)

@@ -12,6 +12,41 @@ bool insidePanelWindow (const juce::Component* c)
     return top != nullptr && (bool) top->getProperties().getWithDefault ("lynxPanel", false);
 }
 
+// the text field that had the keyboard last (always watched, from the first install)
+struct TextWatch final : juce::FocusChangeListener
+{
+    juce::Component::SafePointer<juce::TextEditor> current, left;
+    double leftAt = 0.0;
+
+    void globalFocusChanged (juce::Component* focused) override
+    {
+        auto* field = dynamic_cast<juce::TextEditor*> (focused);
+        if (field == nullptr && focused != nullptr)
+            field = focused->findParentComponentOfClass<juce::TextEditor>();
+        if (field != nullptr)
+        {
+            current = field;
+            left = nullptr;
+            return;
+        }
+        if (current != nullptr && ! juce::Desktop::getInstance().getMainMouseSource().isDragging()
+            && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+        {
+            left = current;
+            leftAt = juce::Time::getMillisecondCounterHiRes();
+        }
+        else
+            left = nullptr;
+        current = nullptr;
+    }
+};
+
+TextWatch& textWatch()
+{
+    static TextWatch w;
+    return w;
+}
+
 struct Watch final : juce::FocusChangeListener
 {
     juce::Component::SafePointer<juce::Component> root;
@@ -86,10 +121,39 @@ bool releaseOnEscape (juce::Component& root)
     return true;
 }
 
+bool typeIntoFieldJustLeft (const juce::KeyPress& key, int graceMs)
+{
+    auto& w = textWatch();
+    auto* field = w.left.getComponent();
+    if (field == nullptr || juce::Time::getMillisecondCounterHiRes() - w.leftAt > graceMs)
+        return false;
+    const auto mods = key.getModifiers();
+    const auto c = key.getTextCharacter();
+    if (mods.isCtrlDown() || mods.isAltDown() || mods.isCommandDown() || c < ' ' || c == 127)
+        return false;
+    if (! field->isShowing() || ! field->isEnabled() || field->isReadOnly() || dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr)
+        return false;
+    w.left = nullptr;
+    field->grabKeyboardFocus();
+    field->insertTextAtCaret (juce::String::charToString (c));
+    return true;
+}
+
+void noteTextFieldLeftForTests (juce::TextEditor* field, double whenMs)
+{
+    textWatch().left = field;
+    textWatch().leftAt = whenMs;
+}
+
 void install (juce::Component& root)
 {
     watch().root = &root;
     juce::Desktop::getInstance().addFocusChangeListener (&watch());
+    static const bool textWatched = [] {
+        juce::Desktop::getInstance().addFocusChangeListener (&textWatch());
+        return true;
+    }();
+    juce::ignoreUnused (textWatched);
 }
 
 void uninstall (juce::Component& root)

@@ -133,6 +133,11 @@ juce::var describe (juce::Component& window, juce::Component& c)
         o->setProperty ("text", box->getText());
     else if (auto* label = dynamic_cast<juce::Label*> (&c))
         o->setProperty ("text", label->getText());
+    else if (auto* field = dynamic_cast<juce::TextEditor*> (&c)) // (round 190ri, issue #247: what was typed, and who has the keys)
+    {
+        o->setProperty ("text", field->getText());
+        o->setProperty ("focused", field->hasKeyboardFocus (true));
+    }
     o->setProperty ("enabled", c.isEnabled());
     o->setProperty ("showing", c.isShowing());
     o->setProperty ("screen", rect (c.getScreenBounds()));
