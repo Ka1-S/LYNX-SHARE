@@ -139,8 +139,12 @@
             check ("Pattern menu: Transpose...", find (rackMenu, tr ("Transpose..."), kept) != nullptr);
             if (shots.isNotEmpty())
             {
+            // (FL's in-place box: a signed whole number; anything else does nothing)
+            check ("Transpose box: signed whole numbers", transposeSemitones ("-12") == -12 && transposeSemitones (" +7 ") == 7 && transposeSemitones ("5") == 5
+                                                             && transposeSemitones ("") == 0 && transposeSemitones ("1.5") == 0 && transposeSemitones ("x") == 0
+                                                             && transposeSemitones ("99999") == 1000);
                 saveMenus (juce::StringArray { tr ("Channel Rack") }, std::vector<juce::PopupMenu> { rackMenu }, shots + "-2-rack-menu.png");
-                auto box = makeTransposeDialog();
+                auto box = makeTransposeBoxForSnapshot();
                 savePng (shot::snapshot (*box), shots + "-2-transpose.png");
             }
 

@@ -15,6 +15,7 @@
 #include "ui/ControllerKnob.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
+#include "ui/InlineTypeIn.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/VideoMedia.h"
@@ -358,89 +359,7 @@ std::optional<double> parseTime (const juce::String& typed, int mode = video::hm
     return negative ? -t : t;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// FL's in-place type-in (round 174d, FL 2026 on screen): a right click on a time opens a text box over the panel's
-// left edge, prefilled with the label's text (selected), and under it a hint row "✓ ✕ <caption>". Enter or ✓ accepts;
-// Esc, ✕ or a click elsewhere cancels.
-class InlineTypeIn final : public juce::Component, private juce::FocusChangeListener
-{
-public:
-    InlineTypeIn (const juce::String& text, const juce::String& caption) : hint (caption)
-    {
-        editor.setFont (theme::font (theme::type::display));
-        editor.setText (text, false);
-        editor.setColour (juce::TextEditor::backgroundColourId, theme::colour::bg0);
-        editor.setColour (juce::TextEditor::textColourId, theme::colour::textPrimary);
-        editor.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
-        editor.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
-        editor.setColour (juce::TextEditor::highlightColourId, juce::Colour (0xff1e6fd9));
-        editor.setColour (juce::TextEditor::highlightedTextColourId, juce::Colours::white);
-        editor.setIndents (4, 2);
-        editor.onReturnKey = [this] { finish (true); };
-        editor.onEscapeKey = [this] { finish (false); };
-        addAndMakeVisible (editor);
-        setMouseClickGrabsKeyboardFocus (false); // (a click on ✓ / ✕ must not take the focus from the box first)
-        juce::Desktop::getInstance().addFocusChangeListener (this);
-    }
-    ~InlineTypeIn() override { juce::Desktop::getInstance().removeFocusChangeListener (this); }
-
-    static constexpr int boxHeight = 28, hintHeight = 22;
-
-    void start()
-    {
-        editor.grabKeyboardFocus();
-        editor.selectAll();
-    }
-
-    void resized() override { editor.setBounds (0, 0, getWidth(), boxHeight); }
-
-    void paint (juce::Graphics& g) override
-    {
-        auto r = getLocalBounds().withTrimmedTop (boxHeight).toFloat();
-        g.setColour (theme::colour::bg0.withAlpha (0.92f));
-        g.fillRect (r);
-        g.setFont (theme::font (theme::type::small));
-        g.setColour (theme::colour::textSecondary);
-        g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), tickArea().toFloat(), juce::Justification::centred);
-        g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x95"), crossArea().toFloat(), juce::Justification::centred);
-        g.drawText (hint, r.withTrimmedLeft ((float) crossArea().getRight() + 8.0f), juce::Justification::centredLeft, true);
-    }
-
-    void mouseUp (const juce::MouseEvent& e) override
-    {
-        if (tickArea().contains (e.getPosition()))
-            finish (true);
-        else if (crossArea().contains (e.getPosition()))
-            finish (false);
-    }
-
-private:
-    juce::Rectangle<int> tickArea() const { return { 4, boxHeight, 18, hintHeight }; }
-    juce::Rectangle<int> crossArea() const { return { 22, boxHeight, 18, hintHeight }; }
-
-    void globalFocusChanged (juce::Component* focused) override
-    {
-        if (focused != &editor && focused != this)
-            finish (false);
-    }
-
-    void finish (bool ok)
-    {
-        if (done)
-            return;
-        done = true;
-        if (onDone)
-            onDone (ok, editor.getText()); // (the owner removes this box asynchronously)
-    }
-
-public:
-    std::function<void (bool ok, const juce::String& text)> onDone;
-
-private:
-    juce::TextEditor editor;
-    juce::String hint;
-    bool done = false;
-};
+using ui::InlineTypeIn; // (round 190ri: ui/InlineTypeIn.h, shared with the Transpose box)
 
 class VideoPlayerEditor final : public juce::Component,
                                 public juce::FileDragAndDropTarget,

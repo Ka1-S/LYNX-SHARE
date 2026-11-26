@@ -13,6 +13,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/DialogFrame.h"
 #include "ui/I18n.h"
+#include "ui/InlineTypeIn.h"
 #include "ui/Theme.h"
 #include "ui/TrackIcons.h"
 #include "ui/WindowOwner.h"
@@ -564,29 +565,35 @@ ui::TrackIconPicker* iconPickerOfNameDialog (juce::AlertWindow& dialog)
     return w != nullptr ? w->iconPicker() : nullptr;
 }
 
-std::unique_ptr<juce::AlertWindow> makeTransposeDialog()
+int transposeSemitones (const juce::String& typed)
 {
-    auto window = std::make_unique<juce::AlertWindow> (tr ("Transpose"), juce::String(), juce::MessageBoxIconType::NoIcon);
-    window->addTextEditor ("semitones", {}, tr ("Semitones"));
-    if (auto* editor = window->getTextEditor ("semitones"))
-        editor->setInputRestrictions (4, "+-0123456789");
-    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
-    return window;
+    auto text = typed.trim();
+    const auto negative = text.startsWithChar ('-');
+    if (negative || text.startsWithChar ('+'))
+        text = text.substring (1);
+    if (text.isEmpty() || ! text.containsOnly ("0123456789"))
+        return 0;
+    const auto value = (int) juce::jmin<juce::int64> (1000, text.getLargeIntValue()); // (each note is clamped anyway)
+    return negative ? -value : value;
 }
 
+// (round 190ri, coordinator review) FL 2026 asks the semitones in its small in-place box "Semitones" (TNameEditForm, 202 x 51
+// px, its bottom-right corner just past the mouse), not in a window; LYNX's box takes a signed whole number (FL's takes any
+// text; each note is clamped on its own, FL to key 131, LYNX to 127)
 void showTransposeDialog (std::function<void (int)> onDone)
 {
-    auto* window = makeTransposeDialog().release();
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onDone] (int result) {
-                                 const auto semitones = window->getTextEditorContents ("semitones").trim().trimCharactersAtStart ("+").getIntValue();
-                                 if (result == 1 && semitones != 0)
-                                     onDone (semitones);
-                             }),
-                             true);
-    keepAboveMainWindow (*window);
-    if (auto* editor = window->getTextEditor ("semitones"))
-        editor->grabKeyboardFocus();
+    if (auto* box = ui::openInlineTypeIn ({}, tr ("Semitones"), [onDone] (const juce::String& typed) {
+            if (const auto semitones = transposeSemitones (typed); semitones != 0 && onDone)
+                onDone (semitones);
+        }))
+        box->restrict (5, "+-0123456789");
+}
+
+std::unique_ptr<juce::Component> makeTransposeBoxForSnapshot()
+{
+    auto box = std::make_unique<ui::InlineTypeIn> ("-12", tr ("Semitones"));
+    box->setSize (202, ui::InlineTypeIn::boxHeight + ui::InlineTypeIn::hintHeight);
+    return box;
 }
 
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,

@@ -13,6 +13,7 @@ FL's audio settings were not touched. The Alt keys were sent with the typing key
 | Shift+Alt+R (Render selected) | The same, clip included; the arm states come back | q04, r02 |
 | Armed disk recording | Each loop pass: an audio clip, muted, on the first free tracks (Insert 5: 5, 6, 7; Insert 10: 8, 9), grouped; the channel goes to the insert. LYNX already does this (190ev / 177c) | v01, w03 |
 | Transpose... (Patterns menu, Picker's pattern menu) | A value box "Semitones", empty; every channel's notes of the picked patterns, steps too (a step note got key 62 and stayed a step); each note clamped on its own (129 + 2, 131 + 2 → 131) | e04, t1_before / t1_after.flp |
+| ... the box (coordinator review, FL 2026 live, t1_before.flp) | Not a window: FL's small in-place name box (TNameEditForm "Semitones", 202 x 51 px), its bottom-right corner 10 px past the mouse (mouse 231,231 -> box 39,190-241,241; the F2 name box the same way); the field takes any text ("a-1.5x+3" typed as is); ✓ / ✕ under it | raw/t2, t3 |
 | Transpose selected... (Channel rack menu) | The same box; the selected channels in the current pattern only | f02, g00, h01 |
 | Scale button of the Piano roll (note icon) | Left-click: Snap to scale on / off. Right-click: the Root note \| Scale menu (roots greyed on "Black notes") | c01, c03 |
 | Alt+C | Playlist: **Slice tool** (Alt+D Delete, Alt+E Select, Alt+B Paint, Alt+Y Playback, Alt+S Slip the same way; the letters alone play notes). Typing keyboard off: C = Slice, Alt+B / Alt+C nothing. Piano roll: change colour (Alt+D there picks Delete). Channel rack: clones the channels. Cloning a pattern is Shift+Ctrl+C | b01, k1-k10 |
@@ -28,7 +29,7 @@ FL's audio settings were not touched. The Alt keys were sent with the typing key
   track. Now: the window opens on WAV, "Start" writes to the recordings folder under FL's name, no file dialog (Folder..., the
   name, the other formats and tails stay for who wants them); `mixerops::placeRenderedFiles` uses the first track with room,
   a pattern render only adds the channel, the Playlist's tools paint it. Two inserts of one name get "_2"; "$track" of the full mix is "Master".
-- **Transpose:** `transposePatterns` (core/RackOps). LYNX's keys end at 127 (FL: 131).
+- **Transpose:** `transposePatterns` (core/RackOps). LYNX's keys end at 127 (FL: 131). The value is asked in FL's in-place box (ui/InlineTypeIn.h, shared with the video player's time box), placed as FL places it; LYNX's field takes a signed whole number (anything else does nothing).
 - **Scale box:** shrinks to icon and arrow before anything else of its row is given room; right-click in its menu chooses and keeps it open (FL).
 - **Alt + tool letter:** `KeyMap::findToolWithAlt`. Alt+C as a second key of "Clone the current pattern" is gone (not FL's).
 - **Copy names:** core/CopyName.h, used by patterns, channels, unique clips, audio clip channels, Edison and Slicex regions, cloned tracks.

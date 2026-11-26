@@ -43,8 +43,11 @@ void showNameColourIconDialog (const juce::String& title, const juce::String& na
 
 // FL's "Transpose..." / "Transpose selected..." value box (round 190ri; FL's field starts empty, "Semitones" under it):
 // `onDone (semitones)` when the user confirms a number other than 0.
+// FL's Transpose... box (round 190ri, FL 2026 live): FL's small in-place box "Semitones" where the menu was (ui/InlineTypeIn.h),
+// a signed whole number; Enter or ✓ applies, Esc or ✕ cancels. `onDone` gets the semitones (not called for 0 or no number).
 void showTransposeDialog (std::function<void (int)> onDone);
-std::unique_ptr<juce::AlertWindow> makeTransposeDialog(); // (its window, also for --snapshot)
+std::unique_ptr<juce::Component> makeTransposeBoxForSnapshot();
+int transposeSemitones (const juce::String& typed); // 0 = nothing to do (empty, not a whole number); at most ±1000
 
 // FL's "Gradient editor" (mixer "Gradient color...", REA_rodada177a §5): First and Last swatches with the blend over
 // `count` tracks, copy / swap buttons and LYNX's colour picker for the swatch being edited. Accept gives the two colours;
