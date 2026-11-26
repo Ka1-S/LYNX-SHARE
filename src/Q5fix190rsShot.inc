@@ -335,8 +335,9 @@
                             for (int x = viewArea.getX(); x < viewArea.getRight(); ++x)
                                 if (! first.expanded (4).contains (x, y))
                                 {
-                                    const auto q = b.getPixelColour (x, y);
-                                    stray += juce::jmin (q.getRed(), q.getGreen(), q.getBlue()) > 200;
+                                    // (near-white pixels this frame has and the first had not: text of a copy of the card)
+                                    const auto p = a.getPixelColour (x, y), q = b.getPixelColour (x, y);
+                                    stray += juce::jmin (q.getRed(), q.getGreen(), q.getBlue()) > 200 && juce::jmin (p.getRed(), p.getGreen(), p.getBlue()) <= 200;
                                 }
                         changedFrames += changed > 0;
                         strayFrames += stray > 0;
