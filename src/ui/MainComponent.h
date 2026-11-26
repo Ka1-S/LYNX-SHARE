@@ -236,7 +236,9 @@ public:
     void applyWelcomeChoice (onboarding::Choice choice);
     void showGettingStarted(); // Help › Getting started: the Next-3 card of the remembered choice (or of this layout)
     void hideGettingStarted();
-    void startFirstSongTourAnywhere(); // Help › First-song tour in every layout (the Simple layout first)
+    // Help › First-song tour in every layout (the Simple layout first; round 190rs G-11: from another layout it asks before
+    // switching, unless `ask` is false)
+    void startFirstSongTourAnywhere (bool ask = true);
     // A confusion signal: shows its tip beside `anchor` unless a tip was shown this session or tips are off
     bool maybeShowTip (onboarding::Tip tip, juce::Component* anchor);
     void closeTip();

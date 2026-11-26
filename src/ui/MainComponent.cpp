@@ -12312,7 +12312,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Welcome..."), [this] { showWelcomeCard (false); });
         menu.addItem (simpleWorkflow != nullptr && simpleWorkflow->tourCanContinue()
                           ? tr ("Continue the first-song tour (step {0} of {1})", { juce::String (simpleWorkflow->tourStep() + 1), juce::String (tour::stepCount) })
-                          : tr ("First-song tour"),
+                          : layoutStyle == layoutstyle::Style::simple ? tr ("First-song tour")
+                                                                      : tr ("First-song tour (Simple layout)"), // (round 190rs G-11: it switches)
                       [this] { startFirstSongTourAnywhere(); });
         menu.addItem (tr ("Getting started"), [this] { showGettingStarted(); });
         // round 190qx (the owner's "make the options easy"): every window's short guide, each also at the end of its menu

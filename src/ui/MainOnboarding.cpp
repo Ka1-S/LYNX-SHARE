@@ -538,8 +538,20 @@ void MainComponent::updateEmptyHint()
 }
 
 // --- Help › First-song tour in every layout -----------------------------------------------------------------------------
-void MainComponent::startFirstSongTourAnywhere()
+void MainComponent::startFirstSongTourAnywhere (bool ask)
 {
+    // round 190rs (G-11, owner D-5): an FL or Live user who picks the tour is asked before his layout changes
+    if (ask && layoutStyle != layoutstyle::Style::simple)
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("First-song tour"),
+                                            tr ("The first-song tour runs in the Simple layout. Switch to it? (View › Layout style brings you back.)"),
+                                            tr ("Switch and start"), tr ("Cancel"), nullptr, juce::ModalCallbackFunction::create ([safe] (int result) {
+                                                if (result == 1 && safe != nullptr)
+                                                    safe->startFirstSongTourAnywhere (false);
+                                            }));
+        return;
+    }
     markSimpleWelcomeSeen (simpleWorkflow.get(), persistent);
     if (layoutStyle != layoutstyle::Style::simple || simpleWorkflow == nullptr)
     {
