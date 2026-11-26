@@ -3,6 +3,7 @@
 #if JUCE_LINUX
 
  #include "core/Preferences.h"
+ #include "core/PipeWireOrder.h"
 
  #include <algorithm>
  #include <array>
@@ -387,17 +388,11 @@ struct Connection
     // the channel positions of a node's ports in one direction (playback: the sink's inputs; capture: the source's outputs)
     std::vector<std::string> channelsOf (std::uint32_t node, bool sinkInputs) const
     {
-        // in the node's own port order (port.id), not the registry's: a 16-channel source whose ports were announced
-        // out of order gave In 1 = AUX8, In 2 = AUX9... (round 190rj)
-        std::vector<std::tuple<int, std::uint32_t, std::string>> found;
+        std::vector<pwchannels::Port> found;
         for (const auto& [id, p] : ports)
             if (p.node == node && p.input == sinkInputs && ! p.monitor)
-                found.emplace_back (p.index, id, p.channel);
-        std::sort (found.begin(), found.end());
-        std::vector<std::string> out;
-        for (auto& f : found)
-            out.push_back (std::get<2> (f));
-        return out;
+                found.push_back ({ p.index, id, p.channel });
+        return pwchannels::inPortOrder (std::move (found)); // (the node's port order, not the registry's: round 190rj)
     }
 };
 

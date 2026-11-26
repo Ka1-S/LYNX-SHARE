@@ -17567,6 +17567,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Menus168zTests.inc"
 #include "Session168aTests.inc"
 #include "Live169bTests.inc"
+#include "Hotfix01313Tests.inc" // round 190rj: hotfix 0.1.31.3 (Online Sessions, PipeWire channel order)
 #include "Live169jTests.inc"
 #include "Live190ahTests.inc"
 #include "Remote190aiTests.inc"
