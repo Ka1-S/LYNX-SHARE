@@ -30258,6 +30258,19 @@ private:
             offline.dispatchPendingMessages();
             text << "playlist rows forced to " << row << " px (LYNX_PAINTBENCH_ROW)\n";
         }
+        // LYNX_PAINTBENCH_SELECT=<track> (round 190ro): that Playlist track selected (a header click), so PR #267's "Dim
+        // unselected tracks" veil is in the frames; LYNX_PAINTBENCH_DIM=0|1 switches that extra off / on for an A/B
+        if (const auto select = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_SELECT", {}); select.isNotEmpty())
+        {
+            ui.getPlaylistForSnapshot().selectTrack (select.getIntValue());
+            offline.dispatchPendingMessages();
+            text << "playlist track " << select.getIntValue() << " selected (LYNX_PAINTBENCH_SELECT)\n";
+        }
+        if (const auto dim = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_DIM", {}); dim.isNotEmpty())
+        {
+            lynx::PlaylistComponent::dimUnselectedTracks = dim.getIntValue() != 0;
+            text << "dim unselected tracks " << (lynx::PlaylistComponent::dimUnselectedTracks ? "on" : "off") << " (LYNX_PAINTBENCH_DIM)\n";
+        }
         // LYNX_PAINTBENCH_KEYS=0|1|2 (round 190oo): the Piano roll's keyboard style (flat, lined piano keys, FL's keys)
         if (const auto keys = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_KEYS", {}); keys.isNotEmpty())
         {

@@ -2,9 +2,12 @@
 //   ON-2  project.clipLaunchStrips on: a new Clip-launch project links Track N to insert N (Live's new set). Its export
 //         to FL Studio holds the same channels, routing, patterns and clips as the same project unlinked (the rendered
 //         WAVs of both, and of their .flp / .als exports, are compared by the round's gate script).
+//   OFF-2 plugins.oneRow: the row of a plugin installed as CLAP, VST3 and VST picks a build an .als export keeps (Live
+//         hosts no CLAP). Round 190rk changes the order to VST3 > CLAP > VST2; until that lands the check names the gap.
 
 #include "core/AlsExport.h"
 #include "core/FlpExport.h"
+#include "core/PluginPicks.h"
 #include "core/Templates.h"
 
 namespace extras190ro
@@ -91,4 +94,65 @@ TEST (extras190ro_cliplaunch_strips_on_and_the_flp_export_unchanged)
     CHECK (a.mixer.size() == b.mixer.size());
     for (std::size_t m = 0; m < std::min (a.mixer.size(), b.mixer.size()); ++m)
         CHECK (a.mixer[m].volume == b.mixer[m].volume && a.mixer[m].effects.size() == b.mixer[m].effects.size());
+}
+
+TEST (extras190ro_one_row_pick_reaches_an_als_export)
+{
+    using namespace lynx;
+    // one product installed as CLAP, VST3 and VST: one row (the extra is on by default), and the build a new pick loads
+    const std::vector<pluginpicks::Item> items { { "Vital", "Vital Audio", "VST", false }, { "Vital", "Vital Audio", "CLAP", false },
+                                                 { "Vital", "Vital Audio", "VST3", false } };
+    const auto rows = pluginpicks::groupByFormat (items, true);
+    CHECK (rows.size() == 1 && rows[0].members.size() == 3);
+    if (rows.empty() || rows[0].preferred() < 0)
+        return;
+    const auto picked = items[(std::size_t) rows[0].preferred()].format;
+
+    // that pick on an insert, exported to Live 12 (the app's record callback reports the loaded build's format)
+    const auto exportWith = [] (const std::string& format) {
+        auto song = Song::makeDefault();
+        EffectSlot fx;
+        fx.kind = EffectKind::plugin;
+        fx.plugin.id = format + "-Vital-1";
+        fx.plugin.name = "Vital";
+        song.mixer[1].effects.push_back (fx);
+        AlsExportOptions options;
+        options.pluginRecord = [format] (const PluginRef& ref, bool) -> std::optional<ForeignPlugin> {
+            ForeignPlugin f;
+            f.name = ref.name;
+            f.format = format == "VST3" ? ForeignPlugin::Format::vst3 : format == "CLAP" ? ForeignPlugin::Format::clap : ForeignPlugin::Format::vst2;
+            if (f.format == ForeignPlugin::Format::vst3)
+                f.hasClassId = true, f.classId[0] = 0x56;
+            if (f.format == ForeignPlugin::Format::clap)
+                f.clapId = "audio.vital.synth";
+            if (f.format == ForeignPlugin::Format::vst2)
+                f.vst2Id = 0x56697461;
+            return f;
+        };
+        return exportAls (song, options);
+    };
+    const auto dropped = [] (const AlsExportResult& r) {
+        for (const auto& n : r.notes)
+            if (n.find ("Plugin not exported") != std::string::npos)
+                return true;
+        return false;
+    };
+    // a VST3 build goes to Live with its device, a CLAP build is left out and named (Live has no CLAP)
+    const auto vst3 = exportWith ("VST3"), clap = exportWith ("CLAP");
+    CHECK (vst3.xml.find ("PluginDeviceVst3") != std::string::npos || vst3.xml.find ("Vst3PluginInfo") != std::string::npos);
+    CHECK (! dropped (vst3) && dropped (clap));
+
+    // the merged row's pick. Round 190rk (plugin sweep, same rollup) orders the builds VST3 > CLAP > VST2: then the pick is
+    // the VST3 and the .als keeps it. Before that lands the pick is the CLAP, and the export names what it left out, so
+    // nothing is lost silently. (Integration: once 190rk is in, only the first branch runs; the second can go.)
+    if (pluginpicks::formatRank ("VST3") < pluginpicks::formatRank ("CLAP"))
+    {
+        CHECK (picked == "VST3");
+        CHECK (! dropped (exportWith (picked)));
+    }
+    else
+    {
+        CHECK (picked == "CLAP");
+        CHECK (dropped (exportWith (picked)));
+    }
 }

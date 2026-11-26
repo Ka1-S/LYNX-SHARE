@@ -34,6 +34,8 @@
 //   --live C        channel C is played live (the selected channel): it and what it feeds stay real-time (repeatable)
 //   --loop B        (with --apptransport) a loop region over the song's first B bars: the blocks are split at its end
 //                   and the position wraps, as the app's callback does it (core/RenderAhead.h planSubBlock)
+//   --correlation   the meters also sum each insert's L·R, L² and R², as while the Mixer's correlation bars show (round
+//                   190ro: their audio-thread cost, an A/B with and without)
 //   --paced         the blocks come at real time, as a device's callbacks: reports the callbacks that ran past their
 //                   block's duration (dropouts), the worst callback, and the process CPU (every thread)
 
@@ -273,7 +275,7 @@ int main (int argc, char** argv)
     int blockSize = 256, threads = 0, reps = 5;
     double seconds = 0.0, warmup = 0.0;
     bool offline = false, meters = true, stopped = scenario == "idle" || scenario == "afterstop", units = false, aheadMode = false, paced = false, appTransport = false,
-         aheadAlways = false;
+         aheadAlways = false, correlation = false;
     std::vector<int> liveChannels;
     std::vector<std::string> deactivateSpecs;
     int loopBars = 0;
@@ -320,6 +322,8 @@ int main (int argc, char** argv)
             gate = true;
         else if (a == "--deactivate") // round 190op (P4): "c:1,2" channels / "i:3,4" inserts deactivated (core/TrackStates.h)
             deactivateSpecs.push_back (next());
+        else if (a == "--correlation") // round 190ro: the Mixer's correlation bars' sums (core/Meters.h correlationWanted)
+            correlation = true;
     }
 
     constexpr int sampleRate = 44100;
@@ -459,7 +463,7 @@ int main (int argc, char** argv)
 
     std::printf ("scenario %s: %zu channels, %zu inserts, %.1f s at %d Hz, block %d, %d worker threads, %s, meters %s%s\n", scenario.c_str(),
                  song.channels.size(), song.mixer.size(), (double) totalSamples / sampleRate, sampleRate, blockSize, threads,
-                 offline ? "offline quality" : "live quality", meters ? "on" : "off", stopped ? ", stopped" : "");
+                 offline ? "offline quality" : "live quality", meters ? (correlation ? "on, with the correlation sums" : "on") : "off", stopped ? ", stopped" : "");
 
     std::vector<double> cpu, nsPerSample, buildMs, droppedPerMin, overPerMin;
     std::vector<long long> instr;
@@ -477,6 +481,7 @@ int main (int argc, char** argv)
         renderer->prepare (sampleRate, std::max (2048, blockSize));
         renderer->setProfiling (units);
         auto bank = std::make_unique<MeterBank>();
+        bank->correlationWanted.store (correlation, std::memory_order_relaxed); // (round 190ro; nothing reads them, so they stay wanted)
         const auto levels = std::getenv ("LYNX_PB_LEVELS") != nullptr; // (round 190of)
         std::vector<float> trackPeaks (song.mixer.size(), 0.0f);
         auto live = std::make_unique<LiveEventQueue>();
