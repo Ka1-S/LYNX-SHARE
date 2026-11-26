@@ -88,3 +88,13 @@ TEST (stab190rp_a_device_that_hung_the_start_is_skipped_next_time)
     CHECK (app.find ("if (uncleanDevice = uncleanDeviceOpen(); uncleanDevice.isNotEmpty())") != std::string::npos);
     CHECK (app.find ("lynx::AudioEngine::skipSavedDevice = true;") != std::string::npos);
 }
+
+// Every abort that is not a heap corruption gets the emergency save (round 190rp, coordinator item 2): glibc's other
+// fatal aborts ("FATAL: exception not rethrown", after a thread was killed) were taken for heap corruptions.
+TEST (stab190rp_only_the_allocators_abort_skips_the_save)
+{
+    const auto guard = i18ntest::readFile ("src/platform/CrashGuard.cpp");
+    const auto at = guard.find ("bool heapCorruptionCrash (void* exceptionPointers) noexcept");
+    CHECK (at != std::string::npos && guard.find ("return allocatorMessage (abortMessage());", at) != std::string::npos);
+    CHECK (guard.find ("RaiseException (abortExceptionCode, EXCEPTION_NONCONTINUABLE, 0, nullptr)") != std::string::npos);
+}

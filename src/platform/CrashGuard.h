@@ -208,10 +208,23 @@ int crashWatchdogSeconds() noexcept;
 void armCrashWatchdog (void* exceptionPointers) noexcept;
 bool heapCorruptionCrash (void* exceptionPointers) noexcept;
 void writeHeapCrashFile (void* exceptionPointers) noexcept;
+// Round 190rp: what the C library said when it aborted (glibc's own message, e.g. "free(): invalid pointer" or "FATAL:
+// exception not rethrown"; "" when it said nothing or elsewhere). Signal-safe: a static buffer, no allocation.
+// heapCorruptionCrash is true only when the heap is known to be broken: Windows' heap exception, a glibc abort whose
+// message is the allocator's, macOS' libsystem_malloc. Any other abort or terminate gets the emergency save (the
+// watchdog still ends a handler that waits on a broken allocator).
+const char* abortMessage() noexcept;
+// Round 190rp (Windows): abort() (a C++ terminate, an assert, the C runtime) reaches the crash handler as an exception
+// (it ended the process with exit code 3 and no crash file before). Called by hardenSignals.
+constexpr unsigned long abortExceptionCode = 0xE0AB0001ul;
 // --faulttest heap / hang (tests of the above): `heap` breaks a heap chunk's header and frees its neighbour, so the C
 // library aborts inside free() holding the arena lock (Linux; macOS: frees a pointer it never handed out); `hang`
 // makes the crash handler wait for ever after it armed the watchdog (setHangInCrashHandlerForTest), then faults.
 [[noreturn]] void heapCorruptionForTest() noexcept;
+// --faulttest abort / terminate / unwind (round 190rp): std::abort(); an uncaught exception (std::terminate); and
+// (glibc) a cancelled thread whose catch-all swallows the cancellation, so glibc aborts with "FATAL: exception not
+// rethrown" (what JUCE's thread kill ends in): none of them is a heap corruption
+[[noreturn]] void abortForTest (int kind) noexcept;
 void setHangInCrashHandlerForTest() noexcept;
 bool hangInCrashHandlerForTest() noexcept;
 

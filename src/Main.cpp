@@ -536,8 +536,13 @@ void onCrash (void* exceptionPointers)
     const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
     // JUCE's backtrace (named frames only), then every frame of the faulting thread as module+offset (round 157a: a
     // release LYNX.exe has no symbols, so its own frames were missing from the file)
-    folder.getChildFile ("crash " + stamp + ".txt").replaceWithText (juce::SystemStats::getStackBacktrace() + "\n--- frames (module+offset)\n"
-                                                                    + juce::String::fromUTF8 (lynx::crashguard::exceptionBacktrace (exceptionPointers).c_str()));
+    // (round 190rp: an abort that is not a heap corruption names what the C library said and gets the emergency save)
+    const auto libraryMessage = juce::String::fromUTF8 (lynx::crashguard::abortMessage()).trim();
+    const auto crashFile = folder.getChildFile ("crash " + stamp + ".txt");
+    crashFile.replaceWithText (juce::SystemStats::getStackBacktrace() + "\n--- frames (module+offset)\n"
+                               + juce::String::fromUTF8 (lynx::crashguard::exceptionBacktrace (exceptionPointers).c_str())
+                               + (libraryMessage.isNotEmpty() ? "\n--- C library: " + libraryMessage + " (not a heap corruption: the emergency save is attempted)\n"
+                                                              : juce::String()));
     lynx::crashguard::note (("crashed: backtrace in autosave\\crash " + stamp + ".txt").toStdString());
     if (lynx::crashguard::hangInCrashHandlerForTest()) // (--faulttest hang: a handler that never returns; the watchdog ends it)
         for (;;)
@@ -546,7 +551,8 @@ void onCrash (void* exceptionPointers)
     if (crashEngine != nullptr)
     {
         juce::String error;
-        lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
+        const auto saved = lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
+        crashFile.appendText ("--- emergency save: " + (saved ? "recovered " + stamp + lynx::ProjectFile::extension : "failed (" + error + ")") + "\n");
     }
 }
 // Round 190rf (Linux): the X server went away (crashguard::watchDisplayConnection): the project in memory is saved as a
@@ -918,6 +924,19 @@ public:
             // must end the process: LYNX_CRASH_WATCHDOG_S makes the test short)
             // round 190rp: recovery = the project <folder>/before.lynx in an engine, then a crash: the crash handler's
             // emergency save is what the recovery round trip (engine/RecoveryTest.cpp) opens and compares
+            // round 190rp: abort / terminate / unwind = aborts that are not a heap corruption (the emergency save runs:
+            // an engine with <folder>/before.lynx, if any, is set for it)
+            if (args[i + 1] == "abort" || args[i + 1] == "terminate" || args[i + 1] == "unwind")
+            {
+                static lynx::AudioEngine* engine = new lynx::AudioEngine (false);
+                juce::String error;
+                if (auto song = lynx::ProjectFile::load (crashFolderForTest.getChildFile ("before.lynx"), error))
+                    engine->setSong (std::move (*song));
+                crashEngine = engine;
+                if (! sanitizerOwnsSignals())
+                    lynx::crashguard::hardenSignals(); // (Windows: abort() reaches the crash handler through it)
+                lynx::crashguard::abortForTest (args[i + 1] == "terminate" ? 1 : args[i + 1] == "unwind" ? 2 : 0);
+            }
             if (args[i + 1] == "recovery")
             {
                 static lynx::AudioEngine* engine = new lynx::AudioEngine (false);

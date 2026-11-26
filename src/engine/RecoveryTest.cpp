@@ -335,6 +335,57 @@ juce::String recoveryRoundTripSelfTest (juce::String& log)
         else if (written <= 0 || lostSeconds > 1.2)
             problems.add ("take: " + juce::String (lostSeconds, 2) + " s lost");
     }
+    // 5. round 190rp: every abort that is not a heap corruption gets the emergency save (a glibc abort skipped it before,
+    //    whatever its cause), and the crash file says why; a real heap corruption still skips it and says so
+    {
+       #if JUCE_WINDOWS
+        const char* const kinds[] = { "abort", "terminate", "heap" };
+       #elif defined(__GLIBC__)
+        const char* const kinds[] = { "abort", "terminate", "unwind", "heap" };
+       #else
+        const char* const kinds[] = { "abort", "terminate", "heap" };
+       #endif
+        for (const auto* kind : kinds)
+        {
+            const auto folder = root.getChildFile (juce::String ("abort-") + kind);
+            folder.createDirectory();
+            juce::String error;
+            ProjectFile::save (recoverySong (false), folder.getChildFile ("before.lynx"), error);
+            const auto heap = juce::String (kind) == "heap";
+           #if JUCE_WINDOWS
+            _putenv_s ("LYNX_CRASH_WATCHDOG_S", "20");
+           #else
+            setenv ("LYNX_CRASH_WATCHDOG_S", "20", 1);
+           #endif
+            juce::ChildProcess child;
+            const auto started = child.start (juce::StringArray { exe.getFullPathName(), "--faulttest", kind, folder.getFullPathName() }, 0);
+            const auto ended = started && child.waitForProcessToFinish (60000);
+            if (! ended)
+                child.kill();
+            juce::String text;
+            for (const auto& f : folder.findChildFiles (juce::File::findFiles, false, "crash *.txt"))
+                text << f.loadFileAsString();
+            const auto recovered = folder.findChildFiles (juce::File::findFiles, false, "recovered *.lynx").size();
+            const auto line = [&text] (const char* tag) { return text.fromFirstOccurrenceOf (tag, true, false).upToFirstOccurrenceOf ("\n", false, false); };
+            say (juce::String ("abort kind ") + kind + ": " + (ended ? "ended" : "did not end") + ", " + juce::String (recovered) + " recovered project(s); "
+                 + line ("--- C library:") + " " + line ("--- emergency save:") + line ("The emergency save was skipped") + line ("C library: "));
+            if (! ended)
+                problems.add (juce::String (kind) + ": the child did not end");
+            else if (heap ? recovered != 0 || ! text.contains ("skipped") : recovered != 1 || ! text.contains ("--- emergency save: recovered"))
+                problems.add (juce::String (kind) + ": " + juce::String (recovered) + " recovered project(s)" + (text.isEmpty() ? juce::String (", no crash file") : juce::String()));
+           #if defined(__GLIBC__)
+            if (juce::String (kind) == "unwind" && ! text.contains ("exception not rethrown"))
+                problems.add ("unwind: the crash file does not name glibc's message");
+            if (heap && ! text.contains ("C library: "))
+                problems.add ("heap: the crash file does not name the allocator's message");
+           #endif
+        }
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_CRASH_WATCHDOG_S", "");
+       #else
+        unsetenv ("LYNX_CRASH_WATCHDOG_S");
+       #endif
+    }
    #else
     juce::ignoreUnused (exe, say);
     return "SKIPPED (Windows x64, Linux / macOS x86-64 / ARM64 only)";
