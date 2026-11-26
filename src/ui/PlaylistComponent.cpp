@@ -10650,6 +10650,54 @@ void PlaylistComponent::bandReset (int track)
     repaint();
 }
 
+// FL's Delete of the selected tracks (round 190ri, FL 2026 live: "Are you sure you want to delete 3 selected tracks?" /
+// "Selected tracks: 2-4" with their names, Ok / Cancel); one track goes at once, as before
+void PlaylistComponent::deleteTracksAsked (std::vector<int> tracks)
+{
+    const auto remove = [safe = juce::Component::SafePointer<PlaylistComponent> (this), tracks] {
+        if (safe == nullptr)
+            return;
+        safe->setSelection ({});
+        safe->selectedTracks.clear();
+        safe->engine.editSong ([tracks] (Song& s) {
+            for (auto it = tracks.rbegin(); it != tracks.rend(); ++it)
+                noteedit::removeTrack (s, *it);
+        });
+    };
+    if (tracks.size() < 2)
+        return remove();
+    juce::String names, ranges;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        const auto t = tracks[i];
+        const auto& list = engine.getSong().playlistTracks;
+        names << "\n" << (t < (int) list.size() && ! list[(std::size_t) t].name.empty() ? juce::String::fromUTF8 (list[(std::size_t) t].name.c_str())
+                                                                                        : tr ("Track {0}", { juce::String (t + 1) }));
+        if (i == 0 || tracks[i - 1] != t - 1)
+        {
+            auto j = i;
+            while (j + 1 < tracks.size() && tracks[j + 1] == tracks[j] + 1)
+                ++j;
+            ranges << (ranges.isEmpty() ? "" : ", ") << juce::String (t + 1) << (j > i ? "-" + juce::String (tracks[j] + 1) : juce::String());
+        }
+    }
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Confirm"),
+                                        tr ("Are you sure you want to delete {0} selected tracks?", { juce::String ((int) tracks.size()) }) + "\n"
+                                            + tr ("Selected tracks: {0}", { ranges }) + "\n" + names,
+                                        tr ("OK"), tr ("Cancel"), this, juce::ModalCallbackFunction::create ([remove] (int r) { if (r != 0) remove(); }));
+}
+
+void PlaylistComponent::moveTracksBy (std::vector<int> tracks, int direction)
+{
+    std::sort (tracks.begin(), tracks.end());
+    std::vector<int> after;
+    engine.editSong ([&tracks, direction, &after, count = numTracks()] (Song& s) { after = noteedit::moveTrackBlock (s, tracks, direction, count); });
+    if (selectedTracks.size() > 1 || ! after.empty())
+        selectedTracks = after;
+    refreshTrackLayout();
+    repaint();
+}
+
 std::vector<int> PlaylistComponent::tracksForMenu (int track) const
 {
     // the menu's track and, when it is one of them, the other selected tracks
@@ -10717,14 +10765,27 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                          colourTracks (tracks, colour);
                      }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
     menu.addItem (tr ("Random color"), [this, tracks = tracksForMenu (track)] {
+        // (FL 2026, round 190ri: each selected track its own random colour, one undo step)
         const auto& palette = lynxPalette();
-        const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        colourTracks (tracks, c);
+        std::vector<std::uint32_t> colours;
+        for (std::size_t i = 0; i < tracks.size(); ++i)
+            colours.push_back (palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())]);
+        engine.editSong ([tracks, colours, simple = simpleHeaders] (Song& s) {
+            for (std::size_t i = 0; i < tracks.size(); ++i)
+                recolourTrack (s, tracks[i], colours[i], simple);
+        });
     });
     // FL's "Change icon" (EEPLTrackIconMenuClick, REA round 168h); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, track, current = info.icon] {
         ui::showTrackIconPicker (juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1), current, [this, track] (int icon) {
-            editTrack (track, [icon] (PlaylistTrack& t) { t.icon = icon; });
+            engine.editSong ([tracks = tracksForMenu (track), icon] (Song& s) {
+                for (const auto t : tracks)
+                {
+                    if ((int) s.playlistTracks.size() <= t)
+                        s.playlistTracks.resize ((std::size_t) t + 1);
+                    s.playlistTracks[(std::size_t) t].icon = icon;
+                }
+            });
         });
     });
     // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
@@ -10736,12 +10797,18 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     });
     // FL's "Auto name clips" (round 190mp, DE-127; EEPLTrackAutoNameChildMenuClick, capture 190mp A1): after "Auto name"
     menu.addItem (tr ("Auto name clips"), [this, track, tracks = tracksForMenu (track)] { autoNameClipsFromMenu (track, tracks); });
-    menu.addItem (tr ("Reset"), [this, track] {
-        editTrack (track, [] (PlaylistTrack& t) {
-            t.name.clear();
-            t.colour = 0;
-            t.height = 0;
-            t.muted = false;
+    menu.addItem (tr ("Reset"), [this, tracks = tracksForMenu (track)] { // (FL 2026: every selected track, round 190ri)
+        engine.editSong ([tracks] (Song& s) {
+            for (const auto track : tracks)
+            {
+                if ((int) s.playlistTracks.size() <= track)
+                    s.playlistTracks.resize ((std::size_t) track + 1);
+                auto& t = s.playlistTracks[(std::size_t) track];
+                t.name.clear();
+                t.colour = 0;
+                t.height = 0;
+                t.muted = false;
+            }
         });
     });
     menu.addSeparator();
@@ -10749,8 +10816,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a mixer track) or an instrument
         // track (a channel and its mixer track)
         juce::PopupMenu modes, audio, instruments;
-        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned,
-                       [this, track] { engine.editSong ([track] (Song& s) { trackmodes::unassign (s, track); }); });
+        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned, [this, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks] (Song& s) {
+                for (const auto t : tracks)
+                    trackmodes::unassign (s, t);
+            });
+        });
         // FL's Audio track ▸ (REA round 190cp, FUN_0122eff0 / FUN_012ec590; round 165 issue11c f5): "New mixer
         // track(s)", then every insert as "N. name", the linked one ticked, one linked to another track greyed. A pick
         // works on the selected tracks, one undo step; an insert left behind is disarmed (FL).
@@ -10855,7 +10926,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         {
             // FL's Size menu sets the size factor (0.333, 0.5, 1, 1.5, 2): 16 px + factor × (default − 16) (round 190ft)
             const auto h = percent == 100 ? baseRowHeight() : polish::heightForFlSize (percent == 33 ? 1.0 / 3.0 : percent / 100.0, baseRowHeight());
-            size.addItem (juce::String (percent) + "%", true, current == scaledHeight (h), [this, track, h] { setTrackHeights ({ track }, h); });
+            size.addItem (juce::String (percent) + "%", true, current == scaledHeight (h), [this, tracks = tracksForMenu (track), h] { setTrackHeights (tracks, h); });
             all.addItem (juce::String (percent) + "%", [this, count, h] {
                 std::vector<int> tracks;
                 for (int t = 0; t < count; ++t)
@@ -10900,15 +10971,22 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto header = noteedit::groupHeaderOf (song, track);
         const auto member = info.grouped && track > 0;
         const auto folded = header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
-        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, track] {
+        // (FL 2026, round 190ri, kainproctor: Group / Ungroup act on every selected track, in one undo step)
+        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, tracks = tracksForMenu (track)] {
             // (round 190cg) in the Clip-launch workflow the group is a bus: its members play through the header's mixer track
+            const auto group = [tracks, live = liveStyle] (Song& s) {
+                for (const auto t : tracks)
+                    if (t > 0)
+                    {
+                        noteedit::groupWithAbove (s, t);
+                        if (live)
+                            arrange::makeGroupBus (s, t);
+                    }
+            };
             if (liveStyle)
-                engine.editSongStructural ([track] (Song& s) {
-                    noteedit::groupWithAbove (s, track);
-                    arrange::makeGroupBus (s, track);
-                });
+                engine.editSongStructural (group);
             else
-                engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
+                engine.editSong (group);
         });
         // the same for a group made in another layout; ticked while the group plays through its header's mixer track
         // (round 190jf, B17: offered for every group, a folder's bus "if the user wants"; the innermost folder of the track)
@@ -10934,7 +11012,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 });
             }
         }
-        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
+        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks] (Song& s) {
+                for (const auto t : tracks)
+                    noteedit::ungroupTrack (s, t);
+            });
+        });
         // round 190jf (B17, LYNX's nested folders; FL's groups have one level): shown for grouped tracks only
         if (member)
         {
@@ -11031,14 +11114,17 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 if (! autolanes::shown())
                     toggleAutomationLanes();
             });
-        auto muteAll = [this, track] (bool mute) {
-            engine.editSong ([track, mute] (Song& s) {
+        auto muteAll = [this, tracks = tracksForMenu (track)] (bool mute) { // (FL 2026: the selected tracks' clips, round 190ri)
+            engine.editSong ([tracks, mute] (Song& s) {
                 for (auto& c : s.playlist)
-                    if (c.track == track)
+                    if (std::find (tracks.begin(), tracks.end(), c.track) != tracks.end())
                         c.muted = mute;
             });
         };
-        const auto hasClips = ! seen.empty();
+        const auto targets = tracksForMenu (track);
+        const auto hasClips = ! seen.empty() || std::any_of (song.playlist.begin(), song.playlist.end(), [&targets] (const Clip& c) {
+                                                    return std::find (targets.begin(), targets.end(), c.track) != targets.end();
+                                                });
         {
             // FL's "Consolidate track(s)" (round 146a): the track's clips rendered into one audio clip
             juce::PopupMenu consolidate;
@@ -11111,13 +11197,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track); });
     });
     menu.addItem (theme::mnemonic (tr ("Clone..."), 'o'), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
-    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, track] {
-        setSelection ({});
-        engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
-    });
+    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, tracks = tracksForMenu (track)] { deleteTracksAsked (tracks); });
     menu.addSeparator();
-    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
-    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
+    // (FL 2026, round 190ri: the selected tracks move together, past a whole group; one undo step)
+    const auto tracks = tracksForMenu (track);
+    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), tracks.front() > 0, false, [this, tracks] { moveTracksBy (tracks, -1); });
+    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), tracks.back() + 1 < count, false, [this, tracks] { moveTracksBy (tracks, 1); });
     return menu;
 }
 

@@ -328,6 +328,7 @@ public:
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     void setTrackHeightsForTest (std::vector<int> tracks, int height) { setTrackHeights (std::move (tracks), height); } // (round 190ng, issue #222)
     std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
+    void selectTracksForSnapshot (std::vector<int> tracks) { selectedTracks = std::move (tracks); } // (round 190ri)
     int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
     juce::Rectangle<int> trackLedForSnapshot (int track) const { return trackLed (track); } // (round 190jf)
     int headerWidthForSnapshot() const noexcept { return headerWidth; }
@@ -847,6 +848,8 @@ private:
     void showClipMenu (int clip);
     void showRulerMenu (int x, int y = -1);
     juce::PopupMenu markerMenu (int index, int x); // FL's marker menu (round 190ri)
+    void deleteTracksAsked (std::vector<int> tracks); // (round 190ri: FL's question for more than one)
+    void moveTracksBy (std::vector<int> tracks, int direction);
 public:
     juce::PopupMenu markerMenuForSnapshot (int index) { return markerMenu (index, 0); }
 private:

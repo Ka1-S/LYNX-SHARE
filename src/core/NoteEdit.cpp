@@ -800,6 +800,60 @@ void removeTrack (Song& song, int track)
         song.playlistTracks.erase (song.playlistTracks.begin() + track);
 }
 
+std::vector<int> moveTrackBlock (Song& song, std::vector<int> tracks, int direction, int count)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    if (tracks.empty() || tracks.front() < 0 || direction == 0)
+        return tracks;
+    const auto first = tracks.front(), last = tracks.back();
+    const auto contiguous = last - first + 1 == (int) tracks.size();
+    if (! contiguous)
+    {
+        if ((direction < 0 && first <= 0) || (direction > 0 && last + 1 >= count))
+            return tracks;
+        if (direction > 0)
+            for (auto it = tracks.rbegin(); it != tracks.rend(); ++it)
+                swapTracks (song, *it, *it + 1);
+        else
+            for (const auto t : tracks)
+                swapTracks (song, t, t - 1);
+        for (auto& t : tracks)
+            t += direction;
+        return tracks;
+    }
+    // the unit to pass: the next row, or its whole group
+    int from = 0, to = 0;
+    if (direction > 0)
+    {
+        from = to = last + 1;
+        if (from >= count)
+            return tracks;
+        while (to + 1 < count && to + 1 < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) to + 1].grouped)
+            ++to;
+    }
+    else
+    {
+        from = to = first - 1;
+        if (to < 0)
+            return tracks;
+        while (from > 0 && from < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) from].grouped)
+            --from;
+    }
+    const auto size = to - from + 1;
+    if (direction > 0) // each row of the unit, top first, bubbles up over the block
+        for (int r = from; r <= to; ++r)
+            for (int k = r; k > r - (int) tracks.size(); --k)
+                swapTracks (song, k - 1, k);
+    else // each row of the unit, bottom first, bubbles down under the block
+        for (int r = to; r >= from; --r)
+            for (int k = r; k < r + (int) tracks.size(); ++k)
+                swapTracks (song, k, k + 1);
+    for (auto& t : tracks)
+        t += direction * size;
+    return tracks;
+}
+
 void swapTracks (Song& song, int a, int b)
 {
     if (a < 0 || b < 0 || a == b)

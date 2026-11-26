@@ -235,3 +235,28 @@ TEST (community190ri_marker_move_content)
     CHECK (s.markers()[0].name == "c" && s.markers()[0].tick == bar (1) && s.markers()[1].name == "a" && s.markers()[1].tick == bar (3)
            && s.playlist[4].start == bar (1) && s.playlist[0].start == bar (3));
 }
+
+// FL 2026 live (kainproctor 11-25): Move down with tracks 2-4 selected passes the group of tracks 5-7 at once
+TEST (community190ri_move_selected_tracks)
+{
+    lynx::Song s;
+    s.playlistTracks.resize (10);
+    for (int i = 0; i < 10; ++i)
+        s.playlistTracks[(std::size_t) i].name = std::to_string (i + 1);
+    s.playlistTracks[5].grouped = s.playlistTracks[6].grouped = true; // (5 heads 6 and 7)
+    auto moved = lynx::noteedit::moveTrackBlock (s, { 1, 2, 3 }, 1, 10);
+    CHECK ((moved == std::vector<int> { 4, 5, 6 }));
+    std::string order;
+    for (const auto& t : s.playlistTracks)
+        order += t.name + ",";
+    CHECK (order == "1,5,6,7,2,3,4,8,9,10,");
+    CHECK (s.playlistTracks[2].grouped && s.playlistTracks[3].grouped && ! s.playlistTracks[4].grouped);
+    moved = lynx::noteedit::moveTrackBlock (s, moved, -1, 10); // (and back up, past the group again)
+    CHECK ((moved == std::vector<int> { 1, 2, 3 }));
+    order.clear();
+    for (const auto& t : s.playlistTracks)
+        order += t.name + ",";
+    CHECK (order == "1,2,3,4,5,6,7,8,9,10,");
+    CHECK ((lynx::noteedit::moveTrackBlock (s, { 0, 2 }, -1, 10) == std::vector<int> { 0, 2 })); // (the top: nothing)
+    CHECK ((lynx::noteedit::moveTrackBlock (s, { 0, 2 }, 1, 10) == std::vector<int> { 1, 3 }));
+}
