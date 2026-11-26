@@ -5,6 +5,8 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+
+#include "core/SelectionKeep.h"
 #include "core/ZoomAnchor.h"
 #include "core/RackOps.h"
 #include "core/MuteKeys.h"
@@ -6966,11 +6968,36 @@ void PianoRollComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
     repaint();
 }
 
+std::vector<PianoRollComponent::NoteKey> PianoRollComponent::keysInOrder() const
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    std::vector<NoteKey> keys;
+    keys.reserve (notes.size());
+    for (const auto& n : notes)
+        keys.push_back ({ n.channel, n.key, n.start, n.length });
+    return keys;
+}
+
 void PianoRollComponent::changeListenerCallback (juce::ChangeBroadcaster*)
 {
     // pattern/channel switched or the pattern changed externally (undo, another window): the selection no longer applies
     const auto& song = engine.getSong();
     const auto count = currentPattern (song).notes.size();
+
+    // round 190rs (G-31, 190rl FIX-LIST 12): over an undo / redo the selection is found again by content — the notes are
+    // re-sorted after a move, so by index it lit up other notes
+    if (engine.getSongStamp() != knownKeysStamp)
+    {
+        auto now = keysInOrder();
+        if (engine.getHistoryStepStamp() > knownKeysStamp && knownKeysStamp != 0 && drag == Drag::none && ! selection.empty()
+            && song.currentPattern == knownPattern && engine.getSelectedChannel() == knownChannel)
+        {
+            setSelection (selkeep::remap (knownKeys, selection, now));
+            knownNoteCount = count;
+        }
+        knownKeys = std::move (now);
+        knownKeysStamp = engine.getSongStamp();
+    }
 
     if (song.currentPattern != knownPattern || engine.getSelectedChannel() != knownChannel || count != knownNoteCount)
     {

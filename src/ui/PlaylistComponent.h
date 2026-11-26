@@ -1420,6 +1420,11 @@ private:
         auto operator<=> (const ClipKey&) const = default;
     };
     std::vector<ClipKey> clipKeys (const std::vector<int>& indices) const;
+    // round 190rs (G-31): every clip's key in index order as last seen, and the song stamp it belongs to (an undo / redo
+    // re-finds the selection by them, core/SelectionKeep.h)
+    std::vector<ClipKey> clipKeysInOrder() const;
+    std::vector<ClipKey> knownClipKeys;
+    std::uint64_t knownClipKeysStamp = 0;
     selhistory::History<ClipKey> selectionHistory;
     std::vector<ClipKey> selectionAtPress;
 

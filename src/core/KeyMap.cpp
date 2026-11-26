@@ -364,7 +364,7 @@ std::vector<Action> makeActions()
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks
-        { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
+        { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks: route track N to insert N (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190ht, issue #154): the linked headers list their mixer track's insert effects
         { "playlist.trackInserts", TR_NOOP ("Show insert effects on linked tracks on/off"), Context::playlist, {} },
         // LYNX extra (round 190op, P4): hidden Playlist tracks

@@ -1,0 +1,85 @@
+// Round 190rs (0.1.32 quality stage Q5 fixes): the gaps of round 190rq's REA coverage that need a rule in core.
+
+#include "core/NoteEdit.h"
+#include "core/SelectionKeep.h"
+
+namespace q5fix190rs
+{
+struct NoteKey // (as PianoRollComponent::NoteKey)
+{
+    int channel = 0, key = 0;
+    std::int64_t start = 0, length = 0;
+    auto operator<=> (const NoteKey&) const = default;
+};
+inline std::vector<NoteKey> keysOf (const lynx::Pattern& p)
+{
+    std::vector<NoteKey> out;
+    for (const auto& n : p.notes)
+        out.push_back ({ n.channel, n.key, n.start, n.length });
+    return out;
+}
+} // namespace q5fix190rs
+
+// G-31: select notes 3 and 4 of 8, move them past note 6 (the Piano roll re-sorts the notes and tracks the selection),
+// undo: notes 3 and 4 are selected again, not whatever sits at the moved notes' indices; redo selects the moved ones
+TEST (q5fix190rs_selection_kept_by_content_over_undo_of_a_move)
+{
+    using namespace lynx;
+    Pattern original;
+    for (int i = 0; i < 8; ++i)
+    {
+        Note n;
+        n.key = 60;
+        n.start = i * 96;
+        n.length = 48;
+        original.notes.push_back (n);
+    }
+    auto moved = original;
+    std::vector<int> tracked { 3, 4 };
+    moved.notes[3].start += 336; // 288 -> 624, 384 -> 720: past the note at 576
+    moved.notes[4].start += 336;
+    noteedit::sortTracking (moved, tracked);
+    CHECK (tracked == std::vector<int> ({ 5, 7 })); // (the moved notes now sit at 5 and 7)
+
+    // the old rule (by index) would have selected 5 and 7 of the restored pattern: the notes at 480 and 672
+    const auto undone = selkeep::remap (q5fix190rs::keysOf (moved), tracked, q5fix190rs::keysOf (original));
+    CHECK (undone == std::vector<int> ({ 3, 4 }));
+    const auto redone = selkeep::remap (q5fix190rs::keysOf (original), undone, q5fix190rs::keysOf (moved));
+    CHECK (redone == std::vector<int> ({ 5, 7 }));
+
+    // an untouched selection stays; an undone paste (items removed) keeps only the items still there
+    CHECK (selkeep::remap (q5fix190rs::keysOf (original), { 0, 6 }, q5fix190rs::keysOf (original)) == std::vector<int> ({ 0, 6 }));
+    auto pasted = original;
+    Note extra;
+    extra.key = 72;
+    extra.start = 1000;
+    extra.length = 48;
+    pasted.notes.push_back (extra);
+    CHECK (selkeep::remap (q5fix190rs::keysOf (pasted), { 1, 8 }, q5fix190rs::keysOf (original)) == std::vector<int> ({ 1 }));
+    // a transposition of every note undone: each keeps its own selection (paired in order)
+    auto up = original;
+    for (auto& n : up.notes)
+        n.key += 12;
+    CHECK (selkeep::remap (q5fix190rs::keysOf (up), { 2, 5 }, q5fix190rs::keysOf (original)) == std::vector<int> ({ 2, 5 }));
+    // duplicates: two equal notes, one selected, one selected after
+    auto twins = original;
+    twins.notes.push_back (twins.notes[2]);
+    const auto twinKeys = q5fix190rs::keysOf (twins);
+    CHECK (selkeep::remap (twinKeys, { 8 }, twinKeys).size() == 1);
+}
+
+// G-31, the Playlist twin: clips keyed by track, kind, source, start and length
+TEST (q5fix190rs_playlist_selection_kept_by_content_over_undo_of_a_move)
+{
+    struct ClipKey
+    {
+        int track = 0, kind = 0, source = 0;
+        std::int64_t start = 0, length = 0;
+        auto operator<=> (const ClipKey&) const = default;
+    };
+    std::vector<ClipKey> before { { 0, 0, 1, 0, 384 }, { 0, 0, 1, 384, 384 }, { 1, 0, 2, 0, 384 }, { 2, 0, 3, 0, 384 } };
+    // clip 1 (track 0, bar 2) dragged to track 3 and re-sorted to the end; then undone
+    std::vector<ClipKey> moved { before[0], before[2], before[3], { 3, 0, 1, 384, 384 } };
+    CHECK (lynx::selkeep::remap (moved, { 3 }, before) == std::vector<int> ({ 1 }));
+    CHECK (lynx::selkeep::remap (before, { 1 }, moved) == std::vector<int> ({ 3 }));
+}

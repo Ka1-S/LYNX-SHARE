@@ -31,6 +31,8 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+
+#include "core/SelectionKeep.h"
 #include "core/MuteKeys.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
@@ -13907,6 +13909,17 @@ double PlaylistComponent::keyZoomAnchorPx() const
     return zoomanchor::anchorPx (zoomanchor::Source::keys, 0.0, grid.getWidth(), playing, playhead, selected);
 }
 
+std::vector<PlaylistComponent::ClipKey> PlaylistComponent::clipKeysInOrder() const
+{
+    const auto& playlist = engine.getSong().playlist;
+    std::vector<ClipKey> keys;
+    keys.reserve (playlist.size());
+    for (const auto& c : playlist)
+        keys.push_back ({ c.track, (int) c.kind, c.kind == ClipKind::audio ? c.channel : c.kind == ClipKind::automation ? c.automation : c.pattern,
+                          c.start, c.length });
+    return keys;
+}
+
 std::vector<PlaylistComponent::ClipKey> PlaylistComponent::clipKeys (const std::vector<int>& indices) const
 {
     const auto& playlist = engine.getSong().playlist;
@@ -16300,6 +16313,17 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 
     // the clip list changed externally (undo, pattern removal...): the selection no longer applies
     const auto count = engine.getSong().playlist.size();
+
+    // round 190rs (G-31, 190rl FIX-LIST 12): over an undo / redo the selection is found again by content — clips are
+    // re-sorted after a move, so by index it lit up other clips
+    if (engine.getSongStamp() != knownClipKeysStamp)
+    {
+        auto now = clipKeysInOrder();
+        if (engine.getHistoryStepStamp() > knownClipKeysStamp && knownClipKeysStamp != 0 && drag == Drag::none && ! selection.empty())
+            setSelection (selkeep::remap (knownClipKeys, selection, now)); // (sets knownClipCount)
+        knownClipKeys = std::move (now);
+        knownClipKeysStamp = engine.getSongStamp();
+    }
 
     if (count != knownClipCount && drag == Drag::none)
     {
