@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## La griglia e l'arrangiamento
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Nella scheda di benvenuto, clicca `Ableton Live o Bitwig`, oppure scegli `Vista › Stile del layout › Flusso a lancio di clip`.
 2. Le tracce della Playlist sono le colonne della griglia di clip; ogni riga è una scena. L'arrangiamento sta a destra.
-3. Qui apriamo il brano demo di LYNX. Il suo arrangiamento ha tre sezioni: Intro, Verse e Hook.
+3. Qui apriamo uno dei brani demo di LYNX (`File › Nuovo da modello`, o la pagina iniziale). Il suo arrangiamento ha tre sezioni: Intro, Verse e Hook.
 
 ## Scene dalle sezioni
 

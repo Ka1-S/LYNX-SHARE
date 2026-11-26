@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## Het opdrachtenpalet
 
 ![Het opdrachtenpalet met "tracker" getypt](/assets/img/learn/command-palette-1.webp)
 
-1. Druk op `?` (of `Ctrl+Shift+Y`, of klik op het vergrootglas in de werkbalk).
+1. Druk op `?` (of `Ctrl+Shift+Y`, of klik op het vergrootglas in de werkbalk). In de Clipstart-lay-out toont of verbergt `?` de Info View, zoals in Live, dus druk daar op `Ctrl+Shift+Y`. Ook `Help › Acties zoeken...` opent het palet.
 2. Typ een paar letters van wat je zoekt. De lijst bevat elke actie met haar sneltoets, elk menu-item met zijn plek, de schakelaars van de LYNX-extra's, de pagina's van de Instellingen en je recente projecten. Acties vind je in elke taal ook via hun Engelse namen.
 3. Kies een rij met de pijltoetsen en druk op `Enter`, of dubbelklik erop. `Esc` sluit het palet.
 

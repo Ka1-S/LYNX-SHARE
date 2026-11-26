@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## A folha de atalhos
 
 ![A folha de atalhos](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Aperte `F1` (ou `Ajuda › Atalhos`): as teclas de todas as janelas, as próprias do FL Studio. `F1` de novo fecha.
+1. Aperte `F1` (ou `Ajuda › Atalhos`): as teclas de todas as janelas, as próprias do FL Studio no Layout Pattern. `F1` de novo fecha. (No FL Studio, `F1` abre o manual; no LYNX SHARE, o manual fica em `Ajuda › Manual (wiki)...`.)
 
 ## Mude um atalho
 

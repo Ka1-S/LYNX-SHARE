@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## Buka file .als
 
 ![File › Open...](/assets/img/learn/open-als-1.webp)
 
 1. Pilih `File › Buka...` (`Ctrl+O`) dan pilih file `.als` set-nya, di dalam folder proyeknya.
-2. LYNX SHARE membukanya di tata letak peluncuran klip. Ableton Live sendiri tidak diperlukan, dan `.als` tidak pernah diubah.
+2. LYNX SHARE membukanya. Di tata letak peluncuran klip (`Tampilan › Gaya tata letak`), klip sesi ada di kisi klip, seperti di Live; membuka file tidak mengubah tata letak. Ableton Live sendiri tidak diperlukan, dan `.als` tidak pernah diubah.
 
 ## Apa yang ikut terbawa
 

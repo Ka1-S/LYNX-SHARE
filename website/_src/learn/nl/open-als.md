@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## De .als openen
 
 ![Bestand › Openen...](/assets/img/learn/open-als-1.webp)
 
 1. Kies `Bestand › Openen...` (`Ctrl+O`) en kies het `.als`-bestand van de set, in de projectmap.
-2. LYNX SHARE opent het in de Clipstart-lay-out. Ableton Live zelf is niet nodig, en de `.als` wordt nooit gewijzigd.
+2. LYNX SHARE opent het. In de Clipstart-lay-out (`Beeld › Lay-outstijl`) staan de sessieclips in het clipraster, zoals in Live; een bestand openen verandert de lay-out niet. Ableton Live zelf is niet nodig, en de `.als` wordt nooit gewijzigd.
 
 ## Wat er wordt overgenomen
 

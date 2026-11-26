@@ -241,6 +241,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
       mixer (e),
       browser (e)
 {
+    keyMap.setFlFileKeys (layoutStyle == layoutstyle::Style::pattern); // round 190rs (D-4): the Pattern layout's FL Ctrl+N from the start
     if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
     // round 190nc (DL-95): Live's Macro Mappings list takes the Browser's place while a rack maps (Live's look)
@@ -3575,6 +3576,7 @@ void MainComponent::setTypingPiano (bool on)
 
 void MainComponent::loadKeyMap()
 {
+    keyMap.setFlFileKeys (false); // (keys.json is read over LYNX's defaults; the layout's rule comes after, round 190rs)
     keyMap.resetToDefaults();
     const auto file = PluginHost::settingsFolder().getChildFile ("keys.json");
 
@@ -3586,6 +3588,7 @@ void MainComponent::loadKeyMap()
         for (const auto& e : errors)
             juce::Logger::writeToLog ("keys.json: " + juce::String (e));
     }
+    keyMap.setFlFileKeys (layoutStyle == layoutstyle::Style::pattern); // round 190rs (D-4): FL's Ctrl+N in the Pattern layout
 
     auto keyOf = [this] (const std::string& id) {
         const auto& chords = keyMap.chordsFor (id);
@@ -3881,6 +3884,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::dimUnselectedTracks = on;
         else if (key == "darkenMutedTracks") // PR #268 (round 190qm): Playlist › View › Darken switched-off tracks (LYNX)
             PlaylistComponent::darkenMutedTracks = on;
+        else if (key == "routingHints") // round 190rs (G-01): Settings › LYNX extras › Routing hints (LYNX)
+            PlaylistComponent::routingHints = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -4322,6 +4327,7 @@ void MainComponent::saveUiSettings()
                                       + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
                                       + "\ndimUnselectedTracks=" + juce::String (PlaylistComponent::dimUnselectedTracks ? 1 : 0)
                                       + "\ndarkenMutedTracks=" + juce::String (PlaylistComponent::darkenMutedTracks ? 1 : 0)
+                                      + "\nroutingHints=" + juce::String (PlaylistComponent::routingHints ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -5014,6 +5020,15 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         return s == Style::pattern || (s == Style::clipLaunch && clipGridView != nullptr) || (s == Style::simple && simpleWorkflow != nullptr);
     };
     engine.setLiveAutomationOverride (style == Style::clipLaunch); // (round 190oa, DL-58: Live's Re-Enable Automation)
+    // round 190rs (owner D-4): the Pattern layout uses FL's Ctrl+N (Save new version), the others LYNX's (New project)
+    if (keyMap.flFileKeys() != (style == Style::pattern))
+    {
+        keyMap.setFlFileKeys (style == Style::pattern);
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->setControlHints(); // (the New / Save buttons' hints name the keys)
+        });
+    }
     if (style == from && partsReady (style))
         return;
     // each style's own parts are made the first time it is chosen (nothing of them exists in Pattern workflow)
@@ -6024,8 +6039,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "mixer.moveLeft", tr ("Move the selected inserts left"));
             action (menu, "mixer.moveRight", tr ("Move the selected inserts right"));
             menu.addSeparator();
-            action (menu, "mixer.linkChannels", tr ("Link the selected channels to the selected insert"));
-            action (menu, "mixer.linkChannelsFrom", tr ("Link the selected channels to inserts starting from the selected one"));
+            action (menu, "mixer.linkChannels", tr ("Route selected channels to this track"));
+            action (menu, "mixer.linkChannelsFrom", tr ("Route selected channels starting from this track"));
             action (menu, "mixer.selectLinkedChannels", tr ("Select the channels linked to the selected insert"));
             break;
         case Panel::browser:
@@ -10855,7 +10870,7 @@ void MainComponent::showShortcutManager()
         safe->loadKeyMap();
         safe->setControlHints();
         safe->menuItemsChanged();
-    });
+    }, keyMap.flFileKeys());
 }
 
 void MainComponent::showMissingFiles (bool afterOpening)
@@ -12311,7 +12326,8 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Welcome..."), [this] { showWelcomeCard (false); });
         menu.addItem (simpleWorkflow != nullptr && simpleWorkflow->tourCanContinue()
                           ? tr ("Continue the first-song tour (step {0} of {1})", { juce::String (simpleWorkflow->tourStep() + 1), juce::String (tour::stepCount) })
-                          : tr ("First-song tour"),
+                          : layoutStyle == layoutstyle::Style::simple ? tr ("First-song tour")
+                                                                      : tr ("First-song tour (Simple layout)"), // (round 190rs G-11: it switches)
                       [this] { startFirstSongTourAnywhere(); });
         menu.addItem (tr ("Getting started"), [this] { showGettingStarted(); });
         // round 190qx (the owner's "make the options easy"): every window's short guide, each also at the end of its menu
@@ -12333,8 +12349,20 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 closeTip();
             updateEmptyHint();
         });
+        // round 190rs (G-20, G-21): the site's tutorials, manual, FAQ and this version's notes, in the app's language (FL's
+        // Help index and tutorials, Live's manual item, BandLab's video tutorials and help centre)
         menu.addSeparator();
-        menu.addItem (tr ("Search actions...") + "\t?", [this] { showActionSearch(); }); // #228 (round 190nq)
+        menu.addItem (tr ("Tutorials (lynx-share.com/learn)..."), [] { juce::URL (howto::siteUrl ("learn/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("Manual (wiki)..."), [] { juce::URL (howto::siteUrl ("wiki/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("FAQ and troubleshooting..."), [] { juce::URL (howto::siteUrl ("faq/")).launchInDefaultBrowser(); });
+        menu.addItem (tr ("What's new in this version..."), [] {
+            juce::URL (howto::siteUrl ("updates/") + "#v" + juce::String (JUCE_APPLICATION_VERSION_STRING) + "-alpha").launchInDefaultBrowser();
+        });
+        menu.addSeparator();
+        // #228 (round 190nq); round 190rs (G-12): in Live's look "?" toggles the Info View, so the item shows the key that
+        // opens the search there (Ctrl+Shift+Y)
+        menu.addItem (tr ("Search actions...") + (theme::livelook::active() ? shortcutText ("view.commandPalette") : juce::String ("\t?")),
+                      [this] { showActionSearch(); });
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
@@ -12617,7 +12645,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
             { TR_NOOP ("Selector / Up, Down"), TR_NOOP ("Select (Ctrl: add, Shift: range)") },
             { "Alt+Up / Alt+Down", TR_NOOP ("Move the selected channels") },
             { "Alt+C / Alt+Del", TR_NOOP ("Clone / delete the selected channels") },
-            { "Ctrl+L", TR_NOOP ("Send the selected channels to free mixer inserts") },
+            { "Ctrl+L", TR_NOOP ("Route to free mixer track") },
             { TR_NOOP ("1..0 / Ctrl+1..0"), TR_NOOP ("Mute / solo channels 1-10 (typing piano off)") },
             { TR_NOOP ("Knobs and faders"), TR_NOOP ("Drag (Ctrl: fine), wheel, Alt+click or middle-click resets") },
             { TR_NOOP ("Right-click a knob/fader"), TR_NOOP ("Type value, reset, automation, MIDI link") },
@@ -12736,7 +12764,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                     g.setColour (colour::textSecondary);
                     g.setFont (font (type::body));
                     // (round 190oj WG-4: an action that does not fit on one line at 85 % takes two lines, instead of "res...")
-                    const auto action = tr (row.action);
+                    const auto action = flFileKeys && juce::String (row.action) == "New project / open" ? tr ("Save new version / open") : tr (row.action);
                     const auto room = columnWidth - keyWidth - 10;
                     if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), action) * 0.85f > (float) room)
                     {
@@ -12781,11 +12809,14 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
         }
 
         std::vector<std::pair<juce::String, juce::String>> fkeys;
+        bool flFileKeys = false; // round 190rs (D-4): the Pattern layout's Ctrl+N is FL's Save new version
         juce::Label manageNote;
         juce::HyperlinkButton manage;
     };
 
-    return std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
+    auto sheet = std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
+    sheet->flFileKeys = map.flFileKeys() && map.chordsFor ("file.saveNewVersion") == map.defaultsFor ("file.saveNewVersion");
+    return sheet;
 }
 
 void MainComponent::showHelp()

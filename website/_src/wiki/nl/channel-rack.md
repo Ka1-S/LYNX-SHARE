@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Het Channel Rack met steprijen](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Deze werken zolang het Channel Rack de focus heeft.
 | Klonen | `Alt+C` | Kloont de geselecteerde kanalen |
 | Verwijderen | `Alt+Del` | Verwijdert de geselecteerde kanalen |
 | Groeperen | `Alt+G` | Zet de geselecteerde kanalen in een nieuwe filtergroep |
-| Naar Mixer routeren | `Ctrl+L` | Stuurt de geselecteerde kanalen naar vrije Mixer-inserts |
+| Naar vrij mixerspoor leiden | `Ctrl+L` | Stuurt de geselecteerde kanalen naar vrije Mixer-inserts |
 | Mute | `1` tot `0` | Mute of unmute kanaal 1 tot 10 |
 | Solo | `Ctrl+1` tot `Ctrl+0` | Zet kanaal 1 tot 10 solo |
 | Grafiekbaan | `Ctrl+K` | Toont of verbergt de grafiekbaan |

@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Esta página percorre uma vez o caminho inteiro: um pattern de bateria, uma melodia, um arranjo, uma mixagem e um arquivo exportado. Cada parte tem um link para a página que cobre a janela correspondente por completo. Se você não ouvir nada em algum ponto, veja [Configuração de áudio](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Para adicionar um som que não está lá, clique na caixa `+ adicionar canal` so
 
 ## Mixar e adicionar um efeito
 
-1. Pressione `F9` para mostrar o [Mixer](/wiki/mixer/). Os cinco canais iniciais já tocam pelos inserts 1 a 5, e um canal adicionado pelo menu `+ adicionar canal` usa um insert livre. O número na caixa de rota do canal, no Channel Rack, diz qual.
+1. Pressione `F9` para mostrar o [Mixer](/wiki/mixer/). Uma trilha do Mixer também se chama insert. Os cinco canais iniciais já tocam pelos inserts 1 a 5 (as faixas da Playlist só guardam clipes, então a faixa 1 da Playlist não é o insert 1), e um canal adicionado pelo menu `+ adicionar canal` toca no Master (a caixa de rota dele mostra `---`), como no FL Studio. O número na caixa de rota do canal, no Channel Rack, diz qual.
 2. Para mover canais para inserts livres só deles, selecione-os no Channel Rack e pressione `Ctrl+L`. Cada insert recebe o nome e a cor do canal.
 3. Arraste o fader de um insert para definir o nível.
 4. Clique em um insert para selecioná-lo. O painel de efeitos à direita mostra os slots de efeito dele (dez linhas, e a lista rola).
@@ -60,7 +60,7 @@ Para adicionar um som que não está lá, clique na caixa `+ adicionar canal` so
 | Playlist | `F5` | Mostra ou oculta a Playlist |
 | Modo Pattern ou Song | `L` | Alterna o que `Space` toca |
 | Mixer | `F9` | Mostra ou oculta o Mixer |
-| Enviar para inserts livres | `Ctrl+L` | Dá aos canais selecionados seus próprios inserts do Mixer |
+| Rotear para trilha de mixer livre | `Ctrl+L` | Dá aos canais selecionados seus próprios inserts do Mixer |
 | Salvar | `Ctrl+S` | Salva o projeto como `.lynx` |
 | Exportar | `Ctrl+R` | Abre a janela de exportação com o último formato usado |
 

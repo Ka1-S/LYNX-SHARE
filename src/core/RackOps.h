@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/LayoutStyle.h"
 #include "core/Song.h"
 
 namespace lynx
@@ -270,6 +271,12 @@ int insertChannel (Song& song, int index, ChannelDef channel);
 // a name another channel has gets " #2", " #3"..., and the insert takes the channel's name while it still has its
 // default one ("Insert N", Master's "Master"); a name the user gave the insert stays.
 int addChannelRouted (Song& song, ChannelDef channel, int insert = -1);
+
+// Round 190rs (owner decision D-3, live check in FL 2026 26.1.7: a 3x Osc added from the Channel rack's "+" reads "---"
+// and its window "3x Osc (Master)"; the FL manual says the same): where a channel added to the Channel rack plays. In the
+// Pattern layout (FL's) the Master; Ctrl+L or the route box's menu gives it a free insert. In the Clip-launch and Simple
+// layouts a free insert of its own, as a new Live or BandLab track has its own mixer channel.
+int newChannelInsert (Song& song, layoutstyle::Style style);
 
 // Removes several channels (any order). Returns how many were removed.
 int removeChannels (Song& song, std::vector<int> channels);

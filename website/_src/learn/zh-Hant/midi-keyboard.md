@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## MIDI 設定
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![彈入 Piano roll 的音符](/assets/img/learn/midi-keyboard-2.webp)
 
-1. 在 Channel rack 中選擇一個樂器並彈奏：馬上就能聽到。
+1. 在 Channel rack 中選擇一個樂器（在簡易或片段啟動版面中，選擇一條音軌）並彈奏：馬上就能聽到。
 2. 不需要驅動或設定：符合 class-compliant 標準的鍵盤即插即用。
 
 ## 錄製音符
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. 按錄製，選擇 `音符和自動化`，然後按播放並彈奏你的部分。
 2. 停止後，音符就在 Piano roll 裡，可以編輯和量化。
+
+## 須知
+
+- 要用鍵盤上的旋鈕來轉動某個旋鈕，在 LYNX 中對該旋鈕按右鍵，選擇 `關聯到控制器...`，然後轉動鍵盤上的一個旋鈕。在片段啟動版面中，`Ctrl+M`（MIDI 對應模式）可以一次對應多個控制項。請見[MIDI 控制器](/wiki/midi-controllers/)。
 
 另見[MIDI 控制器](/wiki/midi-controllers/)。

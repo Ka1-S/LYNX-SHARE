@@ -323,7 +323,14 @@ void MainComponent::showGettingStarted()
                     safe->hideGettingStarted();
             });
         };
-        next3Card->tutorials = [] { juce::URL ("https://lynx-share.com/wiki/getting-started/").launchInDefaultBrowser(); };
+        // round 190rs (G-25, T-8): the layout's own Learn tutorial in the app's language (was the English wiki page)
+        next3Card->tutorials = [safe] {
+            const auto style = safe != nullptr ? safe->layoutStyle : layoutstyle::Style::pattern;
+            const auto slug = style == layoutstyle::Style::clipLaunch ? "learn/clip-launch-tour/"
+                              : style == layoutstyle::Style::simple   ? "learn/simple-beat/"
+                                                                      : "learn/pattern-tour/";
+            juce::URL (howto::siteUrl (slug)).launchInDefaultBrowser();
+        };
     }
     if (persistent)
         onboardCtx.plugins = engine.getPluginHost().getKnownPlugins().getNumTypes();
@@ -476,7 +483,7 @@ void MainComponent::updateEmptyHint()
             kind = EmptyHint::none;
     }
     juce::Component* parent = kind == EmptyHint::clipGrid ? clipGridView.get() : kind == EmptyHint::none ? nullptr : static_cast<juce::Component*> (&playlist);
-    if (emptyHint != nullptr && (emptyHint->getKind() != kind || emptyHint->getParentComponent() != parent))
+    if (emptyHint != nullptr && (emptyHint->getKind() != kind || emptyHint->getView() != parent))
     {
         emptyHint->attachTo (nullptr);
         emptyHint.reset();
@@ -538,8 +545,20 @@ void MainComponent::updateEmptyHint()
 }
 
 // --- Help › First-song tour in every layout -----------------------------------------------------------------------------
-void MainComponent::startFirstSongTourAnywhere()
+void MainComponent::startFirstSongTourAnywhere (bool ask)
 {
+    // round 190rs (G-11, owner D-5): an FL or Live user who picks the tour is asked before his layout changes
+    if (ask && layoutStyle != layoutstyle::Style::simple)
+    {
+        juce::Component::SafePointer<MainComponent> safe (this);
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("First-song tour"),
+                                            tr ("The first-song tour runs in the Simple layout. Switch to it? (View › Layout style brings you back.)"),
+                                            tr ("Switch and start"), tr ("Cancel"), nullptr, juce::ModalCallbackFunction::create ([safe] (int result) {
+                                                if (result == 1 && safe != nullptr)
+                                                    safe->startFirstSongTourAnywhere (false);
+                                            }));
+        return;
+    }
     markSimpleWelcomeSeen (simpleWorkflow.get(), persistent);
     if (layoutStyle != layoutstyle::Style::simple || simpleWorkflow == nullptr)
     {

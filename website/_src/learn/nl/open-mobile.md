@@ -1,5 +1,5 @@
 ---
-source: 2f250cfce4
+source: 34cd5eb731
 ---
 ## Het nummer openen
 
@@ -12,7 +12,7 @@ source: 2f250cfce4
 
 ![Het nummer in de Eenvoudige lay-out](/assets/img/learn/open-mobile-2.webp)
 
-- Het nummer opent in de Eenvoudige lay-out, één track per instrument, met het tempo, de patterns of regio's en de mix.
+- Het nummer opent met één track per instrument, het tempo, de patterns of regio's en de mix. In de Eenvoudige lay-out (`Beeld › Lay-outstijl`) lijkt het het meest op de telefoon-app; een bestand openen verandert de lay-out niet.
 - Druk op Afspelen om het te horen.
 - Klik op een track om hem te bewerken in de dock onder de tijdlijn.
 

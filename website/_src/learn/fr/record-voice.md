@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Avant de commencer
 
@@ -21,7 +21,7 @@ Le bouton `+ Piste de voix` de la carte `Ensuite : 3 choses à essayer` fait la 
 ![La fenêtre Enregistrement : que souhaitez-vous enregistrer ?](/assets/img/learn/record-voice-2.webp)
 
 1. Appuyez sur Enregistrer dans la barre d'outils.
-2. La première fois, une fenêtre demande quoi enregistrer. Choisissez `Audio, dans la Playlist sous forme de clip audio`. Cochez `Ne plus demander` pour garder ce choix.
+2. La première fois, une fenêtre demande quoi enregistrer. Choisissez `Audio, dans la Playlist sous forme de clip audio`. Cochez `Mémoriser mon choix (clic droit sur Enregistrer pour le filtre)` pour garder ce choix.
 3. Appuyez sur Lecture, puis chantez ou parlez. La prise se dessine sur la piste Voice pendant que vous enregistrez.
 4. Appuyez sur Stop. La prise est maintenant un clip audio sur la timeline.
 5. Appuyez encore une fois sur Enregistrer pour couper l'enregistrement, afin que la prochaine Lecture ne fasse que lire.
@@ -43,5 +43,6 @@ Le bouton `+ Piste de voix` de la carte `Ensuite : 3 choses à essayer` fait la 
 - Aucun son n'arrive ? Vérifiez le périphérique d'entrée dans `Options › Réglages audio...`. Une piste Voice enregistre depuis la première entrée du périphérique.
 - `Preset`, au-dessus des effets, charge une chaîne d'effets toute prête pour une voix.
 - `Voix claire` dans le menu de la piste réduit le bruit de fond.
+- Dans la disposition Pattern ou Clip-launch, choisissez l'entrée dans la case d'entrée d'une piste du Mixer et armez cette piste, ou utilisez `Outils › Enregistrement audio en un clic › Dans la playlist comme clip audio`. Voir [Enregistrement](/wiki/recording/).
 
 Voir aussi [Enregistrement](/wiki/recording/) et [Disposition Simple](/wiki/simple-layout/).

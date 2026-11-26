@@ -324,16 +324,31 @@
                 items.add (it.getItem().text);
             check (juce::String ("Help has Welcome..., the first-song tour and Getting started in the ") + layoutstyle::id (style) + " layout",
                    items.contains (tr ("Welcome...")) && items.contains (tr ("Getting started"))
-                       && (items.contains (tr ("First-song tour"))
+                       && (items.contains (tr ("First-song tour")) || items.contains (tr ("First-song tour (Simple layout)"))
                            || items.joinIntoString ("\n").contains (tr ("Continue the first-song tour (step {0} of {1})", { "1", juce::String (tour::stepCount) }).upToFirstOccurrenceOf ("(", false, false))));
             if (help >= 0)
                 saveMenus (juce::StringArray { tr ("Help") }, std::vector<juce::PopupMenu> { helpMenu },
                            prefix + "-help-" + layoutstyle::id (style) + ".png");
         }
-        // Help › First-song tour from the Pattern layout: the Simple layout, the tour
+        // Help › First-song tour from the Pattern layout: a question first (round 190rs G-11), Cancel keeps the layout;
+        // Switch and start: the Simple layout, the tour
         line ("tour from Pattern");
         fresh (layoutstyle::Style::pattern);
         ui.startFirstSongTourAnywhere();
+        settle();
+        {
+            auto* box = juce::ModalComponentManager::getInstance()->getModalComponent (0);
+            check ("Help › First-song tour from the Pattern layout asks before switching (the layout stays until the answer)",
+                   dynamic_cast<juce::AlertWindow*> (box) != nullptr && ui.getLayoutStyle() == layoutstyle::Style::pattern);
+            if (box != nullptr)
+            {
+                write (*box, box->getLocalBounds(), "tour-ask");
+                box->exitModalState (0); // Cancel
+            }
+            settle();
+            check ("Cancel keeps the Pattern layout and starts no tour", ui.getLayoutStyle() == layoutstyle::Style::pattern);
+        }
+        ui.startFirstSongTourAnywhere (false); // (= Switch and start)
         settle();
         check ("Help › First-song tour from the Pattern layout opens the Simple layout and starts the tour",
                ui.getLayoutStyle() == layoutstyle::Style::simple && ui.getSimpleWorkflowForSnapshot() != nullptr && ui.getSimpleWorkflowForSnapshot()->tourRunning());

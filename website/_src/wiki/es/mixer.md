@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![El Mixer](/assets/img/mixer.webp)
 
-Cada canal suena a través de un insert del Mixer. Cada insert tiene un fader, pan, silenciar y solo, un medidor de picos, hasta 25 ranuras de efecto con su propia cantidad dry/wet, y un EQ integrado. Todos los inserts acaban en el Master salvo que los enrutes a otro sitio. Pulsa `F9` para mostrar u ocultar el Mixer.
+Cada canal suena a través de un insert del Mixer (una pista del Mixer, también llamada insert). Las pistas de la Playlist no son pistas del Mixer: solo contienen clips, y un clip suena por los inserts de sus canales esté donde esté, así que la pista 1 de la Playlist no es el insert 1. Cada insert tiene un fader, pan, silenciar y solo, un medidor de picos, hasta 25 ranuras de efecto con su propia cantidad dry/wet, y un EQ integrado. Todos los inserts acaban en el Master salvo que los enrutes a otro sitio. Pulsa `F9` para mostrar u ocultar el Mixer.
 
 Un proyecto puede tener hasta 500 inserts. El Mixer tiene una franja para añadir uno nuevo. La caja de la barra de título del Mixer elige uno de ocho diseños de franja, de `Compacto` a `Extra grande`.
 
@@ -21,7 +21,9 @@ En el Channel Rack, arrastra la caja de ruta del canal (o usa la rueda sobre ell
 
 `Ctrl+L` en el Channel Rack funciona con varios canales seleccionados a la vez. Cada uno va a su propio insert libre.
 
-Con el foco en el Mixer, `Ctrl+L` vincula los canales seleccionados al insert seleccionado, y `Ctrl+Shift+L` los vincula a inserts consecutivos a partir de él.
+Con el foco en el Mixer, `Ctrl+L` (`Enrutar los canales seleccionados a esta pista`) envía los canales seleccionados al insert seleccionado, y `Ctrl+Shift+L` (`Enrutar los canales seleccionados a partir de esta pista`) los envía a inserts consecutivos a partir de él.
+
+Para emparejar las pistas de la Playlist con inserts, `Vincular pistas de la Playlist a pistas del mezclador` en el menú de la Playlist vincula la pista 1 al insert 1, la pista 2 al insert 2 y así sucesivamente, en el proyecto actual. Al señalar la cabecera de una pista de la Playlist se indica dónde se oyen sus clips (`Indicaciones de enrutamiento (LYNX)` en Configuración › Extras de LYNX).
 
 ## Seleccionar y mover inserts
 
@@ -59,7 +61,7 @@ Edison, el editor y grabador de audio, puede estar en cualquier ranura de efecto
 
 - `Abrir editor de audio` (`Ctrl+E`) en el menú del insert carga Edison en la primera ranura vacía del insert y lo abre. `Abrir el editor de audio y grabar` (`Shift+E`) lo carga listo para grabar cuando suena la canción.
 - Los modos de grabación son `Ahora`, `Con entrada` (el predeterminado: espera a que la entrada supere un umbral), `Entrada` y `Al reproducir`. `Anexar` pone una grabación nueva después del audio que ya hay. El tiempo máximo de grabación es `Sin límite` o 1, 3, 5, 10, 30 o 60 minutos: una ranura nueva empieza en 30, `Abrir el editor de audio y grabar` fija 5.
-- `Sinc` reproduce el audio de Edison al tiempo de la canción mientras esta suena.
+- `Sync` reproduce el audio de Edison al tiempo de la canción mientras esta suena.
 - Edison sigue grabando después de cerrar su ventana.
 - `Herram. › Macros › Quitar todas las instancias de Edison` vacía todas las ranuras Edison del proyecto, tras una pregunta.
 - Las ranuras Edison de los proyectos de FL Studio (.flp) se abren con su audio.

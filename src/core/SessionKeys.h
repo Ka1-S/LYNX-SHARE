@@ -37,7 +37,11 @@ enum class Command
     freezeTrack,                                         // round 190ff: Freeze / Unfreeze Track, the clip grid focused
     gridDeactivateClip, // round 190im (R12): 0 = Deactivate / Activate the selected clip, the clip grid focused
     splitClips,         // round 190im (R12): Ctrl+E = Split the Playlist's selected clips (at the time selection's edges / the playhead)
-    gridCropClip        // round gap190og (detail-020): Ctrl+Shift+J = Crop Clip on the selected MIDI clip, the clip grid focused
+    gridCropClip,       // round gap190og (detail-020): Ctrl+Shift+J = Crop Clip on the selected MIDI clip, the clip grid focused
+    // round 190rs (G-30, coordinator 11-26): Live's track keys, the clip grid focused. With a track's title selected Ctrl+D
+    // duplicates the track and Del deletes it (a selected clip keeps its own Ctrl+D / Del); Ctrl+Shift+T inserts a MIDI
+    // track and Ctrl+Alt+T a return track. Live's Insert Audio Track key, Ctrl+T, stays LYNX's typing keyboard (global).
+    gridDuplicateTrack, gridDeleteTrack, gridInsertMidiTrack, gridInsertReturnTrack
 };
 
 constexpr bool defaultKeyActs (Command, layoutstyle::Style style) noexcept { return style == layoutstyle::Style::clipLaunch; }
@@ -64,6 +68,10 @@ inline const char* menuKey (Command c, layoutstyle::Style style) noexcept
         case Command::gridDeactivateClip: return "\t0";
         case Command::splitClips: return "\tCtrl+E";
         case Command::gridCropClip: return "\tCtrl+Shift+J";
+        case Command::gridDuplicateTrack: return "\tCtrl+D";
+        case Command::gridDeleteTrack: return "\tDel";
+        case Command::gridInsertMidiTrack: return "\tCtrl+Shift+T";
+        case Command::gridInsertReturnTrack: return "\tCtrl+Alt+T";
     }
     return "";
 }

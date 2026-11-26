@@ -36,7 +36,7 @@ To add a sound that is not there, click the `+ add channel` box under the last r
 
 ## Mix it and add an effect
 
-1. Press `F9` to show the [Mixer](/wiki/mixer/). The five starting channels already play through inserts 1 to 5, and a channel added from the `+ add channel` menu takes a free insert. The number in the channel's route box in the Channel rack says which one.
+1. Press `F9` to show the [Mixer](/wiki/mixer/). A Mixer track is also called an insert. The five starting channels already play through inserts 1 to 5 (Playlist tracks only hold clips, so Playlist track 1 is not insert 1), and a channel added from the `+ add channel` menu plays into the Master (its route box reads `---`), as in FL Studio. The number in the channel's route box in the Channel rack says which one.
 2. To move channels to free inserts of their own, select them in the Channel rack and press `Ctrl+L`. Each insert takes the channel's name and colour.
 3. Drag an insert's fader to set its level.
 4. Click an insert to select it. The effects panel on the right shows its effect slots (ten rows, and the list scrolls).
@@ -62,7 +62,7 @@ To add a sound that is not there, click the `+ add channel` box under the last r
 | Playlist | `F5` | Shows or hides the Playlist |
 | Pattern or Song mode | `L` | Switches what `Space` plays |
 | Mixer | `F9` | Shows or hides the Mixer |
-| Send to free inserts | `Ctrl+L` | Gives the selected channels their own Mixer inserts |
+| Route to free mixer track | `Ctrl+L` | Gives the selected channels their own Mixer inserts |
 | Save | `Ctrl+S` | Saves the project as `.lynx` |
 | Export | `Ctrl+R` | Opens the export window with the last used format |
 

@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![O Mixer](/assets/img/mixer.webp)
 
-Todo canal toca por um insert do Mixer. Cada insert tem fader, pan, mudo e solo, um medidor de pico, até 25 slots de efeito, cada um com uma quantidade seco/molhado, e um EQ embutido. Todos os inserts terminam no Master, a menos que você os roteie para outro lugar. Aperte `F9` para mostrar ou esconder o Mixer.
+Todo canal toca por um insert do Mixer (uma trilha do Mixer, também chamada de insert). As faixas da Playlist não são trilhas do Mixer: elas só guardam clipes, e um clipe toca pelos inserts dos seus canais onde quer que esteja, então a faixa 1 da Playlist não é o insert 1. Cada insert tem fader, pan, mudo e solo, um medidor de pico, até 25 slots de efeito, cada um com uma quantidade seco/molhado, e um EQ embutido. Todos os inserts terminam no Master, a menos que você os roteie para outro lugar. Aperte `F9` para mostrar ou esconder o Mixer.
 
 Um projeto pode ter até 500 inserts. O Mixer tem uma faixa de adição para criar um novo. A caixa na barra de título do Mixer escolhe um de oito layouts de faixa, de `Compacta` a `Extra grande`.
 
@@ -21,7 +21,9 @@ No Channel Rack, arraste a caixa de rota do canal (ou use a roda sobre ela) para
 
 `Ctrl+L` no Channel Rack funciona com vários canais selecionados de uma vez. Cada um vai para o seu próprio insert livre.
 
-Com o foco no Mixer, `Ctrl+L` vincula os canais selecionados ao insert selecionado, e `Ctrl+Shift+L` os vincula a inserts consecutivos a partir dele.
+Com o foco no Mixer, `Ctrl+L` (`Rotear canais selecionados para esta faixa`) envia os canais selecionados para o insert selecionado, e `Ctrl+Shift+L` (`Rotear canais selecionados a partir desta faixa`) os envia para inserts consecutivos a partir dele.
+
+Para parear faixas da Playlist com inserts, `Vincular faixas da Playlist às trilhas do mixer` no menu da Playlist liga a faixa 1 ao insert 1, a faixa 2 ao insert 2 e assim por diante, no projeto atual. Apontar para o cabeçalho de uma faixa da Playlist diz onde os clipes dela são ouvidos (`Dicas de roteamento (LYNX)` em Configurações › Extras do LYNX).
 
 ## Selecionar e mover inserts
 
@@ -59,7 +61,7 @@ O Edison, o editor e gravador de áudio, pode ficar em qualquer slot de efeito, 
 
 - `Abrir editor de áudio` (`Ctrl+E`) no menu do insert carrega o Edison no primeiro slot vazio do insert e o abre. `Abrir editor de áudio e gravar` (`Shift+E`) o carrega pronto para gravar quando a música toca.
 - Os modos de gravação são `Agora`, `Na entrada` (o padrão: espera a entrada passar de um limiar), `Entrada` e `Ao tocar`. `Anexar` põe uma gravação nova depois do áudio que já está lá. O tempo máximo de gravação é `Sem limite` ou 1, 3, 5, 10, 30 ou 60 minutos: um slot novo começa em 30, `Abrir editor de áudio e gravar` define 5.
-- `Sincronia` toca o áudio do Edison no tempo da música enquanto a música toca.
+- `Sync` toca o áudio do Edison no tempo da música enquanto a música toca.
 - O Edison continua gravando depois de você fechar a janela dele.
 - `Ferramentas › Macros › Remover todas as instâncias do Edison` esvazia todos os slots do Edison do projeto, depois de uma pergunta.
 - Slots do Edison em projetos do FL Studio (.flp) abrem com o áudio deles.

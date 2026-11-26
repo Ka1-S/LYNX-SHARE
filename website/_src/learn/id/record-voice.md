@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Sebelum mulai
 
@@ -21,7 +21,7 @@ Tombol `+ Trek voice` di kartu `Berikutnya: 3 hal untuk dicoba` melakukan hal ya
 ![Jendela Perekaman: apa yang ingin kamu rekam?](/assets/img/learn/record-voice-2.webp)
 
 1. Tekan Record di toolbar.
-2. Saat pertama kali, sebuah jendela menanyakan apa yang direkam. Pilih `Audio, ke Playlist sebagai clip audio`. Centang `Jangan tanya lagi` untuk mempertahankan pilihan itu.
+2. Saat pertama kali, sebuah jendela menanyakan apa yang direkam. Pilih `Audio, ke Playlist sebagai clip audio`. Centang `Ingat pilihan saya (klik kanan tombol rekam untuk filter rekaman)` untuk mempertahankan pilihan itu.
 3. Tekan Play, lalu bernyanyi atau bicaralah. Take digambar di track Voice selama kamu merekam.
 4. Tekan Stop. Take kini menjadi clip audio di linimasa.
 5. Tekan Record sekali lagi untuk mematikan perekaman, supaya Play berikutnya hanya memutar.
@@ -43,5 +43,6 @@ Tombol `+ Trek voice` di kartu `Berikutnya: 3 hal untuk dicoba` melakukan hal ya
 - Tidak ada suara masuk? Periksa perangkat input di `Opsi › Pengaturan audio...`. Track Voice merekam dari input pertama perangkat.
 - `Preset` di atas efek memuat rantai efek siap pakai untuk suara.
 - `Suara bersih` di menu track mengurangi derau latar.
+- Di tata letak Pattern atau peluncuran klip, pilih input di kotak input sebuah track Mixer dan arm track itu, atau pakai `Alat › Rekaman audio sekali klik › Ke playlist sebagai klip audio`. Lihat [Merekam](/wiki/recording/).
 
 Lihat juga [Merekam](/wiki/recording/) dan [Tata letak sederhana](/wiki/simple-layout/).

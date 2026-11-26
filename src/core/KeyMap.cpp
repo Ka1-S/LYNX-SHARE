@@ -223,7 +223,7 @@ std::vector<Action> makeActions()
         { "rack.cut", TR_NOOP ("Cut the selected channels' steps"), Context::channelRack, { chord ('X', ctrl) } },
         { "rack.copy", TR_NOOP ("Copy the selected channels' steps"), Context::channelRack, { chord ('C', ctrl) } },
         { "rack.paste", TR_NOOP ("Paste steps into the selected channels"), Context::channelRack, { chord ('V', ctrl) } },
-        { "rack.sendToInserts", TR_NOOP ("Send the selected channels to free mixer inserts"), Context::channelRack, { chord ('L', ctrl) } },
+        { "rack.sendToInserts", TR_NOOP ("Route to free mixer track"), Context::channelRack, { chord ('L', ctrl) } },
         { "rack.graphEditor", TR_NOOP ("Step graph lanes on/off"), Context::channelRack, { chord ('K', ctrl) } },
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
         { "rack.follow", TR_NOOP ("Follow the playhead (page along with the playing step) on/off"), Context::channelRack, {} },
@@ -364,7 +364,7 @@ std::vector<Action> makeActions()
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks
-        { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
+        { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks: route track N to insert N (current project) on/off"), Context::playlist, {} },
         // LYNX extra (round 190ht, issue #154): the linked headers list their mixer track's insert effects
         { "playlist.trackInserts", TR_NOOP ("Show insert effects on linked tracks on/off"), Context::playlist, {} },
         // LYNX extra (round 190op, P4): hidden Playlist tracks
@@ -540,8 +540,8 @@ std::vector<Action> makeActions()
         // too (checked in FL, [SHOT] 190nq mixkeys); Alt moves the tracks (above)
         { "mixer.selectPrevious", TR_NOOP ("Select the previous mixer track"), Context::mixer, { chord (left), chord (left, ctrl), chord (left, shift) } },
         { "mixer.selectNext", TR_NOOP ("Select the next mixer track"), Context::mixer, { chord (right), chord (right, ctrl), chord (right, shift) } },
-        { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
-        { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
+        { "mixer.linkChannels", TR_NOOP ("Route selected channels to this track"), Context::mixer, { chord ('L', ctrl) } },
+        { "mixer.linkChannelsFrom", TR_NOOP ("Route selected channels starting from this track"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
         { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
@@ -1234,9 +1234,63 @@ KeyMap::KeyMap()
 void KeyMap::resetToDefaults()
 {
     chords.clear();
+    ctrlNTakenByUser = false;
+    userSet.assign (actions().size(), 0);
 
-    for (const auto& a : actions())
-        chords.push_back (a.defaults);
+    for (std::size_t i = 0; i < actions().size(); ++i)
+        chords.push_back (defaultChords (i));
+}
+
+std::vector<Chord> KeyMap::flNewProjectChords()
+{
+    return {}; // FL 2026's File › New has no key of its own (live check, round 190rs)
+}
+
+std::vector<Chord> KeyMap::defaultChords (std::size_t index) const
+{
+    const auto& a = actions()[index];
+    if (! flFile)
+        return a.defaults;
+    const std::string id (a.id);
+    if (id == "file.new")
+        return flNewProjectChords();
+    if (id == "file.saveNewVersion")
+    {
+        auto out = a.defaults;
+        if (! ctrlNTakenByUser)
+            out.insert (out.begin(), Chord { 'N', ctrl });
+        return out;
+    }
+    return a.defaults;
+}
+
+std::vector<Chord> KeyMap::defaultsFor (const std::string& actionId) const
+{
+    const auto& list = actions();
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (actionId == list[i].id)
+            return defaultChords (i);
+    return {};
+}
+
+void KeyMap::setFlFileKeys (bool on)
+{
+    if (on == flFile)
+        return;
+    const auto& list = actions();
+    std::vector<char> atDefault (list.size());
+    for (std::size_t i = 0; i < list.size(); ++i)
+        atDefault[i] = ! userSet[i] && chords[i] == defaultChords (i);
+    flFile = on;
+    // a binding of the user's own (an action away from its defaults) that uses Ctrl+N keeps it
+    ctrlNTakenByUser = false;
+    const Chord ctrlN { 'N', ctrl };
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (! atDefault[i] && std::find (chords[i].begin(), chords[i].end(), ctrlN) != chords[i].end())
+            ctrlNTakenByUser = true;
+    for (std::size_t i = 0; i < list.size(); ++i)
+        if (atDefault[i])
+            chords[i] = defaultChords (i);
 }
 
 bool KeyMap::playsNote (const Chord& c, bool typingPiano) noexcept
@@ -1270,10 +1324,11 @@ std::string KeyMap::findUserBound (const Chord& c, Context focus, bool typingPia
     {
         const auto& a = list[i];
 
-        if ((a.context != Context::global && a.context != focus) || chords[i] == a.defaults)
+        const auto defaults = defaultChords (i);
+        if ((a.context != Context::global && a.context != focus) || chords[i] == defaults)
             continue;
         if (std::find (chords[i].begin(), chords[i].end(), c) == chords[i].end()
-            || std::find (a.defaults.begin(), a.defaults.end(), c) != a.defaults.end())
+            || std::find (defaults.begin(), defaults.end(), c) != defaults.end())
             continue; // (a default key keeps its usual priority)
         if (typingPiano && plainPrintable && ! a.whilePiano)
             continue;
@@ -1367,7 +1422,10 @@ void KeyMap::setChords (const std::string& actionId, std::vector<Chord> newChord
 
     for (std::size_t i = 0; i < list.size(); ++i)
         if (actionId == list[i].id)
+        {
             chords[i] = std::move (newChords);
+            userSet[i] = 1;
+        }
 }
 
 bool KeyMap::loadJson (const std::string& json, std::vector<std::string>* errors)
@@ -1526,7 +1584,7 @@ bool KeyMap::isDefault (const std::string& actionId) const
 
     for (std::size_t i = 0; i < list.size(); ++i)
         if (actionId == list[i].id)
-            return chords[i] == list[i].defaults;
+            return chords[i] == defaultChords (i);
 
     return true;
 }
@@ -1539,7 +1597,7 @@ std::string KeyMap::overridesJson() const
 
     for (std::size_t i = 0; i < list.size(); ++i)
     {
-        if (chords[i] == list[i].defaults)
+        if (chords[i] == defaultChords (i))
             continue;
 
         out += first ? "" : ",\n";

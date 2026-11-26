@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## Die Befehlspalette
 
 ![Die Befehlspalette mit eingetipptem „tracker“](/assets/img/learn/command-palette-1.webp)
 
-1. Drücke `?` (oder `Ctrl+Shift+Y`, oder klicke auf die Lupe in der Symbolleiste).
+1. Drücke `?` (oder `Ctrl+Shift+Y`, oder klicke auf die Lupe in der Symbolleiste). Im Clip-Start-Layout blendet `?` wie in Live die Info-Ansicht ein oder aus, drücke dort also `Ctrl+Shift+Y`. Auch `Hilfe › Aktionen suchen...` öffnet sie.
 2. Tippe ein paar Buchstaben von dem, was du suchst. Die Liste enthält jede Aktion mit ihrem Tastenkürzel, jeden Menüeintrag mit seinem Ort, die Schalter der LYNX-Extras, die Seiten der Einstellungen und deine letzten Projekte. Aktionen findest du in jeder Sprache auch über ihre englischen Namen.
 3. Wähle mit den Pfeiltasten eine Zeile und drücke `Enter`, oder doppelklicke darauf. `Esc` schließt die Palette.
 

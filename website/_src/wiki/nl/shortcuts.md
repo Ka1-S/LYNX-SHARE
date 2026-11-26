@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![Het venster Sneltoetsen beheren: een doorzoekbare lijst van acties met de toetsen van elke actie](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Een aantal van deze toetsen doet iets anders binnen een editor die de focus heef
 
 | Toets | Wat het doet |
 |---|---|
-| `Ctrl+N` | Nieuw project |
+| `Ctrl+N` | Nieuwe versie opslaan in de Pattern-lay-out (zoals in FL Studio); Nieuw project in de Clipstart- en de Eenvoudige lay-out |
 | `Ctrl+O` | Project openen |
 | `Ctrl+S` | Opslaan |
 | `Ctrl+Shift+S` | Opslaan als |
-| `Ctrl+Alt+S` | Nieuwe versie opslaan |
+| `Ctrl+Alt+S` | Nieuwe versie opslaan (elke lay-out) |
 | `Ctrl+R` | Audio exporteren |
 | `Ctrl+Shift+R` | Een MP3-bestand exporteren |
 | `Ctrl+Shift+M` | Een MIDI-bestand exporteren |
@@ -118,7 +118,7 @@ Deze toetsen werken alleen in de Clipstart-lay-out.
 | `Alt+C` | De geselecteerde kanalen klonen |
 | `Alt+Del` | De geselecteerde kanalen verwijderen |
 | `Alt+G` | De geselecteerde kanalen groeperen |
-| `Ctrl+L` | De geselecteerde kanalen naar vrije Mixer-inserts sturen |
+| `Ctrl+L` | Naar vrij mixerspoor leiden (de geselecteerde kanalen krijgen vrije Mixer-inserts) |
 | `Ctrl+K` | Step-grafiekbanen aan of uit |
 | `1` tot `0` | Kanaal 1 tot 10 muten of unmuten |
 | `Ctrl+1` tot `Ctrl+0` | Kanaal 1 tot 10 solo zetten |
@@ -239,8 +239,8 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `F2` | De geselecteerde insert hernoemen en kleuren |
 | `S` | De geselecteerde inserts solo zetten |
 | `Alt+S` | De geselecteerde inserts solo zetten samen met de inserts die ze voeden |
-| `Ctrl+L` | De geselecteerde kanalen koppelen aan de geselecteerde insert |
-| `Ctrl+Shift+L` | De geselecteerde kanalen koppelen aan inserts, te beginnen bij de geselecteerde |
+| `Ctrl+L` | Geselecteerde kanalen naar deze track routeren (de geselecteerde insert) |
+| `Ctrl+Shift+L` | Geselecteerde kanalen routeren vanaf deze track (de geselecteerde insert) |
 | `Alt+L` | De kanalen selecteren die aan de geselecteerde insert zijn gekoppeld |
 | `Del` | De geselecteerde inserts verwijderen. LYNX SHARE vraagt eerst om bevestiging |
 | `Ctrl+E` | De audio-editor openen |

@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Bu sayfa tüm yolu bir kez baştan sona gösterir: bir davul pattern'i, bir melodi, bir aranjman, bir mix ve dışa aktarılmış bir dosya. Her bölüm, penceresini ayrıntısıyla anlatan sayfaya bağlanır. Herhangi bir noktada hiçbir şey duymuyorsanız [Ses ayarı](/wiki/audio-setup/) sayfasına bakın.
 
@@ -34,7 +34,7 @@ Olmayan bir ses eklemek için son satırın altındaki `+ kanal ekle` kutusuna t
 
 ## Mix yapma ve efekt ekleme
 
-1. [Mixer](/wiki/mixer/)'i göstermek için `F9` tuşuna basın. Başlangıçtaki beş kanal zaten 1'den 5'e kadar insert'ler üzerinden çalar; `+ kanal ekle` menüsünden eklenen kanal boş bir insert alır. Channel Rack'te kanalın yönlendirme kutusundaki sayı hangisi olduğunu söyler.
+1. [Mixer](/wiki/mixer/)'i göstermek için `F9` tuşuna basın. Bir Mixer izine insert de denir. Başlangıçtaki beş kanal zaten 1'den 5'e kadar insert'ler üzerinden çalar (Playlist izleri yalnızca klip tutar, bu yüzden Playlist izi 1, insert 1 değildir); `+ kanal ekle` menüsünden eklenen kanal ise FL Studio'daki gibi Master'a çalar (yönlendirme kutusunda `---` yazar). Channel Rack'te kanalın yönlendirme kutusundaki sayı hangisi olduğunu söyler.
 2. Kanalları kendilerine ait boş insert'lere taşımak için Channel Rack'te seçin ve `Ctrl+L` tuşuna basın. Her insert kanalın adını ve rengini alır.
 3. Seviyesini ayarlamak için bir insert'in fader'ını sürükleyin.
 4. Seçmek için bir insert'e tıklayın. Sağdaki efekt paneli efekt yuvalarını gösterir (on satır, liste kayar).
@@ -60,7 +60,7 @@ Olmayan bir ses eklemek için son satırın altındaki `+ kanal ekle` kutusuna t
 | Playlist | `F5` | Playlist'i gösterir veya gizler |
 | Pattern veya Song modu | `L` | `Space` tuşunun neyi çaldığını değiştirir |
 | Mixer | `F9` | Mixer'i gösterir veya gizler |
-| Boş insert'lere gönder | `Ctrl+L` | Seçili kanallara kendi Mixer insert'lerini verir |
+| Boş mikser kanalına yönlendir | `Ctrl+L` | Seçili kanallara kendi Mixer insert'lerini verir |
 | Kaydet | `Ctrl+S` | Projeyi `.lynx` olarak kaydeder |
 | Dışa aktar | `Ctrl+R` | Son kullanılan formatla dışa aktarma penceresini açar |
 

@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Antes de empezar
 
@@ -21,7 +21,7 @@ El botón `+ Pista de voz` de la tarjeta `Siguiente: 3 cosas que probar` hace lo
 ![La ventana de grabación: ¿qué quieres grabar?](/assets/img/learn/record-voice-2.webp)
 
 1. Pulsa Record en la barra de herramientas.
-2. La primera vez, una ventana pregunta qué grabar. Elige `Audio, en la Playlist como clip de audio`. Marca `No volver a preguntar` para conservar esa elección.
+2. La primera vez, una ventana pregunta qué grabar. Elige `Audio, en la Playlist como clip de audio`. Marca `Recordar mi elección (clic derecho en Grabar: filtro de grabación)` para conservar esa elección.
 3. Pulsa Play y luego canta o habla. La toma se dibuja en la pista de voz mientras grabas.
 4. Pulsa Stop. La toma ya es un clip de audio en la línea de tiempo.
 5. Pulsa Record una vez más para desactivar la grabación, de modo que el siguiente Play solo reproduzca.
@@ -43,5 +43,6 @@ El botón `+ Pista de voz` de la tarjeta `Siguiente: 3 cosas que probar` hace lo
 - ¿No entra sonido? Revisa el dispositivo de entrada en `Opciones › Configuración de audio...`. Una pista de voz graba desde la primera entrada del dispositivo.
 - `Preset`, sobre los efectos, carga una cadena de efectos lista para voz.
 - `Voz limpia`, en el menú de la pista, reduce el ruido de fondo.
+- En el Diseño Pattern o Clip-launch, elige la entrada en la casilla de entrada de una pista del Mixer y arma esa pista, o usa `Herram. › Grabación de audio con un clic › En la playlist como clip de audio`. Consulta [Grabación](/wiki/recording/).
 
 Consulta también [Grabación](/wiki/recording/) y [Diseño simple](/wiki/simple-layout/).

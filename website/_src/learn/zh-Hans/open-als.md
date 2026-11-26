@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## 打开 .als
 
 ![File › Open...](/assets/img/learn/open-als-1.webp)
 
 1. 选择 `文件 › 打开...`（`Ctrl+O`），在工程文件夹中选取该 Live Set 的 `.als` 文件。
-2. LYNX SHARE 会在片段启动布局中打开它。不需要安装 Ableton Live，`.als` 也绝不会被修改。
+2. LYNX SHARE 会打开它。在片段启动布局（`视图 › 布局样式`）中，会话片段会像在 Live 中一样放在片段网格里；打开文件不会改变布局。不需要安装 Ableton Live，`.als` 也绝不会被修改。
 
 ## 会带过来什么
 

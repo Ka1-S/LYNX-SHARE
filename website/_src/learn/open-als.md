@@ -1,13 +1,13 @@
 ---
 title: Open an Ableton Live set
-summary: Open a .als in the Clip-launch layout: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live.
+summary: Open a .als: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live. The Clip-launch layout shows it as Live does.
 ---
 ## Open the .als
 
 ![File › Open...](/assets/img/learn/open-als-1.webp)
 
 1. Choose `File › Open...` (`Ctrl+O`) and pick the set's `.als` file, inside its project folder.
-2. LYNX SHARE opens it in the Clip-launch layout. Ableton Live itself is not needed, and the `.als` is never changed.
+2. LYNX SHARE opens it. In the Clip-launch layout (`View › Layout style`) the session clips sit in the clip grid, as in Live; opening a file doesn't change the layout. Ableton Live itself is not needed, and the `.als` is never changed.
 
 ## What comes over
 

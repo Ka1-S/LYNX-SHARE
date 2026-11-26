@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## .als dosyasını açın
 
 ![File › Open...](/assets/img/learn/open-als-1.webp)
 
 1. `Dosya › Aç...` (`Ctrl+O`) yolunu seçin ve set'in proje klasöründeki `.als` dosyasını seçin.
-2. LYNX SHARE onu Klip başlatma yerleşiminde açar. Ableton Live'ın kendisi gerekmez ve `.als` asla değiştirilmez.
+2. LYNX SHARE onu açar. Klip başlatma yerleşiminde (`Görünüm › Yerleşim stili`) session klipleri, Live'daki gibi klip ızgarasında durur; bir dosya açmak yerleşimi değiştirmez. Ableton Live'ın kendisi gerekmez ve `.als` asla değiştirilmez.
 
 ## Neler gelir
 

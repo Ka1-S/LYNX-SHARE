@@ -136,12 +136,13 @@ class ShortcutPanel final : public juce::Component,
                             private juce::ListBoxModel
 {
 public:
-    ShortcutPanel (bool keep, std::function<void()> changed) : persistent (keep), onChanged (std::move (changed))
+    ShortcutPanel (bool keep, std::function<void()> changed, bool flFileKeys = false) : persistent (keep), onChanged (std::move (changed))
     {
         if (persistent && keyMapFile().existsAsFile())
             map.loadJson (keyMapFile().loadFileAsString().toStdString());
         else if (! persistent)
             map.setChords ("pattern.next", { { keys::f9, keys::ctrl | keys::shift } }); // a changed one for the snapshot
+        map.setFlFileKeys (flFileKeys); // round 190rs (D-4): the Pattern layout's FL Ctrl+N, as the main window has it
 
         search.setTextToShowWhenEmpty (tr ("Search an action or a key (e.g. \"Ctrl+L\")"), theme::colour::textDisabled);
         search.setFont (theme::font (theme::type::body));
@@ -189,7 +190,7 @@ public:
         clearKeys.onClick = [this] { setChords ({}); };
         resetOne.onClick = [this] {
             if (const auto* a = selectedAction())
-                setChords (a->defaults);
+                setChords (map.defaultsFor (a->id)); // (round 190rs: the layout's defaults, FL's Ctrl+N in Pattern)
         };
         resetAll.onClick = [this] { confirmResetAll(); };
         openFile.onClick = [this] {
@@ -457,7 +458,8 @@ private:
             if (const auto* o = keys::findAction (other))
             {
                 // the key the user just chose wins over a default key of the other action; two keys of his own: the panel's
-                const auto otherIsDefault = std::find (o->defaults.begin(), o->defaults.end(), chord) != o->defaults.end();
+                const auto otherDefaults = map.defaultsFor (o->id); // (round 190rs: the layout's defaults)
+                const auto otherIsDefault = std::find (otherDefaults.begin(), otherDefaults.end(), chord) != otherDefaults.end();
                 if (otherIsDefault)
                     names.add ("\"" + tr (o->description) + "\" (" + contextName (o->context) + ")");
             }
@@ -538,9 +540,9 @@ private:
 };
 } // namespace
 
-void showShortcutManager (std::function<void()> onChanged)
+void showShortcutManager (std::function<void()> onChanged, bool flFileKeys)
 {
-    openToolWindow (std::make_unique<ShortcutPanel> (true, std::move (onChanged)), tr ("Manage shortcuts"), "shortcuts");
+    openToolWindow (std::make_unique<ShortcutPanel> (true, std::move (onChanged), flFileKeys), tr ("Manage shortcuts"), "shortcuts");
 }
 
 std::unique_ptr<juce::Component> makeShortcutManagerPanel (bool persistent, std::function<void()> onChanged)

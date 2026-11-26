@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## Abra o .als
 
 ![Arquivo › Abrir...](/assets/img/learn/open-als-1.webp)
 
 1. Escolha `Arquivo › Abrir...` (`Ctrl+O`) e selecione o arquivo `.als` do set, dentro da pasta do projeto.
-2. O LYNX SHARE abre o set no Layout Clip-launch. Você não precisa do Ableton Live, e o `.als` nunca é alterado.
+2. O LYNX SHARE abre o set. No Layout Clip-launch (`Exibir › Estilo de layout`) os clipes de sessão ficam na grade de clipes, como no Live; abrir um arquivo não muda o layout. Você não precisa do Ableton Live, e o `.als` nunca é alterado.
 
 ## O que vem junto
 

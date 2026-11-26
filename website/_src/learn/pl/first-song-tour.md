@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Zacznij wycieczkę
 
 ![Karta powitalna z "Dopiero zaczynam tworzyć muzykę"](/assets/img/learn/first-song-tour-1.webp)
 
-1. Przy pierwszym uruchomieniu LYNX SHARE pyta, skąd przychodzisz. Wybierz `Dopiero zaczynam tworzyć muzykę`.
+1. Przy pierwszym uruchomieniu LYNX SHARE pyta, skąd przychodzisz. Wybierz `Dopiero zaczynam tworzyć muzykę`. Przegapiłeś to? `Pomoc › Samouczek pierwszej piosenki` uruchamia wycieczkę z każdego układu; gdy musi przełączyć na Prosty układ, najpierw pyta.
 2. Otwiera się Prosty układ, a karta wycieczki pokazuje krok 1 z 7. Każdy krok wskazuje element, którego masz użyć.
-3. Zrób krok sam albo kliknij `Zrób to za mnie`. `Next ›` przechodzi dalej bez wykonania kroku, `‹ Back` cofa.
+3. Zrób krok sam albo kliknij `Zrób to za mnie` (krok z pętlą zamiast tego oferuje `Pokaż pętle`). `Next ›` przechodzi dalej bez wykonania kroku, `‹ Back` cofa, a `Pomiń samouczek` kończy wycieczkę.
 
 ## Beat, tonacja i instrument
 

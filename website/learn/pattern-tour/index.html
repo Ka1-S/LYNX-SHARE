@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="e9cd3c94";
+window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=e9cd3c94">
+<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -100,9 +100,9 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ol><li>Press <code>F5</code> for the Playlist. It arranges your patterns into a song.</li><li>Click on a track to place the current pattern. Place it several times to make it play for longer.</li><li>Switch the transport from <code>Pattern</code> to <code>Song</code> (or press <code>L</code>) and press Play to hear the Playlist.</li></ol>
 <h2 id="the-mixer">The Mixer</h2>
 <figure><a class="shot" href="/assets/img/learn/pattern-tour-4.webp"><img src="/assets/img/learn/pattern-tour-4.webp" alt="The Mixer with a track per channel" loading="lazy" width="1000" height="321"></a></figure>
-<ol><li>Press <code>F9</code> for the Mixer.</li><li>Each channel plays into a Mixer track. Drag a fader to set its level, and add effects in the track's slots.</li><li>The Master track on the left is what you hear and what you export.</li></ol>
+<ol><li>Press <code>F9</code> for the Mixer.</li><li>Each channel plays into the Mixer track (insert) whose number is in its route box: the small box between the knobs and the channel's name in the Channel rack (the starter channels use 1 to 5). Drag the box or turn the mouse wheel over it to change it, double-click it to see that Mixer track, and press <code>Ctrl+L</code> to give the selected channels free Mixer tracks.</li><li>Playlist tracks only hold clips, so Playlist track 1 is not Mixer track 1: a clip plays through its channels' Mixer tracks wherever it sits. Point at a Playlist track's header to read where its clips are heard; <code>Link Playlist tracks to mixer tracks</code> in the Playlist menu pairs them, track 1 with Mixer track 1 and so on. More in <a href="/learn/mixer-routing/">Route tracks in the Mixer</a>.</li><li>Drag a fader to set a Mixer track's level, and add effects in its slots. The Master track on the left is what you hear and what you export.</li></ol>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li><code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code> show or hide the four windows, as in FL Studio. <code>F8</code> opens the Plugin picker.</li><li>The same project opens in the Simple and Clip-launch layouts too: see <a href="/learn/switch-layouts/">One project, three layouts</a>.</li></ul>
+<ul><li><code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code> show or hide the four windows, as in FL Studio. <code>F8</code> opens the Plugin picker.</li><li>The lane at the bottom of the Piano roll sets each note's velocity.</li><li>The same project opens in the Simple and Clip-launch layouts too: see <a href="/learn/switch-layouts/">One project, three layouts</a>.</li></ul>
 <p>See also <a href="/wiki/coming-from-fl-studio/">Coming from FL Studio</a> and <a href="/wiki/shortcuts/">Keyboard shortcuts</a>.</p></div><nav class="wpn"><a href="/learn/switch-layouts/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="lt.switch-layouts.t">One project, three layouts</b></a><a href="/learn/open-flp/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="lt.open-flp.t">Open an FL Studio project</b></a></nav></article></div>
 </main>
 <footer><div class="wrap">
@@ -113,8 +113,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=e9cd3c94" defer></script>
-<script src="/assets/learn.js?v=e9cd3c94" defer></script>
-<script src="/assets/motion.js?v=e9cd3c94" defer></script>
+<script src="/assets/site.js?v=ef13bf2b" defer></script>
+<script src="/assets/learn.js?v=ef13bf2b" defer></script>
+<script src="/assets/motion.js?v=ef13bf2b" defer></script>
 </body>
 </html>

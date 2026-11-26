@@ -1,5 +1,5 @@
 ---
-source: f439a070b5
+source: 141ffc1370
 ---
 LYNX SHARE is een gratis, opensource DAW voor Windows, macOS en Linux met drie lay-outs in één programma. De standaard is de Pattern-lay-out: je programmeert patterns in het Channel Rack en de Piano Roll, arrangeert ze in de Playlist en mixt ze in de Mixer. De Clipstart-lay-out start clips en scènes vanuit een raster, in de stijl van Ableton Live, en de Eenvoudige lay-out brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile. `Beeld › Lay-outstijl` wisselt er op elk moment tussen. Het opent FL Studio-projecten (`.flp`), Ableton Live-sets (`.als`), FL Studio Mobile-projecten (`.flm`), DAWproject-bestanden, GarageBand- en BandLab-projecten en trackermodules, exporteert `.flp`, `.als`, `.dawproject` en `.flm`, en slaat zijn eigen `.lynx`-formaat op.
 
@@ -27,7 +27,7 @@ Plugins van derden zijn optioneel. LYNX SHARE heeft eigen instrumenten en effect
 
 ## Je werk opslaan
 
-`Ctrl+S` slaat op, `Ctrl+Shift+S` slaat op onder een nieuwe naam en `Ctrl+Alt+S` slaat een nieuwe versie op (Song_2, Song_3 enzovoort). Er is een automatische opslag, bereikbaar via `Bestand › Map voor automatisch opslaan openen` en `Bestand › Terugzetten naar laatste back-up...`.
+`Ctrl+S` slaat op, `Ctrl+Shift+S` slaat op onder een nieuwe naam en `Ctrl+Alt+S` slaat een nieuwe versie op (Song_2, Song_3 enzovoort); in de Pattern-lay-out doet `Ctrl+N` dat ook, zoals in FL Studio. Er is een automatische opslag, bereikbaar via `Bestand › Map voor automatisch opslaan openen` en `Bestand › Terugzetten naar laatste back-up...`.
 
 `Bestand › Nieuw vanuit sjabloon` heeft vier beginpunten: Empty, Basic beat, Trap with 808 en House.
 

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="e9cd3c94";
+window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=e9cd3c94">
+<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -91,7 +91,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <main>
 <div class="phead"><div class="wrap"><p class="crumb"><a href="/learn/" data-i18n="nav.learn">Learn</a></p><h1 data-i18n="lt.clip-launch-tour.t">Tour the Clip-launch layout</h1><p data-i18n="lt.clip-launch-tour.s">The Ableton Live way in LYNX SHARE: a grid of clips, scenes made from the song's sections, launching, the Device view and the arrangement.</p><p class="tmeta"><span data-i18n="lr.l.clip">Clip-launch layout</span> · <span>1:00</span> · <span data-i18n="lr.lv.beginner">Beginner</span></p></div></div><div class="wrap learn"><div class="lgrid"><figure class="tvid" data-voices="en pt-BR" data-v="clip-launch-tour"><div class="vbox"><video controls preload="none" playsinline width="1920" height="1080" poster="/assets/img/learn/clip-launch-tour-en.webp"><source src="/assets/media/learn/clip-launch-tour-en-1080.mp4" type="video/mp4" media="(min-width: 1100px)"><source src="/assets/media/learn/clip-launch-tour-en-720.mp4" type="video/mp4"><track kind="captions" srclang="en" label="English" src="/assets/media/learn/clip-launch-tour-en.vtt"><track kind="captions" srclang="zh-Hans" label="简体中文" src="/assets/media/learn/clip-launch-tour-zh-Hans.vtt"><track kind="captions" srclang="zh-Hant" label="繁體中文" src="/assets/media/learn/clip-launch-tour-zh-Hant.vtt"><track kind="captions" srclang="nl" label="Nederlands" src="/assets/media/learn/clip-launch-tour-nl.vtt"><track kind="captions" srclang="fr" label="Français" src="/assets/media/learn/clip-launch-tour-fr.vtt"><track kind="captions" srclang="de" label="Deutsch" src="/assets/media/learn/clip-launch-tour-de.vtt"><track kind="captions" srclang="id" label="Bahasa Indonesia" src="/assets/media/learn/clip-launch-tour-id.vtt"><track kind="captions" srclang="it" label="Italiano" src="/assets/media/learn/clip-launch-tour-it.vtt"><track kind="captions" srclang="ja" label="日本語" src="/assets/media/learn/clip-launch-tour-ja.vtt"><track kind="captions" srclang="ko" label="한국어" src="/assets/media/learn/clip-launch-tour-ko.vtt"><track kind="captions" srclang="pl" label="Polski" src="/assets/media/learn/clip-launch-tour-pl.vtt"><track kind="captions" srclang="pt-BR" label="Português (Brasil)" src="/assets/media/learn/clip-launch-tour-pt-BR.vtt"><track kind="captions" srclang="ru" label="Русский" src="/assets/media/learn/clip-launch-tour-ru.vtt"><track kind="captions" srclang="es" label="Español" src="/assets/media/learn/clip-launch-tour-es.vtt"><track kind="captions" srclang="tr" label="Türkçe" src="/assets/media/learn/clip-launch-tour-tr.vtt"></video></div><figcaption><span data-i18n="lr.dl">Download the video:</span> <a href="/assets/media/learn/clip-launch-tour-en-720.mp4" download>720p, 2.1 MB</a> · <a href="/assets/media/learn/clip-launch-tour-en-1080.mp4" download>1080p, 3.2 MB</a> · <span data-i18n="lr.capN">Captions in every language of this site (CC button).</span></figcaption></figure><aside class="chap"><h2 data-i18n="lr.chap">Chapters</h2><ol><li><button type="button" data-seek="0"><b>0:00</b> <span data-i18n="lt.clip-launch-tour.c0">Grid and arrangement</span></button></li><li><button type="button" data-seek="14.4"><b>0:14</b> <span data-i18n="lt.clip-launch-tour.c1">Scenes from sections</span></button></li><li><button type="button" data-seek="36.0"><b>0:36</b> <span data-i18n="lt.clip-launch-tour.c2">Clips and devices</span></button></li></ol></aside></div><article class="lsteps"><div class="prose" id="wprose"><h2 id="the-grid-and-the-arrangement">The grid and the arrangement</h2>
 <figure><a class="shot" href="/assets/img/learn/clip-launch-tour-1.webp"><img src="/assets/img/learn/clip-launch-tour-1.webp" alt="The Clip-launch layout: the clip grid and the arrangement side by side" loading="lazy" width="1280" height="720"></a></figure>
-<ol><li>On the welcome card, click <code>Ableton Live or Bitwig</code>, or choose <code>View › Layout style › Clip-launch layout</code>.</li><li>The Playlist's tracks are the columns of the clip grid; each row is a scene. The arrangement sits on the right.</li><li>Here we open LYNX's demo song. Its arrangement has three sections: Intro, Verse and Hook.</li></ol>
+<ol><li>On the welcome card, click <code>Ableton Live or Bitwig</code>, or choose <code>View › Layout style › Clip-launch layout</code>.</li><li>The Playlist's tracks are the columns of the clip grid; each row is a scene. The arrangement sits on the right.</li><li>Here we open one of LYNX's demo songs (<code>File › New from template</code>, or the start page). Its arrangement has three sections: Intro, Verse and Hook.</li></ol>
 <h2 id="scenes-from-sections">Scenes from sections</h2>
 <figure><a class="shot" href="/assets/img/learn/clip-launch-tour-2.webp"><img src="/assets/img/learn/clip-launch-tour-2.webp" alt="Right-click a slot: Create scenes from sections" loading="lazy" width="900" height="344"></a></figure>
 <ol><li>Right-click a slot and choose <code>Create scenes from sections</code>.</li><li>Each section becomes a scene, named and coloured after it, with every track's clip of that section.</li></ol>
@@ -111,8 +111,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=e9cd3c94" defer></script>
-<script src="/assets/learn.js?v=e9cd3c94" defer></script>
-<script src="/assets/motion.js?v=e9cd3c94" defer></script>
+<script src="/assets/site.js?v=ef13bf2b" defer></script>
+<script src="/assets/learn.js?v=ef13bf2b" defer></script>
+<script src="/assets/motion.js?v=ef13bf2b" defer></script>
 </body>
 </html>

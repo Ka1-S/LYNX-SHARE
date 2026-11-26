@@ -1,12 +1,12 @@
 ---
-source: 136366330e
+source: f015d99f56
 ---
 ## Apri il .flp
 
 ![File › Apri...](/assets/img/learn/open-flp-1.webp)
 
 1. Scegli `File › Apri...` (`Ctrl+O`), oppure trascina il `.flp` sulla finestra.
-2. Seleziona il progetto. LYNX SHARE trova i suoi plugin e sample e lo apre nel layout Pattern.
+2. Seleziona il progetto. LYNX SHARE trova i suoi plugin e sample, poi lo apre. Nel layout Pattern (`Vista › Stile del layout`) appare com'era in FL Studio; aprire un file non cambia il layout.
 3. FL Studio non serve, e il file `.flp` non viene mai modificato.
 
 ## Cosa arriva
@@ -15,7 +15,7 @@ source: 136366330e
 
 - I pattern con le loro note, la Playlist con tracce e marker, i canali, il Mixer con routing, livelli ed effetti.
 - I plugin propri di FL Studio, come 3x Osc, suonano su motori che LYNX SHARE ha ricreato. Clicca il nome di un canale per aprirne la finestra.
-- I plugin VST3 e CLAP di terze parti si caricano quando lo stesso plugin è installato.
+- I plugin VST, VST3 e CLAP di terze parti (AU su Mac) si caricano quando lo stesso plugin è installato.
 
 ![3x Osc aperto dal Channel Rack](/assets/img/learn/open-flp-3.webp)
 

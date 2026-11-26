@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![Der Mixer](/assets/img/mixer.webp)
 
-Jeder Kanal spielt über ein Mixer-Insert. Jedes Insert hat einen Fader, Pan, Stumm und Solo, eine Spitzenpegelanzeige, bis zu 25 Effekt-Slots mit je einem Dry/Wet-Anteil und einen eingebauten EQ. Alle Inserts enden im Master, solange du sie nicht anders routest. Mit `F9` zeigst du den Mixer an oder blendest ihn aus.
+Jeder Kanal spielt über ein Mixer-Insert (eine Mixer-Spur, auch Insert genannt). Playlist-Spuren sind keine Mixer-Spuren: Sie enthalten nur Clips, und ein Clip spielt über die Inserts seiner Kanäle, egal wo er liegt, deshalb ist Playlist-Spur 1 nicht Insert 1. Jedes Insert hat einen Fader, Pan, Stumm und Solo, eine Spitzenpegelanzeige, bis zu 25 Effekt-Slots mit je einem Dry/Wet-Anteil und einen eingebauten EQ. Alle Inserts enden im Master, solange du sie nicht anders routest. Mit `F9` zeigst du den Mixer an oder blendest ihn aus.
 
 Ein Projekt kann bis zu 500 Inserts haben. Der Mixer hat eine Leiste zum Hinzufügen eines neuen. Das Feld in der Titelleiste des Mixers wählt eines von acht Streifenlayouts, von `Kompakt` bis `Extra groß`.
 
@@ -21,7 +21,9 @@ Ziehe im Channel Rack das Routing-Feld des Kanals (oder nutze das Mausrad darauf
 
 `Ctrl+L` im Channel Rack wirkt auf mehrere gewählte Kanäle gleichzeitig. Jeder geht an sein eigenes freies Insert.
 
-Hat der Mixer den Fokus, verknüpft `Ctrl+L` die gewählten Kanäle mit dem gewählten Insert, und `Ctrl+Shift+L` verknüpft sie mit aufeinanderfolgenden Inserts ab diesem.
+Hat der Mixer den Fokus, schickt `Ctrl+L` (`Ausgewählte Kanäle auf diese Spur routen`) die gewählten Kanäle auf das gewählte Insert, und `Ctrl+Shift+L` (`Ausgewählte Kanäle ab dieser Spur routen`) schickt sie auf aufeinanderfolgende Inserts ab diesem.
+
+Um Playlist-Spuren mit Inserts zu paaren, verknüpft `Playlist-Spuren mit Mixer-Spuren verknüpfen` im Playlist-Menü Spur 1 mit Insert 1, Spur 2 mit Insert 2 und so weiter, für das aktuelle Projekt. Zeigst du auf den Kopf einer Playlist-Spur, siehst du, wo ihre Clips zu hören sind (`Routing-Hinweise (LYNX)` unter Einstellungen › LYNX-Extras).
 
 ## Inserts auswählen und verschieben
 

@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## Ajustes MIDI
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Notas tocadas en el Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Selecciona un instrumento en el Channel rack y toca: lo oyes al instante.
+1. Selecciona un instrumento en el Channel rack (en los diseños Simple o Clip-launch, selecciona una pista) y toca: lo oyes al instante.
 2. No hace falta ningún driver ni configuración: los teclados class-compliant funcionan sin más.
 
 ## Graba notas
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Pulsa Grabar, elige `Notas y automatización`, luego pulsa Play y toca tu parte.
 2. Para: las notas están en el Piano roll, listas para editar y cuantizar.
+
+## Conviene saber
+
+- Para mover un control con las perillas de tu teclado, haz clic derecho en el control en LYNX, elige `Vincular a controlador...` y mueve una perilla de tu teclado. En el Diseño Clip-launch, `Ctrl+M` (MIDI Map Mode) asigna varios controles a la vez. Consulta [Controladores MIDI](/wiki/midi-controllers/).
 
 Mira también [Controladores MIDI](/wiki/midi-controllers/).

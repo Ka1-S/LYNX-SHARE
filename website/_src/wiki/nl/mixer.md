@@ -1,9 +1,9 @@
 ---
-source: c943e134a7
+source: 7497701d9e
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
-Elk kanaal speelt via een Mixer-insert. Elke insert heeft een fader, pan, mute en solo, een piekmeter, tot 25 effectslots met elk een dry/wet-hoeveelheid, en een ingebouwde EQ. Alle inserts komen uiteindelijk in de Master tenzij je ze elders naartoe routeert. Druk op `F9` om de Mixer te tonen of te verbergen.
+Elk kanaal speelt via een Mixer-insert (een Mixer-track, ook insert genoemd). Playlist-tracks zijn geen Mixer-tracks: ze bevatten alleen clips, en een clip speelt via de inserts van zijn kanalen, waar hij ook staat, dus Playlist-track 1 is niet insert 1. Elke insert heeft een fader, pan, mute en solo, een piekmeter, tot 25 effectslots met elk een dry/wet-hoeveelheid, en een ingebouwde EQ. Alle inserts komen uiteindelijk in de Master tenzij je ze elders naartoe routeert. Druk op `F9` om de Mixer te tonen of te verbergen.
 
 Een project kan tot 500 inserts hebben. De Mixer heeft een toevoegstrook voor een nieuwe. Het vak in de titelbalk van de Mixer kiest een van acht striplayouts, van `Compact` tot `Extra groot`.
 
@@ -21,7 +21,9 @@ Sleep in het Channel Rack het routevak van het kanaal (of gebruik er het wiel op
 
 `Ctrl+L` in het Channel Rack werkt op meerdere geselecteerde kanalen tegelijk. Elk gaat naar zijn eigen vrije insert.
 
-Met de focus op de Mixer koppelt `Ctrl+L` de geselecteerde kanalen aan de geselecteerde insert, en `Ctrl+Shift+L` koppelt ze aan opeenvolgende inserts vanaf die insert.
+Met de focus op de Mixer stuurt `Ctrl+L` (`Geselecteerde kanalen naar deze track routeren`) de geselecteerde kanalen naar de geselecteerde insert, en `Ctrl+Shift+L` (`Geselecteerde kanalen routeren vanaf deze track`) stuurt ze naar opeenvolgende inserts vanaf die insert.
+
+Om Playlist-tracks aan inserts te koppelen, koppelt `Playlist-sporen koppelen aan mixersporen` in het Playlist-menu track 1 aan insert 1, track 2 aan insert 2 enzovoort, voor het huidige project. Wijs je naar de kop van een Playlist-track, dan zie je waar de clips te horen zijn (`Routinghints (LYNX)` in Instellingen › LYNX-extra's).
 
 ## Inserts selecteren en verplaatsen
 

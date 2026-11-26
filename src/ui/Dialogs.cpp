@@ -232,7 +232,7 @@ public:
     RecordChoiceWindow()
         : ui::dialog::Alert (tr ("Recording"), tr ("What would you like to record?"), juce::MessageBoxIconType::NoIcon, nullptr, 400)
     {
-        dontAsk.setButtonText (tr ("Don't ask again (right-click the record button for the recording filter)"));
+        dontAsk.setButtonText (tr ("Remember my choice (right-click the record button for the recording filter)"));
         // as wide as the longest text needs (round 190cj), within the choices' limits; longer notes wrap
         auto width = juce::jmax ((int) RecordChoiceButton::minWidth,
                                  juce::GlyphArrangement::getStringWidthInt (getLookAndFeel().getAlertWindowMessageFont(), dontAsk.getButtonText()) + 44);

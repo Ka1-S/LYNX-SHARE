@@ -118,9 +118,14 @@ public:
     EmptyHintCard (onboarding::EmptyHint kind, std::vector<Button> buttons, std::function<juce::Rectangle<int>()> where = {});
     ~EmptyHintCard() override;
     onboarding::EmptyHint getKind() const noexcept { return kind; }
-    // shown over `parent` (or hidden: nullptr); placed again when the parent is resized
-    void attachTo (juce::Component* parent);
-    void place();
+    // shown over `view` (or hidden: nullptr), as an overlay in the view's parent right above it (issue #313); placed again
+    // when the view moves or changes size
+    void attachTo (juce::Component* view);
+    juce::Component* getView() const noexcept { return watched.getComponent(); }
+    // Issue #313 (round 190rs): the card is laid out when it is attached and when its parent changes size, never again in
+    // between (a zoom or scroll step of the view under it re-asked for its place and the card jumped). `force`: lay out now.
+    void place (bool force = true);
+    static inline bool pinned = true; // (false: the old rule, every update re-centres it; the #313 route's "before")
     static constexpr int width = 520;
     int idealHeight() const;
     void paint (juce::Graphics&) override;
@@ -129,6 +134,11 @@ public:
 
 private:
     void componentMovedOrResized (juce::Component&, bool, bool) override { place(); }
+    void componentVisibilityChanged (juce::Component&) override { place(); }
+    void componentParentHierarchyChanged (juce::Component& view) override { attachTo (&view); } // (a view docked elsewhere)
+    void componentBeingDeleted (juce::Component&) override { attachTo (nullptr); }
+    juce::Rectangle<int> placedFor, placed; // the view's bounds (in its parent) the card was laid out for, and where it went
+    bool placedFits = true;
     onboarding::EmptyHint kind;
     std::function<juce::Rectangle<int>()> where;
     juce::OwnedArray<juce::TextButton> buttons;

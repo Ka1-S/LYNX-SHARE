@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## La grille et l'arrangement
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Sur la carte de bienvenue, cliquez sur `Ableton Live ou Bitwig`, ou choisissez `Vue › Style de disposition › Disposition par lancement de clips`.
 2. Les pistes de la Playlist sont les colonnes de la grille de clips ; chaque ligne est une scène. L'arrangement est à droite.
-3. Ici nous ouvrons le morceau de démo de LYNX. Son arrangement compte trois sections : Intro, Verse et Hook.
+3. Ici nous ouvrons l'un des morceaux de démo de LYNX (`Fichier › Nouveau à partir d'un modèle`, ou la page de démarrage). Son arrangement compte trois sections : Intro, Verse et Hook.
 
 ## Des scènes à partir des sections
 

@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## 外掛管理器
 
 ![Options › Plugin manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. 選擇 `選項 › 外掛管理器...`。它列出 LYNX 找到的所有外掛，以及廠商、格式和檔案。
-2. `外掛資料夾...` 顯示 LYNX 尋找的位置：標準的 VST3 和 CLAP 資料夾，以及你新增的任何資料夾。
+2. `外掛資料夾...` 顯示 LYNX 尋找的位置：標準的 VST、VST3 和 CLAP 資料夾（Linux 上還有 LV2，Mac 上還有 AU），以及你新增的任何資料夾。
 
 ## 掃描外掛
 

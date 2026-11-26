@@ -1333,12 +1333,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                                  automated.shown ({ AutomationTargetKind::channelVolume, row }, channel.volume), false,
                                  touched && knobDrag == Area::volume ? accent : knobArc, hovered (Area::volume) || (touched && knobDrag == Area::volume));
 
-                // small box with the mixer insert ("-" = straight to Master)
+                // small box with the mixer insert ("---" = straight to Master, as FL 2026 shows it; round 190rs G-04)
                 const auto routeArea = controlBounds (Area::route, row).toFloat();
                 g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
                                                       channel.mixerTrack <= 0));
                 g.setFont (theme::font (theme::type::caption, true));
-                textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
+                textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("---"), routeArea.toNearestInt(),
                             juce::Justification::centred);
                 g.setFont (theme::font (theme::type::body));
 
@@ -1438,7 +1438,18 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // as LYNX drew it before 190jp
                 const auto left = nameAlignLeft || theme::soft(); // (round 190qw: the Soft look's names start after the strip)
                 const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : left ? 5.0f : 6.0f;
-                const auto textArea = nameArea.withTrimmedLeft (theme::soft() ? 11.0f : left ? 7.0f : 6.0f).withTrimmedRight (rightTrim);
+                auto leftTrim = theme::soft() ? 11.0f : left ? 7.0f : 6.0f;
+                // round 190rs (G-06, FL 2026 pairs/92b): a channel linked to an instrument track carries a mark left of its
+                // name, as FL's (LYNX's own keyboard glyph); an icon of the channel's own wins (it shows at the right)
+                if (iconWidth == 0.0f && linkedToInstrumentTrack (row))
+                {
+                    // (drawn only where the repaint reaches it: a playhead column leaves this static mark alone)
+                    if (const auto mark = juce::Rectangle<float> (nameArea.getX() + leftTrim, nameArea.getCentreY() - 6.0f, 12.0f, 12.0f);
+                        g.clipRegionIntersects (mark.getSmallestIntegerContainer()))
+                        ui::drawTrackIconCached (g, trackicons::Icon::keyboard, mark, (theme::soft() ? textSecondary : onAccent).withAlpha (channel.muted ? 0.45f : 0.85f));
+                    leftTrim += 15.0f;
+                }
+                const auto textArea = nameArea.withTrimmedLeft (leftTrim).withTrimmedRight (rightTrim);
                 textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
                                      left ? juce::Justification::centredLeft : juce::Justification::centred, false);
                 g.setFont (theme::font (theme::type::body));
@@ -2030,6 +2041,20 @@ juce::Rectangle<int> ChannelRackComponent::previewMuteBounds (int row) const
 
 // --- the control contract for the knobs and the route box ----------------------------------------
 
+bool ChannelRackComponent::linkedToInstrumentTrack (int row) const
+{
+    if (instrumentTrackLinksStamp != engine.getSongStamp())
+    {
+        const auto& song = engine.getSong();
+        instrumentTrackLinksStamp = engine.getSongStamp();
+        instrumentTrackLinks.assign (song.channels.size(), 0);
+        for (const auto& track : song.playlistTracks)
+            if (track.mode == PlaylistTrackMode::instrument && track.channel >= 0 && track.channel < (int) instrumentTrackLinks.size())
+                instrumentTrackLinks[(std::size_t) track.channel] = 1;
+    }
+    return row >= 0 && row < (int) instrumentTrackLinks.size() && instrumentTrackLinks[(std::size_t) row] != 0;
+}
+
 ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
 {
     if (area == Area::autoMin || area == Area::autoMax) // round 190ow: FL's MIN / MAX of an automation clip (`row` = it)
@@ -2061,7 +2086,16 @@ ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
     spec.name = name + " - " + tr ("Target mixer track");
     spec.maximum = maxMixerTracks - 1; // every insert, like FL (round 162: the inserts past the mixer's last one are added)
     spec.interval = 1.0;
-    spec.toText = [] (double v) { return v < 0.5 ? tr ("Master") : tr ("Insert {0}", { juce::String (juce::roundToInt (v)) }); };
+    // round 190rs (G-04, queue item 92): the insert's name after its number, so the hint says where the sound goes
+    spec.toText = [this] (double v) {
+        if (v < 0.5)
+            return tr ("Master");
+        const auto t = juce::roundToInt (v);
+        const auto& mixer = engine.getSong().mixer;
+        const auto own = t < (int) mixer.size() ? juce::String (juce::CharPointer_UTF8 (mixer[(std::size_t) t].name.c_str())).trim() : juce::String();
+        const auto number = tr ("Insert {0}", { juce::String (t) });
+        return own.isEmpty() || own == "Insert " + juce::String (t) || own == number ? number : tr ("Insert {0} · {1}", { juce::String (t), own });
+    };
     spec.fromText = [] (const juce::String& t) -> std::optional<double> {
         if (t.trim().startsWithIgnoreCase ("m"))
             return 0.0;
@@ -3023,7 +3057,8 @@ int ChannelRackComponent::addChannel (ChannelDef c, bool openEditor, int insert)
     // round 190ok (D2): Settings › Audio › "Smart disable for new instrument plugins" (LYNX extra; FL's default: off)
     if (c.instrument == InstrumentKind::plugin && flsettings::options().smartDisableNewPlugins.load())
         c.setSmartDisable (true);
-    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert); });
+    // (round 190rs D-3: no insert asked for = where a channel added to the rack goes in this layout, the Master in Pattern)
+    engine.editSong ([&] (Song& s) { index = addChannelRouted (s, c, insert >= 0 ? insert : newChannelInsert (s, layoutstyle::current())); });
     selectionAnchor = index;
     selectRows ({ index }, index);
 
@@ -3377,7 +3412,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                     menu.addItem (tr ("Next free insert"), [this, row] {
                         engine.editSong ([row] (Song& s) { s.channels[(std::size_t) row].mixerTrack = s.claimFreeInsert(); });
                     });
-                    menu.addItem (tr ("Send the selected channels to free inserts") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
+                    menu.addItem (tr ("Route to free mixer track") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
 
                     if (onOpenMixerInsert)
                         menu.addItem (tr ("Show this insert in the Mixer"), [this, row] {
@@ -3769,7 +3804,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
         const auto shownArea = active ? knobDrag : area;
         const auto shownRow = active ? knobRow : row;
         h = ui::valueHint (specFor (shownArea, shownRow), valueOf (shownArea, shownRow),
-                           shownArea == Area::route ? tr ("[LMB] drag or [Wheel] routes  [2xLMB] show in the Mixer  [RMB] next free insert")
+                           shownArea == Area::route ? tr ("[LMB] drag or [Wheel] routes  [2xLMB] show in the Mixer  [RMB] menu (next free insert)")
                                                     : ui::valueGestures());
         return h;
     }
@@ -4342,7 +4377,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     menu.addSeparator();
     menu.addItem (tr ("Move up") + "\tAlt+Up", engine.getSelectedChannels().front() > 0, false, [this] { moveSelected (-1); });
     menu.addItem (tr ("Move down") + "\tAlt+Down", engine.getSelectedChannels().back() < count - 1, false, [this] { moveSelected (1); });
-    menu.addItem (tr ("Send to free mixer inserts") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
+    menu.addItem (tr ("Route to free mixer track") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
     {
         juce::PopupMenu sort;
         sort.addItem (tr ("By name"), [this] { sortChannels (ChannelSort::name); });
@@ -4399,7 +4434,7 @@ void ChannelRackComponent::addInstrumentItems (juce::PopupMenu& menu, int insert
             c.group = filterGroup;
         const auto kind = c.instrument;
         engine.editSong ([&] (Song& s) {
-            c.mixerTrack = s.claimFreeInsert();
+            c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3: the Master in the Pattern layout, as FL)
             index = insertAt < 0 ? (s.channels.push_back (c), (int) s.channels.size() - 1) : insertChannel (s, insertAt, c);
         });
         selectionAnchor = index;
@@ -4503,7 +4538,7 @@ void ChannelRackComponent::chooseSample (int channel, int insertAt)
                                       c.group = filterGroup;
                                   int index = 0;
                                   engine.editSong ([&] (Song& s) {
-                                      c.mixerTrack = s.claimFreeInsert();
+                                      c.mixerTrack = newChannelInsert (s, layoutstyle::current()); // (round 190rs D-3)
                                       index = insertChannel (s, std::min (insertAt, (int) s.channels.size()), c);
                                   });
                                   selectionAnchor = index;
@@ -4540,7 +4575,7 @@ void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
 
     engine.editSong ([channel, path, name] (Song& s) {
         const auto isNew = channel < 0 || channel >= (int) s.channels.size();
-        const auto freeInsert = s.claimFreeInsert();
+        const auto freeInsert = isNew ? newChannelInsert (s, layoutstyle::current()) : 0; // (round 190rs D-3)
         auto& c = isNew ? s.channels.emplace_back() : s.channels[(std::size_t) channel];
 
         if (isNew)

@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![La fenêtre d'export avec WAV sélectionné : étendue, queue et fichiers à gauche, format à droite, options de mixage en dessous](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ Le `.dawproject` contient les pistes, les dossiers, les clips, les notes, l'audi
 - `Écrire aussi une vidéo avec ce mixage` n'apparaît que si le projet a une piste vidéo, et il faut FFmpeg.
 - `Rendre via le matériel en temps réel` n'apparaît que si le projet a un insert matériel actif. Cet export dure aussi longtemps que le morceau.
 - Render to audio, qui convertit un insert en clip audio, joue environ 5 dB plus fort que l'insert qu'il remplace dans cette version.
+- Pour déplacer un projet sur un autre ordinateur, `Fichier › Tout rassembler et enregistrer` copie dans le dossier du projet les samples et les enregistrements qui sont en dehors (`Fichier › Toujours rassembler et enregistrer` le fait à chaque enregistrement), et `Fichier › Exporter › Paquet de loops zippé...` met le projet et chaque fichier qu'il utilise dans un seul `.zip`.
 
 ## Voir aussi
 

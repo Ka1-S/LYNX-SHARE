@@ -29,7 +29,7 @@ Third-party plugins are optional. LYNX SHARE has its own instruments and effects
 
 ## Save your work
 
-`Ctrl+S` saves, `Ctrl+Shift+S` saves under a new name, and `Ctrl+Alt+S` saves a new version (Song_2, Song_3 and so on). There is an autosave, reachable from `File › Open autosave folder` and `File › Revert to last backup...`.
+`Ctrl+S` saves, `Ctrl+Shift+S` saves under a new name, and `Ctrl+Alt+S` saves a new version (Song_2, Song_3 and so on); in the Pattern layout `Ctrl+N` does too, as in FL Studio. There is an autosave, reachable from `File › Open autosave folder` and `File › Revert to last backup...`.
 
 `File › New from template` has four starting points: Empty, Basic beat, Trap with 808 and House.
 

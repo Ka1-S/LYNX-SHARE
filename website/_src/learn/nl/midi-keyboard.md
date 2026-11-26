@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## MIDI-instellingen
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Noten die in de Pianorol zijn gespeeld](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Selecteer een instrument in het Channel Rack en speel: je hoort het meteen.
+1. Selecteer een instrument in het Channel Rack (selecteer in de Eenvoudige of de Clipstart-lay-out een track) en speel: je hoort het meteen.
 2. Je hebt geen driver of installatie nodig: class-compliant keyboards werken gewoon.
 
 ## Noten opnemen
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Druk op Opnemen, kies `Noten en automatisering`, druk dan op Afspelen en speel je partij.
 2. Stop: de noten staan in de Pianorol, klaar om te bewerken en te quantizen.
+
+## Goed om te weten
+
+- Wil je een knop bedienen met de knoppen van je keyboard, klik dan met de rechtermuisknop op de knop in LYNX, kies `Koppelen aan controller...` en draai aan een knop op je keyboard. In de Clipstart-lay-out koppelt `Ctrl+M` (MIDI Map Mode) meerdere bedieningselementen tegelijk. Zie [MIDI-controllers](/wiki/midi-controllers/).
 
 Zie ook [MIDI-controllers](/wiki/midi-controllers/).

@@ -37,7 +37,7 @@ What is different from FL Studio:
 | Browser | `Alt+F8` |
 | Pattern / Song mode | `L` |
 | Undo | `Ctrl+Z` undoes, or redoes after an undo. `Ctrl+Alt+Z` undoes backwards |
-| Save new version | `Ctrl+Alt+S` |
+| Save new version | `Ctrl+N` (as in FL Studio) or `Ctrl+Alt+S` |
 | Export | `Ctrl+R`, MP3 on `Ctrl+Shift+R`, MIDI on `Ctrl+Shift+M` |
 | Mixer inserts, sends and sidechain | The same, with up to 25 effect slots per insert (10 by default) |
 | Fruity Wrapper | Third-party plugins are hosted directly, see [Third-party plugins](/wiki/plugins/) |

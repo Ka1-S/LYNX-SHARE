@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## La feuille de raccourcis
 
 ![La feuille de raccourcis](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Appuyez sur `F1` (ou `Aide › Raccourcis`) : les touches de chaque fenêtre, celles de FL Studio. `F1` à nouveau la ferme.
+1. Appuyez sur `F1` (ou `Aide › Raccourcis`) : les touches de chaque fenêtre, celles de FL Studio dans la disposition Pattern. `F1` à nouveau la ferme. (Dans FL Studio, `F1` ouvre le manuel ; dans LYNX SHARE, le manuel est `Aide › Manuel (wiki)...`.)
 
 ## Changez un raccourci
 

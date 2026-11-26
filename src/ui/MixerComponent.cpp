@@ -1312,6 +1312,19 @@ juce::Rectangle<int> MixerStrips::nameArea (int t) const
     return { stripX (t), r.nameTop, nameWidth, r.nameHeight };
 }
 
+bool MixerStrips::linkedToAudioTrack (const Song& song, int t) const
+{
+    if (audioTrackLinksStamp != engine.getSongStamp())
+    {
+        audioTrackLinksStamp = engine.getSongStamp();
+        audioTrackLinks.assign (song.mixer.size(), 0);
+        for (const auto& track : song.playlistTracks)
+            if (track.mode == PlaylistTrackMode::audio && track.mixerTrack > 0 && track.mixerTrack < (int) audioTrackLinks.size())
+                audioTrackLinks[(std::size_t) track.mixerTrack] = 1;
+    }
+    return t > 0 && t < (int) audioTrackLinks.size() && audioTrackLinks[(std::size_t) t] != 0;
+}
+
 juce::Rectangle<int> MixerStrips::iconArea (int t) const
 {
     const auto w = stripWidthOf (t) - spec().gap;
@@ -2120,10 +2133,19 @@ void MixerStrips::paint (juce::Graphics& g)
                          hovered (Part::fold) ? colour::textPrimary : colour::textSecondary);
         }
 
-        if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
-            ui::drawTrackIcon (g, icon, iconArea (t).toFloat(),
-                               track.muted ? bandInk.withAlpha (0.5f)
-                                           : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f));
+        // round 190rs (G-06, FL 2026 pairs/16): an insert linked to a Playlist audio track and without an icon of its own
+        // shows LYNX's waveform glyph there, as FL marks the link
+        {
+            const auto ink = [&] {
+                return track.muted ? bandInk.withAlpha (0.5f)
+                                   : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f);
+            };
+            if (const auto own = trackicons::iconFor (track.icon); own != trackicons::Icon::none)
+                ui::drawTrackIcon (g, own, iconArea (t).toFloat(), ink());
+            // (coordinator 11-26, option b: static marks are left out of repaints that don't reach them, e.g. the meters')
+            else if (g.clipRegionIntersects (iconArea (t)) && linkedToAudioTrack (song, t))
+                ui::drawTrackIconCached (g, trackicons::Icon::audio, iconArea (t).toFloat(), ink()); // (from the picture cache)
+        }
 
         if (! track.effects.empty() && sp.fxBadge)
         {

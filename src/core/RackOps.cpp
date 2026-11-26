@@ -878,6 +878,11 @@ int addChannelRouted (Song& song, ChannelDef channel, int insert)
     return (int) song.channels.size() - 1;
 }
 
+int newChannelInsert (Song& song, layoutstyle::Style style)
+{
+    return style == layoutstyle::Style::pattern ? 0 : song.claimFreeInsert();
+}
+
 int insertChannel (Song& song, int index, ChannelDef channel)
 {
     const auto count = (int) song.channels.size();

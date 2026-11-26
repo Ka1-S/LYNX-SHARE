@@ -4461,6 +4461,7 @@ void AudioEngine::undo()
     remoteHistoryError.clear();
     remoteHistoryCode = "changed";
     if (sessionHistory) sessionStep (false); else historyStep (false);
+    historyStepStamp = songStamp;
 }
 
 void AudioEngine::redo()
@@ -4470,6 +4471,7 @@ void AudioEngine::redo()
     remoteHistoryError.clear();
     remoteHistoryCode = "changed";
     if (sessionHistory) sessionStep (true); else historyStep (true);
+    historyStepStamp = songStamp;
 }
 
 namespace
@@ -4560,6 +4562,7 @@ void AudioEngine::jumpToHistory (int index)
     gestureSaved = false;
     levelsPending = false;
     publishSong();
+    historyStepStamp = songStamp;
 }
 
 void AudioEngine::setSelectedChannel (int channel)

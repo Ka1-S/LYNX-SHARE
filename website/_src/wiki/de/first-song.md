@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Diese Seite geht einmal den ganzen Weg durch: ein Drum-Pattern, eine Melodie, ein Arrangement, ein Mix und eine exportierte Datei. Jeder Abschnitt verweist auf die Seite, die sein Fenster vollständig behandelt. Wenn du an irgendeiner Stelle nichts hörst, lies [Audio einrichten](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Um einen Sound hinzuzufügen, der noch fehlt, klicke unter der letzten Zeile auf
 
 ## Mischen und einen Effekt hinzufügen
 
-1. Drücke `F9`, um den [Mixer](/wiki/mixer/) anzuzeigen. Die fünf Start-Kanäle spielen bereits über die Inserts 1 bis 5, und ein Kanal, der über das Menü `+ Kanal hinzufügen` hinzukommt, nimmt einen freien Insert. Die Zahl im Routing-Feld des Kanals im Channel Rack sagt, welchen.
+1. Drücke `F9`, um den [Mixer](/wiki/mixer/) anzuzeigen. Eine Mixer-Spur heißt auch Insert. Die fünf Start-Kanäle spielen bereits über die Inserts 1 bis 5 (Playlist-Spuren enthalten nur Clips, deshalb ist Playlist-Spur 1 nicht Insert 1), und ein Kanal, der über das Menü `+ Kanal hinzufügen` hinzukommt, spielt wie in FL Studio in den Master (sein Routing-Feld zeigt `---`). Die Zahl im Routing-Feld des Kanals im Channel Rack sagt, welchen.
 2. Um Kanäle auf eigene freie Inserts zu legen, wähle sie im Channel Rack aus und drücke `Ctrl+L`. Jeder Insert übernimmt Namen und Farbe des Kanals.
 3. Ziehe am Fader eines Inserts, um den Pegel einzustellen.
 4. Klicke auf ein Insert, um ihn zu wählen. Der Effektbereich rechts zeigt seine Effekt-Slots (zehn Zeilen, die Liste scrollt).
@@ -60,7 +60,7 @@ Um einen Sound hinzuzufügen, der noch fehlt, klicke unter der letzten Zeile auf
 | Playlist | `F5` | Blendet die Playlist ein oder aus |
 | Pattern- oder Song-Modus | `L` | Schaltet um, was `Space` abspielt |
 | Mixer | `F9` | Blendet den Mixer ein oder aus |
-| Auf freie Inserts schicken | `Ctrl+L` | Gibt den gewählten Kanälen eigene Mixer-Inserts |
+| Zu freier Mixerspur leiten | `Ctrl+L` | Gibt den gewählten Kanälen eigene Mixer-Inserts |
 | Speichern | `Ctrl+S` | Speichert das Projekt als `.lynx` |
 | Exportieren | `Ctrl+R` | Öffnet das Export-Fenster mit dem zuletzt benutzten Format |
 

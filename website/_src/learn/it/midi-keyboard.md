@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## Impostazioni MIDI
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Note suonate nel Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Seleziona uno strumento nel Channel rack e suona: lo senti subito.
+1. Seleziona uno strumento nel Channel rack (nel layout Simple o Clip-launch, seleziona una traccia) e suona: lo senti subito.
 2. Non servono driver né configurazione: le tastiere class-compliant funzionano e basta.
 
 ## Registra le note
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Premi Registra, scegli `Note e automazione`, poi premi Play e suona la tua parte.
 2. Ferma: le note sono nel Piano roll, pronte da modificare e quantizzare.
+
+## Da sapere
+
+- Per muovere una manopola con le manopole della tua tastiera, clicca con il tasto destro la manopola in LYNX, scegli `Collega a controller...` e muovi una manopola sulla tastiera. Nel layout Clip-launch, `Ctrl+M` (MIDI Map Mode) assegna più controlli in una volta. Vedi [Controller MIDI](/wiki/midi-controllers/).
 
 Vedi anche [Controller MIDI](/wiki/midi-controllers/).

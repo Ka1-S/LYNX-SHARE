@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Mulai tur
 
 ![Kartu sambutan dengan "Saya baru membuat musik"](/assets/img/learn/first-song-tour-1.webp)
 
-1. Saat pertama kali dibuka, LYNX SHARE menanyakan dari mana kamu datang. Pilih `Saya baru membuat musik`.
+1. Saat pertama kali dibuka, LYNX SHARE menanyakan dari mana kamu datang. Pilih `Saya baru membuat musik`. Terlewat? `Bantuan › Tur lagu pertama` memulai tur dari tata letak mana pun; ia bertanya dulu bila harus beralih ke tata letak sederhana.
 2. Tata letak sederhana terbuka dan kartu tur menampilkan langkah 1 dari 7. Setiap langkah menunjuk kontrol yang dipakai.
-3. Lakukan langkahnya sendiri, atau klik `Lakukan untukku`. `Next ›` lanjut tanpa mengerjakannya, `‹ Back` kembali.
+3. Lakukan langkahnya sendiri, atau klik `Lakukan untukku` (langkah loop menawarkan `Tampilkan loop` sebagai gantinya). `Next ›` lanjut tanpa mengerjakannya, `‹ Back` kembali, dan `Lewati tur` mengakhiri tur.
 
 ## Beat, kunci nada, dan instrumen
 

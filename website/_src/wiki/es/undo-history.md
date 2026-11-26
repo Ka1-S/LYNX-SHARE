@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![La ventana del historial de deshacer: seis pasos de Start a Add notes, con Mute: Kick como el actual](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Cada vez que guardas sobre un archivo de proyecto existente, la versión que se 
 |---|---|
 | `Archivo › Revertir a la última copia de seguridad...` | Reemplaza el proyecto abierto por su copia más reciente, tras preguntar. El archivo del proyecto solo cambia cuando guardas |
 | `Archivo › Abrir carpeta de autoguardado` | Muestra las copias en el gestor de archivos |
-| `Archivo › Guardar nueva versión` (`Ctrl+Alt+S`) | Guarda como `Song_2`, `Song_3` y así sucesivamente, junto al archivo actual |
+| `Archivo › Guardar nueva versión` (`Ctrl+Alt+S`; `Ctrl+N` en el Diseño Pattern) | Guarda como `Song_2`, `Song_3` y así sucesivamente, junto al archivo actual |
 
 La sección `Copia de seguridad` de `Opciones › Configuración general...` tiene estos ajustes:
 

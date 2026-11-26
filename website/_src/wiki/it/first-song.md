@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Questa pagina percorre una volta l'intero cammino: un pattern di batteria, una melodia, un arrangiamento, un mix e un file esportato. Ogni parte rimanda alla pagina che tratta la sua finestra per intero. Se a un certo punto non senti nulla, vedi [Configurazione audio](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Per aggiungere un suono che non c'è, fai clic sulla casella `+ aggiungi canale`
 
 ## Mixare e aggiungere un effetto
 
-1. Premi `F9` per mostrare il [Mixer](/wiki/mixer/). I cinque canali iniziali suonano già attraverso gli insert da 1 a 5, e un canale aggiunto dal menu `+ aggiungi canale` prende un insert libero. Il numero nella casella di instradamento del canale nel Channel Rack dice quale.
+1. Premi `F9` per mostrare il [Mixer](/wiki/mixer/). Una traccia del Mixer si chiama anche insert. I cinque canali iniziali suonano già attraverso gli insert da 1 a 5 (le tracce della Playlist contengono solo clip, quindi la traccia 1 della Playlist non è l'insert 1), e un canale aggiunto dal menu `+ aggiungi canale` suona nel Master (la sua casella di instradamento mostra `---`), come in FL Studio. Il numero nella casella di instradamento del canale nel Channel Rack dice quale.
 2. Per spostare i canali su insert liberi tutti loro, selezionali nel Channel Rack e premi `Ctrl+L`. Ogni insert prende il nome e il colore del canale.
 3. Trascina il fader di un insert per impostarne il livello.
 4. Fai clic su un insert per selezionarlo. Il pannello degli effetti a destra mostra i suoi slot effetto (dieci righe, l'elenco scorre).
@@ -60,7 +60,7 @@ Per aggiungere un suono che non c'è, fai clic sulla casella `+ aggiungi canale`
 | Playlist | `F5` | Mostra o nasconde la Playlist |
 | Modalità Pattern o Brano | `L` | Cambia ciò che suona `Space` |
 | Mixer | `F9` | Mostra o nasconde il Mixer |
-| Manda a insert liberi | `Ctrl+L` | Dà ai canali selezionati i loro insert del Mixer |
+| Instrada a una traccia mixer libera | `Ctrl+L` | Dà ai canali selezionati i loro insert del Mixer |
 | Salva | `Ctrl+S` | Salva il progetto come `.lynx` |
 | Esporta | `Ctrl+R` | Apre la finestra di esportazione con l'ultimo formato usato |
 

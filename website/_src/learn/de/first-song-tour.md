@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Die Tour starten
 
 ![Die Willkommenskarte mit "Ich bin neu in der Musikproduktion"](/assets/img/learn/first-song-tour-1.webp)
 
-1. Beim ersten Start fragt LYNX SHARE, woher du kommst. Wähle `Ich bin neu im Musikmachen`.
+1. Beim ersten Start fragt LYNX SHARE, woher du kommst. Wähle `Ich bin neu im Musikmachen`. Verpasst? `Hilfe › Tour zum ersten Song` startet die Tour aus jedem Layout; muss sie ins Einfache Layout wechseln, fragt sie vorher.
 2. Das Einfache Layout öffnet sich, und die Karte der Tour zeigt Schritt 1 von 7. Jeder Schritt zeigt auf das Bedienelement, das du brauchst.
-3. Mach den Schritt selbst oder klicke auf `Mach es für mich`. `Next ›` geht weiter, ohne ihn zu machen, `‹ Back` geht zurück.
+3. Mach den Schritt selbst oder klicke auf `Mach es für mich` (beim Loop-Schritt gibt es stattdessen `Loops anzeigen`). `Next ›` geht weiter, ohne ihn zu machen, `‹ Back` geht zurück, und `Tour überspringen` beendet die Tour.
 
 ## Beat, Tonart und Instrument
 

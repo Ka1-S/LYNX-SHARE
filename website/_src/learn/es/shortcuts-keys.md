@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## La hoja de atajos
 
 ![La hoja de atajos](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Pulsa `F1` (o `Ayuda › Atajos`): las teclas de cada ventana, las propias de FL Studio. `F1` otra vez la cierra.
+1. Pulsa `F1` (o `Ayuda › Atajos`): las teclas de cada ventana, las propias de FL Studio en el Diseño Pattern. `F1` otra vez la cierra. (En FL Studio `F1` abre el manual; en LYNX SHARE el manual está en `Ayuda › Manual (wiki)...`.)
 
 ## Cambia un atajo
 

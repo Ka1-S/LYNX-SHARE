@@ -31,6 +31,8 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+
+#include "core/SelectionKeep.h"
 #include "core/MuteKeys.h"
 #include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
@@ -1261,6 +1263,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     dropLaneProbe.setComponentID ("simple.dropLane");
     dropLaneProbe.setInterceptsMouseClicks (false, false);
     addChildComponent (dropLaneProbe);
+    addAndMakeVisible (overviewGapBlock); // (transparent: the Playlist paints the band; a press there is no ruler or strip press)
     addChildComponent (insertMarkLine); // round 190mk (DL-70)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
@@ -1990,7 +1993,8 @@ void PlaylistComponent::resized()
     for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
         c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
     pointerButton.setVisible (pointerclick::buttonShown && ! simpleHeaders && (! toolbarFitsNarrow || pointerButton.getRight() <= toolbarEnd));
-    overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
+    overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight - overviewGap);
+    overviewGapBlock.setBounds (overview.getX(), overview.getBottom(), overview.getWidth(), overviewGap);
     // FL's "+" (21 x 18 at 7 px from the left of the header panel), on the ruler's row; FL's headers only
     if (addTrackButton != nullptr)
     {
@@ -2633,6 +2637,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
         }
     }
 
+    // round 190rs: the band between the overview strip and the ruler (FL 2026: a lighter 2 px band), so the two read apart
+    if (g.clipRegionIntersects ({ headerWidth, rulerTop - overviewGap, getWidth() - headerWidth, overviewGap }))
+    {
+        g.setColour (colour::bg4);
+        g.fillRect (headerWidth, rulerTop - overviewGap, getWidth() - headerWidth, overviewGap);
+    }
+
     // --- ruler (drawn in its own coordinates, below the toolbar) -----------------
     {
         const uitrace::Scope traceRuler ("Playlist ruler", false);
@@ -3258,7 +3269,19 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     const auto nameFont = labelFont (type::body, true); // (round 190je: condensed with FL-style labels on)
                     g.setFont (nameFont);
                     const auto name = custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : tr ("Track {0}", { juce::String (t + 1) });
-                    const auto nameLeft = (int) left + 6;
+                    auto nameLeft = (int) left + 6;
+                    // round 190rs (G-06, FL 2026 pairs/92b): an instrument track without an icon of its own carries a mark
+                    // before its name, as FL's (LYNX's own keyboard glyph)
+                    if (t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::instrument
+                        && trackicons::iconFor (song.playlistTracks[(std::size_t) t].icon) == trackicons::Icon::none && trackHeight >= 16)
+                    {
+                        const auto size = (float) juce::jmin (12, trackHeight - 6);
+                        const auto midY = flTall ? (float) y + 11.0f : (float) y + (float) (trackHeight - 1) * 0.5f;
+                        if (const auto mark = juce::Rectangle<float> ((float) nameLeft, midY - size * 0.5f, size, size);
+                            g.clipRegionIntersects (mark.getSmallestIntegerContainer())) // (a playhead column leaves this static mark alone)
+                            ui::drawTrackIconCached (g, trackicons::Icon::keyboard, mark, muted ? colour::textDisabled : flHeaderInk (plate).withMultipliedAlpha (0.85f));
+                        nameLeft += (int) size + 3;
+                    }
                     const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;
                     const auto nameBox = flTall ? juce::Rectangle<int> (nameLeft, y + 3, juce::jmax (8, nameRight - nameLeft), 16)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
@@ -9926,6 +9949,44 @@ juce::Rectangle<int> PlaylistComponent::trackSharedMark (int track) const
     return { leftmost - 4 - size, led.getCentreY() - size / 2, size, size };
 }
 
+// Round 190rs (G-01, queue item 92): an unassigned Playlist track holds clips only, and each clip plays through its
+// channels' mixer inserts, so the header hint says where the track's clips are heard (FL's hint bar shows the name only;
+// the LYNX extra "Routing hints", on by default, text only)
+juce::String PlaylistComponent::routeHintFor (const Song& song, int track)
+{
+    const auto r = trackmodes::routeSummary (song, track);
+    if (! r.clips)
+        return tr ("(a lane for clips: they play through their channels' inserts)");
+    if (r.channels.empty())
+        return {};
+    if (r.channels.size() == 1)
+    {
+        const auto& ch = song.channels[(std::size_t) r.channels.front()];
+        const auto name = ch.name.empty() ? tr ("Channel {0}", { juce::String (r.channels.front() + 1) }) : juce::String::fromUTF8 (ch.name.c_str());
+        const auto t = r.inserts.front();
+        if (t == 0)
+            return tr ("plays {0} → Master", { name });
+        const auto own = t < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()).trim() : juce::String();
+        return own.isEmpty() || own == "Insert " + juce::String (t) ? tr ("plays {0} → insert {1}", { name, juce::String (t) })
+                                                                      : tr ("plays {0} → insert {1} ({2})", { name, juce::String (t), own });
+    }
+    const auto count = juce::String ((int) r.channels.size());
+    if (r.inserts.size() == 1)
+        return r.inserts.front() == 0 ? tr ("plays {0} channels → Master", { count })
+                                      : tr ("plays {0} channels → insert {1}", { count, juce::String (r.inserts.front()) });
+    juce::StringArray list;
+    for (const auto t : r.inserts)
+    {
+        if (list.size() == 8)
+        {
+            list.add ("...");
+            break;
+        }
+        list.add (t == 0 ? tr ("Master") : juce::String (t));
+    }
+    return tr ("plays {0} channels → inserts {1}", { count, list.joinIntoString (", ") });
+}
+
 bool PlaylistComponent::linkedHeaders() const
 {
     return ! simpleHeaders && engine.getSong().linkTracksToMixer;
@@ -10761,9 +10822,19 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
     menu.addItem (theme::mnemonic (tr ("Rename, color and icon..."), 'R'), [this, track] { renameTrack (track); }); // (FL's text, round 190ng)
     // (issue #201, round 190ll: a colour picked here goes to every selected track when this one is among them)
-    menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
-                         colourTracks (tracks, colour);
-                     }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
+    // round 190rs (G-15): FL 2026's "Change color..." opens the colour selector (one undo step for every selected track);
+    // LYNX's palette stays right under it as "Color palette" (add, never remove)
+    {
+        const auto mouse = juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1);
+        menu.addItem (tr ("Change color..."), [this, tracks = tracksForMenu (track), mouse, current = info.colour] {
+            ui::showColourPickerPopup (mouse, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
+                                       [this, tracks] (juce::Colour c) { colourTracks (tracks, c.getARGB()); }, {},
+                                       [this, tracks] { colourTracks (tracks, 0); });
+        });
+        menu.addSubMenu (tr ("Color palette"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
+                             colourTracks (tracks, colour);
+                         }, mouse));
+    }
     menu.addItem (tr ("Random color"), [this, tracks = tracksForMenu (track)] {
         // (FL 2026, round 190ri: each selected track its own random colour, one undo step)
         const auto& palette = lynxPalette();
@@ -13907,6 +13978,17 @@ double PlaylistComponent::keyZoomAnchorPx() const
     return zoomanchor::anchorPx (zoomanchor::Source::keys, 0.0, grid.getWidth(), playing, playhead, selected);
 }
 
+std::vector<PlaylistComponent::ClipKey> PlaylistComponent::clipKeysInOrder() const
+{
+    const auto& playlist = engine.getSong().playlist;
+    std::vector<ClipKey> keys;
+    keys.reserve (playlist.size());
+    for (const auto& c : playlist)
+        keys.push_back ({ c.track, (int) c.kind, c.kind == ClipKind::audio ? c.channel : c.kind == ClipKind::automation ? c.automation : c.pattern,
+                          c.start, c.length });
+    return keys;
+}
+
 std::vector<PlaylistComponent::ClipKey> PlaylistComponent::clipKeys (const std::vector<int>& indices) const
 {
     const auto& playlist = engine.getSong().playlist;
@@ -15627,8 +15709,15 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                 hint.value += " " + tr ("(bus: {0} mixer track(s) send into it; \"+A\" adds its volume and pan lanes)", { juce::String (sources) });
         }
         else if (linkedHeaders()) // issue #170 (round 190ib): a track that only repeats a track above it
+        {
             if (const auto repeats = autolink::repeatedTracks (song); h.track >= 0 && h.track < (int) repeats.size() && repeats[(std::size_t) h.track] >= 0)
                 hint.value += " " + tr ("(repeats Track {0}'s instruments: plays through insert {0})", { juce::String (repeats[(std::size_t) h.track] + 1) });
+        }
+        else if (routingHints && ! simpleHeaders && ! h.led && ! noteedit::isGroupHeader (song, h.track)) // round 190rs (G-01, LYNX extra): where an unassigned track is heard (a group header holds no clips of its own)
+        {
+            if (const auto route = routeHintFor (song, h.track); route.isNotEmpty())
+                hint.value += "  " + route;
+        }
         hint.hasMenu = ! h.led && ! h.arrow && ! h.arm && ! h.input;
         return hint;
     }
@@ -16300,6 +16389,17 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 
     // the clip list changed externally (undo, pattern removal...): the selection no longer applies
     const auto count = engine.getSong().playlist.size();
+
+    // round 190rs (G-31, 190rl FIX-LIST 12): over an undo / redo the selection is found again by content — clips are
+    // re-sorted after a move, so by index it lit up other clips
+    if (engine.getSongStamp() != knownClipKeysStamp)
+    {
+        auto now = clipKeysInOrder();
+        if (engine.getHistoryStepStamp() > knownClipKeysStamp && knownClipKeysStamp != 0 && drag == Drag::none && ! selection.empty())
+            setSelection (selkeep::remap (knownClipKeys, selection, now)); // (sets knownClipCount)
+        knownClipKeys = std::move (now);
+        knownClipKeysStamp = engine.getSongStamp();
+    }
 
     if (count != knownClipCount && drag == Drag::none)
     {

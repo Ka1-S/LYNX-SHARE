@@ -6,9 +6,9 @@ summary: New to making music? Choose “I'm new to making music” on the first 
 
 ![The welcome card with "I'm new to making music"](/assets/img/learn/first-song-tour-1.webp)
 
-1. On the first start, LYNX SHARE asks where you are coming from. Choose `I'm new to making music`.
+1. On the first start, LYNX SHARE asks where you are coming from. Choose `I'm new to making music`. Missed it? `Help › First-song tour` starts the tour from any layout; it asks first when it has to switch to the Simple layout.
 2. The Simple layout opens and the tour's card shows step 1 of 7. Each step points at the control to use.
-3. Do the step yourself, or click `Do it for me`. `Next ›` moves on without doing it, `‹ Back` goes back.
+3. Do the step yourself, or click `Do it for me` (the loop step offers `Show the loops` instead). `Next ›` moves on without doing it, `‹ Back` goes back, and `Skip tour` ends the tour.
 
 ## Beat, key and instrument
 

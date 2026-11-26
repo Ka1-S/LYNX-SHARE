@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## La cuadrícula y el arreglo
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. En la tarjeta de bienvenida, haz clic en `Ableton Live o Bitwig`, o elige `Ver › Estilo de diseño › Diseño de lanzamiento de clips`.
 2. Las pistas de la Playlist son las columnas de la cuadrícula de clips; cada fila es una escena. El arreglo está a la derecha.
-3. Aquí abrimos la canción de demostración de LYNX. Su arreglo tiene tres secciones: Intro, Verse y Hook.
+3. Aquí abrimos una de las canciones de demostración de LYNX (`Archivo › Nuevo desde plantilla`, o la página de inicio). Su arreglo tiene tres secciones: Intro, Verse y Hook.
 
 ## Escenas a partir de secciones
 

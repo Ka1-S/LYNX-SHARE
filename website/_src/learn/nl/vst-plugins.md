@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Pluginbeheer
 
 ![Opties › Pluginbeheer](/assets/img/learn/vst-plugins-1.webp)
 
 1. Kies `Opties › Pluginbeheer...`. Het toont elke plugin die LYNX vond, met fabrikant, formaat en bestand.
-2. `Pluginmappen...` toont waar LYNX zoekt: de standaardmappen voor VST3 en CLAP, plus elke map die je toevoegt.
+2. `Pluginmappen...` toont waar LYNX zoekt: de standaardmappen voor VST, VST3 en CLAP (op Linux ook LV2 en op een Mac AU), plus elke map die je toevoegt.
 
 ## Zoeken naar plugins
 

@@ -8,7 +8,7 @@ summary: The Ableton Live way in LYNX SHARE: a grid of clips, scenes made from t
 
 1. On the welcome card, click `Ableton Live or Bitwig`, or choose `View › Layout style › Clip-launch layout`.
 2. The Playlist's tracks are the columns of the clip grid; each row is a scene. The arrangement sits on the right.
-3. Here we open LYNX's demo song. Its arrangement has three sections: Intro, Verse and Hook.
+3. Here we open one of LYNX's demo songs (`File › New from template`, or the start page). Its arrangement has three sections: Intro, Verse and Hook.
 
 ## Scenes from sections
 

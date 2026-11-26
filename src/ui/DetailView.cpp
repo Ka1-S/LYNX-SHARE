@@ -405,7 +405,8 @@ public:
                 {
                     g.setColour (colour::textSecondary);
                     g.setFont (font (type::small));
-                    g.drawText (tr ("Drop effects here"), room, juce::Justification::centred, true);
+                    // round 190rs (G-17): Live's own words in Live's look
+                    g.drawText (theme::livelook::active() ? tr ("Drop Audio Effects Here") : tr ("Drop effects here"), room, juce::Justification::centred, true);
                 }
             }
             if (dropBefore >= 0)

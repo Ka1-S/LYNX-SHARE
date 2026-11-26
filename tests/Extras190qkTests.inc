@@ -18,7 +18,7 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 13);
+    CHECK (std::size (extras::onSince0132) == 14); // (round 190rs: playlist.routingHints)
     // the five turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #268's
     // veil; round 190ro took round 190qh's two Mixer views and PR #267's veil out again, below)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
@@ -30,7 +30,9 @@ TEST (extras190qk_default_lists)
     for (const auto* id : { "playlist.midiDrop", "theme.tracksFromAccent", "plugins.recent", "plugins.oneRow", "browser.midiPreview",
                             "browser.tabCompletes", "playlist.gainHandleFollowsView",
                             // round 190ro (ON-2): new, empty Clip-launch projects only (tests/Extras190roTests.inc)
-                            "project.clipLaunchStrips" })
+                            "project.clipLaunchStrips",
+                            // round 190rs (G-01): the routing hint on unassigned track headers (text only)
+                            "playlist.routingHints" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",

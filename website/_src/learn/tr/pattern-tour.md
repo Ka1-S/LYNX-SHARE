@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![Her kanal için bir izi olan Mixer](/assets/img/learn/pattern-tour-4.webp)
 
 1. Mixer için `F9` tuşuna basın.
-2. Her kanal bir Mixer izine çalar. Seviyeyi ayarlamak için fader'ı sürükleyin, efektleri izin slot'larına ekleyin.
-3. Soldaki Master izi, duyduğunuz ve dışa aktardığınız şeydir.
+2. Her kanal, numarası rota kutusunda yazan Mixer izine (insert) çalar: Channel Rack'te knob'lar ile kanalın adı arasındaki küçük kutu (başlangıç kanalları 1'den 5'e kadarını kullanır). Değiştirmek için kutuyu sürükleyin ya da üzerinde fare tekerleğini çevirin, o Mixer izini görmek için çift tıklayın ve seçili kanallara boş Mixer izleri vermek için `Ctrl+L` tuşlarına basın.
+3. Playlist izleri yalnızca klip tutar, bu yüzden Playlist izi 1, Mixer izi 1 değildir: bir klip nerede durursa dursun kanallarının Mixer izleri üzerinden çalar. Kliplerinin nerede duyulduğunu okumak için bir Playlist izinin başlığının üzerine gelin; Playlist menüsündeki `Playlist parçalarını mikser kanallarına bağla` onları eşleştirir, iz 1'i Mixer izi 1 ile ve böyle devam eder. Daha fazlası: [Mixer'de izleri yönlendirin](/learn/mixer-routing/).
+4. Bir Mixer izinin seviyesini ayarlamak için fader'ı sürükleyin, efektleri slot'larına ekleyin. Soldaki Master izi, duyduğunuz ve dışa aktardığınız şeydir.
 
 ## Bilmekte fayda var
 
 - `F5`, `F6`, `F7` ve `F9` tuşları, FL Studio'daki gibi dört pencereyi gösterir veya gizler. `F8` Plugin picker'ı açar.
+- Piano Roll'un altındaki şerit her notanın velocity'sini ayarlar.
 - Aynı proje Basit ve Klip başlatma yerleşimlerinde de açılır: bkz. [Bir proje, üç yerleşim](/learn/switch-layouts/).
 
 Ayrıca bkz. [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) ve [Klavye kısayolları](/wiki/shortcuts/).

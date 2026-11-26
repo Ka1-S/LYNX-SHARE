@@ -1086,6 +1086,9 @@ public:
     bool hasSessionHistory() const noexcept { return sessionHistory; }
     std::function<void (const juce::StringArray& skipped)> onSessionUndoSkipped;
     std::uint64_t getSongStamp() const noexcept { return songStamp; }
+    // Round 190rs (G-31): the song stamp an undo, a redo or a history jump published last (0: none yet). An editor that
+    // sees it newer than its last look re-finds its selection by content (core/SelectionKeep.h).
+    std::uint64_t getHistoryStepStamp() const noexcept { return historyStepStamp; }
 
     // Undo history as a list of states, oldest first: the undo steps, the current state, then the redo
     // steps. Each entry is named after what changed from the previous one (core/History.h).
@@ -1386,6 +1389,7 @@ private:
     void finishAudioTake();
     double estimatedPositionNow() const noexcept;
     AutomationDisplay automationDisplay;
+    std::uint64_t historyStepStamp = 0;     // round 190rs: see getHistoryStepStamp
     std::uint64_t songStamp = 1;            // + 1 at every publishSong (the display's tables follow the Song)
     double automationDisplayAtMs = -1.0e9;  // when it was last refreshed
     double automationDisplayCostMs = 0.0;

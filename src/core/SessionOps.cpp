@@ -1,5 +1,6 @@
 #include "core/SessionOps.h"
 #include "core/TrackClips.h"
+#include "core/PlaylistTrackOps.h"
 
 #include <algorithm>
 #include <cmath>
@@ -264,6 +265,75 @@ bool paste (Song& song, int track, int scene, const SlotClip& content)
         settings.groove = 0; // (copied from a project state whose groove is gone)
     song.clipGrid->slots[(std::size_t) slot] = std::move (settings);
     return true;
+}
+
+int duplicateTrack (Song& song, int track)
+{
+    if (track < 0)
+        return -1;
+    const auto oldChannel = track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument
+                                ? song.playlistTracks[(std::size_t) track].channel
+                                : -1;
+    pltracks::CloneOptions options;
+    options.routing = true; // (Live's copy keeps the track's output and sends)
+    const auto at = pltracks::cloneTracks (song, { track }, options);
+    if (at < 0 || ! song.clipGrid)
+        return at;
+    const auto newChannel = at < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) at].mode == PlaylistTrackMode::instrument
+                                ? song.playlistTracks[(std::size_t) at].channel
+                                : -1;
+    int scenes = (int) song.clipGrid->scenes.size();
+    for (const auto& slot : song.clipGrid->slots)
+        scenes = std::max (scenes, slot.scene + 1);
+    std::map<int, int> patternFor;
+    const auto moveNotes = [oldChannel, newChannel] (Pattern& p) {
+        for (auto& n : p.notes)
+            if (n.channel == oldChannel)
+                n.channel = newChannel;
+    };
+    for (int s = 0; s < scenes; ++s)
+    {
+        auto content = copyOf (song, track, s);
+        if (! content)
+            continue;
+        if (oldChannel >= 0 && newChannel >= 0 && oldChannel != newChannel && content->clip.kind == ClipKind::pattern)
+        {
+            if (content->trackClip)
+                moveNotes (*content->trackClip); // (the paste makes the track clip's own copy)
+            else if (const auto p = content->clip.pattern; p >= 0 && p < (int) song.patterns.size())
+            {
+                if (! patternFor.count (p))
+                {
+                    auto copy = song.patterns[(std::size_t) p];
+                    moveNotes (copy);
+                    song.patterns.push_back (std::move (copy));
+                    patternFor[p] = (int) song.patterns.size() - 1;
+                }
+                content->clip.pattern = patternFor[p];
+            }
+        }
+        paste (song, at, s, *content);
+    }
+    return at;
+}
+
+int assignTrackColourToClips (Song& song, int track)
+{
+    if (! song.clipGrid || track < 0)
+        return 0;
+    const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
+    int scenes = (int) song.clipGrid->scenes.size();
+    for (const auto& slot : song.clipGrid->slots)
+        scenes = std::max (scenes, slot.scene + 1);
+    int changed = 0;
+    for (int s = 0; s < scenes; ++s)
+        if (launcher::clipAt (*song.clipGrid, track, s) != nullptr)
+            if (auto* settings = launcher::settingsAt (*song.clipGrid, track, s); settings != nullptr && settings->colour != colour)
+            {
+                settings->colour = colour;
+                ++changed;
+            }
+    return changed;
 }
 
 std::optional<SlotClip> cut (Song& song, int track, int scene)

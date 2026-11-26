@@ -1,5 +1,5 @@
 ---
-source: f439a070b5
+source: 141ffc1370
 ---
 LYNX SHARE es una DAW gratuita y de código abierto para Windows, macOS y Linux con tres diseños en un solo programa. El predeterminado es el diseño Patrón: programas patrones en el Channel Rack y el Piano Roll, los arreglas en la Playlist y los mezclas en el Mixer. El diseño de lanzamiento de clips lanza clips y escenas desde una cuadrícula, al estilo de Ableton Live, y el diseño simple mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile. `Ver › Estilo de diseño` cambia entre ellos en cualquier momento. Abre proyectos de FL Studio (`.flp`), sets de Ableton Live (`.als`), proyectos de FL Studio Mobile (`.flm`), archivos DAWproject, proyectos de GarageBand y BandLab y módulos de tracker, exporta `.flp`, `.als`, `.dawproject` y `.flm`, y guarda su propio formato `.lynx`.
 
@@ -27,7 +27,7 @@ Los plugins de terceros son opcionales. LYNX SHARE tiene sus propios instrumento
 
 ## Guarda tu trabajo
 
-`Ctrl+S` guarda, `Ctrl+Shift+S` guarda con un nombre nuevo y `Ctrl+Alt+S` guarda una versión nueva (Song_2, Song_3 y así sucesivamente). Hay un autoguardado, accesible desde `Archivo › Abrir carpeta de autoguardado` y `Archivo › Revertir a la última copia de seguridad...`.
+`Ctrl+S` guarda, `Ctrl+Shift+S` guarda con un nombre nuevo y `Ctrl+Alt+S` guarda una versión nueva (Song_2, Song_3 y así sucesivamente); en el Diseño Pattern también lo hace `Ctrl+N`, como en FL Studio. Hay un autoguardado, accesible desde `Archivo › Abrir carpeta de autoguardado` y `Archivo › Revertir a la última copia de seguridad...`.
 
 `Archivo › Nuevo desde plantilla` tiene cuatro puntos de partida: Empty, Basic beat, Trap with 808 y House.
 

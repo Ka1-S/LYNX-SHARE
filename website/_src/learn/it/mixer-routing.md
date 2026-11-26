@@ -1,11 +1,20 @@
 ---
-source: da7928152b
+source: ee9bb943c6
 ---
+## Tracce della Playlist e tracce del Mixer
+
+Nel layout Pattern una traccia della Playlist non è una traccia del Mixer: la traccia 1 della Playlist non è la traccia 1 del Mixer (insert 1).
+
+- Le tracce della Playlist contengono solo clip. Un clip suona attraverso le tracce del Mixer dei suoi canali, ovunque si trovi.
+- Ogni canale del Channel rack suona nella traccia del Mixer il cui numero è nella sua casella di instradamento, tra le manopole e il suo nome. Trascina la casella per cambiarla; `Ctrl+L` dà ai canali selezionati delle tracce del Mixer libere.
+- Tre punti ti dicono dove va un suono: la casella di instradamento nel Channel rack, il suggerimento quando punti l'intestazione di una traccia della Playlist e il suggerimento di una traccia del Mixer, che elenca i canali che suonano in essa.
+- Vuoi abbinarle? `Collega le tracce della Playlist alle tracce del mixer` nel menu della Playlist collega la traccia 1 alla traccia 1 del Mixer, la traccia 2 alla traccia 2 del Mixer e così via, per il progetto corrente.
+
 ## Seleziona una traccia
 
 ![Il Mixer con la traccia Chords selezionata](/assets/img/learn/mixer-routing-1.webp)
 
-1. Apri il Mixer con `F9`. Ogni traccia va al Master.
+1. Apri il Mixer con `F9`. Ogni traccia del Mixer va al Master.
 2. Clicca la traccia da inviare, qui Chords.
 
 ## Instradamento e livello di mandata

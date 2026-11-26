@@ -1,5 +1,5 @@
 ---
-source: 76e742e396
+source: 9bf58111cf
 ---
 Ta strona przechodzi raz przez całą drogę: pattern perkusyjny, melodia, aranżacja, miks i wyeksportowany plik. Każda część odsyła do strony, która opisuje dane okno w całości. Jeśli w którymkolwiek momencie nic nie słychać, zajrzyj do [Ustawień audio](/wiki/audio-setup/).
 
@@ -34,7 +34,7 @@ Aby dodać brakujący dźwięk, kliknij pole `+ dodaj kanał` pod ostatnim wiers
 
 ## Zmiksuj i dodaj efekt
 
-1. Naciśnij `F9`, aby pokazać [Mixer](/wiki/mixer/). Pięć początkowych kanałów już gra przez inserty od 1 do 5, a kanał dodany z menu `+ dodaj kanał` zajmuje wolny insert. Numer w polu routingu kanału w Channel Rack mówi, który.
+1. Naciśnij `F9`, aby pokazać [Mixer](/wiki/mixer/). Ścieżkę Mixera nazywa się też insertem. Pięć początkowych kanałów już gra przez inserty od 1 do 5 (ścieżki Playlisty zawierają tylko klipy, więc ścieżka Playlisty 1 to nie insert 1), a kanał dodany z menu `+ dodaj kanał` gra do Mastera (jego pole routingu pokazuje `---`), tak jak w FL Studio. Numer w polu routingu kanału w Channel Rack mówi, który.
 2. Aby przenieść kanały na własne wolne inserty, zaznacz je w Channel Rack i naciśnij `Ctrl+L`. Każdy insert przejmuje nazwę i kolor kanału.
 3. Przeciągnij suwak inserta, aby ustawić poziom.
 4. Kliknij insert, aby go zaznaczyć. Panel efektów po prawej pokazuje jego sloty efektów (dziesięć wierszy, lista się przewija).
@@ -60,7 +60,7 @@ Aby dodać brakujący dźwięk, kliknij pole `+ dodaj kanał` pod ostatnim wiers
 | Playlist | `F5` | Pokazuje lub ukrywa Playlist |
 | Tryb Pattern lub Song | `L` | Przełącza to, co gra `Space` |
 | Mixer | `F9` | Pokazuje lub ukrywa Mixer |
-| Wyślij na wolne inserty | `Ctrl+L` | Daje zaznaczonym kanałom własne inserty Mixera |
+| Kieruj do wolnej ścieżki miksera | `Ctrl+L` | Daje zaznaczonym kanałom własne inserty Mixera |
 | Zapisz | `Ctrl+S` | Zapisuje projekt jako `.lynx` |
 | Eksport | `Ctrl+R` | Otwiera okno eksportu z ostatnio użytym formatem |
 

@@ -1,11 +1,11 @@
 ---
-source: 8ba7b7fb58
+source: 22aa96a12a
 ---
 ## Paleta poleceń
 
 ![Paleta poleceń z wpisanym „tracker”](/assets/img/learn/command-palette-1.webp)
 
-1. Naciśnij `?` (albo `Ctrl+Shift+Y`, albo kliknij lupę na pasku narzędzi).
+1. Naciśnij `?` (albo `Ctrl+Shift+Y`, albo kliknij lupę na pasku narzędzi). W układzie Clip-launch `?` pokazuje lub ukrywa Info View, tak jak w Live, więc tam naciśnij `Ctrl+Shift+Y`. Otwiera ją też `Pomoc › Szukaj akcji...`.
 2. Wpisz kilka liter tego, czego szukasz. Lista zawiera każdą akcję ze skrótem, każdy element menu z jego miejscem, przełączniki dodatków LYNX, strony Ustawień i ostatnie projekty. Akcje znajdziesz też po angielskich nazwach w każdym języku.
 3. Wybierz wiersz strzałkami i naciśnij `Enter` albo kliknij go dwukrotnie. `Esc` zamyka paletę.
 

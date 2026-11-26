@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Het Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![De Mixer met een track per kanaal](/assets/img/learn/pattern-tour-4.webp)
 
 1. Druk op `F9` voor de Mixer.
-2. Elk kanaal speelt naar een Mixer-track. Sleep een fader om het niveau in te stellen en voeg effecten toe in de slots van de track.
-3. De Master-track links is wat je hoort en exporteert.
+2. Elk kanaal speelt naar de Mixer-track (insert) waarvan het nummer in zijn routevak staat: het kleine vak tussen de knoppen en de naam van het kanaal in het Channel Rack (de startkanalen gebruiken 1 tot 5). Sleep het vak of draai het muiswiel erboven om het te wijzigen, dubbelklik erop om die Mixer-track te zien en druk op `Ctrl+L` om de geselecteerde kanalen vrije Mixer-tracks te geven.
+3. Playlist-tracks bevatten alleen clips, dus Playlist-track 1 is niet Mixer-track 1: een clip speelt via de Mixer-tracks van zijn kanalen, waar hij ook staat. Wijs naar de kop van een Playlist-track om te lezen waar de clips te horen zijn; `Playlist-sporen koppelen aan mixersporen` in het Playlist-menu maakt er paren van, track 1 met Mixer-track 1 enzovoort. Meer in [Tracks routeren in de Mixer](/learn/mixer-routing/).
+4. Sleep een fader om het niveau van een Mixer-track in te stellen en voeg effecten toe in de slots. De Master-track links is wat je hoort en exporteert.
 
 ## Goed om te weten
 
 - `F5`, `F6`, `F7` en `F9` tonen of verbergen de vier vensters, zoals in FL Studio. `F8` opent de Plugin-kiezer.
+- De baan onderaan de Piano Roll stelt de velocity van elke noot in.
 - Hetzelfde project opent ook in de Eenvoudige en de Clipstart-lay-out: zie [Eén project, drie lay-outs](/learn/switch-layouts/).
 
 Zie ook [Komend van FL Studio](/wiki/coming-from-fl-studio/) en [Sneltoetsen](/wiki/shortcuts/).

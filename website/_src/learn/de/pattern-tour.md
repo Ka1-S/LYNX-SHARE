@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Das Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![Der Mixer mit einer Spur pro Kanal](/assets/img/learn/pattern-tour-4.webp)
 
 1. Drücke `F9` für den Mixer.
-2. Jeder Kanal spielt auf eine Mixer-Spur. Ziehe an einem Fader, um den Pegel einzustellen, und füge Effekte in den Slots der Spur hinzu.
-3. Die Master-Spur links ist das, was du hörst und exportierst.
+2. Jeder Kanal spielt auf die Mixer-Spur (Insert), deren Nummer in seinem Routing-Feld steht: das kleine Feld zwischen den Reglern und dem Namen des Kanals im Channel Rack (die Starter-Kanäle nutzen 1 bis 5). Ziehe am Feld oder dreh das Mausrad darüber, um sie zu ändern, doppelklicke darauf, um diese Mixer-Spur zu sehen, und drücke `Ctrl+L`, um den gewählten Kanälen freie Mixer-Spuren zu geben.
+3. Playlist-Spuren enthalten nur Clips, deshalb ist Playlist-Spur 1 nicht Mixer-Spur 1: Ein Clip spielt über die Mixer-Spuren seiner Kanäle, egal wo er liegt. Zeige auf den Kopf einer Playlist-Spur, um zu lesen, wo ihre Clips zu hören sind; `Playlist-Spuren mit Mixer-Spuren verknüpfen` im Playlist-Menü bildet Paare, Spur 1 mit Mixer-Spur 1 und so weiter. Mehr unter [Spuren im Mixer routen](/learn/mixer-routing/).
+4. Ziehe an einem Fader, um den Pegel einer Mixer-Spur einzustellen, und füge Effekte in ihre Slots ein. Die Master-Spur links ist das, was du hörst und exportierst.
 
 ## Gut zu wissen
 
 - `F5`, `F6`, `F7` und `F9` blenden die vier Fenster ein und aus, wie in FL Studio. `F8` öffnet den Plugin-Picker.
+- Die Bahn unten im Piano Roll stellt die Velocity jeder Note ein.
 - Dasselbe Projekt öffnet sich auch im Einfachen und im Clip-Start-Layout: siehe [Ein Projekt, drei Layouts](/learn/switch-layouts/).
 
 Siehe auch [Umstieg von FL Studio](/wiki/coming-from-fl-studio/) und [Tastenkürzel](/wiki/shortcuts/).

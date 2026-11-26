@@ -13,6 +13,10 @@ namespace lynx::ui
 {
 // Draws `icon` fitted (centred, square) into `area`.
 void drawTrackIcon (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<float> area, juce::Colour colour);
+// Round 190rs (G-06): the same glyph from a small picture cache (key: icon, pixel size, colour), for marks drawn on every
+// row of a 30 Hz view (the channel rack's buttons, the Playlist's headers, the Mixer's strips): one image blit instead of
+// a path fill and stroke per row and frame. Message thread.
+void drawTrackIconCached (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<float> area, juce::Colour colour);
 
 // The icon picker (FL's "Change icon..." of mixer tracks, channels and Playlist tracks; FL's rename dialog's F5 icon
 // menu): a grid of LYNX's icons in a pop-up at `screenArea`, the current one (`currentFlIndex`, FL's index) marked,

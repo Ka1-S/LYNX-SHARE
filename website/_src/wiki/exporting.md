@@ -105,6 +105,7 @@ The `.dawproject` holds tracks, folders, clips, notes, audio with its warp marke
 - `Also write a video with this mix` appears only when the project has a video track, and it needs FFmpeg.
 - `Render through the hardware in real time` appears only when the project has an active hardware insert. That export takes as long as the song.
 - Render to audio, where an insert is bounced to an audio clip, plays about 5 dB louder than the insert it replaces in this version.
+- To move a project to another computer, `File › Collect all and save` copies the samples and recordings from outside the project's folder into it (`File › Always collect and save` does it on every save), and `File › Export › Zipped loop package...` puts the project and every file it uses in one `.zip`.
 
 ## Related
 

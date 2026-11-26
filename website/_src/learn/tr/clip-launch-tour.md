@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## Izgara ve aranjman
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Karşılama kartında `Ableton Live veya Bitwig` düğmesine tıklayın ya da `Görünüm › Yerleşim stili › Klip başlatma iş akışı` yolunu seçin.
 2. Playlist'in izleri klip ızgarasının sütunlarıdır; her satır bir sahnedir. Aranjman sağda durur.
-3. Burada LYNX'in demo şarkısını açıyoruz. Aranjmanında üç bölüm var: Intro, Verse ve Hook.
+3. Burada LYNX'in demo şarkılarından birini açıyoruz (`Dosya › Şablondan yeni` ya da başlangıç sayfası). Aranjmanında üç bölüm var: Intro, Verse ve Hook.
 
 ## Bölümlerden sahneler
 

@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![La finestra Gestisci scorciatoie: un elenco di azioni con ricerca e i tasti di ciascuna](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Alcuni di questi tasti fanno altro dentro un editor che ha il focus. Nel Piano R
 
 | Tasto | Cosa fa |
 |---|---|
-| `Ctrl+N` | Nuovo progetto |
+| `Ctrl+N` | Salva nuova versione nel layout Pattern (come in FL Studio); Nuovo progetto nei layout Clip-launch e Simple |
 | `Ctrl+O` | Apri progetto |
 | `Ctrl+S` | Salva |
 | `Ctrl+Shift+S` | Salva come |
-| `Ctrl+Alt+S` | Salva nuova versione |
+| `Ctrl+Alt+S` | Salva nuova versione (ogni layout) |
 | `Ctrl+R` | Esporta audio |
 | `Ctrl+Shift+R` | Esporta un file MP3 |
 | `Ctrl+Shift+M` | Esporta un file MIDI |
@@ -118,7 +118,7 @@ Questi tasti funzionano solo nel flusso a lancio di clip.
 | `Alt+C` | Clona i canali selezionati |
 | `Alt+Del` | Elimina i canali selezionati |
 | `Alt+G` | Raggruppa i canali selezionati |
-| `Ctrl+L` | Manda i canali selezionati a insert del Mixer liberi |
+| `Ctrl+L` | Instrada a una traccia mixer libera (i canali selezionati ricevono insert del Mixer liberi) |
 | `Ctrl+K` | Corsie del grafico degli step attive o disattive |
 | `1` a `0` | Silenzia o riattiva i canali da 1 a 10 |
 | `Ctrl+1` a `Ctrl+0` | Mette in solo i canali da 1 a 10 |
@@ -239,8 +239,8 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `F2` | Rinomina e colora l'insert selezionato |
 | `S` | Mette in solo gli insert selezionati |
 | `Alt+S` | Mette in solo gli insert selezionati con gli insert che li alimentano |
-| `Ctrl+L` | Collega i canali selezionati all'insert selezionato |
-| `Ctrl+Shift+L` | Collega i canali selezionati agli insert a partire da quello selezionato |
+| `Ctrl+L` | Instrada i canali selezionati su questa traccia (l'insert selezionato) |
+| `Ctrl+Shift+L` | Instrada i canali selezionati a partire da questa traccia (l'insert selezionato) |
 | `Alt+L` | Seleziona i canali collegati all'insert selezionato |
 | `Del` | Elimina gli insert selezionati. LYNX SHARE chiede prima conferma |
 | `Ctrl+E` | Apre l'editor audio |

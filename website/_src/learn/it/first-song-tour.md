@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Avvia il tour
 
 ![La scheda di benvenuto con "Sono nuovo nella musica"](/assets/img/learn/first-song-tour-1.webp)
 
-1. Al primo avvio, LYNX SHARE chiede da dove vieni. Scegli `Sono alle prime armi con la musica`.
+1. Al primo avvio, LYNX SHARE chiede da dove vieni. Scegli `Sono alle prime armi con la musica`. Te lo sei perso? `Aiuto › Tour della prima canzone` avvia il tour da qualsiasi layout; se deve passare al layout Simple, prima lo chiede.
 2. Si apre il layout Simple e la scheda del tour mostra il passo 1 di 7. Ogni passo indica il controllo da usare.
-3. Fai il passo da solo, oppure clicca `Fallo per me`. `Next ›` va avanti senza farlo, `‹ Back` torna indietro.
+3. Fai il passo da solo, oppure clicca `Fallo per me` (il passo del loop offre invece `Mostra i loop`). `Next ›` va avanti senza farlo, `‹ Back` torna indietro e `Salta il tour` termina il tour.
 
 ## Beat, tonalità e strumento
 

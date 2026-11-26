@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![Mixer dengan satu track per channel](/assets/img/learn/pattern-tour-4.webp)
 
 1. Tekan `F9` untuk Mixer.
-2. Setiap channel diputar ke satu track Mixer. Seret fader untuk mengatur levelnya, dan tambahkan efek di slot track.
-3. Track Master di sebelah kiri adalah yang kamu dengar dan yang kamu ekspor.
+2. Setiap channel diputar ke track Mixer (insert) yang nomornya ada di kotak rutenya: kotak kecil di antara kenop dan nama channel di Channel rack (channel awal memakai 1 sampai 5). Seret kotak itu atau putar roda mouse di atasnya untuk mengubahnya, klik dua kali untuk melihat track Mixer itu, dan tekan `Ctrl+L` untuk memberi channel terpilih track Mixer yang kosong.
+3. Track Playlist hanya berisi klip, jadi track Playlist 1 bukan track Mixer 1: sebuah klip diputar lewat track Mixer dari channel-nya di mana pun letaknya. Tunjuk judul track Playlist untuk membaca di mana klipnya terdengar; `Tautkan trek Playlist ke trek mixer` di menu Playlist memasangkannya, track 1 dengan track Mixer 1, dan seterusnya. Selengkapnya di [Rutekan track di Mixer](/learn/mixer-routing/).
+4. Seret fader untuk mengatur level sebuah track Mixer, dan tambahkan efek di slot-nya. Track Master di sebelah kiri adalah yang kamu dengar dan yang kamu ekspor.
 
 ## Perlu diketahui
 
 - `F5`, `F6`, `F7`, dan `F9` menampilkan atau menyembunyikan keempat jendela itu, seperti di FL Studio. `F8` membuka Plugin picker.
+- Lajur di bagian bawah Piano roll mengatur velocity setiap not.
 - Proyek yang sama juga terbuka di tata letak sederhana dan peluncuran klip: lihat [Satu proyek, tiga tata letak](/learn/switch-layouts/).
 
 Lihat juga [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/) dan [Pintasan keyboard](/wiki/shortcuts/).

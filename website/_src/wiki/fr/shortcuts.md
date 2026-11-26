@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![La fenêtre Gérer les raccourcis : une liste d'actions avec recherche et les touches de chacune](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Certaines de ces touches font autre chose dans un éditeur qui a le focus. Dans 
 
 | Touche | Effet |
 |---|---|
-| `Ctrl+N` | Nouveau projet |
+| `Ctrl+N` | Enregistrer une nouvelle version dans la disposition Pattern (comme dans FL Studio) ; Nouveau projet dans les dispositions Clip-launch et Simple |
 | `Ctrl+O` | Ouvrir un projet |
 | `Ctrl+S` | Enregistrer |
 | `Ctrl+Shift+S` | Enregistrer sous |
-| `Ctrl+Alt+S` | Enregistrer une nouvelle version |
+| `Ctrl+Alt+S` | Enregistrer une nouvelle version (toutes les dispositions) |
 | `Ctrl+R` | Exporter l'audio |
 | `Ctrl+Shift+R` | Exporter un fichier MP3 |
 | `Ctrl+Shift+M` | Exporter un fichier MIDI |
@@ -118,7 +118,7 @@ Ces touches ne fonctionnent que dans la disposition par lancement de clips.
 | `Alt+C` | Clone les canaux sélectionnés |
 | `Alt+Del` | Supprime les canaux sélectionnés |
 | `Alt+G` | Groupe les canaux sélectionnés |
-| `Ctrl+L` | Envoie les canaux sélectionnés vers des inserts du Mixer libres |
+| `Ctrl+L` | Router vers une piste de mixage libre (les canaux sélectionnés reçoivent des inserts du Mixer libres) |
 | `Ctrl+K` | Affiche ou masque les couloirs de graphe des steps |
 | `1` à `0` | Coupe ou rétablit le son des canaux 1 à 10 |
 | `Ctrl+1` à `Ctrl+0` | Met en solo les canaux 1 à 10 |
@@ -239,8 +239,8 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `F2` | Renomme et colore l'insert sélectionné |
 | `S` | Met en solo les inserts sélectionnés |
 | `Alt+S` | Met en solo les inserts sélectionnés avec les inserts qui les alimentent |
-| `Ctrl+L` | Lie les canaux sélectionnés à l'insert sélectionné |
-| `Ctrl+Shift+L` | Lie les canaux sélectionnés à des inserts à partir de celui qui est sélectionné |
+| `Ctrl+L` | Router les canaux sélectionnés vers cette piste (l'insert sélectionné) |
+| `Ctrl+Shift+L` | Router les canaux sélectionnés à partir de cette piste (l'insert sélectionné) |
 | `Alt+L` | Sélectionne les canaux liés à l'insert sélectionné |
 | `Del` | Supprimer les inserts sélectionnés. LYNX SHARE demande d'abord confirmation |
 | `Ctrl+E` | Ouvre l'éditeur audio |

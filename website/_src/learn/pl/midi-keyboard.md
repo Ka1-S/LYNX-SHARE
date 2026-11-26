@@ -1,5 +1,5 @@
 ---
-source: 76bd1dd297
+source: 9c0b19dee4
 ---
 ## Ustawienia MIDI
 
@@ -13,7 +13,7 @@ source: 76bd1dd297
 
 ![Nuty zagrane do Piano roll](/assets/img/learn/midi-keyboard-2.webp)
 
-1. Zaznacz instrument w Channel Rack i graj: słyszysz go od razu.
+1. Zaznacz instrument w Channel Rack (w układzie Prostym lub Clip-launch zaznacz ścieżkę) i graj: słyszysz go od razu.
 2. Nie potrzebujesz sterownika ani konfiguracji: klawiatury class-compliant po prostu działają.
 
 ## Nagraj nuty
@@ -22,5 +22,9 @@ source: 76bd1dd297
 
 1. Naciśnij Nagrywaj, wybierz `Nuty i automatyka`, potem naciśnij Odtwórz i zagraj swoją partię.
 2. Zatrzymaj: nuty są w Piano roll, gotowe do edycji i kwantyzacji.
+
+## Warto wiedzieć
+
+- Żeby poruszać gałką za pomocą gałek klawiatury, kliknij gałkę w LYNX prawym przyciskiem, wybierz `Powiąż z kontrolerem...` i porusz gałką na klawiaturze. W układzie Clip-launch `Ctrl+M` (tryb MIDI Map) przypisuje kilka kontrolek naraz. Zobacz [Kontrolery MIDI](/wiki/midi-controllers/).
 
 Zobacz też [Kontrolery MIDI](/wiki/midi-controllers/).

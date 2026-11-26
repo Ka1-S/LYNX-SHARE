@@ -1,5 +1,5 @@
 ---
-source: ebe3befa50
+source: 53b620ca2d
 ---
 ## 어디서 넘어오는지 고르기
 
@@ -10,6 +10,8 @@ source: ebe3befa50
    - `BandLab, FL Studio Mobile 또는 GarageBand`: 간단한 레이아웃. 트랙, 루프, 빠른 녹음이 한 창에 모여 있습니다.
    - `FL Studio`: 패턴 레이아웃. 채널 랙, 피아노 롤, 플레이리스트, 믹서가 있습니다.
    - `Ableton Live 또는 Bitwig`: 클립 실행 레이아웃. 클립과 씬의 그리드가 있습니다.
+   - `Logic, Cubase, Reaper, Pro Tools 또는 Studio One`: 믹서를 바로 쓸 수 있는 간단한 레이아웃. 타임라인에 악기마다 트랙 하나가 놓입니다.
+   - `음악 만들기가 처음이에요`: 간단한 레이아웃과 짧은 첫 곡 투어.
 3. 하나를 클릭합니다. 여기서는 BandLab을 고릅니다. 간단한 레이아웃이 열리고 드럼 트랙에 스타터 비트가 놓입니다.
 
 ## 레이아웃 바꾸기

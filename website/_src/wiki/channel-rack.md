@@ -76,7 +76,7 @@ These work while the Channel rack has focus.
 | Clone | `Alt+C` | Clones the selected channels |
 | Delete | `Alt+Del` | Deletes the selected channels |
 | Group | `Alt+G` | Puts the selected channels in a new filter group |
-| Route to Mixer | `Ctrl+L` | Sends the selected channels to free Mixer inserts |
+| Route to free mixer track | `Ctrl+L` | Sends the selected channels to free Mixer inserts |
 | Mute | `1` to `0` | Mutes or unmutes channels 1 to 10 |
 | Solo | `Ctrl+1` to `Ctrl+0` | Solos channels 1 to 10 |
 | Graph lane | `Ctrl+K` | Shows or hides the graph lane |

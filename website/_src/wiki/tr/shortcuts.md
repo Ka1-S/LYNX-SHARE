@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![Kısayolları yönet penceresi: her eylemin tuşlarıyla aranabilir bir liste](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Bu tuşların bazıları odaktaki bir editörde başka bir şey yapar. Piano Rol
 
 | Tuş | Ne yapar |
 |---|---|
-| `Ctrl+N` | Yeni proje |
+| `Ctrl+N` | Pattern yerleşiminde yeni sürüm kaydet (FL Studio'daki gibi); Klip başlatma ve Basit yerleşimlerde yeni proje |
 | `Ctrl+O` | Proje aç |
 | `Ctrl+S` | Kaydet |
 | `Ctrl+Shift+S` | Farklı kaydet |
-| `Ctrl+Alt+S` | Yeni sürüm kaydet |
+| `Ctrl+Alt+S` | Yeni sürüm kaydet (her yerleşimde) |
 | `Ctrl+R` | Ses dışa aktar |
 | `Ctrl+Shift+R` | MP3 dosyası dışa aktar |
 | `Ctrl+Shift+M` | MIDI dosyası dışa aktar |
@@ -118,7 +118,7 @@ Bu tuşlar yalnızca Klip başlatma iş akışında çalışır.
 | `Alt+C` | Seçili kanalları klonla |
 | `Alt+Del` | Seçili kanalları sil |
 | `Alt+G` | Seçili kanalları grupla |
-| `Ctrl+L` | Seçili kanalları boş Mixer insert'lerine gönder |
+| `Ctrl+L` | Boş mikser kanalına yönlendir (seçili kanallar boş Mixer insert'leri alır) |
 | `Ctrl+K` | Step grafik şeritlerini aç veya kapat |
 | `1` - `0` | 1 ile 10 arası kanalları sustur veya seslerini aç |
 | `Ctrl+1` - `Ctrl+0` | 1 ile 10 arası kanalları solo yap |
@@ -239,8 +239,8 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `F2` | Seçili insert'i yeniden adlandır ve renklendir |
 | `S` | Seçili insert'leri solo yap |
 | `Alt+S` | Seçili insert'leri, onları besleyen insert'lerle birlikte solo yap |
-| `Ctrl+L` | Seçili kanalları seçili insert'e bağla |
-| `Ctrl+Shift+L` | Seçili kanalları seçili olandan başlayarak insert'lere bağla |
+| `Ctrl+L` | Seçili kanalları bu mixer kanalına yönlendir (seçili insert) |
+| `Ctrl+Shift+L` | Seçili kanalları bu mixer kanalından başlayarak yönlendir (seçili insert) |
 | `Alt+L` | Seçili insert'e bağlı kanalları seç |
 | `Del` | Seçili insert'leri sil. LYNX SHARE önce sorar |
 | `Ctrl+E` | Ses editörünü aç |

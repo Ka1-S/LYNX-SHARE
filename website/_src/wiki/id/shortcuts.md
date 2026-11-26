@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![Jendela Kelola pintasan: daftar aksi yang bisa dicari beserta tombol masing-masing](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Beberapa tombol ini melakukan hal lain di dalam editor yang sedang fokus. Di Pia
 
 | Tombol | Fungsinya |
 |---|---|
-| `Ctrl+N` | Proyek baru |
+| `Ctrl+N` | Simpan versi baru di tata letak Pattern (seperti di FL Studio); Proyek baru di tata letak peluncuran klip dan sederhana |
 | `Ctrl+O` | Buka proyek |
 | `Ctrl+S` | Simpan |
 | `Ctrl+Shift+S` | Simpan sebagai |
-| `Ctrl+Alt+S` | Simpan versi baru |
+| `Ctrl+Alt+S` | Simpan versi baru (setiap tata letak) |
 | `Ctrl+R` | Ekspor audio |
 | `Ctrl+Shift+R` | Ekspor file MP3 |
 | `Ctrl+Shift+M` | Ekspor file MIDI |
@@ -118,7 +118,7 @@ Tombol-tombol ini hanya berfungsi di alur kerja Peluncuran klip.
 | `Alt+C` | Kloning channel terpilih |
 | `Alt+Del` | Hapus channel terpilih |
 | `Alt+G` | Kelompokkan channel terpilih |
-| `Ctrl+L` | Kirim channel terpilih ke insert Mixer yang kosong |
+| `Ctrl+L` | Rutekan ke trek mixer kosong (channel terpilih mendapat insert Mixer yang kosong) |
 | `Ctrl+K` | Jalur grafik step aktif atau mati |
 | `1` sampai `0` | Mute atau batalkan mute channel 1 sampai 10 |
 | `Ctrl+1` sampai `Ctrl+0` | Solo channel 1 sampai 10 |
@@ -239,8 +239,8 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `F2` | Ganti nama dan warna insert terpilih |
 | `S` | Solo insert terpilih |
 | `Alt+S` | Solo insert terpilih beserta insert yang mengumpannya |
-| `Ctrl+L` | Tautkan channel terpilih ke insert terpilih |
-| `Ctrl+Shift+L` | Tautkan channel terpilih ke insert mulai dari insert terpilih |
+| `Ctrl+L` | Rutekan channel terpilih ke track ini (insert terpilih) |
+| `Ctrl+Shift+L` | Rutekan channel terpilih mulai dari track ini (insert terpilih) |
 | `Alt+L` | Pilih channel yang tertaut ke insert terpilih |
 | `Del` | Menghapus insert terpilih. LYNX SHARE bertanya dulu |
 | `Ctrl+E` | Buka editor audio |

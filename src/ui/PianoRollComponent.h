@@ -1007,6 +1007,11 @@ private:
     void eventPaneChanged(); // after a change: lay out, repaint, show the percentage, remember it
     int knownPattern = -1, knownChannel = -1;
     std::size_t knownNoteCount = 0;
+    // round 190rs (G-31): the current pattern's note keys in index order as last seen, and the song stamp they belong to
+    // (an undo / redo re-finds the selection by them, core/SelectionKeep.h)
+    std::vector<NoteKey> knownKeys;
+    std::uint64_t knownKeysStamp = 0;
+    std::vector<NoteKey> keysInOrder() const;
 
     static inline std::vector<Note> clipboard;
 

@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Empieza el tour
 
 ![La tarjeta de bienvenida con "Soy nuevo en la música"](/assets/img/learn/first-song-tour-1.webp)
 
-1. En el primer inicio, LYNX SHARE pregunta de dónde vienes. Elige `Estoy empezando con la música`.
+1. En el primer inicio, LYNX SHARE pregunta de dónde vienes. Elige `Estoy empezando con la música`. ¿Te lo saltaste? `Ayuda › Tour de la primera canción` inicia el tour desde cualquier diseño; pregunta antes cuando tiene que cambiar al diseño Simple.
 2. Se abre el diseño Simple y la tarjeta del tour muestra el paso 1 de 7. Cada paso señala el control que debes usar.
-3. Haz el paso tú mismo o pulsa `Hazlo por mí`. `Next ›` avanza sin hacerlo, `‹ Back` vuelve atrás.
+3. Haz el paso tú mismo o pulsa `Hazlo por mí` (el paso del loop ofrece `Mostrar los loops` en su lugar). `Next ›` avanza sin hacerlo, `‹ Back` vuelve atrás y `Omitir tour` termina el tour.
 
 ## Beat, tonalidad e instrumento
 

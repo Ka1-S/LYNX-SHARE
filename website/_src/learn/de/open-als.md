@@ -1,12 +1,12 @@
 ---
-source: c0332e1e43
+source: ab4773af9c
 ---
 ## Die .als öffnen
 
 ![Datei › Öffnen...](/assets/img/learn/open-als-1.webp)
 
 1. Wähle `Datei › Öffnen...` (`Ctrl+O`) und such die `.als`-Datei des Sets in ihrem Projektordner aus.
-2. LYNX SHARE öffnet sie im Clip-Start-Layout. Ableton Live selbst wird nicht gebraucht, und die `.als` wird nie verändert.
+2. LYNX SHARE öffnet sie. Im Clip-Start-Layout (`Ansicht › Layout-Stil`) liegen die Session-Clips wie in Live im Clip-Raster; das Öffnen einer Datei ändert das Layout nicht. Ableton Live selbst wird nicht gebraucht, und die `.als` wird nie verändert.
 
 ## Was übernommen wird
 

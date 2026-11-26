@@ -1,5 +1,5 @@
 ---
-source: 3043ff188d
+source: 9aa368f62c
 ---
 ![La ventana Gestionar atajos: una lista con búsqueda de acciones con las teclas de cada una](/assets/img/wiki/shortcuts.webp)
 
@@ -42,11 +42,11 @@ Algunas de estas teclas hacen otra cosa dentro de un editor que tiene el foco. E
 
 | Tecla | Qué hace |
 |---|---|
-| `Ctrl+N` | Nuevo proyecto |
+| `Ctrl+N` | Guardar nueva versión en el Diseño Pattern (como en FL Studio); Nuevo proyecto en los diseños Clip-launch y Simple |
 | `Ctrl+O` | Abrir proyecto |
 | `Ctrl+S` | Guardar |
 | `Ctrl+Shift+S` | Guardar como |
-| `Ctrl+Alt+S` | Guardar nueva versión |
+| `Ctrl+Alt+S` | Guardar nueva versión (todos los diseños) |
 | `Ctrl+R` | Exportar audio |
 | `Ctrl+Shift+R` | Exportar un archivo MP3 |
 | `Ctrl+Shift+M` | Exportar un archivo MIDI |
@@ -118,7 +118,7 @@ Estas teclas funcionan solo en el diseño de lanzamiento de clips.
 | `Alt+C` | Clona los canales seleccionados |
 | `Alt+Del` | Elimina los canales seleccionados |
 | `Alt+G` | Agrupa los canales seleccionados |
-| `Ctrl+L` | Envía los canales seleccionados a inserts libres del Mixer |
+| `Ctrl+L` | Enrutar a pista de mezclador libre (los canales seleccionados reciben inserts libres del Mixer) |
 | `Ctrl+K` | Activa o desactiva los carriles de gráfico de pasos |
 | `1` a `0` | Silencia o activa los canales 1 a 10 |
 | `Ctrl+1` a `Ctrl+0` | Pone en solo los canales 1 a 10 |
@@ -239,8 +239,8 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `F2` | Renombra y colorea el insert seleccionado |
 | `S` | Pone en solo los inserts seleccionados |
 | `Alt+S` | Pone en solo los inserts seleccionados junto con los inserts que los alimentan |
-| `Ctrl+L` | Vincula los canales seleccionados al insert seleccionado |
-| `Ctrl+Shift+L` | Vincula los canales seleccionados a inserts a partir del seleccionado |
+| `Ctrl+L` | Enrutar los canales seleccionados a esta pista (el insert seleccionado) |
+| `Ctrl+Shift+L` | Enrutar los canales seleccionados a partir de esta pista (el insert seleccionado) |
 | `Alt+L` | Selecciona los canales vinculados al insert seleccionado |
 | `Del` | Elimina los inserts seleccionados. LYNX SHARE pregunta antes |
 | `Ctrl+E` | Abre el editor de audio |

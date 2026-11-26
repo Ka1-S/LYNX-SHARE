@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![El Channel Rack con filas de pasos](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Funcionan mientras el Channel Rack tiene el foco.
 | Clonar | `Alt+C` | Clona los canales seleccionados |
 | Eliminar | `Alt+Del` | Elimina los canales seleccionados |
 | Agrupar | `Alt+G` | Pone los canales seleccionados en un grupo de filtro nuevo |
-| Enrutar al Mixer | `Ctrl+L` | Envía los canales seleccionados a inserts libres del Mixer |
+| Enrutar a pista de mezclador libre | `Ctrl+L` | Envía los canales seleccionados a inserts libres del Mixer |
 | Silenciar | `1` a `0` | Silencia o activa los canales 1 a 10 |
 | Solo | `Ctrl+1` a `Ctrl+0` | Pone en solo los canales 1 a 10 |
 | Carril de gráfico | `Ctrl+K` | Muestra u oculta el carril de gráfico |

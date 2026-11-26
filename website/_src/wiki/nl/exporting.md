@@ -1,5 +1,5 @@
 ---
-source: b05790879f
+source: 56f7378df1
 ---
 ![Het exportvenster met WAV gekozen: bereik, staart en bestanden links, formaat rechts, mixopties eronder](/assets/img/wiki/export.webp)
 
@@ -103,6 +103,7 @@ De `.dawproject` bevat tracks, mappen, clips, noten, audio met zijn warpmarkers,
 - `Ook een video met deze mix schrijven` verschijnt alleen als het project een videotrack heeft, en het heeft FFmpeg nodig.
 - `Realtime via de hardware renderen` verschijnt alleen als het project een actieve hardware-insert heeft. Die export duurt zo lang als het nummer.
 - Renderen naar audio, waarbij een insert naar een audioclip wordt gebounced, klinkt in deze versie ongeveer 5 dB luider dan de insert die het vervangt.
+- Om een project naar een andere computer te verhuizen, kopieert `Bestand › Alles verzamelen en opslaan` de samples en opnames van buiten de projectmap erin (`Bestand › Altijd verzamelen en opslaan` doet dat bij elke keer opslaan), en zet `Bestand › Exporteren › Gezipt looppakket...` het project en elk bestand dat het gebruikt in één `.zip`.
 
 ## Gerelateerd
 

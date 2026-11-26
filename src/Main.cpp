@@ -3928,6 +3928,23 @@ public:
             return;
         }
 
+        // --emptyhint313shot <prefix> (issue #313, round 190rs): the empty-state card while the view zooms: src/Q5fix190rsShot.inc
+        if (args.contains ("--emptyhint313shot"))
+        {
+            setApplicationReturnValue (runEmptyHint313Shot (args[args.indexOf ("--emptyhint313shot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --q5fix190rsshot <prefix> <project.flp> (round 190rs, 0.1.32 stage Q5 fixes): src/Q5fix190rsShot.inc
+        if (args.contains ("--q5fix190rsshot"))
+        {
+            const auto at = args.indexOf ("--q5fix190rsshot");
+            setApplicationReturnValue (runQ5fix190rsShot (args[at + 1].unquoted(), args[at + 2].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --extras190roshot <prefix> (round 190ro: LYNX extras review 2, the gain handle in view, the Mixer at FL's height, the
         // Clip-launch strips of new projects): src/Extras190roShot.inc
         if (args.contains ("--extras190roshot"))
@@ -22077,6 +22094,7 @@ private:
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "Extras190qkShot.inc" // round 190qk (the LYNX extras on by default)
 #include "Extras190roShot.inc" // round 190ro (LYNX extras review 2)
+#include "Q5fix190rsShot.inc" // round 190rs (0.1.32 stage Q5 fixes)
 #include "Optionsux190qx.inc" // round 190qx (the owner's "make the options easy")
 #include "SettingsShots190qx.inc" // round 190qx (Settings pages before / after)
 #include "Polish190qwShot.inc" // round 190qw (design polish pass, the Soft look)

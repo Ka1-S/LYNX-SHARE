@@ -1,13 +1,13 @@
 ---
-source: d75e795e31
+source: 20141e69c9
 ---
 ## Start de rondleiding
 
 ![De welkomstkaart met "Ik ben nieuw met muziek maken"](/assets/img/learn/first-song-tour-1.webp)
 
-1. Bij de eerste start vraagt LYNX SHARE waar je vandaan komt. Kies `Ik ben nieuw met muziek maken`.
+1. Bij de eerste start vraagt LYNX SHARE waar je vandaan komt. Kies `Ik ben nieuw met muziek maken`. Gemist? `Help › Tour van het eerste nummer` start de rondleiding vanuit elke lay-out; als hij naar de Eenvoudige lay-out moet overschakelen, vraagt hij het eerst.
 2. De Eenvoudige lay-out opent en de kaart van de rondleiding toont stap 1 van 7. Elke stap wijst naar het bedieningselement dat je nodig hebt.
-3. Doe de stap zelf, of klik op `Doe het voor mij`. Met `Next ›` ga je verder zonder de stap te doen, met `‹ Back` ga je terug.
+3. Doe de stap zelf, of klik op `Doe het voor mij` (bij de loop-stap staat daar `Loops tonen`). Met `Next ›` ga je verder zonder de stap te doen, met `‹ Back` ga je terug en `Tour overslaan` beëindigt de rondleiding.
 
 ## Beat, toonsoort en instrument
 

@@ -1,13 +1,13 @@
 ---
 title: Add your VST3 and CLAP plugins
-summary: The Plugin manager finds the VST3 and CLAP plugins on your computer; load one on a Mixer track and it opens in its own window.
+summary: The Plugin manager finds the VST, VST3 and CLAP plugins on your computer; load one on a Mixer track and it opens in its own window.
 ---
 ## Plugin manager
 
 ![Options › Plugin manager](/assets/img/learn/vst-plugins-1.webp)
 
 1. Choose `Options › Plugin manager...`. It lists every plugin LYNX found, with its vendor, format and file.
-2. `Plugin folders...` shows where LYNX looks: the standard VST3 and CLAP folders, plus any folder you add.
+2. `Plugin folders...` shows where LYNX looks: the standard VST, VST3 and CLAP folders (also LV2 on Linux and AU on a Mac), plus any folder you add.
 
 ## Scan for plugins
 

@@ -263,6 +263,16 @@ int instrumentTrackPattern (Song& song, int track);
 // The text FL's hint bar adds for a track header: "(Audio track, linked to mixer track N)" / "(Instrument track)";
 // empty for an unassigned track.
 std::string describe (const Song& song, int track);
+// Round 190rs (G-01, queue item 92 "Playlist track 1 is not Mixer track 1"): where an unassigned track's clips are heard.
+// A Playlist track holds clips only; each clip plays through its channels' mixer inserts. `channels`: the channels its
+// pattern clips (the notes' channels) and audio clips play, in channel order; `inserts`: their mixer inserts, distinct
+// and sorted (0 = the Master); `clips`: any pattern or audio clip on the track (automation clips don't count).
+struct RouteSummary
+{
+    std::vector<int> channels, inserts;
+    bool clips = false;
+};
+RouteSummary routeSummary (const Song& song, int track);
 // The mixer track an audio track's record button arms (FL 2026, issue #11: the header of an audio track has "Audio input
 // source", "Recording / Monitoring" and "Arm/disarm recording" buttons that act on its linked mixer track; unassigned and
 // instrument tracks have none). -1 when `track` is not an audio track linked to an existing insert.

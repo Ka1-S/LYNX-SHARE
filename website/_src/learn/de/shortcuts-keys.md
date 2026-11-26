@@ -1,11 +1,11 @@
 ---
-source: 3249b81fd7
+source: 3d0aa83022
 ---
 ## Die Tastenkürzel-Übersicht
 
 ![Die Tastenkürzel-Übersicht](/assets/img/learn/shortcuts-keys-1.webp)
 
-1. Drücke `F1` (oder `Hilfe › Tastenkürzel`): die Tasten jedes Fensters, die von FL Studio. Noch einmal `F1` schließt sie.
+1. Drücke `F1` (oder `Hilfe › Tastenkürzel`): die Tasten jedes Fensters, im Pattern-Layout die von FL Studio. Noch einmal `F1` schließt sie. (In FL Studio öffnet `F1` das Handbuch; in LYNX SHARE ist das Handbuch `Hilfe › Handbuch (Wiki)...`.)
 
 ## Ein Tastenkürzel ändern
 

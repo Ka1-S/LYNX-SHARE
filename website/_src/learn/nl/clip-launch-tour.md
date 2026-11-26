@@ -1,5 +1,5 @@
 ---
-source: db3d570973
+source: a67c9787fa
 ---
 ## Het raster en de arrangement-weergave
 
@@ -7,7 +7,7 @@ source: db3d570973
 
 1. Klik op de welkomstkaart op `Ableton Live of Bitwig`, of kies `Beeld › Lay-outstijl › Clipstart-lay-out`.
 2. De tracks van de Playlist zijn de kolommen van het clipraster, elke rij is een scène. De arrangement-weergave staat rechts.
-3. Hier openen we de demosong van LYNX. De arrangement-weergave heeft drie secties: Intro, Verse en Hook.
+3. Hier openen we een van de demosongs van LYNX (`Bestand › Nieuw vanuit sjabloon`, of de startpagina). De arrangement-weergave heeft drie secties: Intro, Verse en Hook.
 
 ## Scènes uit secties
 

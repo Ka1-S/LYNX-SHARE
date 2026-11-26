@@ -1,11 +1,20 @@
 ---
-source: da7928152b
+source: ee9bb943c6
 ---
+## Playlist-Spuren und Mixer-Spuren
+
+Im Pattern-Layout ist eine Playlist-Spur keine Mixer-Spur: Playlist-Spur 1 ist nicht Mixer-Spur 1 (Insert 1).
+
+- Playlist-Spuren enthalten nur Clips. Ein Clip spielt über die Mixer-Spuren seiner Kanäle, egal wo er liegt.
+- Jeder Kanal des Channel Rack spielt auf die Mixer-Spur, deren Nummer in seinem Routing-Feld steht, zwischen den Reglern und seinem Namen. Ziehe am Feld, um sie zu ändern; `Ctrl+L` gibt den gewählten Kanälen freie Mixer-Spuren.
+- Drei Stellen sagen dir, wohin ein Klang geht: das Routing-Feld im Channel Rack, der Hinweis, wenn du auf den Kopf einer Playlist-Spur zeigst, und der Hinweis einer Mixer-Spur, der die Kanäle auflistet, die auf sie spielen.
+- Sollen sie paarweise zusammengehören? `Playlist-Spuren mit Mixer-Spuren verknüpfen` im Playlist-Menü verknüpft Spur 1 mit Mixer-Spur 1, Spur 2 mit Mixer-Spur 2 und so weiter, für das aktuelle Projekt.
+
 ## Eine Spur auswählen
 
 ![Der Mixer mit ausgewählten Chords](/assets/img/learn/mixer-routing-1.webp)
 
-1. Öffne den Mixer mit `F9`. Jede Spur geht an den Master.
+1. Öffne den Mixer mit `F9`. Jede Mixer-Spur geht an den Master.
 2. Klicke auf die Spur, die du senden willst, hier die Chords.
 
 ## Routing und Send-Pegel

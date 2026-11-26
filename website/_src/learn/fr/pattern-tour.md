@@ -1,5 +1,5 @@
 ---
-source: a15336c4bb
+source: 7f57110df8
 ---
 ## Le Channel Rack
 
@@ -31,12 +31,14 @@ source: a15336c4bb
 ![Le Mixer avec une piste par canal](/assets/img/learn/pattern-tour-4.webp)
 
 1. Appuyez sur `F9` pour ouvrir le Mixer.
-2. Chaque canal joue dans une piste du Mixer. Faites glisser un fader pour régler son niveau et ajoutez des effets dans les slots de la piste.
-3. La piste Master, à gauche, est ce que vous entendez et ce que vous exportez.
+2. Chaque canal joue dans la piste du Mixer (insert) dont le numéro figure dans sa case de routage : la petite case entre les boutons et le nom du canal dans le Channel Rack (les canaux de départ utilisent 1 à 5). Faites glisser la case ou tournez la molette de la souris dessus pour la changer, double-cliquez dessus pour voir cette piste du Mixer, et appuyez sur `Ctrl+L` pour donner aux canaux sélectionnés des pistes du Mixer libres.
+3. Les pistes de la Playlist ne contiennent que des clips, donc la piste 1 de la Playlist n'est pas la piste 1 du Mixer : un clip joue à travers les pistes du Mixer de ses canaux, où qu'il se trouve. Pointez l'en-tête d'une piste de la Playlist pour lire où ses clips sont entendus ; `Lier les pistes de la Playlist aux pistes de mixage` dans le menu de la Playlist les associe, la piste 1 avec la piste 1 du Mixer et ainsi de suite. Plus d'infos dans [Router des pistes dans le Mixer](/learn/mixer-routing/).
+4. Faites glisser un fader pour régler le niveau d'une piste du Mixer et ajoutez des effets dans ses slots. La piste Master, à gauche, est ce que vous entendez et ce que vous exportez.
 
 ## Bon à savoir
 
 - `F5`, `F6`, `F7` et `F9` affichent ou masquent les quatre fenêtres, comme dans FL Studio. `F8` ouvre le sélecteur de plugins (Plugin picker).
+- La voie en bas du Piano roll règle la vélocité de chaque note.
 - Le même projet s'ouvre aussi dans les dispositions Simple et Clip-launch : voir [Un projet, trois dispositions](/learn/switch-layouts/).
 
 Voir aussi [Venir de FL Studio](/wiki/coming-from-fl-studio/) et [Raccourcis clavier](/wiki/shortcuts/).

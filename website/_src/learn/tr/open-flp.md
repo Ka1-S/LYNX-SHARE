@@ -1,12 +1,12 @@
 ---
-source: 136366330e
+source: f015d99f56
 ---
 ## .flp dosyasını açın
 
 ![File › Open...](/assets/img/learn/open-flp-1.webp)
 
 1. `Dosya › Aç...` (`Ctrl+O`) yolunu seçin ya da `.flp` dosyasını pencerenin üzerine bırakın.
-2. Projeyi seçin. LYNX SHARE eklentilerini ve örneklerini bulur, sonra projeyi Pattern yerleşiminde açar.
+2. Projeyi seçin. LYNX SHARE eklentilerini ve örneklerini bulur, sonra projeyi açar. Pattern yerleşiminde (`Görünüm › Yerleşim stili`) FL Studio'daki gibi görünür; bir dosya açmak yerleşimi değiştirmez.
 3. FL Studio'nun kendisi gerekmez ve `.flp` dosyası asla değiştirilmez.
 
 ## Neler gelir
@@ -15,7 +15,7 @@ source: 136366330e
 
 - Notalarıyla pattern'ler, izleri ve işaretleriyle Playlist, kanallar, rotaları, seviyeleri ve efektleriyle Mixer.
 - 3x Osc gibi FL Studio'nun kendi eklentileri, LYNX SHARE'in yeniden oluşturduğu motorlarda çalar. Penceresini açmak için bir kanalın adına tıklayın.
-- Üçüncü taraf VST3 ve CLAP eklentileri, aynı eklenti kuruluysa yüklenir.
+- Üçüncü taraf VST, VST3 ve CLAP eklentileri (Mac'te AU), aynı eklenti kuruluysa yüklenir.
 
 ![Channel Rack'ten açılan 3x Osc](/assets/img/learn/open-flp-3.webp)
 

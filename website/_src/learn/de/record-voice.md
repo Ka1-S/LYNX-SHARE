@@ -1,5 +1,5 @@
 ---
-source: 6cdabe8ca5
+source: e954a3440f
 ---
 ## Bevor du anfängst
 
@@ -21,7 +21,7 @@ Die Schaltfläche `+ Stimme-Spur` auf der Karte `Als Nächstes: 3 Dinge zum Ausp
 ![Das Aufnahmefenster: Was möchtest du aufnehmen?](/assets/img/learn/record-voice-2.webp)
 
 1. Drücke Record in der Symbolleiste.
-2. Beim ersten Mal fragt ein Fenster, was aufgenommen werden soll. Wähle `Audio, in die Playlist als Audioclip`. Hake `Nicht mehr fragen` an, um diese Wahl zu behalten.
+2. Beim ersten Mal fragt ein Fenster, was aufgenommen werden soll. Wähle `Audio, in die Playlist als Audioclip`. Hake `Meine Auswahl merken (Rechtsklick auf die Aufnahmetaste für den Aufnahmefilter)` an, um diese Wahl zu behalten.
 3. Drücke Play, dann sing oder sprich. Der Take wird auf der Stimmenspur gezeichnet, während du aufnimmst.
 4. Drücke Stop. Der Take ist jetzt ein Audio-Clip auf der Zeitleiste.
 5. Drücke Record noch einmal, um die Aufnahme auszuschalten, damit das nächste Play nur abspielt.
@@ -43,5 +43,6 @@ Die Schaltfläche `+ Stimme-Spur` auf der Karte `Als Nächstes: 3 Dinge zum Ausp
 - Kommt kein Ton an? Prüfe das Eingabegerät unter `Optionen › Audioeinstellungen...`. Eine Stimmenspur nimmt vom ersten Eingang des Geräts auf.
 - `Preset` über den Effekten lädt eine fertige Effektkette für eine Stimme.
 - `Klare Stimme` im Menü der Spur verringert Hintergrundgeräusche.
+- Im Pattern- oder Clip-Start-Layout wählst du den Eingang im Eingangsfeld einer Mixer-Spur und schaltest diese Spur scharf, oder du nutzt `Tools › Audioaufnahme mit einem Klick › In die Playlist als Audio-Clip`. Siehe [Aufnahme](/wiki/recording/).
 
 Siehe auch [Aufnahme](/wiki/recording/) und [Einfaches Layout](/wiki/simple-layout/).

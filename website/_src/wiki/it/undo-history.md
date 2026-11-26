@@ -1,5 +1,5 @@
 ---
-source: 2298a70fec
+source: 7031553640
 ---
 ![La finestra Cronologia annullamenti: sei passi da Start a Add notes, con Mute: Kick come passo corrente](/assets/img/wiki/history.webp)
 
@@ -54,7 +54,7 @@ Ogni volta che salvi sopra un file di progetto esistente, la versione sostituita
 |---|---|
 | `File › Ripristina l'ultimo backup...` | Sostituisce il progetto aperto con il suo backup più recente, dopo aver chiesto. Il file di progetto cambia solo quando salvi |
 | `File › Apri cartella dei salvataggi automatici` | Mostra i backup nel file manager |
-| `File › Salva nuova versione` (`Ctrl+Alt+S`) | Salva come `Song_2`, `Song_3` e così via, accanto al file corrente |
+| `File › Salva nuova versione` (`Ctrl+Alt+S`; `Ctrl+N` nel layout Pattern) | Salva come `Song_2`, `Song_3` e così via, accanto al file corrente |
 
 La sezione `Backup` di `Opzioni › Impostazioni generali...` ha queste impostazioni:
 

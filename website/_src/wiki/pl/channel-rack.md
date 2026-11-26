@@ -1,5 +1,5 @@
 ---
-source: 200df26182
+source: aad66b5125
 ---
 ![Channel Rack z wierszami kroków](/assets/img/rack.webp)
 
@@ -74,7 +74,7 @@ Działają, gdy Channel Rack ma fokus.
 | Klonuj | `Alt+C` | Klonuje zaznaczone kanały |
 | Usuń | `Alt+Del` | Usuwa zaznaczone kanały |
 | Grupuj | `Alt+G` | Umieszcza zaznaczone kanały w nowej grupie filtra |
-| Kieruj do Mixera | `Ctrl+L` | Kieruje zaznaczone kanały na wolne inserty Mixera |
+| Kieruj do wolnej ścieżki miksera | `Ctrl+L` | Kieruje zaznaczone kanały na wolne inserty Mixera |
 | Wycisz | `1` do `0` | Wycisza lub przywraca kanały od 1 do 10 |
 | Solo | `Ctrl+1` do `Ctrl+0` | Włącza solo dla kanałów od 1 do 10 |
 | Pas wykresu | `Ctrl+K` | Pokazuje lub ukrywa pas wykresu |

@@ -1,12 +1,12 @@
 ---
-source: ea21203077
+source: d01a209e47
 ---
 ## Plugin yöneticisi
 
 ![Seçenekler › Plugin yöneticisi](/assets/img/learn/vst-plugins-1.webp)
 
 1. `Seçenekler › Plugin yöneticisi...` seçeneğini seçin. LYNX'in bulduğu her plugin'i üreticisi, biçimi ve dosyasıyla listeler.
-2. `Plugin klasörleri...` LYNX'in nereye baktığını gösterir: standart VST3 ve CLAP klasörleri ile eklediğiniz her klasör.
+2. `Plugin klasörleri...` LYNX'in nereye baktığını gösterir: standart VST, VST3 ve CLAP klasörleri (Linux'ta LV2, Mac'te AU da) ile eklediğiniz her klasör.
 
 ## Plugin tarayın
 
