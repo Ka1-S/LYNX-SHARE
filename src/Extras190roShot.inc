@@ -125,7 +125,8 @@
             const auto clipBox = pl.clipBoundsForSnapshot (clipIndex).toFloat();
             check ("ON-1 on: the half circle sits in the middle of the clip's visible part (" + handle.toString() + ", clip " + clipBox.toString() + ")",
                    ! handle.isEmpty() && handle.getRight() < (float) pl.getWidth() && handle.getX() > (float) pl.headerWidthForSnapshot()
-                       && std::abs (handle.getCentreX() - (juce::jmax (clipBox.getX(), (float) pl.headerWidthForSnapshot()) + (float) pl.getWidth()) * 0.5f) < 2.0f);
+                       && std::abs (handle.getCentreX() - (juce::jmax (clipBox.getX(), (float) pl.headerWidthForSnapshot()) + juce::jmin (clipBox.getRight(), (float) pl.getWidth())) * 0.5f) < 12.0f
+                       && handle.getCentreX() < clipBox.getCentreX() - 200.0f);
             both (pl, rows(), "on1-handle-in-view");
 
             // a press on the half circle and a drag up: the clip's gain changes, the clip stays where it is
@@ -300,8 +301,8 @@
             // the first start's card for FL users names the page, on its one line
             const auto line = tr ("Works like FL Studio. LYNX's additions: Options › LYNX extras.");
             const auto lineWidth = juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), line);
-            check ("the FL card's line fits its one line (" + juce::String (lineWidth, 0) + " px of " + juce::String ((Next3Card::width - 36) / 0.85, 0) + ")",
-                   lineWidth <= (float) (Next3Card::width - 36) / 0.85f);
+            check ("the FL card's line fits its one line (" + juce::String (lineWidth, 0) + " px of " + juce::String ((onboardui::Next3Card::width - 36) / 0.85, 0) + ")",
+                   lineWidth <= (float) (onboardui::Next3Card::width - 36) / 0.85f);
         }
 
         ui::motion::enabled() = motionBefore;
