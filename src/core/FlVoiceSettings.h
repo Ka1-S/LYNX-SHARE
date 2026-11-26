@@ -5,7 +5,9 @@
 // pitch; each an envelope and an LFO) and the channel filter. The fields keep FL's own units, so a block read and
 // written back is the same bytes (round 190f, issue #129).
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -109,5 +111,22 @@ inline void write (std::vector<std::uint8_t>& block, const Settings& s)
     std::memcpy (block.data() + 0x15c, &s.modX, 4);
     std::memcpy (block.data() + 0x160, &s.modY, 4);
     std::memcpy (block.data() + 0x168, &s.filterType, 4);
+}
+// Round 190rt (issue #311): FL's Misc › Levels adjustment Mod X / Mod Y offsets (ChannelMisc::LevelAdjust::modX / modY,
+// −1…1 = FL's −256…256) on a 364-byte block's Mod X / Mod Y (0…256): the two raw values add up (FUN_00fea140), as FL's
+// render of a 3x Osc with the offset shows (issues309_190rt/art/fl/b-osc-levelmodx.wav: the filter closes). No offset: the
+// block as it is, byte for byte.
+inline void addLevelOffsets (std::uint8_t* block, float modXOffset, float modYOffset) noexcept
+{
+    auto add = [block] (int at, float offset) {
+        if (offset == 0.0f)
+            return;
+        std::int32_t v = 0;
+        std::memcpy (&v, block + at, 4);
+        v = std::clamp (v + (std::int32_t) std::lround (offset * 256.0f), 0, 256);
+        std::memcpy (block + at, &v, 4);
+    };
+    add (0x15c, modXOffset);
+    add (0x160, modYOffset);
 }
 } // namespace lynx::flvoice

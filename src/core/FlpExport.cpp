@@ -1,3 +1,4 @@
+#include "core/FlVoiceBlock.h"
 #include "core/GrossBeat.h"
 #include "core/StepSlide.h"
 #include "core/Sections.h"
@@ -1077,7 +1078,25 @@ struct Converter
         }
 
         // the channel filter and articulators
-        if (def.sampler.flChannel.size() >= 88)
+        if (flvoiceblock::has (def))
+        {
+            // round 190rt (issue #311): a generator that carries the plugin voice processor's block (3x Osc, DX10,
+            // Granulizer, BeepMap) — FL loads the channel's records into it, so they are the block's own (its Envelope /
+            // instrument tab), not the Sampler's ADSR
+            const auto block = flvoiceblock::bytes (def);
+            for (int k = 0; k < 5; ++k)
+            {
+                auto& e = c.envelopes[(std::size_t) k];
+                e.present = true;
+                e.rawSize = 68;
+                std::memcpy (e.raw.data(), block.data() + 0x44 * k, 68);
+            }
+            c.envelopeCount = 5;
+            std::memcpy (&c.modX, block.data() + 0x15c, 4);
+            std::memcpy (&c.modY, block.data() + 0x160, 4);
+            std::memcpy (&c.filterType, block.data() + 0x168, 4);
+        }
+        else if (def.sampler.flChannel.size() >= 88)
         {
             // FL's own records as the import stored them (REA_rodada76)
             for (int k = 0; k < 5; ++k)
@@ -1381,6 +1400,28 @@ struct Converter
         return false;
     }
 
+    // round 190rt (issue #309): the channel's FL volume envelope is on — FL then sends no note-off for a step note
+    // (length 0): it sounds on past its step and past the channel's next notes (FL 2026 renders rel50 / rel50-2steps in
+    // issues309_190rt/art), so a one-step LYNX note, which LYNX releases after its step, goes out with its length
+    bool volumeEnvelopeOn (int channel) const
+    {
+        for (const auto& c : out.channels)
+            if (c.index == channel)
+            {
+                const auto& e = c.envelopes[1];
+                if (! e.present)
+                    return false;
+                if (e.rawSize >= 8)
+                {
+                    std::int32_t on = 0;
+                    std::memcpy (&on, e.raw.data() + 4, 4);
+                    return on != 0;
+                }
+                return e.enabled;
+            }
+        return false;
+    }
+
     void patterns()
     {
         for (int i = 0; i < (int) song.patterns.size(); ++i)
@@ -1425,7 +1466,9 @@ struct Converter
                 // Only on a channel that plays a sample: FL holds a step note on a generator (3x Osc, a plugin)
                 // until something cuts it, so the voices pile up (FL render, round 171e)
                 // A slide note keeps its length (length 0 would move the notes at once) unless it has none (issue #272)
-                const auto step = (! n.slide && n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel)) || n.heldStep() || stepslide::is (n);
+                const auto step = (! n.slide && n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel)
+                                   && ! volumeEnvelopeOn (n.channel))
+                                  || n.heldStep() || stepslide::is (n);
                 f.length = step ? 0 : std::max<std::uint32_t> (1, ticks (n.length));
                 f.channel = (std::uint16_t) n.channel;
                 f.key = (std::uint16_t) std::clamp (n.key, 0, 131);

@@ -1,5 +1,6 @@
 #include "ui/RemoteControl.h"
 
+#include "core/ClipLinks.h"
 #include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
 #include "core/MidiControls.h"
@@ -562,10 +563,24 @@ private:
         recordNow = false;
         const auto& automations = engine.getSong().automations;
         const auto live = std::find_if (automations.begin(), automations.end(), [this] (const Automation& a) { return a.isLive() && a.target == target(); });
+        // round 190rt (issue #310): the clip that drives the control shows as its controller (FL: "Automation clips")
+        const auto clip = live == automations.end() ? cliplinks::clipDriving (engine.getSong(), target()) : -1;
+        bool clipsHeader = false;
         for (int i = 0; i < (int) outputs.size(); ++i)
         {
             const auto& o = outputs[(std::size_t) i];
+            if (o.automation >= 0 && ! clipsHeader)
+            {
+                internalSelect.addSectionHeading (tr ("Automation clips"));
+                clipsHeader = true;
+            }
             internalSelect.addItem (o.label, i + 2);
+            if (o.automation >= 0)
+            {
+                if (o.automation == clip)
+                    internalNow = i + 1;
+                continue;
+            }
             if (live != automations.end() && live->source.track == o.track && live->source.slot == o.slot && live->source.output == o.output
                 && live->source.channel == o.channel)
             {
@@ -720,8 +735,12 @@ private:
             const auto chosen = internalSelect.getSelectedId() - 1; // 0 = (none)
             if (chosen != internalNow)
             {
+                // round 190rt (issue #310): leaving a clip takes the control out of that clip's targets
+                const auto wasClip = internalNow > 0 && internalNow <= (int) outputs.size() ? outputs[(std::size_t) (internalNow - 1)].automation : -1;
+                if (wasClip >= 0)
+                    engine.editSong ([t, wasClip] (Song& s) { cliplinks::unlink (s, wasClip, t); });
                 if (chosen > 0 && chosen <= (int) outputs.size())
-                    linkToController (engine, t, outputs[(std::size_t) (chosen - 1)]);
+                    linkToController (engine, t, outputs[(std::size_t) (chosen - 1)], conflicts.getToggleState());
                 else
                     engine.editSong ([t] (Song& s) {
                         for (int i = (int) s.automations.size() - 1; i >= 0; --i)
@@ -731,7 +750,7 @@ private:
             }
             // "Record automation" of the internal controller link
             const auto record = recordAutomation.getToggleState();
-            if (chosen > 0 && (chosen != internalNow || record != recordNow))
+            if (chosen > 0 && chosen <= (int) outputs.size() && outputs[(std::size_t) (chosen - 1)].automation < 0 && (chosen != internalNow || record != recordNow))
                 engine.editSong ([t, record] (Song& s) {
                     for (auto& a : s.automations)
                         if (a.isLive() && a.target == t)
