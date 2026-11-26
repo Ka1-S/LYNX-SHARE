@@ -1,4 +1,5 @@
 #include "ui/TrackIcons.h"
+#include "ui/ImageCaches.h"
 
 #include <map>
 #include <tuple>
@@ -690,6 +691,7 @@ void drawTrackIconCached (juce::Graphics& g, trackicons::Icon icon, juce::Rectan
     if (pixels <= 0)
         return;
     static std::map<std::tuple<int, int, std::uint32_t>, juce::Image> cache;
+    static const bool registered = ui::registerImageCache ([] { cache.clear(); }); (void) registered; // (a plugin build empties it at unload)
     const auto key = std::make_tuple ((int) icon, pixels, colour.getARGB());
     auto it = cache.find (key);
     if (it == cache.end())
