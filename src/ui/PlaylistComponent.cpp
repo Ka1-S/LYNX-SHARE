@@ -773,6 +773,7 @@ public:
                                 juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
+        owner.paintMutedTracks (g); // (over the picture: a mute changes without the lanes being painted again)
         owner.paintStickyTitles (g);
         if (! owner.gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
             owner.paintPlayhead (g);
@@ -2508,6 +2509,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
+        if (! cachePainting) // (the cached picture gets it from PlayheadCache::paint)
+            paintMutedTracks (g);
+
         if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
             paintStickyTitles (g);
 
@@ -3308,6 +3312,39 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 // draws them without the cache
 // Round 190ig (FL look, Pattern layout): the titles of the audio and automation clips that start left of the view, held at
 // its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
+void PlaylistComponent::paintMutedTracks (juce::Graphics& g)
+{
+    if (! flClipLook())
+        return;
+
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    if (grid.isEmpty() || song.playlistTracks.empty())
+        return;
+
+    juce::Graphics::ScopedSaveState state (g);
+
+    // FL's Playlist: a track switched off (its LED dark) steps back as a whole - its lane, clips and automation lanes go
+    // dark, and its header a little too; the tracks that are on keep their colours (the clip's own muted veil stays on top)
+    for (int t = 0; t < (int) song.playlistTracks.size() && t < numTracks(); ++t)
+        if (song.playlistTracks[(std::size_t) t].muted)
+        {
+            const auto height = heightOf (t);
+            if (height <= 0)
+                continue;
+            {
+                const juce::Graphics::ScopedSaveState lane (g);
+                if (g.reduceClipRegion (grid))
+                {
+                    g.setColour (juce::Colours::black.withAlpha (0.45f));
+                    g.fillRect (grid.getX(), trackToY (t), grid.getWidth(), height + laneBlockHeight (t));
+                }
+            }
+            g.setColour (juce::Colours::black.withAlpha (0.30f));
+            g.fillRect (0, trackToY (t), headerWidth, height);
+        }
+}
+
 void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 {
     if (! flClipLook())
