@@ -1565,4 +1565,19 @@ std::vector<KeptLocal> keptLocalChanges (const Song& a, const Song& b)
     return out;
 }
 
+const char* keptLocalName (KeptLocal item)
+{
+    switch (item)
+    {
+        case KeptLocal::vcas: return "VCA";
+        case KeptLocal::mainVolume: return "Main volume";
+        case KeptLocal::modulators: return "Modulators";
+        case KeptLocal::clipGrid: return "Clip grid";
+        case KeptLocal::grooves: return "Grooves";
+        case KeptLocal::mixSnapshots: return "Mix snapshots (LYNX)";
+        case KeptLocal::masterLook: return "Master looks";
+    }
+    return "";
+}
+
 } // namespace lynx::live

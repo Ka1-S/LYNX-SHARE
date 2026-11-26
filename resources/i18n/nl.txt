@@ -13076,3 +13076,4 @@ countries: nl be
 "Tab completes the Browser's search" = "Tab vult de zoekopdracht van de Browser aan"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Terwijl je in de zoekbalk van de Browser typt, verschijnt de rest van een tag (#word) of mapnaam grijs na de tekst, en Tab neemt die over. Uit: er wordt niets aangevuld. De enige schakelaar ervoor is hier."
 "Every LYNX extra at its default" = "Elke LYNX-extra op de standaardwaarde"
+"{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0} wordt in online sessies nog niet gedeeld: de anderen horen deze wijziging niet"
