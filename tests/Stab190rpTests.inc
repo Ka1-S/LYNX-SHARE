@@ -89,6 +89,25 @@ TEST (stab190rp_a_device_that_hung_the_start_is_skipped_next_time)
     CHECK (app.find ("lynx::AudioEngine::skipSavedDevice = true;") != std::string::npos);
 }
 
+// One session marker per running LYNX (round 190rp, coordinator item 3): a crashed window's session is found while other
+// LYNX windows run; an older LYNX's single marker is read as before.
+TEST (stab190rp_session_markers_per_process)
+{
+    using namespace lynx::safety;
+    SessionMarker a, b, legacy, broken;
+    CHECK (parseSessionMarker (sessionMarkerText (1000, 41, 7), a) && a.startMs == 1000 && a.pid == 41 && a.processStart == 7 && ! a.legacy);
+    CHECK (parseSessionMarker (sessionMarkerText (2000, 42, 0), b) && b.pid == 42);
+    CHECK (parseSessionMarker ("1795700000000\n", legacy) && legacy.legacy && legacy.startMs == 1795700000000LL);
+    CHECK (! parseSessionMarker ("nothing here", broken));
+    auto alive = [] (std::uint32_t pid, std::uint64_t) { return pid == 41; }; // (41 runs, 42 crashed)
+    CHECK (newestEndedSession ({ a, b }, alive) == 2000);
+    CHECK (newestEndedSession ({ a }, alive) == -1);
+    CHECK (newestEndedSession ({ a, b, legacy }, alive) == 1795700000000LL);
+    const auto main = i18ntest::readFile ("src/ui/MainComponent.cpp");
+    CHECK (main.find ("InterProcessLock> (\"LYNX-ui-session\")") == std::string::npos);
+    CHECK (main.find ("\"session-running-\" + juce::String (crashguard::processId())") != std::string::npos);
+}
+
 // Every abort that is not a heap corruption gets the emergency save (round 190rp, coordinator item 2): glibc's other
 // fatal aborts ("FATAL: exception not rethrown", after a thread was killed) were taken for heap corruptions.
 TEST (stab190rp_only_the_allocators_abort_skips_the_save)

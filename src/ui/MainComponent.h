@@ -672,7 +672,6 @@ private:
     juce::String recoveryPlugin;
     void checkInterruptedTakes(); // round 163: takes left by a crash while recording
     void quickRecordAudio();      // round 163: one key from "record" to a clip
-    std::unique_ptr<juce::InterProcessLock> sessionLock;
     juce::File sessionMarker;
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written

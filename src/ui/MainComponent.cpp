@@ -1341,7 +1341,7 @@ MainComponent::~MainComponent()
     setSecondaryWindowKeyHandler (nullptr);
     setLinkedWindowFocusHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
-    if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
+    if (sessionMarker != juce::File()) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
     openMixerInsertHandler() = nullptr;
@@ -9926,23 +9926,34 @@ void MainComponent::startSession()
 {
     // Like FL's backup on crash: a marker exists while LYNX runs; finding one at start means the last session
     // ended without closing (crash, power loss), so the newest backup written during it is offered.
-    sessionLock = std::make_unique<juce::InterProcessLock> ("LYNX-ui-session");
-    if (! sessionLock->enter (0))
+    // round 190rp: one marker per running LYNX (session-running-<pid>.txt), not one per machine held by whichever window
+    // came first: a session whose marker is left while its process is gone ended without closing, even when other LYNX
+    // windows run (safety::newestEndedSession). The markers of ended sessions are removed once read.
+    const auto folder = lynx::platform::settingsFile ("session-running.txt").getParentDirectory();
+    folder.createDirectory();
+    std::vector<safety::SessionMarker> ended;
+    for (const auto& f : folder.findChildFiles (juce::File::findFiles, false, "session-running*.txt"))
     {
-        sessionLock.reset(); // another LYNX window is running: it owns the marker
-        return;
+        safety::SessionMarker m;
+        if (! safety::parseSessionMarker (f.loadFileAsString().toStdString(), m))
+            continue;
+        if (! m.legacy && crashguard::processRunning (m.pid, m.processStart))
+            continue; // (another LYNX that runs now: its marker is its own)
+        ended.push_back (m);
+        f.deleteFile();
     }
-    sessionMarker = lynx::platform::settingsFile ("session-running.txt");
-    if (sessionMarker.existsAsFile())
+    if (const auto previous = safety::newestEndedSession (ended, {}); previous >= 0)
     {
-        const auto previousStart = juce::Time (sessionMarker.loadFileAsString().trim().getLargeIntValue());
+        const auto previousStart = juce::Time (previous);
         juce::Timer::callAfterDelay (2500, [safe = juce::Component::SafePointer<MainComponent> (this), previousStart] {
             if (safe != nullptr)
                 safe->checkPreviousSession (previousStart);
         });
     }
-    sessionMarker.getParentDirectory().createDirectory();
-    safewrite::replaceWithText (sessionMarker, juce::String (juce::Time::getCurrentTime().toMilliseconds()));
+    sessionMarker = folder.getChildFile ("session-running-" + juce::String (crashguard::processId()) + ".txt");
+    safewrite::replaceWithText (sessionMarker, juce::String::fromUTF8 (safety::sessionMarkerText (juce::Time::getCurrentTime().toMilliseconds(),
+                                                                                                    crashguard::processId(), crashguard::processStartTime())
+                                                                          .c_str()));
     // takes that were recording when LYNX stopped (crash, power loss, closed while recording): after the backup offer
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)

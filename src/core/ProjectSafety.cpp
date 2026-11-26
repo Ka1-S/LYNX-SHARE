@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <set>
 
 #include "core/MissingFiles.h"
@@ -118,6 +119,54 @@ std::string crashRecoveryCandidate (const std::vector<BackupFile>& files, std::i
             && (best == nullptr || f.time > best->time || (f.time == best->time && f.name > best->name)))
             best = &f;
     return best != nullptr ? best->name : std::string();
+}
+
+std::string sessionMarkerText (std::int64_t startMs, std::uint32_t pid, std::uint64_t processStart)
+{
+    return "start=" + std::to_string (startMs) + "\npid=" + std::to_string (pid) + "\nprocessStart=" + std::to_string (processStart) + "\n";
+}
+
+bool parseSessionMarker (const std::string& text, SessionMarker& out)
+{
+    out = {};
+    auto value = [&text] (const char* key) -> std::string {
+        const auto at = text.find (key);
+        if (at == std::string::npos)
+            return {};
+        const auto from = at + std::strlen (key);
+        return text.substr (from, text.find ('\n', from) - from);
+    };
+    try
+    {
+        if (text.find ("start=") == std::string::npos)
+        {
+            // an older LYNX's marker: the start time alone
+            const auto first = text.find_first_of ("0123456789");
+            if (first == std::string::npos)
+                return false;
+            out.startMs = std::stoll (text.substr (first));
+            out.legacy = true;
+            return true;
+        }
+        out.startMs = std::stoll (value ("start="));
+        out.pid = (std::uint32_t) std::stoul (value ("pid="));
+        const auto ps = value ("processStart=");
+        out.processStart = ps.empty() ? 0 : std::stoull (ps);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+std::int64_t newestEndedSession (const std::vector<SessionMarker>& markers, const std::function<bool (std::uint32_t, std::uint64_t)>& running)
+{
+    std::int64_t newest = -1;
+    for (const auto& m : markers)
+        if (m.legacy || ! running || ! running (m.pid, m.processStart))
+            newest = std::max (newest, m.startMs);
+    return newest;
 }
 
 bool isTemporarySaveName (const std::string& name)
