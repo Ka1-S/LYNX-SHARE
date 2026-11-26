@@ -9,6 +9,11 @@
     //   5 Clone names through the actions
     //   6 Make unique as sample: the worker's render, cancel, one undo step, an imported "C:\..." data folder
     //   9 F12 closes the Search palette
+    //  13 FL's marker menu on a marker's tag (shot "-13-marker-menu")
+    //  16 the track header menu on the selected tracks (Group, Move down as a block, Random color per track)
+    //  14 #247: a letter typed just after a text field lost the keyboard goes back into it
+    //  15 #296 / #301: a cut hint (or a cut name in its value) shows whole in the bar's bubble and comes back on the bar
+    //  17 #299: a knob's value bubbles close when the knob is hidden or no longer under the pointer
     juce::String community190riCheck (juce::String& log, const juce::String& shots = {})
     {
         using namespace lynx;
@@ -46,7 +51,7 @@
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
             {
                 const auto& item = it.getItem();
-                if (item.text.upToFirstOccurrenceOf ("\t", false, false) == text)
+                if (item.text.upToFirstOccurrenceOf ("\t", false, false).removeCharacters (juce::String ("&") + juce::String::charToString ((juce::juce_wchar) 1)) == text) // (a menu letter's mark left out)
                 {
                     keep.push_back (item);
                     return &keep.back();
@@ -296,6 +301,192 @@
             data.createDirectory();
             offline.editSong ([&data] (Song& song) { song.dataFolder = data.getFullPathName().toStdString(); });
             check ("a data folder that exists is used", uniquesamples::folderFor (offline.getSong(), wav) == data.getChildFile ("Samples"));
+        }
+
+        // 11: the DAWproject export as the window runs it (the file on a worker), and its failures' messages
+        {
+            AudioEngine offline (false);
+            offline.editSong ([] (Song& s) {
+                s = Song::makeDefault();
+                s.patterns.resize (1);
+                s.patterns[0].notes = { { 0, ppq, 0, 60 } };
+                Clip c;
+                c.pattern = 0, c.length = 4 * ppq;
+                s.playlist = { c };
+                Marker m;
+                m.tick = 4 * ppq, m.action = Marker::markerSkip, m.name = "skip";
+                s.addMarker (m);
+            });
+            juce::StringArray notes;
+            juce::String error;
+            const auto out = folder.getChildFile ("worker.dawproject");
+            check ("#11 DAWproject written on a worker", writeDawProjectOnWorkerForTests (offline, out, notes, error) && out.getSize() > 0, error);
+            const auto bad = folder.getChildFile ("no such folder").getChildFile ("x.dawproject");
+            notes.clear();
+            check ("#11 a file that cannot be written says why", ! writeDawProjectOnWorkerForTests (offline, bad, notes, error) && error.isNotEmpty(), error);
+        }
+
+        // 14: the text field's letters (issue #247)
+        {
+            juce::Component window;
+            window.setBounds (100, 100, 300, 80);
+            juce::TextEditor field;
+            field.setBounds (10, 10, 200, 24);
+            window.addAndMakeVisible (field);
+            window.addToDesktop (juce::ComponentPeer::windowIsTemporary);
+            window.setVisible (true);
+            field.setText ("rend", false);
+            field.moveCaretToEnd();
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            ui::keyfocus::noteTextFieldLeftForTests (&field, now);
+            check ("#247 a letter just after the field lost the keys goes into it", ui::keyfocus::typeIntoFieldJustLeft (juce::KeyPress ('e', {}, 'e')) && field.getText() == "rende",
+                   field.getText());
+            ui::keyfocus::noteTextFieldLeftForTests (&field, now - 1000.0);
+            check ("#247 ... not after the grace time", ! ui::keyfocus::typeIntoFieldJustLeft (juce::KeyPress ('r', {}, 'r')));
+            ui::keyfocus::noteTextFieldLeftForTests (&field, juce::Time::getMillisecondCounterHiRes());
+            check ("#247 ... not with Ctrl", ! ui::keyfocus::typeIntoFieldJustLeft (juce::KeyPress ('r', juce::ModifierKeys::ctrlModifier, 'r')) && field.getText() == "rende");
+            ui::keyfocus::noteTextFieldLeftForTests (nullptr, 0.0);
+            window.removeFromDesktop();
+        }
+
+        // 15: the hint bar (issues #296, #301)
+        {
+            ui::HintBar bar;
+            bar.setBounds (0, 0, 220, 30);
+            juce::Image image (juce::Image::ARGB, 220, 30, true);
+            const juce::String text = "Channel button: [LMB] select  [RMB] menu  [Wheel] scroll the rack, the patterns get a colour in the colour of the channel that plays them";
+            bar.setHint ({ text, {}, false, false });
+            {
+                juce::Graphics g (image);
+                bar.paint (g);
+            }
+            check ("#296 a cut hint shows whole in the bar's bubble", ui::quickTipOf (bar).contains ("in the colour of the channel that plays them"));
+            bar.setHint ({ "Tempo", "140", true, true });
+            check ("#296 ... and comes back on the bar for a while", bar.hintToKeep().text == text && bar.hintToKeep (0.0).text == "Tempo");
+            {
+                juce::Graphics g (image);
+                bar.paint (g);
+            }
+            check ("#296 a hint that fits has no bubble", ui::quickTipOf (bar).isEmpty());
+            bar.setHint ({ "Track", "BWB WAVE SOMETHING VERY LONG AND SHORTENED (22)", false, true });
+            {
+                juce::Graphics g (image);
+                bar.paint (g);
+            }
+            check ("#301 a name cut in the value shows whole in the bubble", ui::quickTipOf (bar).contains ("BWB WAVE SOMETHING VERY LONG AND SHORTENED (22)"), ui::quickTipOf (bar));
+            if (shots.isNotEmpty())
+            {
+                const auto tip = ui::quickTipOf (bar);
+                const auto size = ui::quickTipSize (tip);
+                juce::Image bubble (juce::Image::ARGB, size.getWidth(), size.getHeight(), true);
+                juce::Graphics g (bubble);
+                ui::paintQuickTip (g, size.toFloat(), tip);
+                juce::PNGImageFormat png;
+                if (auto out = juce::File (shots + "-15-hint-bubble.png").createOutputStream())
+                    png.writeImageToStream (bubble, *out);
+            }
+        }
+
+        // 17: value bubbles (issue #299)
+        {
+            juce::Component page;
+            page.setBounds (0, 0, 300, 200);
+            juce::Slider knob (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox);
+            knob.setBounds (10, 10, 40, 40);
+            page.addAndMakeVisible (knob);
+            theme::LookAndFeel look;
+            knob.setLookAndFeel (&look);
+            knob.setPopupDisplayEnabled (true, false, &page);
+            const auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            const juce::MouseEvent down (source, { 20.0f, 20.0f }, juce::ModifierKeys::leftButtonModifier, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &knob, &knob, now,
+                                         { 20.0f, 20.0f }, now, 1, false);
+            knob.mouseDown (down);
+            const auto made = knob.getCurrentPopupDisplay() != nullptr;
+            check ("#299 the knob's bubble is closed once the knob is not on screen", made && theme::checkSliderPopupsNow() == 1 && knob.getCurrentPopupDisplay() == nullptr);
+            knob.mouseUp (down);
+            knob.setLookAndFeel (nullptr);
+            check ("#299 a point outside the knob is not on it", ! theme::pointOnVisiblePart (knob, { -100, -100 }));
+            // LYNX's own value pill (the knob contract's, the hover read-out's): it goes when its control moves or is hidden
+            juce::Component window, control;
+            window.setBounds (100, 100, 300, 200);
+            control.setBounds (20, 60, 40, 40);
+            window.addAndMakeVisible (control);
+            window.addToDesktop (juce::ComponentPeer::windowIsTemporary);
+            window.setVisible (true);
+            ui::flashValueTip (control, control.getLocalBounds(), "12%");
+            const auto shown = ui::valueTipShown();
+            const auto keptInPlace = ! ui::checkValueTipNow();
+            control.setTopLeftPosition (20, 10); // (the page scrolled)
+            check ("#299 the value pill shows, stays while its control stays, goes when the control moves", shown && keptInPlace && ui::checkValueTipNow() && ! ui::valueTipShown());
+            ui::flashValueTip (control, control.getLocalBounds(), "13%");
+            control.setVisible (false); // (the page changed)
+            check ("#299 ... and when the control is hidden", ui::checkValueTipNow() && ! ui::valueTipShown());
+            ui::hideValueTip();
+            window.removeFromDesktop();
+        }
+
+        // 13 and 16: the Playlist's marker menu and the track menu on a selection
+        {
+            AudioEngine offline (false);
+            MainComponent main (offline, false);
+            main.setSize (1600, 900);
+            main.setVisible (true);
+            main.setLayoutStyle (layoutstyle::Style::pattern);
+            offline.editSong ([] (Song& s) {
+                s = Song::makeDefault();
+                s.mode = PlayMode::song;
+                s.patterns.resize (1);
+                s.playlistTracks.resize (12);
+                for (int i = 0; i < 12; ++i)
+                    s.playlistTracks[(std::size_t) i].name = "Track " + std::to_string (i + 1);
+                for (const auto [bar, action, name] : { std::tuple { 3, Marker::markerSkip, "B: skip" }, { 7, Marker::markerSkip, "C: skip" }, { 11, Marker::none, "Verse" } })
+                {
+                    Marker m;
+                    m.tick = (std::int64_t) (bar - 1) * 4 * ppq, m.action = action, m.name = name;
+                    s.addMarker (m);
+                }
+                for (int b = 0; b < 12; ++b)
+                {
+                    Clip c;
+                    c.pattern = 0, c.track = b % 3, c.start = (std::int64_t) b * 4 * ppq, c.length = 4 * ppq;
+                    s.playlist.push_back (c);
+                }
+            });
+            offline.dispatchPendingMessages();
+            auto& playlist = main.getPlaylistForSnapshot();
+            std::deque<juce::PopupMenu::Item> kept;
+            const auto markerMenu = playlist.markerMenuForSnapshot (0); // ("B: skip")
+            for (const auto& item : { tr ("Add marker..."), tr ("Add time signature..."), tr ("Place loop"), tr ("Delete"), tr ("Rename..."),
+                                      tr ("Move content left"), tr ("Move content right"), tr ("Marker skip") })
+                check ("marker menu: " + item, find (markerMenu, item, kept) != nullptr);
+            check ("marker menu: the Action list", find (markerMenu, tr ("Marker pause"), kept) != nullptr && find (markerMenu, tr ("Stop recording"), kept) != nullptr);
+            if (const auto* right = find (markerMenu, tr ("Move content right"), kept); right != nullptr && right->action)
+            {
+                right->action();
+                const auto& m = offline.getSong().markers();
+                check ("Move content right: C's section before B's", m.size() == 3 && m[0].name == "C: skip" && m[0].tick == 8 * ppq && m[1].name == "B: skip"
+                                                                       && m[1].tick == 24 * ppq, juce::String (m[0].name) + " " + juce::String (m[0].tick));
+                offline.undo();
+                check ("Move content: one undo step", offline.getSong().markers()[0].name == "B: skip");
+            }
+            if (shots.isNotEmpty())
+                saveMenus (juce::StringArray { tr ("Marker") }, std::vector<juce::PopupMenu> { markerMenu }, shots + "-13-marker-menu.png");
+
+            playlist.selectTracksForSnapshot ({ 6, 7, 8 });
+            const auto trackMenu = playlist.trackMenuForSnapshot (6);
+            if (const auto* group = find (trackMenu, tr ("Group with above track"), kept); group != nullptr && group->action)
+            {
+                group->action();
+                const auto& t = offline.getSong().playlistTracks;
+                check ("Group with above track: every selected track", t.size() > 8 && t[6].grouped && t[7].grouped && t[8].grouped && ! t[9].grouped);
+                offline.undo();
+                check ("Group: one undo step", ! offline.getSong().playlistTracks[6].grouped && ! offline.getSong().playlistTracks[8].grouped);
+            }
+            else
+                check ("track menu: Group with above track", false);
+            if (shots.isNotEmpty())
+                saveMenus (juce::StringArray { tr ("Track") }, std::vector<juce::PopupMenu> { trackMenu }, shots + "-16-track-menu.png");
         }
         return result;
     }

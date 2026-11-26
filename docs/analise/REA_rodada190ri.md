@@ -38,3 +38,49 @@ FL's audio settings were not touched. The Alt keys were sent with the typing key
 - **#272:** core/StepSlide.h. An .flp slide note of length 0 was imported one step long (held on generators): it looked and glided a step
   too long. Now one tick, held, drawn as FL's pill, written back as length 0. Projects saved by an older LYNX keep what they play. The
   .flp export wrote every slide note of one step on a sample channel as length 0 (it would jump in FL): it keeps its length now.
+
+## Second batch (kainproctor and yannikthegenius, 25 Nov)
+
+FL 2026 live, synthetic projects saved by FL in the same sessions: `flmark/m1.flp` (markers of every kind), `m2.flp` (markers a 1,
+b 3, c 7, d 9 with clips at 1, 3, 4, 6, 7, 9), `m2_right.flp` / `m2_left.flp` (what Move content right / left on b saved).
+Shots in `raw/` stay local (FL's title bar shows the licence owner).
+
+| Question | FL 2026 | Evidence |
+|---|---|---|
+| Two skip markers in a row (k3) | A skip that lands on another skip's position goes on to that one's target (1–2 → 7 in m1); the chain is followed at once, also in the render | m1.flp, raw/mk* |
+| A skip that lands on a pause marker | Playback stops there (11:01:00); Play goes on from there, not from the song start | m1.flp, raw/mk* |
+| Marker loop after a skip | 17–18 repeats as when reached without the skip | m1.flp, raw/mk* |
+| Right-click on a marker's tag (k4/k5) | Add marker..., Add time signature..., Place loop, header "<name> at 8:01:00", Delete, Rename..., (separator) Move content left / right, header "Action", radios None, Start, Loop, Marker loop, Marker skip, Marker pause, Time signature, Start recording, Stop recording | raw/mg3 |
+| Left-click / drag on a tag | A click does nothing; a drag moves the marker (snapped) | raw/mg0–mg2 |
+| Move content right on b | b's section (3–6) and c's (7–8) change places with their clips and markers: c at 3, b at 5 | m2_right.flp |
+| Move content left | the same with the section before (from the previous marker, or bar 1) | m2_left.flp |
+| Track headers, several selected (k6) | Ctrl+Shift+click adds tracks to the selection (Shift+click renames); the header menu's Group with above track, Ungroup, Delete (one question with the list: "Are you sure you want to delete 3 selected tracks?"), Move up / down (as a block, past a whole group), Reset, Size, Mute all clips, Random color (a colour per track) act on every selected track | raw/g* (gw: the delete question) |
+| ... right-click on a track that is not selected | it alone becomes the selection | raw/gt* |
+| A shortened channel name (#301) | The button shows "BWB WA..RT (22)"; hovering it, the hint bar shows the whole name (two lines) and the plugin ("3x Osc") on the right | fl301/long.flp, shots/18-301-fl-hover.png |
+| Long hints (#296) | FL's hints are short; the hint bar wraps to a second line; nothing longer is shown | FL's own hints as captured for 190jo |
+
+## Second batch: LYNX before / now
+
+- **Skip chains (item 12):** `markers::compile` followed only the first skip. Now a jump that lands on another jump's start goes on
+  to its target, and one that lands on a pause becomes "jump then pause" (`MarkerJump::jumpThenPause`). A pause kept position 0,
+  so Play after a pause restarted at the song's start: it keeps the marker's position now. The export's spans skip the same way.
+- **Marker menu (item 13):** `PlaylistComponent::markerMenu`, FL's items first; LYNX's ruler menu stays one level down ("Ruler").
+  The tag's hit area takes 3 px above it too. Left-drag moves the marker in one undo step; a click without a drag still goes to it
+  (LYNX). `markers::moveContent` / `canMoveContent` (core/MarkerPlan).
+- **Track menu on a selection (item 16):** the menu used the clicked track for Group, Ungroup, Delete, Move, Reset, Size, Mute all
+  clips and Random color (one colour for all). Now the selection, each in one undo step; `noteedit::moveTrackBlock`; FL's
+  question before deleting more than one.
+- **DAWproject export (item 11):** an exception in the writer was never caught and no window came ("Doesn't work"). Every failure
+  shows a message now. `--export-dawproject <in> <out> [--stress]` writes without the window (see HANDOFF for the stress numbers
+  and the schema check).
+- **Settings search (#247, item 14):** `TabbedComponent::setCurrentTabIndex` calls `toFront (true)`, which takes the keyboard from
+  the search box when a match is on another page. The box gets the keyboard, caret and selection back at once. As a net for every
+  text field: `ui::keyfocus::typeIntoFieldJustLeft` — for 400 ms after a field lost the keyboard without a mouse press, a plain
+  character goes back into it instead of running a shortcut.
+- **Hint bar (#296, item 15):** a hint that is cut shows whole in the bar's bubble; the bar brings back a cut hint of the last 4 s
+  while the pointer is on it. US English for what the app shows, through the English display table (the tr() keys stay):
+  colour(s/ed), centre(d), licence, grey(ed/s), analyse(d/ing), normalise, favourite(s), cancelled, neighbour(s), equaliser,
+  labelled (109 texts). "Dialogue" (spoken dialogue, ADR) stays.
+- **Value bubbles (#299, item 17):** JUCE closes a slider's bubble on its mouse-exit or hover timer; a page that scrolls under a
+  still mouse sends neither. `theme::watchSliderPopup` (from the look and feel, as the bubble is made) closes it once its knob is
+  not under the pointer, is hidden, or its window loses the focus; never while it is dragged.
