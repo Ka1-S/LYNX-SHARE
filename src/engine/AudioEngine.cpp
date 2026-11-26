@@ -2,6 +2,7 @@
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/History.h" // (keepProjectClock: round 190re)
+#include "core/SongBytes.h" // round 190rn: the undo history's byte cap
 #include "core/AutoLook.h"
 #include "core/NewClipColours.h"
 #include "core/SessionMixer.h"
@@ -4043,18 +4044,12 @@ void AudioEngine::saveUndoStep()
 
     if (! samePress)
     {
-        undoStack.push_back ({ song, remote });
+        undoStack.push_back ({ song, remote, {}, songbytes::song (song) });
+        redoStack.clear();
+        trimUndoHistory();
         lastPushSize = undoStack.size();
         lastPushMs = nowMs;
         lastPushPress = buttonDown ? juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime() : juce::Time();
-        redoStack.clear();
-
-        if (undoStack.size() > maxUndoSteps)
-        {
-            undoStack.pop_front();
-            if (recordPassMarked)
-                ++recordPassTrimmed;
-        }
         if (sessionHistory)
         {
             closeSessionStep();
@@ -4066,6 +4061,27 @@ void AudioEngine::saveUndoStep()
     }
     if (sessionHistory)
         sessionAfterOpen = true;
+}
+
+std::size_t AudioEngine::getUndoBytes() const noexcept
+{
+    std::size_t bytes = 0;
+    for (const auto* stack : { &undoStack, &redoStack })
+        for (const auto& entry : *stack)
+            bytes += entry.bytes;
+    return bytes;
+}
+
+void AudioEngine::trimUndoHistory()
+{
+    auto bytes = getUndoBytes();
+    while (undoStack.size() > maxUndoSteps || (bytes > maxUndoBytes && undoStack.size() > 1))
+    {
+        bytes -= undoStack.front().bytes;
+        undoStack.pop_front();
+        if (recordPassMarked)
+            ++recordPassTrimmed;
+    }
 }
 
 // round 190mv (DF-134): FL's "Undo knob tweaks" off. The tweak and its edit come within one press (a drag) or one
@@ -4364,7 +4380,7 @@ void AudioEngine::historyStep (bool redo)
         // The model's saved blob can differ from the running vendor's normalized blob. Redo must restore the
         // actual state we are leaving, captured before any history movement, rather than the stale model bytes.
         std::optional<HistoryEntry> inverse;
-        if (remote) inverse.emplace (HistoryEntry { *before, true });
+        if (remote) inverse.emplace (HistoryEntry { *before, true, {}, songbytes::song (*before) });
         const auto fresh = remote ? remoteFreshTargets (*before, from.back().song) : std::unordered_set<std::uint64_t>();
         const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
         if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
@@ -4377,7 +4393,11 @@ void AudioEngine::historyStep (bool redo)
         movementMayHaveBegun = true;
         const auto clock = song.info;
         if (remote) to.push_back (std::move (*inverse));
-        else to.push_back ({ std::move (song), false });
+        else
+        {
+            const auto bytes = songbytes::song (song);
+            to.push_back ({ std::move (song), false, {}, bytes });
+        }
         song = std::move (from.back().song);
         from.pop_back();
         keepProjectClock (song.info, clock); // (round 190re: undo no longer turns the working time back)
@@ -4486,14 +4506,16 @@ void AudioEngine::jumpToHistory (int index)
     // move through the stacks, then publish once
     while (getHistoryPosition() > index && ! undoStack.empty())
     {
-        redoStack.push_back ({ std::move (song), undoStack.back().remote });
+        const auto bytes = songbytes::song (song);
+        redoStack.push_back ({ std::move (song), undoStack.back().remote, {}, bytes });
         song = std::move (undoStack.back().song);
         undoStack.pop_back();
     }
 
     while (getHistoryPosition() < index && ! redoStack.empty())
     {
-        undoStack.push_back ({ std::move (song), redoStack.back().remote });
+        const auto bytes = songbytes::song (song);
+        undoStack.push_back ({ std::move (song), redoStack.back().remote, {}, bytes });
         song = std::move (redoStack.back().song);
         redoStack.pop_back();
     }
