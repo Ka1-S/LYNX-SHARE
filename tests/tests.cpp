@@ -18118,3 +18118,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hotfix190rcFlpDataTests.inc" // round 190rc: the .flp export writes the project data folder only when it is on this computer (FL 2026: "Invalid project data folder")
 #include "Hotfix190rcPresetsTests.inc" // round 190rc: issue #288, FL presets of the native generators open the generator itself
 #include "Qa190rbTests.inc" // round 190rb (0.1.32 quality): crash / memory fixes from the crash reports, ASan / UBSan and the UI monkey
+#include "Hotfix190ruTests.inc" // round 190ru (0.1.31.3): the .flp export writes plugin song-start values on the plugin's range (FL rendered it as DC)
