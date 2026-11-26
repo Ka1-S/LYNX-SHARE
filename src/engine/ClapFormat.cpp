@@ -467,6 +467,15 @@ public:
 
         inputChannels = mainPortChannels (true, description.isInstrument ? 0 : 2);
         outputChannels = juce::jmax (1, mainPortChannels (false, 2));
+        extraInputPorts = furtherPortChannels (true);
+        extraOutputPorts = furtherPortChannels (false);
+        // round 190rk: a second input port is the plugin's sidechain: a second JUCE input bus ("Sidechain", off until
+        // a slot's sidechain source turns it on, as for VST3), so the Mixer's sidechain routing reaches it
+        if (! extraInputPorts.empty() && extraInputPorts.front() > 0 && getBusCount (true) < 2)
+        {
+            const juce::ScopedValueSetter<bool> allow (addingSideBus, true);
+            addBus (true);
+        }
 
         if (gui != nullptr && ! gui->is_api_supported (plugin, platform::NativeEmbed::clapWindowApi(), false))
             gui = nullptr;
@@ -569,6 +578,9 @@ public:
             activeRate = sampleRate;
             maxBlock = juce::jmax (1, blockSize);
             scratch.setSize (juce::jmax (2, outputChannels), maxBlock);
+            const auto sum = [] (const std::vector<int>& ports) { int total = 0; for (auto c : ports) total += c; return total; };
+            extraIn.setSize (juce::jmax (1, sum (extraInputPorts)), maxBlock);
+            extraOut.setSize (juce::jmax (1, sum (extraOutputPorts)), maxBlock);
 
             if (latency != nullptr)
                 setLatencySamples ((int) latency->get (plugin));
@@ -737,13 +749,71 @@ public:
             return true;
         };
 
+        // round 190rk: one buffer per declared port (see extraInputPorts): the main ones, then silence / a scratch
+        std::array<clap_audio_buffer_t, 16> inBuffers {}, outBuffers {};
+        std::array<float*, 64> extraInPointers {}, extraOutPointers {};
+        uint32_t inCount = 0, outCount = 0;
+        const auto hasMainInput = inputChannels > 0 || ! extraInputPorts.empty();
+        if (hasMainInput)
+            inBuffers[inCount++] = in;
+        // the sidechain port (the first extra input) gets the side bus's channels when a slot's source turned it on
+        const auto mainBusChannels = getBusCount (true) > 0 && getBus (true, 0)->isEnabled() ? getBus (true, 0)->getNumberOfChannels() : 0;
+        const auto sideChannels = getBusCount (true) > 1 && getBus (true, 1)->isEnabled() ? getBus (true, 1)->getNumberOfChannels() : 0;
+        std::array<float*, 16> sidePointers {};
+        {
+            int channel = 0;
+            bool first = true;
+            for (const auto c : extraInputPorts)
+            {
+                if (first && sideChannels > 0 && c > 0 && mainBusChannels + sideChannels <= buffer.getNumChannels())
+                {
+                    first = false;
+                    auto& b = inBuffers[inCount++];
+                    for (int k = 0; k < c && k < (int) sidePointers.size(); ++k)
+                        sidePointers[(std::size_t) k] = buffer.getWritePointer (mainBusChannels + juce::jmin (k, sideChannels - 1));
+                    b.data32 = sidePointers.data();
+                    b.channel_count = (uint32_t) c;
+                    continue;
+                }
+                first = false;
+                auto& b = inBuffers[inCount++];
+                b.data32 = extraInPointers.data() + juce::jmin (channel, (int) extraInPointers.size() - 1);
+                b.channel_count = (uint32_t) c;
+                for (int k = 0; k < c && channel < (int) extraInPointers.size() && channel < extraIn.getNumChannels(); ++k, ++channel)
+                {
+                    extraIn.clear (channel, 0, n); // (silence: no sidechain source reaches a CLAP plugin yet)
+                    extraInPointers[(std::size_t) channel] = extraIn.getWritePointer (channel);
+                }
+            }
+        }
+        outBuffers[outCount++] = out;
+        {
+            int channel = 0;
+            for (const auto c : extraOutputPorts)
+            {
+                auto& b = outBuffers[outCount++];
+                b.data32 = extraOutPointers.data() + juce::jmin (channel, (int) extraOutPointers.size() - 1);
+                b.channel_count = (uint32_t) c;
+                for (int k = 0; k < c && channel < (int) extraOutPointers.size() && channel < extraOut.getNumChannels(); ++k, ++channel)
+                {
+                    extraOut.clear (channel, 0, n);
+                    extraOutPointers[(std::size_t) channel] = extraOut.getWritePointer (channel);
+                }
+            }
+        }
+
+        // round 190rk: the host's transport (tempo, signature, position, play / record / loop): it was never given, so
+        // CLAP plugins could not follow the song's tempo
+        fillTransport (n);
+
         clap_process_t process {};
+        process.transport = &transport;
         process.steady_time = steadyTime;
         process.frames_count = (uint32_t) n;
-        process.audio_inputs = inputChannels > 0 ? &in : nullptr;
-        process.audio_inputs_count = inputChannels > 0 ? 1u : 0u;
-        process.audio_outputs = &out;
-        process.audio_outputs_count = 1;
+        process.audio_inputs = inCount > 0 ? inBuffers.data() : nullptr;
+        process.audio_inputs_count = inCount;
+        process.audio_outputs = outBuffers.data();
+        process.audio_outputs_count = outCount;
         process.in_events = events.get();
         process.out_events = &outEvents;
 
@@ -999,6 +1069,26 @@ private:
         std::atomic<std::size_t> write { 0 }, read { 0 };
     };
 
+    bool canAddBus (bool isInput) const override { return isInput && addingSideBus; }
+    bool canApplyBusCountChange (bool isInput, bool isAdding, BusProperties& out) override
+    {
+        if (! isAdding || ! canAddBus (isInput))
+            return false;
+        const auto channels = extraInputPorts.empty() ? 2 : juce::jlimit (1, 2, extraInputPorts.front());
+        out.busName = "Sidechain";
+        out.defaultLayout = channels == 1 ? juce::AudioChannelSet::mono() : juce::AudioChannelSet::stereo();
+        out.isActivatedByDefault = false;
+        return true;
+    }
+    bool isBusesLayoutSupported (const BusesLayout& layouts) const override
+    {
+        // the main buses as they are; the sidechain bus off or with its port's channels
+        if (layouts.inputBuses.size() > 1 && ! layouts.inputBuses[1].isDisabled()
+            && layouts.inputBuses[1].size() != (extraInputPorts.empty() ? 2 : juce::jlimit (1, 2, extraInputPorts.front())))
+            return false;
+        return true;
+    }
+
     static BusesProperties busesFor (const juce::PluginDescription& d)
     {
         BusesProperties buses;
@@ -1007,6 +1097,84 @@ private:
             buses = buses.withInput ("Input", juce::AudioChannelSet::stereo(), true);
 
         return buses.withOutput ("Output", juce::AudioChannelSet::stereo(), true);
+    }
+
+    // round 190rk: clap_event_transport_t from JUCE's play head (CLAP's fixed point beat and second times)
+    void fillTransport (int)
+    {
+        transport = {};
+        transport.header.size = sizeof (clap_event_transport_t);
+        transport.header.time = 0;
+        transport.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        transport.header.type = CLAP_EVENT_TRANSPORT;
+        transport.header.flags = 0;
+        transport.tempo = 120.0;
+        transport.tsig_num = 4;
+        transport.tsig_denom = 4;
+        auto* head = getPlayHead();
+        const auto pos = head != nullptr ? head->getPosition() : juce::Optional<juce::AudioPlayHead::PositionInfo>();
+        if (! pos.hasValue())
+            return;
+        const auto beats = [] (double b) { return (clap_beattime) std::llround (b * (double) CLAP_BEATTIME_FACTOR); };
+        const auto secs = [] (double t) { return (clap_sectime) std::llround (t * (double) CLAP_SECTIME_FACTOR); };
+        if (const auto bpm = pos->getBpm())
+        {
+            transport.flags |= CLAP_TRANSPORT_HAS_TEMPO;
+            transport.tempo = *bpm;
+        }
+        if (const auto sig = pos->getTimeSignature())
+        {
+            transport.flags |= CLAP_TRANSPORT_HAS_TIME_SIGNATURE;
+            transport.tsig_num = (uint16_t) juce::jlimit (1, 64, sig->numerator);
+            transport.tsig_denom = (uint16_t) juce::jlimit (1, 64, sig->denominator);
+        }
+        if (const auto ppq = pos->getPpqPosition())
+        {
+            transport.flags |= CLAP_TRANSPORT_HAS_BEATS_TIMELINE;
+            transport.song_pos_beats = beats (*ppq);
+            if (const auto bar = pos->getPpqPositionOfLastBarStart())
+                transport.bar_start = beats (*bar);
+            if (const auto count = pos->getBarCount())
+                transport.bar_number = (int32_t) *count;
+        }
+        if (const auto t = pos->getTimeInSeconds())
+        {
+            transport.flags |= CLAP_TRANSPORT_HAS_SECONDS_TIMELINE;
+            transport.song_pos_seconds = secs (*t);
+        }
+        if (pos->getIsPlaying())
+            transport.flags |= CLAP_TRANSPORT_IS_PLAYING;
+        if (pos->getIsRecording())
+            transport.flags |= CLAP_TRANSPORT_IS_RECORDING;
+        if (pos->getIsLooping())
+        {
+            transport.flags |= CLAP_TRANSPORT_IS_LOOP_ACTIVE;
+            if (const auto loop = pos->getLoopPoints())
+            {
+                transport.loop_start_beats = beats (loop->ppqStart);
+                transport.loop_end_beats = beats (loop->ppqEnd);
+                if (transport.tempo > 0.0)
+                {
+                    transport.loop_start_seconds = secs (loop->ppqStart * 60.0 / transport.tempo);
+                    transport.loop_end_seconds = secs (loop->ppqEnd * 60.0 / transport.tempo);
+                }
+            }
+        }
+    }
+
+    // round 190rk: the channel counts of the ports after the first (none without the extension)
+    std::vector<int> furtherPortChannels (bool input) const
+    {
+        std::vector<int> result;
+        if (audioPorts == nullptr)
+            return result;
+        const auto count = audioPorts->count (plugin, input);
+        for (uint32_t i = 1; i < count && i < 16; ++i)
+        {
+            clap_audio_port_info_t info {};
+            result.push_back (audioPorts->get (plugin, i, input, &info) ? juce::jlimit (0, 16, (int) info.channel_count) : 0);
+        }
+        return result;
     }
 
     int mainPortChannels (bool input, int fallback) const
@@ -1188,6 +1356,13 @@ private:
     std::atomic<double> activeRate { 0.0 }; // (atomic: prepareToPlay reads them on the export's thread)
     std::atomic<int> maxBlock { 0 };
     int inputChannels = 0, outputChannels = 2;
+    // round 190rk: the channel counts of the plugin's further audio ports (a sidechain input, extra outputs). CLAP's
+    // process() gets one buffer per declared port; with the main port's only, FabFilter's Pro-Q 4 / Pro-C 3 / Pro-L 2 /
+    // Saturn 2 read past the array and crashed on their first block. They get silence (inputs) and a scratch (outputs).
+    std::vector<int> extraInputPorts, extraOutputPorts;
+    juce::AudioBuffer<float> extraIn, extraOut;
+    bool addingSideBus = false;
+    clap_event_transport_t transport {};
     int64_t steadyTime = 0;
     juce::AudioBuffer<float> scratch;
     EventList events;

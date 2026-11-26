@@ -87,15 +87,17 @@ static unsigned long long thread_id (void)
 }
 
 /* audio ports */
-static uint32_t ports_count (const clap_plugin_t* p, bool in) { (void) p; (void) in; return 1; }
+/* round 190rk: a second port each way (a "Sidechain" input, an "Aux" output), as FabFilter's effects have: the host
+ * must give process() one buffer per declared port (it gave the main ones only, and they read past the array) */
+static uint32_t ports_count (const clap_plugin_t* p, bool in) { (void) p; (void) in; return 2; }
 static bool ports_get (const clap_plugin_t* p, uint32_t index, bool in, clap_audio_port_info_t* info)
 {
     (void) p;
-    if (index != 0) return false;
+    if (index > 1) return false;
     memset (info, 0, sizeof (*info));
-    info->id = in ? 0 : 1;
-    strcpy (info->name, in ? "In" : "Out");
-    info->flags = CLAP_AUDIO_PORT_IS_MAIN;
+    info->id = (in ? 0 : 1) + 10 * index;
+    strcpy (info->name, index == 1 ? (in ? "Sidechain" : "Aux") : (in ? "In" : "Out"));
+    info->flags = index == 0 ? CLAP_AUDIO_PORT_IS_MAIN : 0;
     info->channel_count = 2;
     info->port_type = CLAP_PORT_STEREO;
     info->in_place_pair = CLAP_INVALID_ID;
@@ -312,6 +314,18 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
     for (; next < events; ++next)
         apply_event (e, proc->in_events->get (proc->in_events, next), n);
 
+    if (e->calls == 4)
+    {
+        /* round 190rk: what the host passed (one buffer per port; a transport) */
+        char line[160];
+        int writable = proc->audio_outputs_count > 1 && proc->audio_outputs[1].channel_count > 0 && proc->audio_outputs[1].data32 != NULL
+                       && proc->audio_outputs[1].data32[0] != NULL;
+        if (writable) proc->audio_outputs[1].data32[0][0] = 0.0f;
+        snprintf (line, sizeof (line), "ports in=%u out=%u side_channels=%u aux_writable=%d transport=%d\n", proc->audio_inputs_count,
+                  proc->audio_outputs_count, proc->audio_inputs_count > 1 ? proc->audio_inputs[1].channel_count : 0u, writable,
+                  proc->transport != NULL ? 1 : 0);
+        say (line);
+    }
     if (++e->calls == 10)
     {
         const clap_host_thread_pool_t* pool = (const clap_host_thread_pool_t*) e->host->get_extension (e->host, CLAP_EXT_THREAD_POOL);
