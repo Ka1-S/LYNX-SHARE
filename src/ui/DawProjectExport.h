@@ -13,4 +13,6 @@ void showDawProjectExport (AudioEngine& engine, juce::Component* parent, const j
 
 // Writes `target` (a .dawproject); false with `error`. `notes` gets what was left out. (Also --export-dawproject.)
 bool writeDawProjectFile (const Song& song, PluginHost* host, const juce::File& target, juce::StringArray& notes, juce::String& error);
+// (round 190ri, --selftest) what the export window does: the plugins' records read here, the file written on another thread
+bool writeDawProjectOnWorkerForTests (AudioEngine& engine, const juce::File& target, juce::StringArray& notes, juce::String& error);
 } // namespace lynx

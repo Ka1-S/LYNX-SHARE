@@ -202,6 +202,10 @@ void insertTrack (Song& song, int track);
 void removeTrack (Song& song, int track);
 // Swaps two tracks (their clips and headers), in every arrangement.
 void swapTracks (Song& song, int a, int b);
+// FL's Move up / down of the selected Playlist tracks (round 190ri, FL 2026 live): a run of tracks moves as one block past the
+// next track up / down, or past that track's whole group (a group header and its members); tracks not in one run move
+// one by one. `count` = the rows shown. Returns where the tracks are now.
+std::vector<int> moveTrackBlock (Song& song, std::vector<int> tracks, int direction, int count);
 // Solo: `track` plays alone (every other track muted); on the only unmuted track it unmutes all.
 // `memory` (round 190bx, core/FlSettings.h; null = none kept): the solo remembers every track's mute switch; with
 // `restore` (FL's General › "Restore previous state after solo") the un-solo puts them back instead of unmuting

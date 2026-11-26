@@ -338,11 +338,15 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             safe->playlist.selectTracks (tracks);
     };
     mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
-                                                                                             std::function<void (const std::vector<juce::File>&)> done) {
+                                                                                             std::function<void (const std::vector<juce::File>&, const exportopts::Options&)> done) {
         if (safe != nullptr)
             safe->mixer.selectTrack (0); // (round 190my: FL's render window selects the Master, see exportAudio)
         if (safe != nullptr)
             showExportDialogForTracks (safe->engine, safe->currentFile.getParentDirectory(), safe->projectName, tracks, std::move (done));
+    };
+    mixeroptions::pickAudioClip = [safe = juce::Component::SafePointer<MainComponent> (this)] (int channel) {
+        if (safe != nullptr)
+            safe->playlist.paintSource (ClipKind::audio, channel);
     };
     // round 190np: LYNX_EMPTY_HINTS=1 shows the empty-state hints in an off-screen window too (--paintbench measures them)
     onboardingOn = ! persistent && juce::SystemStats::getEnvironmentVariable ("LYNX_EMPTY_HINTS", {}) == "1";
@@ -2449,6 +2453,9 @@ bool MainComponent::shouldDropFilesWhenDraggedExternally (const juce::DragAndDro
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    // issue #247, reopened (round 190ri): letters typed while a text field just lost the keyboard go back into it
+    if (ui::keyfocus::typeIntoFieldJustLeft (key))
+        return true;
     const workflowextras::TempToolHold::Scope toolKey (workflowextras::tempTools(), key.getKeyCode()); // round 190iu (issue #191.1)
     if (mapKeyPressed (key)) // round 190ef: the map modes' keys and the key mappings (Clip-launch layout only)
         return true;
@@ -2560,6 +2567,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
 
+    // FL: with the typing keyboard on, Alt + a tool's letter picks the tool (round 190ri)
+    if (const auto tool = keyMap.findToolWithAlt (chord, focusContext(), typingPiano); ! tool.empty() && runAction (tool))
+        return true;
+
     // #228 (round 190nq, LYNX extra): "?" (on any keyboard layout) that nothing above used — the Clip-launch Info View
     // keeps it in Live's look — opens the action search
     if (key.getTextCharacter() == '?' && ! key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown()
@@ -2660,6 +2671,8 @@ bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
     // every press (FL's dialog takes the key and nothing happens).
     if (modalDialogOpen())
         return false;
+    if (ui::keyfocus::typeIntoFieldJustLeft (key)) // (issue #247, round 190ri: the Settings window's search box)
+        return true;
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions. Hotfix 0.1.31.2
     // (round 190ra; 10.net): a key a docked plugin left unused comes here (a detached one's goes to keyFromPluginView), and
     // JUCE may still hold a text field of the main window as focused (the Browser's search, a name box) while the system's
@@ -3179,6 +3192,7 @@ bool MainComponent::runAction (const std::string& id)
             closeChannelSettings();
             closeAllToolWindows();
             closeHelp();
+            actionSearch = nullptr; // (round 190ri: the Search palette stayed over the window)
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
@@ -5765,6 +5779,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addSubMenu (tr ("Sort channels"), sort);
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
+            // FL: after Color / Mute / Unmute selected (round 190ri)
+            menu.addItem (tr ("Transpose selected..."), ! engine.getSelectedChannels().empty(), false, [this] { rack.transposeSelected(); });
             // FL 2026's next part (capture 190mf A4, fl-rack-options-menu.png): Zip selected Alt+Z, Unzip all Alt+U (round 190mk)
             menu.addSeparator();
             action (menu, "rack.zipSelected", tr ("Zip selected"), ! engine.getSelectedChannels().empty());
@@ -7593,6 +7609,14 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     menu.addItem (tr ("Rename and color...") + shortcutText ("pattern.rename"), [this, index] { showRenamePattern (index); });
     menu.addSubMenu (tr ("Color"), colours);
     menu.addSubMenu (tr ("Length"), lengths);
+    if (picked.empty())
+        picked = { index };
+    // FL's Patterns › Transpose... (PSPatTransposeMenu, round 190ri): every channel of the pattern; from the picker, every picked pattern
+    menu.addItem (tr ("Transpose..."), [this, picked] {
+        showTransposeDialog ([this, picked] (int semitones) {
+            engine.editSong ([picked, semitones] (Song& s) { transposePatterns (s, picked, {}, semitones); });
+        });
+    });
     menu.addItem (tr ("Insert an empty pattern before this one") + shortcutText ("pattern.insert"), [this] { insertPatternHere(); });
     menu.addItem (tr ("Clone") + shortcutText ("pattern.clone"), [this] { clonePatternNow(); });
     menu.addItem (tr ("Move up") + shortcutText ("pattern.moveUp"), index > 0, false, [this] { movePatternNow (-1); });
@@ -7600,8 +7624,6 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     menu.addItem (tr ("Split by channel"), ! pattern.notes.empty(), false, [this] { splitPatternByChannelNow(); }); // (round 190qu: FL's name and result)
     // FL's Patterns › PSPatQuickRenderMenu / PSPatRenderMenu / PSPatRenderReplaceMenu (PSPatQuickRenderMenuClick, tags 1 / 0 / 2;
     // REA round 168e); opened from the picker, every picked pattern is rendered (round 169k)
-    if (picked.empty())
-        picked = { index };
     menu.addItem (tr ("Quick render as audio clip"), [this, picked] { renderPatternsAsAudioClips (engine, picked, 1); });
     menu.addItem (tr ("Render as audio clip..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 0); });
     menu.addItem (tr ("Render and replace..."), [this, picked] { renderPatternsAsAudioClips (engine, picked, 2); });
@@ -8874,7 +8896,8 @@ void MainComponent::timerCallback()
 
             mouseAt = source.getScreenPosition();
             if (auto* under = source.getComponentUnderMouse(); under == &hintBar)
-                hint = hintBar.getHint(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu)
+                hint = hintBar.hintToKeep(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu;
+                                             // issue #296, round 190ri: a cut hint of the last seconds comes back, whole in the bubble)
             else if (under != nullptr)
             {
                 live = source.isDragging();

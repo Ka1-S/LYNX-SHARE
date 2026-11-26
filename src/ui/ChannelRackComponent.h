@@ -230,6 +230,7 @@ public:
     juce::String filterName() const;
     void showFilterMenu (juce::Component* target);
     void rename (int channel); // "Rename and color..." (F2; issue #201: a new colour goes to every selected channel)
+    void transposeSelected(); // FL's "Transpose selected..." (round 190ri): the selected channels' notes in the current pattern
     void groupSelected (); // "Group selected..." (Alt+G): the selected channels go into a new, named group
     void moveSelectedToGroup (int group); // -1 = no group
     bool isShown (int row) const;          // not hidden by the filter

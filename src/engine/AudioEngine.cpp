@@ -2506,9 +2506,11 @@ void AudioEngine::startAudioTake()
             insert += " DI"; // the dry take of "also record the dry input (LYNX)"
         juce::File file;
         auto recordTo = w.track > 0 ? juce::String::fromUTF8 (song.mixer[(std::size_t) w.track].recordTo.c_str()) : juce::String();
+        if (! juce::File::isAbsolutePath (recordTo)) // (an imported "C:\\..." on Linux / macOS: not a place here; round 190ri)
+            recordTo.clear();
         if (w.dry && recordTo.isNotEmpty())
             recordTo = juce::File (recordTo).getSiblingFile (juce::File (recordTo).getFileNameWithoutExtension() + " DI.wav").getFullPathName();
-        if (recordTo.isNotEmpty() && juce::File::isAbsolutePath (recordTo))
+        if (recordTo.isNotEmpty())
         {
             // FL's "Record <insert> to" file (round 167a): that file; LYNX never overwrites an earlier take, the next
             // ones get "_2", "_3"... (its own choice)
@@ -8335,10 +8337,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             else if (markerJump != nullptr && transportReached (position, (double) markerJump->at))
             {
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
-                if (markerJump->kind == MarkerJump::Kind::pause)
+                if (markerJump->kind != MarkerJump::Kind::jump)
                 {
-                    // FL's "Marker pause": playback stops at the marker; Play goes on from there
-                    position = (double) markerJump->at;
+                    // FL's "Marker pause": playback stops at the marker; Play goes on from there (a skip that lands on one:
+                    // from where it landed, round 190ri)
+                    position = (double) markerJump->to;
                     transport.positionTicks.store (position, std::memory_order_relaxed);
                     transport.playing.store (false, std::memory_order_relaxed); // the rest of the block plays stopped
                 }

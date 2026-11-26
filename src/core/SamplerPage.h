@@ -5,6 +5,7 @@
 // /mnt/e/lynx-work/sampler190dh/FL-FACTS.md), form resource TPluginForm.SmpSheet (rea190bc dfm dump), REA rounds 3,
 // 167h and 181b. Header-only, no JUCE.
 
+#include "core/CopyName.h"
 #include "core/Song.h"
 
 #include <algorithm>
@@ -352,9 +353,7 @@ inline std::string openInNewChannelName (const Song& song, const std::string& sa
     };
     if (! taken (sampleName))
         return sampleName;
-    for (int n = 2;; ++n)
-        if (auto name = sampleName + " #" + std::to_string (n); ! taken (name))
-            return name;
+    return copyname::next (sampleName, taken);
 }
 
 // Remove sample (live check 190ew CTL-4): FL clears the sample and renames the channel "Sampler" without asking

@@ -1854,6 +1854,116 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     }
 }
 
+namespace
+{
+struct SliderPopupWatch final : juce::Timer
+{
+    struct Entry
+    {
+        juce::Component::SafePointer<juce::Slider> slider;
+        bool focused = false; // (its window had the focus when the bubble opened)
+    };
+    std::vector<Entry> list;
+
+    static bool windowFocused (const juce::Component& c)
+    {
+        auto* peer = c.getPeer();
+        return peer != nullptr && peer->isFocused();
+    }
+
+    void add (juce::Slider& s)
+    {
+        for (auto& e : list)
+            if (e.slider.getComponent() == &s)
+                return;
+        list.push_back ({ &s, windowFocused (s) });
+        if (! isTimerRunning())
+            startTimer (60);
+    }
+
+    static bool shouldClose (const Entry& e)
+    {
+        auto& s = *e.slider;
+        if (! s.isShowing())
+            return true;
+        if (s.isMouseButtonDown())
+            return false; // (dragged: the bubble follows the value)
+        if (e.focused && ! windowFocused (s))
+            return true;
+        const auto pointer = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+        return ! pointOnVisiblePart (s, pointer);
+    }
+
+    int check()
+    {
+        int closed = 0;
+        for (auto it = list.begin(); it != list.end();)
+        {
+            auto* s = it->slider.getComponent();
+            if (s == nullptr || s->getCurrentPopupDisplay() == nullptr)
+            {
+                it = list.erase (it);
+                continue;
+            }
+            if (shouldClose (*it))
+            {
+                // (Slider's own mouse-exit is what closes the bubble; called as the base's, an override cannot skip it)
+                const auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const auto now = juce::Time::getCurrentTime();
+                const juce::MouseEvent exit (source, {}, juce::ModifierKeys::currentModifiers, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, s, s, now, {}, now, 0, false);
+                s->juce::Slider::mouseExit (exit);
+                ++closed;
+                it = list.erase (it);
+                continue;
+            }
+            ++it;
+        }
+        if (list.empty())
+            stopTimer();
+        return closed;
+    }
+
+    void timerCallback() override { check(); }
+};
+
+SliderPopupWatch& sliderPopupWatch()
+{
+    static SliderPopupWatch w;
+    return w;
+}
+} // namespace
+
+bool pointOnVisiblePart (const juce::Component& c, juce::Point<int> screen)
+{
+    auto area = c.getScreenBounds();
+    for (auto* p = c.getParentComponent(); p != nullptr && ! area.isEmpty(); p = p->getParentComponent())
+        area = area.getIntersection (p->getScreenBounds());
+    if (! area.contains (screen))
+        return false;
+    // (another window or a part drawn over it: the component under the pointer must be it or one of its own parts)
+    if (auto* top = c.getTopLevelComponent(); top != nullptr && top->isShowing())
+        if (auto* under = top->getComponentAt (top->getLocalPoint (nullptr, screen)); under != nullptr && under != &c && ! c.isParentOf (under))
+            if (dynamic_cast<juce::BubbleComponent*> (under) == nullptr)
+                return false;
+    return true;
+}
+
+void watchSliderPopup (juce::Slider& slider)
+{
+    sliderPopupWatch().add (slider);
+}
+
+int checkSliderPopupsNow()
+{
+    return sliderPopupWatch().check();
+}
+
+int LookAndFeel::getSliderPopupPlacement (juce::Slider& slider)
+{
+    watchSliderPopup (slider); // (asked once, as the bubble is made)
+    return juce::LookAndFeel_V4::getSliderPopupPlacement (slider);
+}
+
 juce::Font LookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
 {
     return uiFont (juce::jmin ((float) type::body, (float) buttonHeight * 0.6f));

@@ -48,6 +48,11 @@ public:
 // st / ct number fields) and their value texts
 struct Laf final : juce::LookAndFeel_V4
 {
+    int getSliderPopupPlacement (juce::Slider& s) override // (issue #299: its value bubble is watched too)
+    {
+        theme::watchSliderPopup (s);
+        return juce::LookAndFeel_V4::getSliderPopupPlacement (s);
+    }
     void drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool) override
     {
         const auto r = b.getLocalBounds().toFloat().reduced (0.5f);

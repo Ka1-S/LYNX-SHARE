@@ -202,7 +202,7 @@ class StemsThread final : public juce::ThreadWithProgressWindow
 {
 public:
     StemsThread (const AudioEngine& e, exportopts::Options o, juce::File base, const std::vector<int>& onlyTracks = {},
-                 std::function<void (const std::vector<juce::File>&)> done = {})
+                 TrackRenderDone done = {})
         : juce::ThreadWithProgressWindow (exportopts::exportsSections (e.getSong(), o) && o.stems == exportopts::Stems::none ? tr ("Exporting sections...")
                                                                                                                          : tr ("Exporting stems..."),
                                           true, true),
@@ -235,7 +235,7 @@ public:
     {
         const auto sectioned = plan.sectioned;
         if (! cancelled && written > 0 && afterRender)
-            afterRender (files);
+            afterRender (files, options);
         if (! cancelled && written > 0 && exportdone::window()) // issue #280 (round 190qr, LYNX extra)
         {
             showExportDoneWindow (sectioned ? tr ("Sections exported") : tr ("Stems exported"),
@@ -265,7 +265,7 @@ public:
     std::shared_ptr<LiveExportHold> liveHold;
 
 private:
-    std::function<void (const std::vector<juce::File>&)> afterRender;
+    TrackRenderDone afterRender;
     exportopts::Options options;
     juce::File baseFile;
     StemPlan plan;
@@ -437,8 +437,13 @@ public:
         }
         rememberedStems = options.stems;
         rememberedStemsMaster = options.stemsIncludeMaster;
+        remembered = options;
         if (! onlyTracks.empty())
         {
+            // FL's "Rendering mixer track" window (round 190ri, live check of FL 2026): WAV, the files in the recordings folder
+            // under FL's recording name ("<project>_<yyyy-mm-dd hh-mm-ss>_<insert>"), no file dialog
+            options = withSingleFormat (options, Format::wav);
+            options.nameTemplate = "$project_$date $hour-$minute-$second_$track";
             options.stems = Stems::mixerTracks;
             options.stemsIncludeMaster = std::find (onlyTracks.begin(), onlyTracks.end(), 0) != onlyTracks.end();
         }
@@ -655,6 +660,8 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &nameLabel, &nameEditor, &wildcardButton, &folderButton, &namePreview })
             c->setVisible (naming);
 
+        if (! onlyTracks.empty())
+            exportButton.setButtonText (trc ("@render button: Start")); // (FL's button; no file dialog follows)
         exportButton.setColour (juce::TextButton::buttonColourId, theme::colour::accent);
         exportButton.setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
         addAndMakeVisible (exportButton);
@@ -1192,6 +1199,8 @@ private:
     // the folder the file dialog opens in (and where $take looks)
     juce::File exportFolder() const
     {
+        if (! onlyTracks.empty()) // (round 190ri: FL renders mixer tracks into the recordings folder)
+            return trackFolder != juce::File() ? trackFolder : engine.getRecordingFolder();
         return lastFolder.isDirectory() ? lastFolder
                : suggestedFolder.isDirectory() ? suggestedFolder
                                                : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
@@ -1203,6 +1212,8 @@ private:
         const auto& song = engine.getSong();
         exportnaming::Context c;
         c.project = suggestedName.toStdString();
+        if (! onlyTracks.empty() && engine.getRecordingStem().isNotEmpty())
+            c.project = engine.getRecordingStem().toStdString();
         const auto now = nowForNaming != juce::Time() ? nowForNaming : juce::Time::getCurrentTime();
         c.year = now.getYear();
         c.month = now.getMonth() + 1;
@@ -1251,6 +1262,8 @@ private:
     // for every name (rollup 0.1.32 step 2: one path for both).
     bool writesWithoutDialog() const
     {
+        if (! onlyTracks.empty())
+            return true;
         return naming && (exportnaming::hasFolders (options.nameTemplate) || (saveextras::exportNoDialog() && exportFolder().isDirectory()));
     }
     juce::File directTarget() const { return exportFolder().getChildFile (resolvedName() + juce::String (exportopts::extension (options.format))); }
@@ -1270,7 +1283,7 @@ private:
 public:
     void setExportFolder (const juce::File& dir)
     {
-        lastFolder = dir;
+        (onlyTracks.empty() ? lastFolder : trackFolder) = dir;
         refreshName();
     }
     bool writesWithoutDialogForCheck() { readControls(); return writesWithoutDialog(); }
@@ -1549,20 +1562,23 @@ private:
     {
         if (persistent)
         {
-            auto remembered = options; // (the locked stem choice of a track render is not remembered)
+            auto kept = options; // (the locked stem choice, the format and the name of a track render are not remembered)
             if (! onlyTracks.empty())
             {
-                remembered.stems = rememberedStems;
-                remembered.stemsIncludeMaster = rememberedStemsMaster;
+                kept.stems = rememberedStems;
+                kept.stemsIncludeMaster = rememberedStemsMaster;
+                kept.format = remembered.format;
+                kept.moreFormats = remembered.moreFormats;
+                kept.nameTemplate = remembered.nameTemplate;
             }
             if (masterMode)
             {
-                remembered.master = false;
-                remembered.stems = beforeMaster.stems;
-                remembered.stemsIncludeMaster = beforeMaster.stemsIncludeMaster;
-                remembered.normalize = beforeMaster.normalize;
+                kept.master = false;
+                kept.stems = beforeMaster.stems;
+                kept.stemsIncludeMaster = beforeMaster.stemsIncludeMaster;
+                kept.normalize = beforeMaster.normalize;
             }
-            exportSettingsFile().replaceWithText (juce::String (exportopts::toText (remembered)));
+            exportSettingsFile().replaceWithText (juce::String (exportopts::toText (kept)));
         }
     }
 
@@ -1613,6 +1629,8 @@ private:
         {
             const auto target = directTarget();
             const auto write = [folder, target] (ExportPanel& panel) {
+                if (! panel.onlyTracks.empty())
+                    folder.createDirectory(); // (the recordings folder is made with the first recording)
                 makeFoldersFor (target, folder);
                 panel.startExport (target, folder);
             };
@@ -1680,7 +1698,8 @@ private:
     {
         if (startExportForCheck)
         {
-            lastFolder = base != juce::File() ? base : file.getParentDirectory();
+            if (onlyTracks.empty())
+                lastFolder = base != juce::File() ? base : file.getParentDirectory();
             startExportForCheck (file);
             return;
         }
@@ -1689,7 +1708,8 @@ private:
         const auto tracks = onlyTracks;
         const auto after = afterRender;
         const auto inRealTime = realtime;
-        lastFolder = base != juce::File() ? base : file.getParentDirectory();
+        if (onlyTracks.empty())
+            lastFolder = base != juce::File() ? base : file.getParentDirectory();
         // round 190ap: what "Same as last time" repeats (the plain Export window only)
         if (persistent && additions)
             exportLastFile().replaceWithText (juce::String::fromUTF8 (exportopts::lastExportToText ({ o, file.getFullPathName().toStdString() }).c_str()));
@@ -1730,7 +1750,7 @@ private:
     }
 
 public:
-    std::function<void (const std::vector<juce::File>&)> afterRender; // showExportDialogForTracks: once the files are written
+    TrackRenderDone afterRender; // showExportDialogForTracks: once the files are written
 
 private:
     AudioEngine& engine;
@@ -1745,6 +1765,8 @@ private:
     juce::ComboBox masterBox;
     exportopts::Stems rememberedStems = exportopts::Stems::none;
     bool rememberedStemsMaster = false;
+    exportopts::Options remembered; // what the window opened with (a track render keeps the last export's format and name)
+    juce::File trackFolder;         // "Folder..." of a track render (this window only; none = the recordings folder)
     exportopts::Options options;
     juce::Label tracksLabel, tracksText;
 
@@ -2843,6 +2865,55 @@ juce::String exportFolderTemplateCheck (AudioEngine& engine, const juce::File& f
     return failed.isEmpty() ? juce::String ("OK") : "ERROR " + failed.joinIntoString ("; ");
 }
 
+juce::String exportTracksWindowCheck (AudioEngine& engine, const juce::File& recordings, const juce::String& shotPrefix)
+{
+    juce::StringArray failed;
+    const auto expect = [&failed] (const char* what, bool ok, const juce::String& detail = {}) {
+        if (! ok)
+            failed.add (juce::String (what) + (detail.isEmpty() ? juce::String() : " (" + detail + ")"));
+    };
+    engine.setRecordingTarget (recordings, "Song");
+    const auto before = ExportPanel::baseFolderAfterForCheck();
+    {
+        ExportPanel panel (engine, juce::File(), "LYNX SHARE", false, -1, { 5, 2 });
+        panel.setSize (620, panel.getHeight());
+        std::vector<juce::File> started;
+        panel.startExportForCheck = [&started] (const juce::File& f) { started.push_back (f); };
+        expect ("no file dialog", panel.writesWithoutDialogForCheck());
+        const auto target = panel.directTargetForCheck();
+        expect ("WAV", target.hasFileExtension ("wav"), target.getFileName());
+        expect ("the recordings folder", target.getParentDirectory() == recordings, target.getFullPathName());
+        // "Song_2026-11-25 15-20-58_$track" ($track is each file's insert)
+        expect ("FL's recording name", target.getFileNameWithoutExtension().startsWith ("Song_2") && target.getFileNameWithoutExtension().endsWith ("_$track")
+                                           && target.getFileNameWithoutExtension().length() == juce::String ("Song_2026-11-25 15-20-58_$track").length(),
+                target.getFileName());
+        if (shotPrefix.isNotEmpty())
+            for (const auto scale : { 1.0f, 1.5f })
+            {
+                const juce::File png (shotPrefix + (scale > 1.0f ? "-1-render-window@150.png" : "-1-render-window.png"));
+                png.deleteFile();
+                juce::FileOutputStream out (png);
+                juce::PNGImageFormat().writeImageToStream (panel.createComponentSnapshot (panel.getLocalBounds(), true, scale), out);
+            }
+        panel.clickExportForCheck();
+        expect ("Start started it", started.size() == 1 && started.front().getParentDirectory() == recordings);
+        expect ("the recordings folder was made", recordings.isDirectory());
+        expect ("the Export window's folder is left alone", ExportPanel::baseFolderAfterForCheck() == before);
+        // the files: one per insert, the Master's too, "_2" for a second insert of the same name
+        auto song = engine.getSong();
+        song.mixer[2].name = song.mixer[5].name = "Vox";
+        exportopts::Options o;
+        o.stems = exportopts::Stems::mixerTracks;
+        o.stemsIncludeMaster = true;
+        const auto plan = planStemExport (song, o, recordings.getChildFile ("Song_x_$track.wav"), { 0, 2, 5 });
+        juce::StringArray names;
+        for (const auto& i : plan.items)
+            names.add (i.file.getFileName());
+        expect ("the files' names", names == juce::StringArray { "Song_x_Master.wav", "Song_x_Vox.wav", "Song_x_Vox_2.wav" }, names.joinIntoString (" | "));
+    }
+    return failed.isEmpty() ? juce::String ("OK") : "ERROR " + failed.joinIntoString ("; ");
+}
+
 std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine)
 {
     auto mode = std::make_shared<ClipRenderMode>();
@@ -2854,7 +2925,7 @@ std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine)
 }
 
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
-                                const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender)
+                                const std::vector<int>& tracks, TrackRenderDone afterRender)
 {
     juce::DialogWindow::LaunchOptions options;
     auto panel = std::make_unique<ExportPanel> (engine, suggestedFolder, suggestedName.isNotEmpty() ? suggestedName : "LYNX SHARE", true, -1, tracks);

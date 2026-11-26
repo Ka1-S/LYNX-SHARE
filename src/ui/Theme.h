@@ -452,6 +452,18 @@ juce::String paintCacheSelfTest();
 juce::String softwareRendererSelfTest();
 
 // --- LookAndFeel ---------------------------------------------------------------------------------
+// Issue #299 (round 190ri, Linux AppImage): a knob's value bubble (juce::Slider's popup display) stayed on screen after the
+// page scrolled under a still mouse — JUCE closes it on the knob's mouse-exit or its hover timer, and a scroll sends neither.
+// Watched from its creation, the bubble closes once its knob is no longer under the pointer (moved away, scrolled out of
+// view or under another part), is hidden (the page or the window changed) or its window loses the focus; never while
+// the knob is being dragged. theme::LookAndFeel watches every slider's bubble; another look and feel calls this from its
+// getSliderPopupPlacement.
+void watchSliderPopup (juce::Slider& slider);
+// (tests) one pass of the watch now; returns how many bubbles it closed
+int checkSliderPopupsNow();
+// (tests) whether the pointer at `screen` is on the part of `c` that can be seen (its parents' bounds clip it)
+bool pointOnVisiblePart (const juce::Component& c, juce::Point<int> screen);
+
 class LookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
@@ -479,6 +491,8 @@ public:
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour& backgroundColour, bool highlighted, bool down) override;
     void drawButtonText (juce::Graphics&, juce::TextButton&, bool highlighted, bool down) override;
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
+    // issue #299 (round 190ri): every slider's value bubble is watched (watchSliderPopup) from its creation
+    int getSliderPopupPlacement (juce::Slider& slider) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     void drawTickBox (juce::Graphics&, juce::Component&, float x, float y, float w, float h, bool ticked, bool enabled, bool highlighted, bool down) override;
 

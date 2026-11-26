@@ -1,4 +1,5 @@
 #include "core/GrossBeat.h"
+#include "core/StepSlide.h"
 #include "core/Sections.h"
 #include "core/ChordLaneOps.h"
 #include "core/ClipEnvelope.h"
@@ -1422,7 +1423,8 @@ struct Converter
                 // a step (one step long, on the step grid): FL's step note, which the Channel Rack shows as a step.
                 // Only on a channel that plays a sample: FL holds a step note on a generator (3x Osc, a plugin)
                 // until something cuts it, so the voices pile up (FL render, round 171e)
-                const auto step = (n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel)) || n.heldStep();
+                // A slide note keeps its length (length 0 would move the notes at once) unless it has none (issue #272)
+                const auto step = (! n.slide && n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel)) || n.heldStep() || stepslide::is (n);
                 f.length = step ? 0 : std::max<std::uint32_t> (1, ticks (n.length));
                 f.channel = (std::uint16_t) n.channel;
                 f.key = (std::uint16_t) std::clamp (n.key, 0, 131);

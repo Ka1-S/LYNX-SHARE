@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "core/CopyName.h"
 #include "core/Effects.h"
 #include "core/NoteEdit.h"
 
@@ -122,12 +123,7 @@ std::string uniqueChannelName (const Song& song, const std::string& name)
     };
     if (name.empty() || ! taken (name))
         return name;
-    for (int k = 2;; ++k)
-    {
-        auto candidate = name + " #" + std::to_string (k);
-        if (! taken (candidate))
-            return candidate;
-    }
+    return copyname::next (name, taken);
 }
 
 Song makePatternRenderSong (const Song& song, int pattern)

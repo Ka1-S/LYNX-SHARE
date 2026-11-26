@@ -167,6 +167,11 @@ public:
     // Action triggered by `chord` with `focus` focused; "" for none. `typingPiano`: the piano is on.
     std::string find (const Chord& chord, Context focus, bool typingPiano) const;
 
+    // FL 2026 (live, round 190ri): while the typing keyboard is on, the letters play notes and Alt + a tool's letter picks
+    // the tool in the Playlist and the Piano roll (Alt+C Slice, Alt+D Delete, Alt+E Select, Alt+B Paint, Alt+Y, Alt+S), unless
+    // that Alt key has a job there (Piano roll: Alt+C colours the notes). Off, Alt + the letter does nothing. "" for none.
+    std::string findToolWithAlt (const Chord& chord, Context focus, bool typingPiano) const;
+
     // Like find(), but only an action the user gave `chord` himself (not one of its default keys). The main window
     // runs it before the panels' own keys, so a key you chose always does what you chose (issue #12: Metronome on
     // 'C' did nothing because the focused Playlist took 'C' for its Knife).

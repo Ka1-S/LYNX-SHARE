@@ -95,6 +95,12 @@ public:
         std::optional<Clip> picked;
     };
     Brush brush;
+    // the tools paint this source from now on (round 190ri: FL after a mixer track render)
+    void paintSource (ClipKind kind, int index)
+    {
+        brush = { kind, index, {} };
+        repaint();
+    }
     int knownCurrentPattern = -1;
 
     explicit PlaylistComponent (AudioEngine& engine);
@@ -322,6 +328,7 @@ public:
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     void setTrackHeightsForTest (std::vector<int> tracks, int height) { setTrackHeights (std::move (tracks), height); } // (round 190ng, issue #222)
     std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
+    void selectTracksForSnapshot (std::vector<int> tracks) { selectedTracks = std::move (tracks); } // (round 190ri)
     int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
     juce::Rectangle<int> trackLedForSnapshot (int track) const { return trackLed (track); } // (round 190jf)
     int headerWidthForSnapshot() const noexcept { return headerWidth; }
@@ -565,7 +572,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker, headerMove, regionLoop, headerWidth, fadeTension,
+                      tempoMarker, marker, headerMove, regionLoop, headerWidth, fadeTension,
                       pointBand, pointsMove, pen, // (round 190lw, issue #207)
                       range, rangeMove }; // (round 190pa, P14)
     void swipeTimeSelectionToComp (int lane);
@@ -799,6 +806,9 @@ private:
     void moveClips (std::vector<int> chosen, std::int64_t delta, int tracks, bool newUndoStep, bool keepInView); // (keys and wheel nudge)
     void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
     void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
+    void makeUniqueAsSample (const std::vector<int>& clips, const juce::File& file); // (round 190ri: on a worker, with progress and Cancel)
+    void makeClipUniqueAsSampleAsked (int clip, bool ask);
+    std::unique_ptr<juce::FileChooser> fileChooser;
     void showFadeHandleMenu (int index, int side); // FL's fade handle menu (round 189i)
     void selectBySelectedSource();
     // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is
@@ -836,7 +846,13 @@ private:
     std::vector<int> sortClips (std::vector<int> placed = {}, bool changedTrack = false); // returns where the placed clips are now
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
-    void showRulerMenu (int x, int y = -1);               // markers, time signature and loop
+    void showRulerMenu (int x, int y = -1);
+    juce::PopupMenu markerMenu (int index, int x); // FL's marker menu (round 190ri)
+    void deleteTracksAsked (std::vector<int> tracks); // (round 190ri: FL's question for more than one)
+    void moveTracksBy (std::vector<int> tracks, int direction);
+public:
+    juce::PopupMenu markerMenuForSnapshot (int index) { return markerMenu (index, 0); }
+private:
 public:
     // (round 190ol: the menu itself, also for the shots). Issue #281 (round 190qr): `y` is the press; on a marker's tag
     // (markerTagAt) the menu is that marker's, wherever on the tag, as FL's
@@ -851,6 +867,9 @@ private:
     int tempoTagAt (int x, int y) const;
     void editTempoMarker (std::int64_t tick, int existing);
     int tempoDragMarker = -1;
+    int markerDragIndex = -1; // (round 190ri) a time marker's tag pressed: dragged = moved, released in place = go to it
+    std::int64_t markerDragTick = 0;
+    bool markerDragMoved = false;
     std::int64_t tempoDragTick = 0;
     // FL 2026's Playlist › Time markers keys (round 167k): Alt+T, Ctrl+T, Shift+Alt+T, Shift+T
     std::int64_t songPositionTick() const;      // the playhead (song position), wrapped like centreOnPlayhead

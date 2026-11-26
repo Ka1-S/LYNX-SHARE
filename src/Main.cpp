@@ -1,5 +1,6 @@
 #include <cfenv>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "engine/UniqueSamples.h"
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
@@ -396,11 +397,62 @@ namespace juce::detail { bool dispatchNextMessageOnSystemQueue (bool returnIfNoP
 #include <cstdlib>
 #include <future>
 #include <mutex>
+#include <deque>
 #include <thread>
 
 namespace
 {
 lynx::AudioEngine* crashEngine = nullptr;
+
+// --export-dawproject --stress (round 190ri, kainproctor's DAWproject export): a song as heavy as his imported FL project —
+// the arrangement repeated to past 1,200 bars, some clips muted, every kind of time marker (also two skips in a row), an
+// audio clip whose sample is not on this computer and a channel whose plugin is not installed
+void community190riStressSong (lynx::Song& s)
+{
+    const auto barTicks = (std::int64_t) 4 * lynx::ppq;
+    lynx::laneview::clipsToLanes (s); // (his: "many lanes made with clips to lanes")
+    auto end = std::max<std::int64_t> (s.songLength(), barTicks * 4);
+    const auto once = s.playlist;
+    for (std::int64_t at = end; at < barTicks * 1200 && ! once.empty(); at += end)
+        for (auto c : once)
+        {
+            c.start += at;
+            c.uid = 0;
+            s.playlist.push_back (c);
+        }
+    for (std::size_t i = 0; i < s.playlist.size(); i += 7)
+        s.playlist[i].muted = true;
+    int bar = 1;
+    for (const auto action : { lynx::Marker::none, lynx::Marker::start, lynx::Marker::markerSkip, lynx::Marker::markerSkip, lynx::Marker::markerLoop,
+                               lynx::Marker::markerPause, lynx::Marker::timeSignature, lynx::Marker::punchIn, lynx::Marker::punchOut, lynx::Marker::songLoop })
+    {
+        lynx::Marker m;
+        m.tick = barTicks * (bar += 8);
+        m.name = "m" + std::to_string (bar);
+        m.action = action;
+        if (action == lynx::Marker::timeSignature)
+            m.numerator = 3;
+        s.addMarker (m);
+    }
+    lynx::ChannelDef missing;
+    missing.name = "Missing sample";
+    missing.instrument = lynx::InstrumentKind::audioClip;
+    missing.samplePath = "/nonexistent/round190ri/kick.wav";
+    s.channels.push_back (missing);
+    lynx::Clip audio;
+    audio.kind = lynx::ClipKind::audio;
+    audio.channel = (int) s.channels.size() - 1;
+    audio.start = barTicks * 3;
+    audio.length = barTicks;
+    audio.track = 0;
+    s.playlist.push_back (audio);
+    lynx::ChannelDef plugin;
+    plugin.name = "Missing plugin";
+    plugin.instrument = lynx::InstrumentKind::plugin;
+    plugin.plugin.name = "Not Installed Synth";
+    plugin.plugin.id = "VST3-NotInstalledSynth-1a2b3c4d-5e6f7a8b";
+    s.channels.push_back (plugin);
+}
 
 // Startup trace (REA round 116): with LYNX_TRACE_STARTUP set, the time of each startup step since the C++ runtime
 // started is written to %APPDATA%\LYNX\startup.log (the loader's own time before that is not included).
@@ -2162,6 +2214,19 @@ public:
                 }
            #endif
             std::_Exit (2); // (not reached when the display part ran)
+        }
+        if (args.contains ("--community190ritest"))
+        {
+            // LYNX --community190ritest report.txt [shot prefix] (round 190ri, the community batch of 0.1.32; also in --selftest):
+            // src/Community190riCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto i = args.indexOf ("--community190ritest");
+            const auto result = community190riCheck (log, args[i + 2].unquoted());
+            juce::File (args[i + 1].unquoted()).replaceWithText (log + "community190ri=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
         }
         if (args.contains ("--qa190rbtest"))
         {
@@ -4643,6 +4708,45 @@ public:
         {
             const auto i = args.indexOf ("--export-als");
             runAlsExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--live11"), args.contains ("--reference"));
+            return;
+        }
+
+        // --export-dawproject <in> <out.dawproject> [--stress] (round 190ri, kainproctor's "Doesn't work"): File › Export ›
+        // DAWproject without the window; the time, the size, the notes and the result to "<out>.txt". --stress makes the song
+        // like his: the arrangement repeated to 1,200+ bars, the automation clips as lanes, every kind of marker, some clips
+        // muted, a sample and a plugin that are not on this computer
+        if (args.contains ("--export-dawproject"))
+        {
+            const auto i = args.indexOf ("--export-dawproject");
+            const juce::File input (args[i + 1].unquoted()), output (args[i + 2].unquoted());
+            juce::String error, report;
+            auto ok = false;
+            {
+                lynx::AudioEngine loader (false);
+                if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject"))
+                    ok = loader.importFlpFile (input, error);
+                else if (auto song = lynx::ProjectFile::load (input, error))
+                {
+                    loader.setSong (std::move (*song));
+                    ok = true;
+                }
+                if (ok && args.contains ("--stress"))
+                    loader.editSong ([] (lynx::Song& s) { community190riStressSong (s); });
+                if (ok)
+                {
+                    loader.capturePluginStates();
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    juce::StringArray notes;
+                    ok = lynx::writeDawProjectFile (loader.getSong(), &loader.getPluginHost(), output, notes, error);
+                    report << "ms=" << juce::String (juce::Time::getMillisecondCounterHiRes() - t0, 0) << "\nbytes=" << output.getSize()
+                           << "\nbars=" << loader.getSong().barAt (loader.getSong().songLength()).number << "\nclips=" << (int) loader.getSong().playlist.size()
+                           << "\nnotes=" << notes.size() << "\n" << notes.joinIntoString ("\n") << "\n";
+                }
+            }
+            report << "result=" << (ok ? "OK" : "ERROR " + error) << "\n";
+            juce::File (output.getFullPathName() + ".txt").replaceWithText (report);
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
             return;
         }
 
@@ -10208,6 +10312,9 @@ private:
         juce::String issues190qrLog;
         const auto issues190qrResult = issues190qrCheck (issues190qrLog);
         // round 190rc (0.1.32 backlog): #288 native generator presets, ... (src/Backlog190rcCheck.inc)
+        // round 190ri (0.1.32 community batch): track renders, transpose, scale box, Alt+C, clone names, unique samples
+        juce::String community190riLog;
+        const auto community190riResult = community190riCheck (community190riLog);
         juce::String backlog190rcLog;
         const auto backlog190rcResult = backlog190rcCheck (backlog190rcLog);
 
@@ -11636,7 +11743,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11762,6 +11869,7 @@ private:
                << "issue282=" << issue282Result << (issue282Result == "OK" ? juce::String() : " | " + issue282Log.replace ("\n", "; ")) << "\n"
                << "issues190qr=" << issues190qrResult << "\n"
                << "backlog190rc=" << backlog190rcResult << "\n"
+               << "community190ri=" << community190riResult << "\n"
                << "qa190rb=" << qa190rbResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
@@ -20260,7 +20368,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it")) // (round 190ic: a GarageBand .band folder too; 190nw: a module)
+        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject")) // (round 190ic: a GarageBand .band folder too; 190nw: a module; 190ri: a DAWproject)
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -21896,6 +22004,7 @@ private:
 #include "ToolbarShot190qg.inc" // round 190qg: the toolbar never hides anything silently (walk, pictures)
 #include "Issues190qrCheck.inc" // round 190qr: issues #274-#281 (markers, rack meter, zoom, extras)
 #include "TrialMark190qtCheck.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)
+#include "Community190riCheck.inc" // round 190ri: the 0.1.32 community batch
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "DetailsShot190mr.inc" // round 190mr
@@ -24623,7 +24732,7 @@ private:
             lynx::AudioEngine loader (false);
             const juce::File input (inputPath);
             // a Live set opens through the same import as an .flp (as File › Open does, and --export-als accepts an .flp)
-            if (input.hasFileExtension ("flp;als"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx;mod;xm;s3m;it;dawproject")) // (round 190ri: every format File › Open imports)
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {

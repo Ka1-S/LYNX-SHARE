@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "core/CopyName.h"
+#include "core/RackOps.h"
 #include "core/TrackClips.h"
 #include "core/Song.h"
 
@@ -246,14 +248,6 @@ struct TrackLayout
 // sharing one source share one copy). The copy is named after the source with " #2" (" #3"... when taken).
 inline void makeClipsUnique (Song& song, const std::vector<int>& clips)
 {
-    auto freeName = [] (const std::string& base, auto&& taken) {
-        for (int n = 2;; ++n)
-        {
-            auto name = base + " #" + std::to_string (n);
-            if (! taken (name))
-                return name;
-        }
-    };
     std::vector<std::pair<int, int>> patterns, automations; // source -> copy
 
     auto copyOf = [] (std::vector<std::pair<int, int>>& map, int source) {
@@ -282,8 +276,10 @@ inline void makeClipsUnique (Song& song, const std::vector<int>& clips)
                     copy.name = trackclips::newClipName (song, c.track);
                     copy.uid = 0;
                 }
+                else if (copyname::defaultPatternNumber (copy.name) != 0) // (FL: a pattern with no name shows its number)
+                    copy.name = newPatternName (song);
                 else
-                    copy.name = freeName (copy.name, [&song] (const std::string& n) {
+                    copy.name = copyname::next (copy.name, [&song] (const std::string& n) {
                         return std::any_of (song.patterns.begin(), song.patterns.end(), [&n] (const Pattern& p) { return p.name == n; });
                     });
                 song.patterns.push_back (std::move (copy));
@@ -300,7 +296,7 @@ inline void makeClipsUnique (Song& song, const std::vector<int>& clips)
             if (to < 0)
             {
                 auto copy = song.automations[(std::size_t) c.automation];
-                copy.name = freeName (copy.name, [&song] (const std::string& n) {
+                copy.name = copyname::next (copy.name, [&song] (const std::string& n) {
                     return std::any_of (song.automations.begin(), song.automations.end(), [&n] (const Automation& a) { return a.name == n; });
                 });
                 song.automations.push_back (std::move (copy));

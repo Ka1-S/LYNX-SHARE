@@ -57,8 +57,11 @@
 #include "core/TransportEdit.h"
 
 #include "core/ClipOps.h"
+#include "core/CopyName.h"
 #include "core/FlClipMenu.h"
 #include "core/Rack.h"
+#include "engine/UniqueSamples.h"
+#include "ui/FileChoosers.h"
 #include "core/Slicer.h"
 
 #include "core/EditorPolish.h"
@@ -2683,7 +2686,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         for (const auto& m : song.markers())
         {
-            const auto x = (float) tickToX ((double) m.tick);
+            const auto dragged = drag == Drag::marker && markerDragMoved && &m - song.markers().data() == markerDragIndex;
+            const auto x = (float) tickToX ((double) (dragged ? markerDragTick : m.tick));
 
             if (x < (float) ruler.getX() - 200.0f || x > (float) ruler.getRight())
                 continue;
@@ -6910,16 +6914,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 return;
 
             case ruler::Action::marker:
-            {
-                // a click on a marker's tag goes to the marker (LYNX), quantized while playing like any song jump
-                const auto markerTick = song.markers()[(std::size_t) markerHit].tick;
-                const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
-                engine.jumpToMarker (markerHit);
-                if (! waits)
-                    playheadTick = (double) markerTick;
-                repaint();
+                // FL's manual: "Left-click, hold & drag a marker to reposition it" (round 190ri). Released without a drag:
+                // LYNX goes to the marker (FL does nothing), on the release
+                drag = Drag::marker;
+                markerDragIndex = markerHit;
+                markerDragTick = song.markers()[(std::size_t) markerHit].tick;
+                markerDragMoved = false;
                 return;
-            }
 
             case ruler::Action::seek:
                 break;
@@ -7915,6 +7916,14 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 rulerMark = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
             return;
 
+        case Drag::marker: // (round 190ri: the tag follows the mouse once it has moved 3 px; the marker moves on release)
+            if (! markerDragMoved && std::abs (e.getDistanceFromDragStartX()) < 3)
+                return;
+            markerDragMoved = true;
+            markerDragTick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
+            repaint (0, rulerTop, getWidth(), timelineHeight);
+            return;
+
         case Drag::tempoMarker: // (round 190hq: the tag follows the mouse; the marker moves on release)
             tempoDragTick = juce::jmax<std::int64_t> (1, snap (xToTick (e.x), snapOn));
             repaint (0, rulerTop, getWidth(), timelineHeight);
@@ -8346,6 +8355,12 @@ bool PlaylistComponent::makeDragHint (ui::Hint& hint)
             hint.text = tr ("Tension: {0}%", { juce::String (juce::roundToInt (clipops::fadeTensionHandle (fadeSide == 0 ? clip->fadeInTension : clip->fadeOutTension) * 100.0)) });
             break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
+        case Drag::marker:
+            if (! markerDragMoved)
+                break;
+            hint.text = tr ("Moving the marker  [Alt] no snap");
+            hint.value = position (markerDragTick);
+            break;
         case Drag::tempoMarker:
             hint.text = tr ("Moving the tempo change  [Alt] no snap");
             hint.value = position (tempoDragTick);
@@ -8605,6 +8620,38 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         engine.performanceCommand (c);
         drag = Drag::none;
         perfTrack = -1;
+        return;
+    }
+    if (drag == Drag::marker)
+    {
+        drag = Drag::none;
+        const auto& song = engine.getSong();
+        if (markerDragIndex >= 0 && markerDragIndex < (int) song.markers().size())
+        {
+            if (markerDragMoved)
+            {
+                if (song.markers()[(std::size_t) markerDragIndex].tick != markerDragTick)
+                    engine.editSong ([i = markerDragIndex, t = markerDragTick] (Song& s) {
+                        if (i >= (int) s.markers().size())
+                            return;
+                        auto m = s.markers()[(std::size_t) i];
+                        s.markers().erase (s.markers().begin() + i);
+                        m.tick = t;
+                        s.addMarker (m);
+                    });
+            }
+            else
+            {
+                // a click on a marker's tag goes to the marker (LYNX), quantized while playing like any song jump
+                const auto markerTick = song.markers()[(std::size_t) markerDragIndex].tick;
+                const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
+                engine.jumpToMarker (markerDragIndex);
+                if (! waits)
+                    playheadTick = (double) markerTick;
+            }
+        }
+        markerDragIndex = -1;
+        repaint();
         return;
     }
     if (drag == Drag::tempoMarker)
@@ -10603,6 +10650,54 @@ void PlaylistComponent::bandReset (int track)
     repaint();
 }
 
+// FL's Delete of the selected tracks (round 190ri, FL 2026 live: "Are you sure you want to delete 3 selected tracks?" /
+// "Selected tracks: 2-4" with their names, Ok / Cancel); one track goes at once, as before
+void PlaylistComponent::deleteTracksAsked (std::vector<int> tracks)
+{
+    const auto remove = [safe = juce::Component::SafePointer<PlaylistComponent> (this), tracks] {
+        if (safe == nullptr)
+            return;
+        safe->setSelection ({});
+        safe->selectedTracks.clear();
+        safe->engine.editSong ([tracks] (Song& s) {
+            for (auto it = tracks.rbegin(); it != tracks.rend(); ++it)
+                noteedit::removeTrack (s, *it);
+        });
+    };
+    if (tracks.size() < 2)
+        return remove();
+    juce::String names, ranges;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        const auto t = tracks[i];
+        const auto& list = engine.getSong().playlistTracks;
+        names << "\n" << (t < (int) list.size() && ! list[(std::size_t) t].name.empty() ? juce::String::fromUTF8 (list[(std::size_t) t].name.c_str())
+                                                                                        : tr ("Track {0}", { juce::String (t + 1) }));
+        if (i == 0 || tracks[i - 1] != t - 1)
+        {
+            auto j = i;
+            while (j + 1 < tracks.size() && tracks[j + 1] == tracks[j] + 1)
+                ++j;
+            ranges << (ranges.isEmpty() ? "" : ", ") << juce::String (t + 1) << (j > i ? "-" + juce::String (tracks[j] + 1) : juce::String());
+        }
+    }
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Confirm"),
+                                        tr ("Are you sure you want to delete {0} selected tracks?", { juce::String ((int) tracks.size()) }) + "\n"
+                                            + tr ("Selected tracks: {0}", { ranges }) + "\n" + names,
+                                        tr ("OK"), tr ("Cancel"), this, juce::ModalCallbackFunction::create ([remove] (int r) { if (r != 0) remove(); }));
+}
+
+void PlaylistComponent::moveTracksBy (std::vector<int> tracks, int direction)
+{
+    std::sort (tracks.begin(), tracks.end());
+    std::vector<int> after;
+    engine.editSong ([&tracks, direction, &after, count = numTracks()] (Song& s) { after = noteedit::moveTrackBlock (s, tracks, direction, count); });
+    if (selectedTracks.size() > 1 || ! after.empty())
+        selectedTracks = after;
+    refreshTrackLayout();
+    repaint();
+}
+
 std::vector<int> PlaylistComponent::tracksForMenu (int track) const
 {
     // the menu's track and, when it is one of them, the other selected tracks
@@ -10670,14 +10765,27 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                          colourTracks (tracks, colour);
                      }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
     menu.addItem (tr ("Random color"), [this, tracks = tracksForMenu (track)] {
+        // (FL 2026, round 190ri: each selected track its own random colour, one undo step)
         const auto& palette = lynxPalette();
-        const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        colourTracks (tracks, c);
+        std::vector<std::uint32_t> colours;
+        for (std::size_t i = 0; i < tracks.size(); ++i)
+            colours.push_back (palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())]);
+        engine.editSong ([tracks, colours, simple = simpleHeaders] (Song& s) {
+            for (std::size_t i = 0; i < tracks.size(); ++i)
+                recolourTrack (s, tracks[i], colours[i], simple);
+        });
     });
     // FL's "Change icon" (EEPLTrackIconMenuClick, REA round 168h); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, track, current = info.icon] {
         ui::showTrackIconPicker (juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1), current, [this, track] (int icon) {
-            editTrack (track, [icon] (PlaylistTrack& t) { t.icon = icon; });
+            engine.editSong ([tracks = tracksForMenu (track), icon] (Song& s) {
+                for (const auto t : tracks)
+                {
+                    if ((int) s.playlistTracks.size() <= t)
+                        s.playlistTracks.resize ((std::size_t) t + 1);
+                    s.playlistTracks[(std::size_t) t].icon = icon;
+                }
+            });
         });
     });
     // FL's "Auto name" (EEPLTrackAutoNameMenuClick → FUN_012ef490, round 168f): the name and colour of what the track plays most
@@ -10689,12 +10797,18 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     });
     // FL's "Auto name clips" (round 190mp, DE-127; EEPLTrackAutoNameChildMenuClick, capture 190mp A1): after "Auto name"
     menu.addItem (tr ("Auto name clips"), [this, track, tracks = tracksForMenu (track)] { autoNameClipsFromMenu (track, tracks); });
-    menu.addItem (tr ("Reset"), [this, track] {
-        editTrack (track, [] (PlaylistTrack& t) {
-            t.name.clear();
-            t.colour = 0;
-            t.height = 0;
-            t.muted = false;
+    menu.addItem (tr ("Reset"), [this, tracks = tracksForMenu (track)] { // (FL 2026: every selected track, round 190ri)
+        engine.editSong ([tracks] (Song& s) {
+            for (const auto track : tracks)
+            {
+                if ((int) s.playlistTracks.size() <= track)
+                    s.playlistTracks.resize ((std::size_t) track + 1);
+                auto& t = s.playlistTracks[(std::size_t) track];
+                t.name.clear();
+                t.colour = 0;
+                t.height = 0;
+                t.muted = false;
+            }
         });
     });
     menu.addSeparator();
@@ -10702,8 +10816,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a mixer track) or an instrument
         // track (a channel and its mixer track)
         juce::PopupMenu modes, audio, instruments;
-        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned,
-                       [this, track] { engine.editSong ([track] (Song& s) { trackmodes::unassign (s, track); }); });
+        modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned, [this, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks] (Song& s) {
+                for (const auto t : tracks)
+                    trackmodes::unassign (s, t);
+            });
+        });
         // FL's Audio track ▸ (REA round 190cp, FUN_0122eff0 / FUN_012ec590; round 165 issue11c f5): "New mixer
         // track(s)", then every insert as "N. name", the linked one ticked, one linked to another track greyed. A pick
         // works on the selected tracks, one undo step; an insert left behind is disarmed (FL).
@@ -10808,7 +10926,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         {
             // FL's Size menu sets the size factor (0.333, 0.5, 1, 1.5, 2): 16 px + factor × (default − 16) (round 190ft)
             const auto h = percent == 100 ? baseRowHeight() : polish::heightForFlSize (percent == 33 ? 1.0 / 3.0 : percent / 100.0, baseRowHeight());
-            size.addItem (juce::String (percent) + "%", true, current == scaledHeight (h), [this, track, h] { setTrackHeights ({ track }, h); });
+            size.addItem (juce::String (percent) + "%", true, current == scaledHeight (h), [this, tracks = tracksForMenu (track), h] { setTrackHeights (tracks, h); });
             all.addItem (juce::String (percent) + "%", [this, count, h] {
                 std::vector<int> tracks;
                 for (int t = 0; t < count; ++t)
@@ -10853,15 +10971,22 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto header = noteedit::groupHeaderOf (song, track);
         const auto member = info.grouped && track > 0;
         const auto folded = header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
-        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, track] {
+        // (FL 2026, round 190ri, kainproctor: Group / Ungroup act on every selected track, in one undo step)
+        menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, tracks = tracksForMenu (track)] {
             // (round 190cg) in the Clip-launch workflow the group is a bus: its members play through the header's mixer track
+            const auto group = [tracks, live = liveStyle] (Song& s) {
+                for (const auto t : tracks)
+                    if (t > 0)
+                    {
+                        noteedit::groupWithAbove (s, t);
+                        if (live)
+                            arrange::makeGroupBus (s, t);
+                    }
+            };
             if (liveStyle)
-                engine.editSongStructural ([track] (Song& s) {
-                    noteedit::groupWithAbove (s, track);
-                    arrange::makeGroupBus (s, track);
-                });
+                engine.editSongStructural (group);
             else
-                engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
+                engine.editSong (group);
         });
         // the same for a group made in another layout; ticked while the group plays through its header's mixer track
         // (round 190jf, B17: offered for every group, a folder's bus "if the user wants"; the innermost folder of the track)
@@ -10887,7 +11012,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 });
             }
         }
-        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
+        menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, tracks = tracksForMenu (track)] {
+            engine.editSong ([tracks] (Song& s) {
+                for (const auto t : tracks)
+                    noteedit::ungroupTrack (s, t);
+            });
+        });
         // round 190jf (B17, LYNX's nested folders; FL's groups have one level): shown for grouped tracks only
         if (member)
         {
@@ -10984,14 +11114,17 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 if (! autolanes::shown())
                     toggleAutomationLanes();
             });
-        auto muteAll = [this, track] (bool mute) {
-            engine.editSong ([track, mute] (Song& s) {
+        auto muteAll = [this, tracks = tracksForMenu (track)] (bool mute) { // (FL 2026: the selected tracks' clips, round 190ri)
+            engine.editSong ([tracks, mute] (Song& s) {
                 for (auto& c : s.playlist)
-                    if (c.track == track)
+                    if (std::find (tracks.begin(), tracks.end(), c.track) != tracks.end())
                         c.muted = mute;
             });
         };
-        const auto hasClips = ! seen.empty();
+        const auto targets = tracksForMenu (track);
+        const auto hasClips = ! seen.empty() || std::any_of (song.playlist.begin(), song.playlist.end(), [&targets] (const Clip& c) {
+                                                    return std::find (targets.begin(), targets.end(), c.track) != targets.end();
+                                                });
         {
             // FL's "Consolidate track(s)" (round 146a): the track's clips rendered into one audio clip
             juce::PopupMenu consolidate;
@@ -11064,13 +11197,12 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track); });
     });
     menu.addItem (theme::mnemonic (tr ("Clone..."), 'o'), [this, track] { cloneTracksWithDialog (tracksForMenu (track)); });
-    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, track] {
-        setSelection ({});
-        engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
-    });
+    menu.addItem (theme::mnemonic (tr ("Delete"), 'e'), [this, tracks = tracksForMenu (track)] { deleteTracksAsked (tracks); });
     menu.addSeparator();
-    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
-    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
+    // (FL 2026, round 190ri: the selected tracks move together, past a whole group; one undo step)
+    const auto tracks = tracksForMenu (track);
+    menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), tracks.front() > 0, false, [this, tracks] { moveTracksBy (tracks, -1); });
+    menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), tracks.back() + 1 < count, false, [this, tracks] { moveTracksBy (tracks, 1); });
     return menu;
 }
 
@@ -11398,8 +11530,9 @@ juce::String PlaylistComponent::markerLabel (const Marker& m)
 
 int PlaylistComponent::markerTagAt (int x, int y) const
 {
-    // the tags hang at the bottom of the ruler (see paint)
-    if (y < rulerTop + timelineHeight - 12 || y >= headerHeight)
+    // the tags hang at the bottom of the ruler (see paint); round 190ri (kainproctor): 3 px above the 11 px tag count too,
+    // the right-click on a tag's top edge gave the ruler menu
+    if (y < rulerTop + timelineHeight - 14 || y >= headerHeight)
         return -1;
     const auto& list = engine.getSong().markers();
     const auto f = theme::font (theme::type::caption, true);
@@ -11457,6 +11590,68 @@ void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
                                  repaint();
                              }),
                              true);
+}
+
+// Round 190ri (kainproctor, Discord 11-25; FL 2026 live, raw/mg3.png and his k5): a right-click on a marker's tag gives FL's
+// marker menu — Add marker..., Add time signature..., Place loop, the marker ("name at 11:01:00"), Delete, Rename..., Move
+// content left / right, then the Action list. LYNX showed its whole ruler menu with the marker's part at its far end, below the
+// screen on a laptop; that menu stays one level down (LYNX's "Ruler" submenu)
+juce::PopupMenu PlaylistComponent::markerMenu (int index, int x)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.markers().size())
+        return menu;
+    const auto& marker = song.markers()[(std::size_t) index];
+    const auto tick = marker.tick;
+    menu.addItem (tr ("Add marker..."), [this, at = juce::jmax<std::int64_t> (0, snap (xToTick (x), true))] { editMarkerName (at, -1); });
+    menu.addItem (tr ("Add time signature..."), [this] { runAction ("playlist.markerSignature"); });
+    menu.addItem (tr ("Place loop"), [this, tick] {
+        engine.editSong ([tick] (Song& s) { markers::placeSongLoop (s, tick); });
+        repaint();
+    });
+    {
+        const auto bar = song.barAt (tick);
+        const auto rest = tick - bar.tick;
+        const auto two = [] (std::int64_t v) { return juce::String (v).paddedLeft ('0', 2); };
+        const auto at = juce::String (bar.number) + ":" + two (rest / ticksPerStep + 1) + ":" + two ((rest % ticksPerStep) * 96 / ppq);
+        const auto name = marker.name.empty() ? markerLabel (marker) : juce::String::fromUTF8 (marker.name.c_str());
+        menu.addSectionHeader (tr ("{0} at {1}", { name, at }));
+    }
+    menu.addItem (tr ("Delete"), [this, index] {
+        engine.editSong ([index] (Song& s) {
+            if (index < (int) s.markers().size())
+                s.markers().erase (s.markers().begin() + index);
+        });
+        repaint();
+    });
+    menu.addItem (tr ("Rename..."), [this, index] { editMarkerName (0, index); });
+    menu.addSeparator();
+    for (const auto direction : { -1, 1 })
+        menu.addItem (direction < 0 ? tr ("Move content left") : tr ("Move content right"), markers::canMoveContent (song, index, direction), false,
+                      [this, index, direction] {
+                          setSelection ({});
+                          engine.editSong ([index, direction] (Song& s) { markers::moveContent (s, index, direction); });
+                          sortClips();
+                          repaint();
+                      });
+    menu.addSectionHeader (tr ("Action"));
+    const auto current = marker.isSignature() ? Marker::timeSignature : marker.action;
+    for (auto [value, text] : { std::pair { Marker::none, TR_NOOP ("None") }, { Marker::start, TR_NOOP ("Start") }, { Marker::songLoop, TR_NOOP ("Loop") },
+                                { Marker::markerLoop, TR_NOOP ("Marker loop") }, { Marker::markerSkip, TR_NOOP ("Marker skip") },
+                                { Marker::markerPause, TR_NOOP ("Marker pause") }, { Marker::timeSignature, TR_NOOP ("Time signature") },
+                                { Marker::punchIn, TR_NOOP ("Start recording") }, { Marker::punchOut, TR_NOOP ("Stop recording") } })
+        quickpick::addRadioItem (menu, tr (text), current == value, [this, index, value = value] {
+            engine.editSong ([index, value] (Song& s) {
+                if (index < (int) s.markers().size())
+                    markers::setAction (s, s.markers()[(std::size_t) index], value);
+            });
+            repaint();
+        });
+    // LYNX: the rest of its ruler menu (loop region, time markers, tempo changes, LYNX's extras)
+    menu.addSeparator();
+    menu.addSubMenu (tr ("Ruler"), rulerMenu (x, -1));
+    return menu;
 }
 
 juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
@@ -11738,6 +11933,8 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
 
 void PlaylistComponent::showRulerMenu (int x, int y)
 {
+    if (const auto marker = y >= 0 ? markerTagAt (x, y) : -1; marker >= 0)
+        return markerMenu (marker, x).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
@@ -12332,7 +12529,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             engine.editSong ([index] (Song& s) {
                 auto& c = s.playlist[(std::size_t) index];
                 auto copy = s.automations[(std::size_t) c.automation];
-                copy.name += " #2";
+                copy.name = copyname::next (copy.name, [&s] (const std::string& name) {
+                    return std::any_of (s.automations.begin(), s.automations.end(), [&name] (const Automation& o) { return o.name == name; });
+                });
                 s.automations.push_back (std::move (copy));
                 c.automation = (int) s.automations.size() - 1;
             });
@@ -12622,10 +12821,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
             menu.addSubMenu (label (e), chop);
         }
         else if (t == "Make unique as sample") // (round 189g)
-            menu.addItem (label (e), [this, targets] {
-                setSelection (targets);
-                makeSelectionUniqueAsSample();
-            });
+            menu.addItem (label (e), [this, index] { makeClipUniqueAsSampleAsked (index, ! juce::ModifierKeys::currentModifiers.isShiftDown()); });
         else if (t == "Edit sample") // (FL: the clip's channel sample into its editor, EEAUEditSampleMenuClick)
             menu.addItem (label (e), sample != nullptr, false, [this, ch, index] { openAudioEditorForChannel (engine, ch, index); });
         else if (t == "Extract stems from sample")
@@ -14280,76 +14476,95 @@ void PlaylistComponent::makeSelectionUnique()
     run();
 }
 
+namespace
+{
+// "Make unique as sample" off the message thread (round 190ri: 628 clips wrote for almost three minutes with the window frozen):
+// progress and Cancel; the song changes in one undo step at the end, and not at all when cancelled
+class UniqueSampleThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    UniqueSampleThread (AudioEngine& e, uniquesamples::Plan p)
+        : juce::ThreadWithProgressWindow (tr ("Make unique as sample"), true, true), engine (e), plan (std::move (p))
+    {
+        setStatusMessage (tr ("{0} clips", { juce::String ((int) plan.parts.size()) }));
+    }
+    void run() override
+    {
+        ok = uniquesamples::render (plan, [this] (double p) {
+            setProgress (p);
+            return ! threadShouldExit();
+        });
+    }
+    void threadComplete (bool) override
+    {
+        if (ok)
+            finish (engine, plan);
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+    static void finish (AudioEngine& e, const uniquesamples::Plan& p)
+    {
+        for (const auto& part : p.parts)
+            if (part.written)
+                e.getSampleLibrary().forget (part.file.getFullPathName()); // (a file that was replaced)
+        if (std::any_of (p.parts.begin(), p.parts.end(), [] (const uniquesamples::Part& part) { return part.written; }))
+            e.editSong ([&p] (Song& s) { uniquesamples::apply (s, p); });
+    }
+
+private:
+    AudioEngine& engine;
+    uniquesamples::Plan plan;
+    bool ok = false;
+};
+} // namespace
+
 void PlaylistComponent::makeSelectionUniqueAsSample()
 {
-    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): what each
-    // selected audio clip plays is saved as "<sample> - Part_<n>.wav" (an earlier " - Part_" suffix is dropped first), in
-    // the project's Samples folder, without a file dialog from this menu; a new audio clip channel copied from the old one
-    // plays the file, and the clip now starts at the file's start. The clip's own pitch, stretch and reverse are rendered
-    // into the file and reset on the clip (round 189l), so it sounds the same. LYNX writes the file next to the source
-    // sample when the project has no data folder.
-    const auto& song = engine.getSong();
-    struct Part
-    {
-        int clip;
-        std::string path, name;
-    };
-    std::vector<Part> parts;
-    for (const auto i : selection)
-    {
-        if (i < 0 || i >= (int) song.playlist.size())
-            continue;
-        const auto& c = song.playlist[(std::size_t) i];
-        if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
-            continue;
-        const juce::File source (juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].samplePath.c_str()));
-        const auto audio = engine.renderClipAudio ((std::size_t) i);
-        if (audio.left.empty())
-            continue;
+    // FL's Edit › Make unique as sample (EEMakeUniqueAsSampleAction, Tag 1 of FUN_0123d640 -> FUN_0123dc00): every selected
+    // audio clip, one file each, with no file dialog (engine/UniqueSamples.h; live check round 190ri). The clip's own pitch,
+    // stretch and reverse are rendered into the file and reset on the clip (round 189l), so it sounds the same.
+    makeUniqueAsSample (selection, {});
+}
 
-        auto folder = song.dataFolder.empty() ? source.getParentDirectory() : juce::File (juce::String::fromUTF8 (song.dataFolder.c_str())).getChildFile ("Samples");
-        if (! folder.createDirectory().wasOk())
-            folder = source.getParentDirectory();
-        auto base = source.getFileNameWithoutExtension();
-        if (const auto at = base.lastIndexOf (" - Part_"); at > 0)
-            base = base.substring (0, at);
-        juce::File out;
-        for (int n = 1;; ++n)
-            if (out = folder.getChildFile (base + " - Part_" + juce::String (n) + ".wav"); ! out.exists())
-                break;
-
-        const auto frames = (int) audio.left.size();
-        const auto stereo = audio.left != audio.right;
-        juce::AudioBuffer<float> buffer (stereo ? 2 : 1, frames);
-        buffer.copyFrom (0, 0, audio.left.data(), frames);
-        if (stereo)
-            buffer.copyFrom (1, 0, audio.right.data(), frames);
-        juce::WavAudioFormat wav;
-        std::unique_ptr<juce::OutputStream> stream (out.createOutputStream());
-        std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), audio.sampleRate, (unsigned int) buffer.getNumChannels(), 32, {}, 0) : nullptr);
-        if (writer == nullptr)
-            continue;
-        stream.release(); // (the writer owns it now)
-        if (! writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples()))
-            continue;
-        writer.reset();
-        parts.push_back ({ i, out.getFullPathName().toStdString(), out.getFileNameWithoutExtension().toStdString() });
-    }
-    if (parts.empty())
+void PlaylistComponent::makeUniqueAsSample (const std::vector<int>& clips, const juce::File& file)
+{
+    auto plan = uniquesamples::makePlan (engine.getSong(), engine.getTransport().sampleRate.load(), clips);
+    if (plan.parts.empty())
         return;
+    if (plan.parts.size() == 1)
+        plan.parts.front().file = file;
+    std::int64_t ticks = 0;
+    for (const auto& p : plan.parts)
+        ticks += p.was.length;
+    if (plan.parts.size() <= 4 && (double) ticks * 60.0 / (juce::jmax (1.0, plan.song.bpm) * ppq) < 20.0) // (a moment: no window)
+    {
+        if (uniquesamples::render (plan, [] (double) { return true; }))
+            UniqueSampleThread::finish (engine, plan);
+        return;
+    }
+    (new UniqueSampleThread (engine, std::move (plan)))->launchThread();
+}
 
-    engine.editSong ([parts] (Song& s) {
-        for (const auto& p : parts)
-        {
-            auto& clip = s.playlist[(std::size_t) p.clip];
-            auto copy = s.channels[(std::size_t) clip.channel];
-            copy.samplePath = p.path;
-            copy.name = quickrender::uniqueChannelName (s, p.name);
-            s.channels.push_back (std::move (copy));
-            clipenv::shift (s, clip, -((double) clip.offset + (double) clip.offsetFraction)); // (round 190gi: its envelopes stay on their audio)
-            clipops::resetRenderedClip (clip, (int) s.channels.size() - 1);
-        }
-    });
+void PlaylistComponent::makeClipUniqueAsSampleAsked (int clip, bool ask)
+{
+    // the clip menu's item (FL 2026 live, round 190ri): the clicked clip alone, its file asked for ("Save sample selection",
+    // the next "<sample> - Part_<n>" offered); Shift skips the question (FL's manual)
+    const auto plan = uniquesamples::makePlan (engine.getSong(), engine.getTransport().sampleRate.load(), { clip });
+    if (plan.parts.empty())
+        return;
+    if (! ask)
+        return makeUniqueAsSample ({ clip }, {});
+    const auto& p = plan.parts.front();
+    int n = 1;
+    fileChooser = ui::makeFileChooser (tr ("Save sample selection"), uniquesamples::nextFree (p.folder, uniquesamples::baseName (p.source), n), "*.wav");
+    ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                       [safe = juce::Component::SafePointer<PlaylistComponent> (this), clip, was = p.was] (const juce::FileChooser& fc) {
+                           const auto file = fc.getResult();
+                           if (safe == nullptr || file == juce::File() || clip >= (int) safe->engine.getSong().playlist.size())
+                               return;
+                           const auto& now = safe->engine.getSong().playlist[(std::size_t) clip];
+                           if (now.kind == was.kind && now.channel == was.channel && now.start == was.start && now.track == was.track)
+                               safe->makeUniqueAsSample ({ clip }, file.hasFileExtension ("wav") ? file : file.withFileExtension ("wav"));
+                       });
 }
 
 void PlaylistComponent::lockAllTracks (bool lock)
@@ -15412,7 +15627,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         if (const auto m = markerTagAt (p.x, p.y); m >= 0)
         {
             const auto& marker = song.markers()[(std::size_t) m];
-            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete");
+            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [LMB] drag: move it  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete");
             hint.value = markerLabel (marker);
             if (const auto* action = markers::actionName (marker.isSignature() ? Marker::timeSignature : marker.action); *action != 0)
                 hint.value += " (" + tr (action) + ")";

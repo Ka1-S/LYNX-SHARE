@@ -469,18 +469,20 @@ void setAllEffectsEnabled (Song& song, int track, bool enabled);
 bool anyEffectEnabled (const Song& song, int track) noexcept;
 
 // --- FL's Disk recording (round 167a, REA_rodada167a §4 / §7) -------------------------------------------------------
-// "Auto-create audio clip": what "Render armed tracks to wave file(s)" puts in the project afterwards. Per file, as FL
-// 2026 does [SHOT s28–s37]: a new audio clip channel named after the file (target "---", the Master), at the end of
-// the Channel Rack, and a clip of the whole file from the song's start on the first Playlist track after every used
-// track (the tracks keep their names). Files with no frames are skipped. Returns how many clips were placed.
+// "Auto-create audio clip": what "Render armed / selected tracks to wave file(s)" puts in the project afterwards. Per file,
+// as FL 2026 does [SHOT s28–s37; live check round 190ri]: a new audio clip channel named after the file (target "---", the
+// Master), at the end of the Channel Rack, and, when the song was rendered, a clip of the whole file from `start` on the
+// first Playlist track with no clip there (with clips on tracks 1 and 4: track 2, then 3; whatever the insert's number);
+// the tracks keep their names. A render of the pattern (`onPlaylist` false) only adds the channel (the Picker shows it).
+// Files with no frames are skipped. Returns how many files were added.
 struct RenderedFile
 {
     std::string path;
     double frames = 0.0, sampleRate = 0.0;
 };
-int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files);
-// The first Playlist track after every track that holds a clip (0 on an empty Playlist).
-int firstTrackAfterUsed (const Song& song) noexcept;
+int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files, bool onPlaylist = true, std::int64_t start = 0);
+// The first Playlist track with no clip from `start` to `end` that is not linked to an insert or a channel.
+int firstTrackFreeIn (const Song& song, std::int64_t start, std::int64_t end) noexcept;
 // FL's "Record <insert> to" default name (REA_rodada167a §7 [SHOT s20–s27]): "<project>_<yyyy-mm-dd hh-mm-ss>_<insert>"
 // (as a take's name, safety::recordingName), the insert's own name or "Insert N".
 std::string insertDisplayName (const Song& song, int track);

@@ -12,6 +12,7 @@
 #include "core/MixerOps.h"
 #include "core/NewtoneFx.h"
 #include "core/VocalPitch.h"
+#include "platform/Paths.h"
 #include "engine/MidiFileIo.h"
 #include "engine/Text.h"
 #include "ui/I18n.h"
@@ -1220,12 +1221,21 @@ private:
         return writer->writeFromFloatArrays (data, channels, (int) out.frames());
     }
 
+    // the offered name: beside the sample, or in Music when its folder is not on this computer (an imported project's Windows
+    // path on Linux was offered as a file of that very name in the working directory; round 190ri)
+    juce::File saveBeside (const juce::String& ending) const
+    {
+        const auto src = platform::localFile (samplePath);
+        const auto folder = src.getParentDirectory().isDirectory() && src != juce::File() ? src.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userMusicDirectory);
+        const auto name = juce::String::fromUTF8 (samplePath.c_str()).replaceCharacter ('\\', '/').fromLastOccurrenceOf ("/", false, false).upToLastOccurrenceOf (".", false, false);
+        return folder.getChildFile (juce::File::createLegalFileName (name.isNotEmpty() ? name : juce::String ("Sample")) + ending);
+    }
+
     void saveWav()
     {
         if (sample == nullptr)
             return;
-        const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
-        chooser = lynx::ui::makeFileChooser (tr ("Save the edited audio"), src.getSiblingFile (src.getFileNameWithoutExtension() + " (edited).wav"), "*.wav");
+        chooser = lynx::ui::makeFileChooser (tr ("Save the edited audio"), saveBeside (" (edited).wav"), "*.wav");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<NewtoneEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())
@@ -1284,8 +1294,7 @@ private:
 
     void saveMidi()
     {
-        const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
-        chooser = lynx::ui::makeFileChooser (tr ("Save the notes as MIDI"), src.getSiblingFile (src.getFileNameWithoutExtension() + ".mid"), "*.mid");
+        chooser = lynx::ui::makeFileChooser (tr ("Save the notes as MIDI"), saveBeside (".mid"), "*.mid");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [safe = juce::Component::SafePointer<NewtoneEditor> (this)] (const juce::FileChooser& fc) {
                                   if (safe == nullptr || fc.getResult() == juce::File())

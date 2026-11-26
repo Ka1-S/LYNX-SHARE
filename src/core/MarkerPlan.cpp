@@ -49,8 +49,10 @@ MarkerPlan makeMarkerPlan (const Song& song)
                 jump.to = nextMarkerTick (list, i, songEnd);
                 break;
             case Marker::markerPause:
-                // playback stops on the marker; Play goes on from there [SHOT fl_pause_resume.png]
+                // playback stops on the marker; Play goes on from there [SHOT fl_pause_resume.png] (round 190ri: `to` is
+                // the marker itself; it was 0, so after the pause Play went on from the song's start)
                 jump.kind = MarkerJump::Kind::pause;
+                jump.to = m.tick;
                 break;
             case Marker::songLoop:
                 // the song's end goes back here [SHOT fl_start_loop_play.png]
@@ -79,6 +81,32 @@ MarkerPlan makeMarkerPlan (const Song& song)
         plan.wrapTo = plan.start;
 
     std::stable_sort (plan.jumps.begin(), plan.jumps.begin() + plan.count, [] (const MarkerJump& a, const MarkerJump& b) { return a.at < b.at; });
+
+    // Round 190ri (kainproctor, Discord 11-25; FL 2026 live, docs/analise/REA_rodada190ri.md): a skip lands on the next marker,
+    // and when that is a Marker skip too FL skips its section as well (skips at bars 3 and 5, a marker at 7: bars 1-2 then 7),
+    // as its render does; landing on a Marker pause stops there. Playback only meets a jump AFTER the position, so a skip
+    // that landed on another one never fired: the chain is followed here, once
+    for (int i = 0; i < plan.count; ++i)
+    {
+        auto& j = plan.jumps[(std::size_t) i];
+        if (j.kind != MarkerJump::Kind::jump || j.to <= j.at)
+            continue; // (a marker loop jumps back to its own marker: nothing to chain)
+        for (int guard = 0; guard < MarkerPlan::maxJumps; ++guard)
+        {
+            const MarkerJump* next = nullptr;
+            for (int k = 0; k < plan.count && next == nullptr; ++k)
+                if (const auto& o = plan.jumps[(std::size_t) k]; o.at == j.to && (o.kind == MarkerJump::Kind::pause || (o.kind == MarkerJump::Kind::jump && o.to > o.at)))
+                    next = &o;
+            if (next == nullptr)
+                break;
+            if (next->kind == MarkerJump::Kind::pause)
+            {
+                j.kind = MarkerJump::Kind::jumpThenPause;
+                break;
+            }
+            j.to = next->to;
+        }
+    }
     return plan;
 }
 
@@ -265,6 +293,70 @@ void addJumpToNextBar (Song& song, std::int64_t tick)
         next.tick = tick + length;
         song.addMarker (next);
     }
+}
+
+namespace
+{
+// the sections around marker `index`: [a0, a1) then [a1, b1) (the one before and this one for `direction` < 0)
+bool contentSections (const Song& song, int index, int direction, std::int64_t& a0, std::int64_t& a1, std::int64_t& b1)
+{
+    const auto& list = song.markers();
+    if (index < 0 || index >= (int) list.size() || direction == 0)
+        return false;
+    const auto end = std::max<std::int64_t> (song.songLength(), list.back().tick);
+    const auto tick = list[(std::size_t) index].tick;
+    const auto after = [&list, end] (std::int64_t t) {
+        for (const auto& m : list)
+            if (m.tick > t)
+                return m.tick;
+        return end;
+    };
+    if (direction > 0)
+    {
+        a0 = tick;
+        a1 = after (tick);
+        if (a1 >= end)
+            return false; // (no marker after this one: nothing on the right)
+        b1 = after (a1);
+    }
+    else
+    {
+        if (tick <= 0)
+            return false;
+        a0 = 0;
+        for (const auto& m : list)
+            if (m.tick < tick)
+                a0 = std::max (a0, m.tick);
+        a1 = tick;
+        b1 = after (tick);
+    }
+    return a1 > a0 && b1 > a1;
+}
+} // namespace
+
+bool canMoveContent (const Song& song, int index, int direction)
+{
+    std::int64_t a0 = 0, a1 = 0, b1 = 0;
+    return contentSections (song, index, direction, a0, a1, b1);
+}
+
+bool moveContent (Song& song, int index, int direction)
+{
+    std::int64_t a0 = 0, a1 = 0, b1 = 0;
+    if (! contentSections (song, index, direction, a0, a1, b1))
+        return false;
+    const auto lengthA = a1 - a0, lengthB = b1 - a1;
+    const auto moved = [&] (std::int64_t t) { return t >= a0 && t < a1 ? t + lengthB : t >= a1 && t < b1 ? t - lengthA : t; };
+    for (auto& c : song.playlist)
+        c.start = moved (c.start);
+    auto list = song.markers();
+    song.markers().clear();
+    for (auto m : list)
+    {
+        m.tick = moved (m.tick);
+        song.addMarker (m);
+    }
+    return true;
 }
 
 int deleteInSelection (Song& song)

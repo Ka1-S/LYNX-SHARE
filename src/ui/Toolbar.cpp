@@ -1270,7 +1270,11 @@ void ChordPanel::mouseDown (const juce::MouseEvent& e)
 
 ui::Hint ChordPanel::hintAt (juce::Point<int>)
 {
-    return { tr ("Detected chord"), {}, false, false };
+    // issue #303 (round 190ri): while nothing is detected ("---") the hint says what the panel is for
+    if (text.trim().isEmpty() || text.removeCharacters ("- ").isEmpty())
+        return { tr ("Chord detection: play notes (MIDI keyboard or the typing keyboard) or select notes in the Piano roll and the chord's name shows here  [RMB] chord style and display delay"),
+                 {}, false, true };
+    return { tr ("Detected chord"), {}, false, true };
 }
 
 // --- Ableton Link toggle (round 190gl) ---------------------------------------------------------------------------

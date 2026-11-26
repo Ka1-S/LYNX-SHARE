@@ -11,6 +11,7 @@
 #include <limits>
 #include <vector>
 
+#include "core/CopyName.h"
 #include "core/SamplePrecompute.h"
 #include "core/Song.h"
 
@@ -515,17 +516,9 @@ inline int makeAudioUnique (Song& song, const std::vector<int>& clips)
         return -1;
 
     auto copy = song.channels[(std::size_t) source];
-    // "Name #2", "Name #3"...: the first free number
-    const auto base = copy.name;
-    for (int n = 2;; ++n)
-    {
-        const auto candidate = base + " #" + std::to_string (n);
-        if (std::none_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& c) { return c.name == candidate; }))
-        {
-            copy.name = candidate;
-            break;
-        }
-    }
+    copy.name = copyname::next (copy.name, [&song] (const std::string& name) { // ("Name #2", "Name #3"...)
+        return std::any_of (song.channels.begin(), song.channels.end(), [&name] (const ChannelDef& c) { return c.name == name; });
+    });
     song.channels.push_back (std::move (copy));
     const auto channel = (int) song.channels.size() - 1;
 

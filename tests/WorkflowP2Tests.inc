@@ -245,6 +245,7 @@ TEST (p2_euclidean_and_fill)
 TEST (p2_pattern_clone_and_move)
 {
     auto song = lynx::Song::makeDefault();
+    song.patterns[0].name = "A";
     song.patterns.push_back ({});
     song.patterns[1].name = "B";
     lynx::Clip c0, c1;
@@ -494,7 +495,8 @@ TEST (p2_key_map_bindings)
     CHECK (map.conflicts().empty());
     CHECK (map.find ({ f8, none }, Context::global, false) == "view.pluginPicker"); // F8 = FL's Plugin picker since round 169k
     CHECK (map.find ({ numpad3, none }, Context::playlist, true) == "pattern.select3");
-    CHECK (map.find ({ 'C', alt }, Context::playlist, false) == "pattern.clone");
+    CHECK (map.find ({ 'C', alt }, Context::playlist, false).empty()); // (FL: nothing; the typing keyboard on = Slice, round 190ri)
+    CHECK (map.find ({ 'C', ctrl | shift }, Context::playlist, false) == "pattern.clone");
     CHECK (map.find ({ 'C', alt }, Context::pianoRoll, false) == "pianoRoll.colourSelected"); // FL's piano roll: Alt+C = colour (round 153)
     CHECK (map.find ({ 'C', alt }, Context::channelRack, false) == "rack.clone"); // the rack wins while focused
     CHECK (map.find ({ 'A', alt }, Context::pianoRoll, false) == "pianoRoll.arpeggiate");

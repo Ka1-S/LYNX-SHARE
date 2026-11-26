@@ -225,7 +225,8 @@ TEST (left167_host_slide_live_jump)
 
 // FL's "Render armed tracks to wave file(s)" with "Auto-create audio clip" (FL 2026 [SHOT s28–s37]): a new audio clip
 // channel named after the file, to the Master ("---"), and a clip of the whole file from bar 1 on the first Playlist
-// track after every used track (Track 28 when 27 were used), the track keeping its name
+// track with room (Track 28 when 27 were used; FL 2026 live, round 190ri: clips on tracks 1 and 4 -> track 2, the next
+// render track 3, whatever the insert's number), the track keeping its name
 TEST (left167_rendered_tracks_go_on_the_first_free_playlist_track)
 {
     using namespace lynx;
@@ -238,7 +239,10 @@ TEST (left167_rendered_tracks_go_on_the_first_free_playlist_track)
     s.playlist.push_back (c);
     c.track = 3;
     s.playlist.push_back (c);
-    CHECK (mixerops::firstTrackAfterUsed (s) == 27);
+    CHECK (mixerops::firstTrackFreeIn (s, 0, ppq * 4) == 0 && mixerops::firstTrackFreeIn (s, ppq * 4, ppq * 8) == 0);
+    c.track = 0, c.start = ppq * 2;
+    s.playlist.push_back (c);
+    CHECK (mixerops::firstTrackFreeIn (s, 0, ppq * 4) == 1);
     const auto channels = s.channels.size();
     const auto placed = mixerops::placeRenderedFiles (s, { { "C:\\Users\\me\\Recorded\\recto.wav", 48000.0 * 4.0, 48000.0 },
                                                            { "/tmp/none.wav", 0.0, 48000.0 },
@@ -249,13 +253,20 @@ TEST (left167_rendered_tracks_go_on_the_first_free_playlist_track)
     CHECK (ch.name == "recto" && ch.instrument == InstrumentKind::audioClip && ch.mixerTrack == 0);
     CHECK (ch.samplePath == "C:\\Users\\me\\Recorded\\recto.wav");
     CHECK (s.channels[channels + 1].name == "two");
-    const auto& clip = s.playlist[2];
-    CHECK (clip.kind == ClipKind::audio && clip.channel == (int) channels && clip.track == 27 && clip.start == 0);
+    const auto& clip = s.playlist[3];
+    CHECK (clip.kind == ClipKind::audio && clip.channel == (int) channels && clip.track == 1 && clip.start == 0);
     CHECK (clip.length == (std::int64_t) (ppq * 8)); // 4 s at 120 BPM = 8 beats
-    CHECK (s.playlist[3].track == 28 && s.playlist[3].length == (std::int64_t) (ppq * 4));
-    CHECK (s.playlistTracks.size() <= 27 || s.playlistTracks[27].name.empty()); // the track keeps its (default) name
+    CHECK (s.playlist[4].track == 2 && s.playlist[4].length == (std::int64_t) (ppq * 4));
+    CHECK (s.playlistTracks.size() <= 1 || s.playlistTracks[1].name.empty()); // the track keeps its (default) name
+    // a pattern render only adds the channel (FL: the Picker's clip, nothing on the Playlist)
+    CHECK (mixerops::placeRenderedFiles (s, { { "/tmp/three.wav", 44100.0, 44100.0 } }, false) == 1);
+    CHECK (s.channels.back().name == "three" && s.playlist.size() == 5);
+    // an instrument / audio track is never taken
+    s.playlistTracks.resize (6);
+    s.playlistTracks[4].mode = PlaylistTrackMode::audio;
+    CHECK (mixerops::firstTrackFreeIn (s, 0, ppq * 4) == 5);
     Song empty;
-    CHECK (mixerops::firstTrackAfterUsed (empty) == 0);
+    CHECK (mixerops::firstTrackFreeIn (empty, 0, 100) == 0);
     CHECK (mixerops::insertDisplayName (s, 2) == "Insert 2");
     s.mixer[2].name = "Vocals";
     CHECK (mixerops::insertDisplayName (s, 2) == "Vocals");

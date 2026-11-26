@@ -32,6 +32,7 @@ struct Played
 {
     std::vector<int> beats;
     bool paused = false;
+    double at = 0.0; // where it paused (round 190ri)
 };
 inline Played play (const lynx::Song& song, int blocks, double from = 0.0, std::tuple<int, double, int> userJump = { -1, 0.0, 0 })
 {
@@ -76,10 +77,11 @@ inline Played play (const lynx::Song& song, int blocks, double from = 0.0, std::
             }
             else if (step.jump != nullptr && position >= (double) step.jump->at - 1e-6)
             {
-                if (step.jump->kind == lynx::MarkerJump::Kind::pause)
+                if (step.jump->kind != lynx::MarkerJump::Kind::jump) // (a pause, or a skip landing on one: round 190ri)
                 {
-                    position = (double) step.jump->at;
+                    position = (double) step.jump->to;
                     out.paused = true;
+                    out.at = position;
                 }
                 else
                     position = (double) step.jump->to;

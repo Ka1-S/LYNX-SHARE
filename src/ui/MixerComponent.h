@@ -10,6 +10,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/ExportOptions.h"
 #include "core/MeterBallistics.h"
 #include "core/MixerLayout.h"
 #include "ui/DemoMode.h"
@@ -101,7 +102,9 @@ extern std::function<void (bool)> setShowStripInserts;
 extern std::function<void (bool)> setShowPeakValues, setShowCorrelation;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
-extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
+extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&, const exportopts::Options&)> done)> renderTracks;
+// The Playlist's tools paint this audio clip channel (FL after a track render; round 190ri; the main window sets it).
+extern std::function<void (int)> pickAudioClip;
 // Selects these Playlist tracks and scrolls the first into view (FL's "Select › Channels and playlist tracks routed to
 // this track", round 190fl; the main window points it at its Playlist).
 extern std::function<void (std::vector<int>)> selectPlaylistTracks;
