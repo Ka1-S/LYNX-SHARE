@@ -1,7 +1,10 @@
 #include "ui/I18n.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cstring>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
 #include "core/Inflate.h"
@@ -43,6 +46,12 @@ struct StringHash
 };
 using TextMap = std::unordered_map<juce::String, juce::String, StringHash>;
 
+std::atomic<unsigned>& textGeneration() // (bumped when the language's texts change: the per-thread caches start again)
+{
+    static std::atomic<unsigned> generation { 0 };
+    return generation;
+}
+
 std::shared_ptr<const TextMap>& textMapSlot()
 {
     static std::shared_ptr<const TextMap> map;
@@ -72,7 +81,25 @@ juce::String tr (const juce::String& english)
 
 juce::String tr (const char* englishUtf8)
 {
-    return translated (juce::String::fromUTF8 (englishUtf8));
+    // Nearly every call passes a string literal: its text, per thread, by its address (checked against a copy of the key,
+    // so a reused buffer cannot give another text), without the UTF-8 conversion and the lookup of every call
+    struct Cache
+    {
+        unsigned generation = ~0u;
+        std::unordered_map<const char*, std::pair<std::string, juce::String>> texts;
+    };
+    thread_local Cache cache;
+    const auto generation = textGeneration().load (std::memory_order_acquire);
+    if (cache.generation != generation || cache.texts.size() > 60000)
+    {
+        cache.texts.clear();
+        cache.generation = generation;
+    }
+    if (const auto it = cache.texts.find (englishUtf8); it != cache.texts.end() && std::strcmp (it->second.first.c_str(), englishUtf8) == 0)
+        return it->second.second;
+    auto text = translated (juce::String::fromUTF8 (englishUtf8));
+    cache.texts.insert_or_assign (englishUtf8, std::pair<std::string, juce::String> { std::string (englishUtf8), text });
+    return text;
 }
 
 juce::String trc (const char* contextAndEnglishUtf8)
@@ -225,6 +252,7 @@ void initialise (const juce::StringArray& args)
         map = std::move (fresh);
     }
     std::atomic_store (&textMapSlot(), map);
+    textGeneration().fetch_add (1, std::memory_order_release);
     juce::LocalisedStrings::setCurrentMappings (strings);
 }
 } // namespace i18n
