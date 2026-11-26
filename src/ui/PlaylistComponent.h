@@ -437,6 +437,9 @@ public:
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
+    // round 190rs (Discord 11-26: clicks meant for the ruler hit the strip): as FL 2026 (19 px strip, then a 2 px band of its
+    // own before the ruler), the strip's last 2 px are a separator band that takes no clicks
+    static constexpr int overviewGap = 2;
     static constexpr int timelineHeight = 24;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
@@ -985,6 +988,7 @@ private:
     void setDropLaneHot (bool hot);
     juce::Rectangle<int> dropLaneArea() const; // the lane in the grid (empty: none or not on screen)
     juce::Component dropLaneProbe; // its place for the first-song tour's ring ("simple.dropLane")
+    juce::Component overviewGapBlock; // round 190rs: the band between the overview strip and the ruler takes clicks and does nothing
     // Round 190mk (DL-70, capture 190mf B1; core/InsertMark.h): Live's insert marker, a 1 px line over the clicked lane
     // pulsing cyan <-> white. Perf-first: an opaque child exactly the line's size, so a pulse repaints those 17 pixels and
     // nothing of the Arrangement's cached picture under it; its timer runs only while it is shown (Live's look, a marker

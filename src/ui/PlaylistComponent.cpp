@@ -1263,6 +1263,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     dropLaneProbe.setComponentID ("simple.dropLane");
     dropLaneProbe.setInterceptsMouseClicks (false, false);
     addChildComponent (dropLaneProbe);
+    addAndMakeVisible (overviewGapBlock); // (transparent: the Playlist paints the band; a press there is no ruler or strip press)
     addChildComponent (insertMarkLine); // round 190mk (DL-70)
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
@@ -1992,7 +1993,8 @@ void PlaylistComponent::resized()
     for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
         c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
     pointerButton.setVisible (pointerclick::buttonShown && ! simpleHeaders && (! toolbarFitsNarrow || pointerButton.getRight() <= toolbarEnd));
-    overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
+    overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight - overviewGap);
+    overviewGapBlock.setBounds (overview.getX(), overview.getBottom(), overview.getWidth(), overviewGap);
     // FL's "+" (21 x 18 at 7 px from the left of the header panel), on the ruler's row; FL's headers only
     if (addTrackButton != nullptr)
     {
@@ -2633,6 +2635,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> ((float) tickToX (playheadTick) - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
         }
+    }
+
+    // round 190rs: the band between the overview strip and the ruler (FL 2026: a lighter 2 px band), so the two read apart
+    if (g.clipRegionIntersects ({ headerWidth, rulerTop - overviewGap, getWidth() - headerWidth, overviewGap }))
+    {
+        g.setColour (colour::bg4);
+        g.fillRect (headerWidth, rulerTop - overviewGap, getWidth() - headerWidth, overviewGap);
     }
 
     // --- ruler (drawn in its own coordinates, below the toolbar) -----------------
