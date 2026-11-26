@@ -1466,8 +1466,10 @@ struct Converter
                 // Only on a channel that plays a sample: FL holds a step note on a generator (3x Osc, a plugin)
                 // until something cuts it, so the voices pile up (FL render, round 171e)
                 // A slide note keeps its length (length 0 would move the notes at once) unless it has none (issue #272)
-                const auto step = (! n.slide && n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel)
-                                   && ! volumeEnvelopeOn (n.channel))
+                // (round 190rt: not on a LYNX Sampler whose ADSR turns FL's volume envelope on — FL would hold the step;
+                // an FL project's own Sampler keeps its steps as steps, so its round trip stays FL's: QUEUE-0.1.33 #24)
+                const auto lynxEnvelope = volumeEnvelopeOn (n.channel) && song.channels[(std::size_t) n.channel].sampler.flChannel.empty();
+                const auto step = (! n.slide && n.length == ticksPerStep && n.start % ticksPerStep == 0 && playsSample (n.channel) && ! lynxEnvelope)
                                   || n.heldStep() || stepslide::is (n);
                 f.length = step ? 0 : std::max<std::uint32_t> (1, ticks (n.length));
                 f.channel = (std::uint16_t) n.channel;
