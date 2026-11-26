@@ -30,6 +30,8 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- Pattern layout: **Ctrl+N** is FL Studio's *Save new version* (Ctrl+Alt+S still works) and *File › New* has no key, as in FL;
+  the Clip-launch and Simple layouts keep Ctrl+N for a new project, and a key you set yourself stays as you set it.
 - Dragging the tempo hides the pointer and is not stopped by the screen's edge, as in FL Studio (#283).
 - *Settings › LYNX extras* also lists the track colors taken from the accent (#238), the Recent list and the one row per plugin
   in the plugin lists, and the Browser's MIDI preview and Tab completion (all on, as they were).

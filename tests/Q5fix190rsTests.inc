@@ -137,3 +137,45 @@ TEST (q5fix190rs_route_summary_of_an_unassigned_track)
     s.playlist.push_back (au);
     CHECK (! trackmodes::routeSummary (s, 3).clips);
 }
+
+// Owner decision D-4: in the Pattern layout Ctrl+N is FL 2026's "Save new version"; New project keeps no key (FL's File ›
+// New has none); the Clip-launch and Simple layouts keep LYNX's Ctrl+N = New project. A key the user set stays.
+#include "core/KeyMap.h"
+TEST (q5fix190rs_ctrl_n_is_save_new_version_in_the_pattern_layout)
+{
+    using namespace lynx::keys;
+    const Chord ctrlN { 'N', ctrl }, ctrlAltS { 'S', (std::uint8_t) (ctrl | alt) };
+    KeyMap m;
+    CHECK (m.find (ctrlN, Context::global, false) == "file.new");
+    m.setFlFileKeys (true);
+    CHECK (m.find (ctrlN, Context::global, false) == "file.saveNewVersion");
+    CHECK (m.find (ctrlAltS, Context::global, false) == "file.saveNewVersion"); // (LYNX's key stays too)
+    CHECK (m.chordsFor ("file.new").empty() && m.isDefault ("file.new") && m.isDefault ("file.saveNewVersion"));
+    CHECK (m.overridesJson() == "{}\n" && m.conflicts().empty());
+    m.setFlFileKeys (false);
+    CHECK (m.find (ctrlN, Context::global, false) == "file.new" && m.chordsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlAltS }));
+
+    // the user gave New project keys of his own (Ctrl+N among them): they stay, and Save new version doesn't take Ctrl+N
+    KeyMap own;
+    CHECK (own.loadJson (R"({"file.new": ["Ctrl+N", "Ctrl+Shift+N"]})"));
+    own.setFlFileKeys (true);
+    CHECK (own.chordsFor ("file.new").size() == 2 && own.find (ctrlN, Context::global, false) == "file.new");
+    CHECK (own.chordsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlAltS }));
+
+    // Ctrl+N given to another action: that one keeps it; New project loses its default key in the Pattern layout
+    KeyMap other;
+    CHECK (other.loadJson (R"({"file.saveAs": ["Ctrl+N"]})"));
+    other.setFlFileKeys (true);
+    CHECK (other.find (ctrlN, Context::global, false) == "file.saveAs" && other.chordsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlAltS }));
+
+    // a choice made in the Pattern layout (Save new version without Ctrl+N) survives keys.json and the next start
+    KeyMap pattern;
+    pattern.setFlFileKeys (true);
+    pattern.setChords ("file.saveNewVersion", { ctrlAltS });
+    KeyMap next;
+    CHECK (next.loadJson (pattern.overridesJson()));
+    next.setFlFileKeys (true);
+    CHECK (next.chordsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlAltS }) && next.find (ctrlN, Context::global, false).empty());
+    // the Shortcut manager's "Reset to default" in the Pattern layout gives FL's keys back
+    CHECK (next.defaultsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlN, ctrlAltS }) && next.defaultsFor ("file.new").empty());
+}

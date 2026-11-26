@@ -13,7 +13,8 @@ namespace lynx
 // works and its keys; search by name or key, change a shortcut by pressing the new keys (a clash with another
 // action of the same panel is shown first), clear, reset one or all. Saved at once in %APPDATA%\LYNX\keys.json
 // (only the changed actions); `onChanged` reloads the key map in the main window.
-void showShortcutManager (std::function<void()> onChanged);
+// flFileKeys: the Pattern layout's FL keys (Ctrl+N = Save new version, round 190rs) are the defaults shown
+void showShortcutManager (std::function<void()> onChanged, bool flFileKeys = false);
 
 // The content, for --snapshot mode (`persistent` false: a sample change, nothing saved).
 std::unique_ptr<juce::Component> makeShortcutManagerPanel (bool persistent, std::function<void()> onChanged = {});

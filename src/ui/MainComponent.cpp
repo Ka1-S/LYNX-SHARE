@@ -3575,6 +3575,7 @@ void MainComponent::setTypingPiano (bool on)
 
 void MainComponent::loadKeyMap()
 {
+    keyMap.setFlFileKeys (false); // (keys.json is read over LYNX's defaults; the layout's rule comes after, round 190rs)
     keyMap.resetToDefaults();
     const auto file = PluginHost::settingsFolder().getChildFile ("keys.json");
 
@@ -3586,6 +3587,7 @@ void MainComponent::loadKeyMap()
         for (const auto& e : errors)
             juce::Logger::writeToLog ("keys.json: " + juce::String (e));
     }
+    keyMap.setFlFileKeys (layoutStyle == layoutstyle::Style::pattern); // round 190rs (D-4): FL's Ctrl+N in the Pattern layout
 
     auto keyOf = [this] (const std::string& id) {
         const auto& chords = keyMap.chordsFor (id);
@@ -5017,6 +5019,15 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         return s == Style::pattern || (s == Style::clipLaunch && clipGridView != nullptr) || (s == Style::simple && simpleWorkflow != nullptr);
     };
     engine.setLiveAutomationOverride (style == Style::clipLaunch); // (round 190oa, DL-58: Live's Re-Enable Automation)
+    // round 190rs (owner D-4): the Pattern layout uses FL's Ctrl+N (Save new version), the others LYNX's (New project)
+    if (keyMap.flFileKeys() != (style == Style::pattern))
+    {
+        keyMap.setFlFileKeys (style == Style::pattern);
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->setControlHints(); // (the New / Save buttons' hints name the keys)
+        });
+    }
     if (style == from && partsReady (style))
         return;
     // each style's own parts are made the first time it is chosen (nothing of them exists in Pattern workflow)
@@ -10859,7 +10870,7 @@ void MainComponent::showShortcutManager()
         safe->loadKeyMap();
         safe->setControlHints();
         safe->menuItemsChanged();
-    });
+    }, keyMap.flFileKeys());
 }
 
 void MainComponent::showMissingFiles (bool afterOpening)
@@ -12753,7 +12764,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                     g.setColour (colour::textSecondary);
                     g.setFont (font (type::body));
                     // (round 190oj WG-4: an action that does not fit on one line at 85 % takes two lines, instead of "res...")
-                    const auto action = tr (row.action);
+                    const auto action = flFileKeys && juce::String (row.action) == "New project / open" ? tr ("Save new version / open") : tr (row.action);
                     const auto room = columnWidth - keyWidth - 10;
                     if (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), action) * 0.85f > (float) room)
                     {
@@ -12798,11 +12809,14 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
         }
 
         std::vector<std::pair<juce::String, juce::String>> fkeys;
+        bool flFileKeys = false; // round 190rs (D-4): the Pattern layout's Ctrl+N is FL's Save new version
         juce::Label manageNote;
         juce::HyperlinkButton manage;
     };
 
-    return std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
+    auto sheet = std::make_unique<Sheet> (std::move (functionKeys), std::move (onManageShortcuts));
+    sheet->flFileKeys = map.flFileKeys() && map.chordsFor ("file.saveNewVersion") == map.defaultsFor ("file.saveNewVersion");
+    return sheet;
 }
 
 void MainComponent::showHelp()

@@ -198,6 +198,18 @@ public:
     void setChords (const std::string& actionId, std::vector<Chord> chords); // [] = unbound
     void resetToDefaults();
 
+    // Round 190rs (owner decision D-4): FL 2026's File menu gives Ctrl+N to "Save new version"; LYNX gives it to New
+    // project. In the Pattern layout (FL's) the defaults follow FL: Save new version gets Ctrl+N (and keeps Ctrl+Alt+S) and
+    // New project takes flNewProjectChords() (FL's own key for it, none when FL has none); the Clip-launch and Simple
+    // layouts keep LYNX's. Switching moves only the actions still at their defaults: a key the user set himself stays, and
+    // Save new version doesn't take Ctrl+N while one of the user's own bindings uses it (keys.json keeps only overrides, so
+    // it reads the same either way).
+    void setFlFileKeys (bool on);
+    bool flFileKeys() const noexcept { return flFile; }
+    // The default chords of an action under the current layout's rule (the Shortcut manager's "Reset to default")
+    std::vector<Chord> defaultsFor (const std::string& actionId) const;
+    static std::vector<Chord> flNewProjectChords();
+
     // Overrides from a JSON object {"action.id": "Ctrl+L", "other.id": ["F4", "Shift+F4"], "x": ""}.
     // Unknown ids and unreadable chords are reported in `errors` and skipped. Returns false if the
     // text is not a JSON object.
@@ -226,6 +238,10 @@ public:
 
 private:
     std::vector<std::vector<Chord>> chords; // parallel to actions()
+    bool flFile = false;
+    bool ctrlNTakenByUser = false; // (set by setFlFileKeys: one of the user's own bindings uses Ctrl+N)
+    std::vector<char> userSet;     // parallel to actions(): set by setChords / loadJson (the user's own keys)
+    std::vector<Chord> defaultChords (std::size_t index) const;
 };
 
 // F10 / F11 (MIDI settings / Project info), FL's rule (FLEngine 0x13545f0, round 167o): when the Settings window is
