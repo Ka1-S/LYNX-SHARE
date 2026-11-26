@@ -18,7 +18,7 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 12);
+    CHECK (std::size (extras::onSince0132) == 13);
     // the six turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
     // and PR #268's veils; round 190ro took round 190qh's two Mixer views out again, below)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
@@ -26,8 +26,9 @@ TEST (extras190qk_default_lists)
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // rollup 0.1.32 step 3, the owner's decisions: #287's MIDI drop (FL ignores a .mid dropped there), #238's track colors
     // and round 190qi's LYNX-only plugin / Browser lists are on too; FL-exact turns them off
+    // round 190ro (EXTRAS-2.md ON-1): the gain handle that stays in view (only where FL shows none)
     for (const auto* id : { "playlist.midiDrop", "theme.tracksFromAccent", "plugins.recent", "plugins.oneRow", "browser.midiPreview",
-                            "browser.tabCompletes" })
+                            "browser.tabCompletes", "playlist.gainHandleFollowsView" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // the ones that change a gesture, a shortcut, a file or the sound stay off
     for (const auto* id : { "playlist.wheelZones", "editing.tempTools", "transport.wToStart", "detail.windowKey", "editing.muteKeyToggles",
@@ -37,7 +38,7 @@ TEST (extras190qk_default_lists)
                             "polyEdit.prepareOnOpen", "layout.trackOnly",
                             "playlist.shadeFadedAudio", "general.hoverValues", // (visual, but over the paint / idle CPU gates)
                             // rollup 0.1.32 step 2: rounds 190qo, 190qr, 190ld's audio editor wheel, 190qg's Grouped toolbar
-                            "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition", "playlist.gainHandleFollowsView",
+                            "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition",
                             "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped",
                             // round 190ro (EXTRAS-2.md OFF-1): 19 px off every FL Mixer fader and meter, +1.6 % a column
                             "mixer.peakValues", "mixer.correlation" })

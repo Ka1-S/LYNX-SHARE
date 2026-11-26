@@ -53,6 +53,9 @@ inline constexpr std::string_view onSince0132[] = {
     "plugins.oneRow",               // round 190qi: one row per plugin across VST / VST3 / CLAP
     "browser.midiPreview",          // round 190qi: a .mid clicked in the Browser plays
     "browser.tabCompletes",         // round 190qi: Tab completes the Browser's search
+    // round 190ro (EXTRAS-2.md ON-1): the gain handle moves only while the clip's middle is out of view, where FL shows no
+    // handle; a press next to its half circle still moves the clip (--extras2_190roshot checks it)
+    "playlist.gainHandleFollowsView", // issue #274: the clip gain handle stays in view
 };
 // On by default before 0.1.32 too: FL Studio's own behaviour (Esc, the start page), the Simple layout's loops (BandLab),
 // and the stretched clips' loop (issue #25, the owner's choice)

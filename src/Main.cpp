@@ -3873,6 +3873,15 @@ public:
             return;
         }
 
+        // --extras190roshot <prefix> (round 190ro: LYNX extras review 2, the gain handle in view, the Mixer at FL's height, the
+        // Clip-launch strips of new projects): src/Extras190roShot.inc
+        if (args.contains ("--extras190roshot"))
+        {
+            setApplicationReturnValue (runExtras190roShot (args[args.indexOf ("--extras190roshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --extras190qkshot <prefix> (round 190qk: the LYNX extras on by default, FL-exact / Recommended): src/Extras190qkShot.inc
         if (args.contains ("--extras190qkshot"))
         {
@@ -5963,6 +5972,10 @@ private:
                 extras190qkResult = "ERROR FL-exact values";
             lynx::extras::userSet() = kept;
         }
+        // round 190ro (src/Extras190roShot.inc, no pictures): the defaults it changed, a press on and beside the gain handle
+        // that stays in view, the Mixer at FL's height, a new Clip-launch project's strips
+        juce::String extras190roResult;
+        runExtras190roShot ({}, &extras190roResult);
         // round 190qx (src/Optionsux190qx.inc): the extras page by area, the Settings options for the palette, tooltips,
         // Reset this page, the window tips, the How-to guides, the notices
         const auto optionsux190qxResult = runOptionsux190qxSelftest (offline);
@@ -11743,7 +11756,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11876,6 +11889,7 @@ private:
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
                << "toolbar_overflow_190qg=" << toolbar190qgResult << "\n"
                << "extras190qk=" << extras190qkResult << "\n"
+               << "extras190ro=" << extras190roResult << "\n"
                << "discord190qu=" << discord190quResult << "\n"
                << "trialmark190qt=" << trialmark190qtResult << (trialmark190qtResult == "OK" ? juce::String() : " | " + trialmark190qtLog.replace ("\n", "; ")) << "\n"
                << "optionsux190qx=" << optionsux190qxResult << "\n"
@@ -21973,6 +21987,7 @@ private:
 #include "Design190ojShot.inc" // round 190oj (design review of every view)
 #include "Design190ooShot.inc" // round 190oo (design review 2: the owner's options and the round's fixes)
 #include "Extras190qkShot.inc" // round 190qk (the LYNX extras on by default)
+#include "Extras190roShot.inc" // round 190ro (LYNX extras review 2)
 #include "Optionsux190qx.inc" // round 190qx (the owner's "make the options easy")
 #include "SettingsShots190qx.inc" // round 190qx (Settings pages before / after)
 #include "Polish190qwShot.inc" // round 190qw (design polish pass, the Soft look)
