@@ -48,7 +48,11 @@ std::string newestBackup (const std::vector<BackupFile>& files, const std::strin
 // The file to offer after LYNX did not close properly: the newest file written since the session started
 // (`sessionStart`, same unit as the times), not an "overwritten" copy (that is older than the saved project).
 // "" when nothing was written in that session.
+// Round 190rp: a save's temporary file is never the candidate ("<name>_temp<hex>", juce::TemporaryFile's name, left
+// half-written when LYNX was killed or the machine went down while an autosave or the emergency save was writing it).
 std::string crashRecoveryCandidate (const std::vector<BackupFile>& files, std::int64_t sessionStart);
+// True for juce::TemporaryFile's name of a file being saved: "<name>_temp" + 1-8 hex digits (no extension).
+bool isTemporarySaveName (const std::string& name);
 
 // --- names ----------------------------------------------------------------------------------------------------------
 // `stem` if `taken` says it is free, else stem + "_2", "_3"... (FL's rule for backup and collected file names).

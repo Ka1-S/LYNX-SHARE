@@ -114,10 +114,24 @@ std::string crashRecoveryCandidate (const std::vector<BackupFile>& files, std::i
 {
     const BackupFile* best = nullptr;
     for (const auto& f : files)
-        if (f.time >= sessionStart && backupKind (f.name) != BackupKind::overwritten
+        if (f.time >= sessionStart && backupKind (f.name) != BackupKind::overwritten && ! isTemporarySaveName (f.name)
             && (best == nullptr || f.time > best->time || (f.time == best->time && f.name > best->name)))
             best = &f;
     return best != nullptr ? best->name : std::string();
+}
+
+bool isTemporarySaveName (const std::string& name)
+{
+    const auto at = name.rfind ("_temp");
+    if (at == std::string::npos)
+        return false;
+    const auto digits = name.size() - (at + 5);
+    if (digits < 1 || digits > 8)
+        return false;
+    for (auto i = at + 5; i < name.size(); ++i)
+        if (! std::isxdigit ((unsigned char) name[i]))
+            return false;
+    return true;
 }
 
 std::string uniqueName (const std::string& stem, const std::function<bool (const std::string&)>& taken)
