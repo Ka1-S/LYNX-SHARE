@@ -327,7 +327,11 @@
             juce::String error;
             const auto out = folder.getChildFile ("worker.dawproject");
             check ("#11 DAWproject written on a worker", writeDawProjectOnWorkerForTests (offline, out, notes, error) && out.getSize() > 0, error);
-            const auto bad = folder.getChildFile ("no such folder").getChildFile ("x.dawproject");
+            // (rollup 0.1.32 step 5: round 190rm's checked writer makes a missing folder, as the export window's own folders
+            // always exist; a path under a plain file can not be written on any system)
+            const auto blocker = folder.getChildFile ("not a folder");
+            blocker.replaceWithText ("x");
+            const auto bad = blocker.getChildFile ("x.dawproject");
             notes.clear();
             check ("#11 a file that cannot be written says why", ! writeDawProjectOnWorkerForTests (offline, bad, notes, error) && error.isNotEmpty(), error);
         }

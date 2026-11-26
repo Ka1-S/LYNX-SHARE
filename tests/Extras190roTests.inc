@@ -143,19 +143,11 @@ TEST (extras190ro_one_row_pick_reaches_an_als_export)
     CHECK (vst3.xml.find ("PluginDeviceVst3") != std::string::npos || vst3.xml.find ("Vst3PluginInfo") != std::string::npos);
     CHECK (! dropped (vst3) && dropped (clap));
 
-    // the merged row's pick. Round 190rk (plugin sweep, same rollup) orders the builds VST3 > CLAP > VST2: then the pick is
-    // the VST3 and the .als keeps it. Before that lands the pick is the CLAP, and the export names what it left out, so
-    // nothing is lost silently. (Integration: once 190rk is in, only the first branch runs; the second can go.)
-    if (pluginpicks::formatRank ("VST3") < pluginpicks::formatRank ("CLAP"))
-    {
-        CHECK (picked == "VST3");
-        CHECK (! dropped (exportWith (picked)));
-    }
-    else
-    {
-        CHECK (picked == "CLAP");
-        CHECK (dropped (exportWith (picked)));
-    }
+    // the merged row's pick: round 190rk orders the builds VST3 > CLAP > VST2 (merged in rollup 0.1.32 step 5), so the pick is
+    // the VST3 and the .als keeps it (the CLAP-first branch of this test went with the merge)
+    CHECK (pluginpicks::formatRank ("VST3") < pluginpicks::formatRank ("CLAP"));
+    CHECK (picked == "VST3");
+    CHECK (! dropped (exportWith (picked)));
 }
 
 // D-2 (FL 2026 checked live 11-26): round 190qe's zoom keys are a LYNX extra, off as FL in the Pattern layout
