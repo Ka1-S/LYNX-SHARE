@@ -13100,3 +13100,4 @@ countries: ru by kz
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Запись остановлена, дубль сохранён. LYNX SHARE снова откроет {0}, когда оно вернётся."
 "LYNX SHARE opens {0} again when it is back." = "LYNX SHARE снова откроет {0}, когда оно вернётся."
 "{0} is back: LYNX SHARE uses it again" = "{0} снова доступно: LYNX SHARE использует его"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "Он остановился, пока открывалось аудиоустройство {0}, поэтому на этот раз LYNX SHARE запустился с устройством по умолчанию. Снова выберите {0} в «Параметры > Настройки аудио», когда его драйвер заработает (например, после обновления или перезагрузки)."

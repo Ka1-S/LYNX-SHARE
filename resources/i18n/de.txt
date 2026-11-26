@@ -13100,3 +13100,4 @@ countries: de at ch li lu
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Die Aufnahme wurde beendet, der Take bleibt erhalten. LYNX SHARE öffnet {0} wieder, sobald es zurück ist."
 "LYNX SHARE opens {0} again when it is back." = "LYNX SHARE öffnet {0} wieder, sobald es zurück ist."
 "{0} is back: LYNX SHARE uses it again" = "{0} ist zurück: LYNX SHARE verwendet es wieder"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "Sie wurde beendet, während das Audiogerät {0} geöffnet wurde, deshalb ist LYNX SHARE diesmal mit dem Standardgerät gestartet. Wähle {0} wieder unter Optionen > Audioeinstellungen, sobald sein Treiber funktioniert (zum Beispiel nach einem Update oder Neustart)."

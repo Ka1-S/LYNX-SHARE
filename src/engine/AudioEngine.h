@@ -100,6 +100,14 @@ public:
     // driver itself on JUCE's ASIO thread, cmake/LynxPatchJuce.cmake fix 29); openAudioDevice() then takes it. Making
     // and opening it took ~0.8 s of the start's critical path. Elsewhere, or for another device type: nothing.
     static void prewarmAudioDevice();
+    // Round 190rp (crash reports since 0.1.31.2, group G1: one Windows machine hung at every start inside its ASIO
+    // driver's open, 6 starts in a row): openAudioDevice notes "opening the audio device <type>: <name>" in the session
+    // file before the saved device opens and "audio device opened" after. When the last session ended inside that open
+    // (Main.cpp reads its steps), this start skips the saved device (no prewarm either), opens the default one, saves
+    // that as the setup and the start-up notice says why. Set before prewarmAudioDevice / openAudioDevice.
+    static inline bool skipSavedDevice = false;
+    // the session step written before the saved device opens (Main.cpp looks for it)
+    static constexpr const char* openingDeviceStep = "opening the audio device ";
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)

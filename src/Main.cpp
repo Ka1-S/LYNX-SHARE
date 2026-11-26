@@ -627,6 +627,22 @@ UncleanCause uncleanCause()
     return cause;
 }
 
+// Round 190rp (crash reports since 0.1.31.2, G1): the device the newest unclean session was opening when it ended (its
+// last steps, after the hang watch's own lines, are AudioEngine::openingDeviceStep without "audio device opened"): the
+// driver hung or crashed in its open. "" when the session got past it.
+juce::String uncleanDeviceOpen()
+{
+    for (int i = uncleanSteps.size(); --i >= 0;)
+    {
+        const auto& step = uncleanSteps[i];
+        if (step.startsWith ("UI not responding") || step.startsWith ("UI responding again") || step.startsWith ("crashed: "))
+            continue;
+        return step.startsWith (lynx::AudioEngine::openingDeviceStep) ? step.fromFirstOccurrenceOf (lynx::AudioEngine::openingDeviceStep, false, false).trim()
+                                                                     : juce::String();
+    }
+    return {};
+}
+
 juce::String collectUncleanSessions()
 {
     juce::String lastStep;
@@ -4917,6 +4933,10 @@ public:
 
         // session breadcrumb: a fail-fast (no crash handler runs) still leaves the last steps behind (round 111)
         uncleanLastStep = collectUncleanSessions();
+        // round 190rp: the saved audio device hung (or crashed) the last start: not this time (see AudioEngine::skipSavedDevice)
+        if (uncleanLastStep.isNotEmpty())
+            if (uncleanDevice = uncleanDeviceOpen(); uncleanDevice.isNotEmpty())
+                lynx::AudioEngine::skipSavedDevice = true;
         sessionsFolder().createDirectory();
         lynx::crashguard::beginSession (
             sessionsFolder().getChildFile ("session-" + juce::String (lynx::crashguard::processId()) + ".txt").getFullPathName().toStdString(),
@@ -5353,6 +5373,8 @@ public:
     // Settings › General › "Crash reports" says (round 159), ask whether to send a report, send it unasked, or not
     void showUncleanNotice()
     {
+        if (uncleanDevice.isNotEmpty())
+            lynx::platform::testModeLog ("saved audio device skipped: the last session ended while it opened (" + uncleanDevice + ")");
         if (lynx::platform::testMode()) // LYNX_TEST_MODE: no prompt, no report sent (written to test-mode.log)
         {
             if (uncleanLastStep.isNotEmpty())
@@ -5368,6 +5390,11 @@ public:
                                  "LYNX SHARE's autosave folder; details in crash-history.log.",
                                  { uncleanLastStep });
         uncleanLastStep.clear();
+        if (uncleanDevice.isNotEmpty()) // (round 190rp)
+            message << "\n\n"
+                    << lynx::tr ("It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. "
+                                 "Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example).",
+                                 { uncleanDevice.fromFirstOccurrenceOf (": ", false, false) });
         const auto cause = uncleanCause();
         // round 157a: a plugin's editor was opening — it crashed (often in the graphics driver, inside the plugin's own
         // OpenGL window): offer to keep that plugin in its own process, where a crash takes only the plugin down
@@ -42121,6 +42148,7 @@ private:
     juce::File fileToOpen;
     bool startupFileHandled = false;
     bool startWithoutPlugins = false; // --no-plugins project.lynx (round 190ap)
+    juce::String uncleanDevice; // round 190rp: "<type>: <name>" of the device the last session hung opening (uncleanDeviceOpen)
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };

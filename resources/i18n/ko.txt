@@ -13100,3 +13100,4 @@ countries: kr
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "녹음이 중지되었고 테이크는 보존되었습니다. {0}이(가) 다시 연결되면 LYNX SHARE가 다시 엽니다."
 "LYNX SHARE opens {0} again when it is back." = "{0}이(가) 다시 연결되면 LYNX SHARE가 다시 엽니다."
 "{0} is back: LYNX SHARE uses it again" = "{0}이(가) 다시 연결됨: LYNX SHARE가 다시 사용합니다"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "오디오 장치 {0}을(를) 여는 중에 멈춰서 이번에는 LYNX SHARE가 기본 장치로 시작했습니다. 드라이버가 작동하면(예: 업데이트나 재시작 후) 옵션 > 오디오 설정에서 {0}을(를) 다시 선택하세요."

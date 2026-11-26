@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "platform/CrashGuard.h" // round 190rp: session steps around the device open
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
 #include "core/History.h" // (keepProjectClock: round 190re)
@@ -626,7 +627,8 @@ void AudioEngine::openAudioDevice()
     mark ("  engine: device types");
 
     // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
-    const auto saved = juce::XmlDocument::parse (audioDeviceFile());
+    // (round 190rp: not after a session that hung or ended inside this open: skipSavedDevice)
+    const auto saved = skipSavedDevice ? std::unique_ptr<juce::XmlElement>() : juce::XmlDocument::parse (audioDeviceFile());
     // (round 190go) the MIDI ports the saved setup names open with the MIDI devices (openMidiDevices: LYNX's MIDI
     // settings decide which inputs are open anyway), not on the audio device's way: JUCE opened them here (~0.1-0.2 s)
     if (saved != nullptr)
@@ -637,6 +639,9 @@ void AudioEngine::openAudioDevice()
         saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
     }
     auto fresh = saved == nullptr;
+    if (saved != nullptr) // (round 190rp: a hang or a crash in the driver's open leaves this as the session's last step)
+        crashguard::note (std::string (openingDeviceStep) + saved->getStringAttribute ("deviceType").toStdString() + ": "
+                          + saved->getStringAttribute ("audioOutputDeviceName").toStdString());
     auto failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
     // (round 190hd) a device made ahead without JUCE's start / stop at init that then failed: once more the usual way
     if (failed && saved != nullptr && asioPrewarmQuickInit())
@@ -651,9 +656,13 @@ void AudioEngine::openAudioDevice()
         choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
         chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
     }
+    if (saved != nullptr)
+        crashguard::note ("audio device opened");
     mark ("  engine: device opened");
     deviceManager.addAudioCallback (this);
     deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
+    if (skipSavedDevice) // (the device that hung is not tried again at the next start: the default one is the setup now)
+        saveAudioDeviceState();
     prefetcher = std::make_unique<StreamPrefetcher> (transport);
     prefetcher->update (song, samples);
     // a project set while the device was not open yet (round 190go: the start-up song, built with the window): its
@@ -665,6 +674,8 @@ void AudioEngine::openAudioDevice()
 
 void AudioEngine::prewarmAudioDevice()
 {
+    if (skipSavedDevice) // (round 190rp: the saved device hung the last session's start)
+        return;
     prewarmAsioDevice (audioDeviceFile());
 }
 

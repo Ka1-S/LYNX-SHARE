@@ -13100,3 +13100,4 @@ countries: tr
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Kayıt durdu ve kayıt alınan take korundu. LYNX SHARE, {0} geri geldiğinde onu yeniden açar."
 "LYNX SHARE opens {0} again when it is back." = "LYNX SHARE, {0} geri geldiğinde onu yeniden açar."
 "{0} is back: LYNX SHARE uses it again" = "{0} geri geldi: LYNX SHARE onu yeniden kullanıyor"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "{0} ses aygıtı açılırken durdu, bu yüzden LYNX SHARE bu kez varsayılan aygıtla başladı. Sürücüsü çalıştığında (örneğin bir güncelleme ya da yeniden başlatma sonrası) {0} aygıtını Seçenekler > Ses ayarları bölümünden yeniden seçin."

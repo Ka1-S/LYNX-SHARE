@@ -13100,3 +13100,4 @@ countries: id
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "Perekaman berhenti dan take tetap disimpan. LYNX SHARE membuka {0} lagi saat perangkat itu kembali."
 "LYNX SHARE opens {0} again when it is back." = "LYNX SHARE membuka {0} lagi saat perangkat itu kembali."
 "{0} is back: LYNX SHARE uses it again" = "{0} sudah kembali: LYNX SHARE memakainya lagi"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "Sesi berhenti saat perangkat audio {0} sedang dibuka, jadi kali ini LYNX SHARE dimulai dengan perangkat bawaan. Pilih {0} lagi di Opsi > Pengaturan audio saat drivernya berfungsi (misalnya setelah pembaruan atau mulai ulang)."

@@ -13100,3 +13100,4 @@ countries: cn sg
 "Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back." = "录音已停止，录音片段已保留。{0} 恢复后 LYNX SHARE 会重新打开它。"
 "LYNX SHARE opens {0} again when it is back." = "{0} 恢复后 LYNX SHARE 会重新打开它。"
 "{0} is back: LYNX SHARE uses it again" = "{0} 已恢复：LYNX SHARE 重新使用它"
+"It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "它在打开音频设备 {0} 时停止，因此这次 LYNX SHARE 使用默认设备启动。待其驱动可以正常工作（例如更新或重启后），请在“选项 > 音频设置”中重新选择 {0}。"

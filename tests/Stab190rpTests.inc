@@ -69,3 +69,22 @@ TEST (stab190rp_recovery_box_offers_plugins_off)
     const auto app = i18ntest::readFile ("src/Main.cpp");
     CHECK (app.find ("mainWindow->getContent().setRecoveryPlugin (uncleanCause().editorPlugin);") != std::string::npos);
 }
+
+// Crash reports since 0.1.31.2, G1: one Windows machine hung at every start inside its ASIO driver's open (6 starts in a
+// row, 0.1.30 to 0.1.31.2). The open is a session step now; a session that ended inside it makes the next start skip
+// the saved device (and its prewarm), open the default one and save that, with the reason in the start-up notice.
+TEST (stab190rp_a_device_that_hung_the_start_is_skipped_next_time)
+{
+    const auto engine = i18ntest::readFile ("src/engine/AudioEngine.cpp");
+    const auto open = engine.find ("void AudioEngine::openAudioDevice()");
+    const auto note = engine.find ("crashguard::note (std::string (openingDeviceStep)", open);
+    const auto init = engine.find ("deviceManager.initialise (0, 2, saved.get(), true)", open);
+    const auto done = engine.find ("crashguard::note (\"audio device opened\");", open);
+    CHECK (open != std::string::npos && note > open && init > note && done > init);
+    CHECK (engine.find ("const auto saved = skipSavedDevice ? std::unique_ptr<juce::XmlElement>()") != std::string::npos);
+    const auto prewarm = engine.find ("void AudioEngine::prewarmAudioDevice()");
+    CHECK (prewarm != std::string::npos && engine.find ("if (skipSavedDevice)", prewarm) < engine.find ("prewarmAsioDevice", prewarm));
+    const auto app = i18ntest::readFile ("src/Main.cpp");
+    CHECK (app.find ("if (uncleanDevice = uncleanDeviceOpen(); uncleanDevice.isNotEmpty())") != std::string::npos);
+    CHECK (app.find ("lynx::AudioEngine::skipSavedDevice = true;") != std::string::npos);
+}
