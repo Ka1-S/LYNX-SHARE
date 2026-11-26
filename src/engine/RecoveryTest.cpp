@@ -48,10 +48,41 @@ Song recoverySong (bool big)
     return s;
 }
 
+// the identity fields an engine gives a song when it takes it (projectId, the objects' uids) are not the song's content
+void dropIdentity (juce::var& v)
+{
+    if (auto* o = v.getDynamicObject())
+    {
+        for (const auto* key : { "uid", "projectId", "nextUid", "arrangementUids" })
+            o->removeProperty (key);
+        auto& props = o->getProperties();
+        for (int i = 0; i < props.size(); ++i)
+            if (auto* value = props.getVarPointerAt (i))
+                dropIdentity (*value);
+    }
+    else if (auto* a = v.getArray())
+    {
+        // (a clip's uid is the last field of its compact array: a 16-digit hex string)
+        for (int i = a->size(); --i >= 0;)
+            if (const auto& item = a->getReference (i); item.isString() && item.toString().length() == 16 && item.toString().containsOnly ("0123456789abcdef"))
+                a->remove (i);
+        for (auto& item : *a)
+            dropIdentity (item);
+    }
+}
+
+// the project as LYNX holds it once opened (read, then taken by an engine, which gives every object its identity:
+// both sides go the same way), written back without the identity fields
 juce::String jsonOf (const juce::File& file, juce::String& error)
 {
     auto song = ProjectFile::load (file, error);
-    return song ? ProjectFile::toJson (*song, false) : juce::String();
+    if (! song)
+        return {};
+    AudioEngine engine (false);
+    engine.setSong (std::move (*song));
+    auto v = juce::JSON::parse (ProjectFile::toJson (engine.getSong(), false));
+    dropIdentity (v);
+    return juce::JSON::toString (v, true);
 }
 
 std::vector<safety::BackupFile> backupsIn (const juce::File& folder)
@@ -188,9 +219,10 @@ juce::String recoveryRoundTripSelfTest (juce::String& log)
         const auto before = folder.getChildFile ("before.lynx");
         if (! ProjectFile::save (recoverySong (false), before, error))
             problems.add ("crash: " + error);
-        // the next start's question: files written since the crashed session started (the folder's files are older)
-        const auto sessionStart = juce::Time::getCurrentTime().toMilliseconds() + 1000;
+        // the next start's question: files written since the crashed session started (the folder's files are older;
+        // file times are whole seconds on Linux, so the session starts on a second boundary after before.lynx's second)
         juce::Thread::sleep (1100);
+        const auto sessionStart = juce::Time::getCurrentTime().toMilliseconds() / 1000 * 1000;
         juce::ChildProcess child;
         const auto started = child.start (juce::StringArray { exe.getFullPathName(), "--faulttest", "recovery", folder.getFullPathName() }, 0);
         if (! started || ! child.waitForProcessToFinish (60000))
@@ -211,6 +243,14 @@ juce::String recoveryRoundTripSelfTest (juce::String& log)
             const auto a = jsonOf (before, e1), b = name.empty() ? juce::String() : jsonOf (offered, e2);
             say ("crash mid-session: exit code 0x" + juce::String::toHexString ((juce::int64) child.getExitCode()) + ", offered \"" + juce::String (name)
                  + "\", " + (b.isEmpty() ? "does not open: " + e2 : juce::String (a == b ? "the same song" : "a different song")));
+            if (b.isNotEmpty() && a != b) // (where they part, for the log)
+            {
+                int at = 0;
+                while (at < a.length() && at < b.length() && a[at] == b[at])
+                    ++at;
+                say ("  the song: ..." + a.substring (juce::jmax (0, at - 60), at + 80).replace ("\n", " ") + "\n  recovered: ..."
+                     + b.substring (juce::jmax (0, at - 60), at + 80).replace ("\n", " "));
+            }
             if (! juce::String (name).startsWith ("recovered "))
                 problems.add ("crash: offered \"" + juce::String (name) + "\" instead of the recovered project");
             else if (b.isEmpty() || a != b)

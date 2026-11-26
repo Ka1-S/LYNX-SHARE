@@ -12,6 +12,18 @@
                 result = "ERROR " + what;
         };
 
+        // the message loop's part (the box's button, its callback, the open that follows: async messages)
+        const auto pump = [] (int ms, const std::function<bool()>& done) {
+            const auto start = juce::Time::getMillisecondCounter();
+            while (juce::Time::getMillisecondCounter() - start < (juce::uint32) ms)
+            {
+                for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
+                if (done && done())
+                    return;
+                juce::Thread::sleep (5);
+            }
+        };
+
         // ---- the recovery box: the backup of a session that ended while a hosted plugin's window was open opens without
         //      third-party plugins by default (Return), the plugin kept off in the project; without a plugin named,
         //      Return opens it as before
@@ -37,7 +49,7 @@
             const auto text = mainUi.recoveryBoxForTest (backup, buttons);
             offline.markSaved(); // (nothing to save: the box's choice opens at once, no "save changes?" first)
             mainUi.checkPreviousSessionForTest (juce::Time::getCurrentTime() - juce::RelativeTime::seconds (30));
-            offline.dispatchPendingMessages();
+            pump (500, [] { return juce::Component::getCurrentlyModalComponent() != nullptr; });
             auto* box = dynamic_cast<juce::AlertWindow*> (juce::Component::getCurrentlyModalComponent());
             check ("recovery box shown (" + juce::String (named ? "plugin named" : "no plugin") + ")", box != nullptr);
             if (box != nullptr)
@@ -47,9 +59,8 @@
                            && buttons[0] == (named ? lynx::tr ("Open backup without third-party plugins") : lynx::tr ("Open backup")));
                 check ("recovery box names the plugin", text.contains ("Crashy Synth 190rp") == named);
                 static_cast<juce::Component*> (box)->keyPressed (juce::KeyPress (juce::KeyPress::returnKey));
-                for (int i = 0; i < 20 && juce::Component::getCurrentlyModalComponent() != nullptr; ++i)
-                    offline.dispatchPendingMessages();
-                offline.dispatchPendingMessages();
+                pump (5000, [&offline] { return ! offline.getSong().channels.empty() && offline.getSong().channels[0].name == "Crashy Synth 190rp"; });
+                pump (200, {});
                 const auto uses = offline.hostedPluginUses();
                 const auto off = std::any_of (uses.begin(), uses.end(), [] (const pluginhold::Use& u) { return u.name == "Crashy Synth 190rp" && u.off; });
                 const auto opened = ! offline.getSong().channels.empty() && offline.getSong().channels[0].name == "Crashy Synth 190rp";
@@ -59,7 +70,7 @@
             }
             while (auto* modal = juce::Component::getCurrentlyModalComponent())
                 modal->exitModalState (0);
-            offline.dispatchPendingMessages();
+            pump (200, {});
             backup.deleteFile();
         }
 
