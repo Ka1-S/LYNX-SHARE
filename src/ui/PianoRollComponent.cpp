@@ -6868,7 +6868,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && ! shift && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
+    if (cmd && ! shift && ! alt && letter == 'C') // (Ctrl+Shift+C: pattern.clone; round 190rw: Ctrl+Alt+C is the global Consolidate)
     {
         copySelection();
         return true;
@@ -6876,7 +6876,11 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 
     if (cmd && letter == 'X')
     {
+        // round 190rw (Q1): with nothing selected FL 2026 cuts all of the channel's notes (checked live); LYNX copied them
+        // all and deleted none
+        const auto doomed = selectionOrAll();
         copySelection();
+        setSelection (doomed);
         deleteSelection();
         return true;
     }
@@ -6895,7 +6899,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 
     // quick note operations: one undo step each, on the selection (or all notes). The quantize ones are key map
     // actions (pianoRoll.quickQuantize / quantizeStarts / quantizeHalf) so they can be reassigned.
-    if (cmd && letter == 'U')
+    if (cmd && ! shift && ! alt && letter == 'U') // (round 190rw: Ctrl+Shift+U is the key map's pianoRoll.liveQuantizeSettings)
     {
         runOperation ([grid] (Pattern& p, const std::vector<int>& t) { return noteedit::chop (p, t, grid); });
         return true;
@@ -6907,7 +6911,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'L')
+    if (cmd && ! alt && letter == 'L') // (round 190rw: Ctrl+Alt+L is the global view.detailToggle, the Clip-launch detail view)
     {
         runOperation ([] (Pattern& p, const std::vector<int>& t) { noteedit::legato (p, t); return t; });
         return true;

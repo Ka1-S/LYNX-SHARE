@@ -9006,8 +9006,12 @@ void PlaylistComponent::cutWithKnife (juce::Point<int> from, juce::Point<int> to
     if (from.getDistanceFrom (to) < 3)
     {
         bool edge = false;
+        // (round 190rw: only inside the clip, as the line cut below: a click whose snap lands on the clip's edge cut a
+        // 1-tick sliver off it, or a 0-length piece off a 1-tick clip)
         if (const auto hit = clipAt (from.x, from.y, edge); hit >= 0)
-            cuts.push_back ({ hit, snap (xToTick (from.x) + round, snapOn) });
+            if (const auto tick = snap (xToTick (from.x) + round, snapOn);
+                tick > playlist[(std::size_t) hit].start && tick < playlist[(std::size_t) hit].end())
+                cuts.push_back ({ hit, tick });
     }
     else
     {
@@ -15040,6 +15044,10 @@ void PlaylistComponent::deleteSelection()
 
 void PlaylistComponent::copySelection()
 {
+    // round 190rw (Q1): FL 2026 keeps its clipboard when Ctrl+C finds nothing selected (checked live: Ctrl+C, Ctrl+D,
+    // Ctrl+C, Ctrl+V pastes the first copy); LYNX's key emptied it
+    if (selection.empty())
+        return;
     clipboard.clear();
     ++clipboardStamp;
     rangeClipboardNewest() = false; // (round 190pa: Ctrl+V pastes clips again)
