@@ -483,7 +483,7 @@ void MainComponent::updateEmptyHint()
             kind = EmptyHint::none;
     }
     juce::Component* parent = kind == EmptyHint::clipGrid ? clipGridView.get() : kind == EmptyHint::none ? nullptr : static_cast<juce::Component*> (&playlist);
-    if (emptyHint != nullptr && (emptyHint->getKind() != kind || emptyHint->getParentComponent() != parent))
+    if (emptyHint != nullptr && (emptyHint->getKind() != kind || emptyHint->getView() != parent))
     {
         emptyHint->attachTo (nullptr);
         emptyHint.reset();

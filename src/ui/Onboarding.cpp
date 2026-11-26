@@ -816,53 +816,74 @@ int EmptyHintCard::idealHeight() const
          + (buttons.isEmpty() ? 0 : 30) + 22;
 }
 
-void EmptyHintCard::attachTo (juce::Component* parent)
+// Issue #313 (round 190rs): the card is an overlay ABOVE its view, a sibling of it in the view's parent, never a child of the
+// view. The Playlist (and the clip grid) keep their picture in a cache that a scroll shifts and a zoom scales
+// (PlaylistComponent::PlayheadCache); as a child the card was painted into that picture, so every wheel step left shifted
+// or stretched copies of it in the view (#313's video: two or three cards side by side). It is placed in view coordinates
+// and follows the view's moves, size and visibility.
+void EmptyHintCard::attachTo (juce::Component* view)
 {
-    if (watched != nullptr && watched != parent)
+    if (watched != nullptr && watched != view)
         watched->removeComponentListener (this);
-    if (parent == nullptr)
+    auto* host = view != nullptr ? view->getParentComponent() : nullptr;
+    if (view == nullptr || host == nullptr)
     {
         if (auto* p = getParentComponent())
             p->removeChildComponent (this);
         watched = nullptr;
         return;
     }
-    const auto fresh = getParentComponent() != parent;
+    const auto fresh = watched != view || getParentComponent() != host;
     if (fresh)
     {
-        parent->addAndMakeVisible (*this);
-        parent->addComponentListener (this);
-        watched = parent;
+        if (auto* p = getParentComponent())
+            p->removeChildComponent (this);
+        view->addComponentListener (this);
+        watched = view;
     }
-    toFront (false);
+    // right above the view in its parent's z-order (a window docked over the view stays over the card)
+    if (fresh || host->getIndexOfChildComponent (this) != host->getIndexOfChildComponent (view) + 1)
+    {
+        if (! fresh)
+            host->removeChildComponent (this);
+        host->addChildComponent (this, host->getIndexOfChildComponent (view) + 1);
+    }
     place (fresh || ! pinned);
 }
 
 void EmptyHintCard::place (bool force)
 {
-    auto* parent = getParentComponent();
-    if (parent == nullptr)
+    auto* view = watched.getComponent();
+    if (view == nullptr || getParentComponent() == nullptr || view->getParentComponent() != getParentComponent())
         return;
-    // issue #313: a card already laid out for this size of its parent stays where it is, also when it is shown again (the
-    // area it centres in moved by a lane's height while the view was scrolled, and the card jumped with it)
-    // (a card made again for the same view, after a hide, takes the place the last one of its kind had there)
+    const auto viewBounds = view->getBoundsInParent();
+    const auto show = [this, view] (bool fits) { setVisible (fits && view->isVisible()); };
+    // issue #313: a card already laid out for this place and size of its view stays where it is, also when it is shown
+    // again (a card made again for the same view takes the place the last one of its kind had there)
     static std::map<int, std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> lastPlace;
     if (pinned && placed.isEmpty())
-        if (const auto it = lastPlace.find ((int) kind); it != lastPlace.end() && it->second.first == parent->getLocalBounds())
+        if (const auto it = lastPlace.find ((int) kind); it != lastPlace.end() && it->second.first == viewBounds)
             placedFor = it->second.first, placed = it->second.second;
-    if (pinned && ! placed.isEmpty() && placedFor == parent->getLocalBounds())
+    if (pinned && ! force && ! placed.isEmpty() && placedFor == viewBounds)
     {
         if (getBounds() != placed)
             setBounds (placed);
-        juce::ignoreUnused (force);
+        show (placedFits);
         return;
     }
-    placedFor = parent->getLocalBounds();
-    auto area = where ? where() : parent->getLocalBounds();
-    area = area.getIntersection (parent->getLocalBounds()).reduced (12);
+    if (pinned && force && ! placed.isEmpty() && placedFor == viewBounds)
+    {
+        setBounds (placed);
+        show (placedFits);
+        return;
+    }
+    placedFor = viewBounds;
+    auto area = where ? where() : view->getLocalBounds();
+    area = area.getIntersection (view->getLocalBounds()).reduced (12);
     const auto w = juce::jmin (width, area.getWidth()), h = juce::jmin (idealHeight(), area.getHeight());
-    setVisible (w >= 260 && h >= 120); // (a tiny view: no hint)
-    setBounds (area.withSizeKeepingCentre (w, h));
+    placedFits = w >= 260 && h >= 120; // (a tiny view: no hint)
+    setBounds (area.withSizeKeepingCentre (w, h) + viewBounds.getPosition());
+    show (placedFits);
     placed = getBounds();
     lastPlace[(int) kind] = { placedFor, placed };
 }
