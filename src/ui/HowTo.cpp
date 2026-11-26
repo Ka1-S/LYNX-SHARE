@@ -30,7 +30,9 @@ const Guide guides[windowCount] = {
       { TR_NOOP ("Each row is a channel: an instrument or a sample. Click its steps to switch them on, right-click to switch them off."),
         TR_NOOP ("The two knobs beside a channel's name set its volume and pan."),
         TR_NOOP ("Click a channel's name for its settings; right-click it for its menu (Piano roll, rename, replace...)."),
-        TR_NOOP ("The + under the channels adds an instrument, a sample player or a plugin."), nullptr } },
+        TR_NOOP ("The + under the channels adds an instrument, a sample player or a plugin."),
+        // round 190rs (G-03, queue item 92): the route box
+        TR_NOOP ("The number box beside the knobs is the Mixer track the channel plays through: drag it to change it, double-click it to show it.") } },
     { "pianoRoll", TR_NOOP ("How to use the Piano roll"), "pattern-tour",
       { TR_NOOP ("Click to draw a note, right-click to delete it. Drag a note's right end to change its length."),
         TR_NOOP ("Ctrl+drag selects notes; hold Alt while dragging to move without snapping."),
@@ -40,7 +42,9 @@ const Guide guides[windowCount] = {
       { TR_NOOP ("Each insert is a track with its own effects and fader; the Master is the first one, everything ends there."),
         TR_NOOP ("Click an empty effect slot (the list on the right) to add an effect to the selected insert."),
         TR_NOOP ("To route an insert into another, select it, then click the arrow at the bottom of the one it should go to."),
-        TR_NOOP ("Right-click that arrow for a sidechain; right-click an insert's name for its menu (rename, color, render...)."), nullptr } },
+        TR_NOOP ("Right-click that arrow for a sidechain; right-click an insert's name for its menu (rename, color, render...)."),
+        // round 190rs (G-03, queue item 92): how a channel reaches an insert; Playlist tracks don't route
+        TR_NOOP ("Each channel plays into the insert in its box in the Channel rack; Playlist tracks only hold clips. Want them paired? Playlist menu › Link Playlist tracks to mixer tracks.") } },
     { "browser", TR_NOOP ("How to use the Browser"), "simple-loops",
       { TR_NOOP ("Click a sample to hear it; drag it onto the Channel rack, the Playlist or a Mixer slot."),
         TR_NOOP ("Type in the search box to find samples, presets and plugins in every folder."),

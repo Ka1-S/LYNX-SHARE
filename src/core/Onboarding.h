@@ -367,7 +367,7 @@ inline const char* tipTitle (Tip t) noexcept
     {
         case Tip::songModeEmpty: return TR_NOOP ("Nothing to play in Song mode yet");
         case Tip::recordNoInput: return TR_NOOP ("No input to record from yet");
-        case Tip::mixerRouting: return TR_NOOP ("Tip: sending one insert into another");
+        case Tip::mixerRouting: return TR_NOOP ("Tip: how sound reaches the Mixer");
         case Tip::pianoRoll: return TR_NOOP ("Tip: drawing notes");
         case Tip::tracker: return TR_NOOP ("Tip: typing notes in the Tracker");
         case Tip::deviceView: return TR_NOOP ("Tip: a track's devices");
@@ -385,7 +385,8 @@ inline const char* tipText (Tip t) noexcept
         case Tip::recordNoInput:
             return TR_NOOP ("To record your voice or an instrument, choose an input in the audio settings and arm a track. Notes from the computer keys or a MIDI keyboard record without one.");
         case Tip::mixerRouting:
-            return TR_NOOP ("Select an insert, then click the arrow at the bottom of another one to send its sound there. Right-click the arrow for a sidechain.");
+            // round 190rs (G-03, queue item 92): first how a channel gets here, then insert-to-insert routing
+            return TR_NOOP ("Each channel plays into the insert in its box in the Channel rack; Playlist tracks only hold clips. To send an insert into another, select it, then click the arrow at the bottom of the other one. Right-click the arrow for a sidechain.");
         case Tip::pianoRoll:
             return TR_NOOP ("Click to draw a note and right-click to delete it. The lane at the bottom sets each note's velocity.");
         case Tip::tracker:
