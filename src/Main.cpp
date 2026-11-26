@@ -4948,9 +4948,10 @@ public:
             playStartupSound();
         splash->setStatus (lynx::tr ("Loading the workspace..."));
         splash->startClock();
-        // the minimum counts from the process start (the window and the audio device took part of it already); a card
-        // on its own thread stays for the drop (round 190hd)
-        splashDuration = ownThread ? landingSeconds : lynx::SplashScreen::remainingDuration (startupTrace.seconds());
+        // the card stays for the logo's drop, then the window shows (round 190hd: a card on its own thread; round 190rn:
+        // the card on the message thread too, so Linux and macOS no longer hold a window that is ready for a 2.1 s
+        // minimum counted from the process start: the window was built at 0.15 s and the audio device open at 0.87 s)
+        splashDuration = landingSeconds;
         splash->setBarDuration (splashDuration);
 
         splash->whenLanded (splashDuration, [this] {
