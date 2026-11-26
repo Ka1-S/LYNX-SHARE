@@ -3277,8 +3277,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     {
                         const auto size = (float) juce::jmin (12, trackHeight - 6);
                         const auto midY = flTall ? (float) y + 11.0f : (float) y + (float) (trackHeight - 1) * 0.5f;
-                        ui::drawTrackIconCached (g, trackicons::Icon::keyboard, juce::Rectangle<float> ((float) nameLeft, midY - size * 0.5f, size, size),
-                                           muted ? colour::textDisabled : flHeaderInk (plate).withMultipliedAlpha (0.85f));
+                        if (const auto mark = juce::Rectangle<float> ((float) nameLeft, midY - size * 0.5f, size, size);
+                            g.clipRegionIntersects (mark.getSmallestIntegerContainer())) // (a playhead column leaves this static mark alone)
+                            ui::drawTrackIconCached (g, trackicons::Icon::keyboard, mark, muted ? colour::textDisabled : flHeaderInk (plate).withMultipliedAlpha (0.85f));
                         nameLeft += (int) size + 3;
                     }
                     const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;

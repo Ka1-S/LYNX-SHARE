@@ -1443,8 +1443,10 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // name, as FL's (LYNX's own keyboard glyph); an icon of the channel's own wins (it shows at the right)
                 if (iconWidth == 0.0f && linkedToInstrumentTrack (row))
                 {
-                    ui::drawTrackIconCached (g, trackicons::Icon::keyboard, juce::Rectangle<float> (nameArea.getX() + leftTrim, nameArea.getCentreY() - 6.0f, 12.0f, 12.0f),
-                                       (theme::soft() ? textSecondary : onAccent).withAlpha (channel.muted ? 0.45f : 0.85f));
+                    // (drawn only where the repaint reaches it: a playhead column leaves this static mark alone)
+                    if (const auto mark = juce::Rectangle<float> (nameArea.getX() + leftTrim, nameArea.getCentreY() - 6.0f, 12.0f, 12.0f);
+                        g.clipRegionIntersects (mark.getSmallestIntegerContainer()))
+                        ui::drawTrackIconCached (g, trackicons::Icon::keyboard, mark, (theme::soft() ? textSecondary : onAccent).withAlpha (channel.muted ? 0.45f : 0.85f));
                     leftTrim += 15.0f;
                 }
                 const auto textArea = nameArea.withTrimmedLeft (leftTrim).withTrimmedRight (rightTrim);

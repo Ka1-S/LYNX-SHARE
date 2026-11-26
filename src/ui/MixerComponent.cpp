@@ -2142,7 +2142,8 @@ void MixerStrips::paint (juce::Graphics& g)
             };
             if (const auto own = trackicons::iconFor (track.icon); own != trackicons::Icon::none)
                 ui::drawTrackIcon (g, own, iconArea (t).toFloat(), ink());
-            else if (linkedToAudioTrack (song, t))
+            // (coordinator 11-26, option b: static marks are left out of repaints that don't reach them, e.g. the meters')
+            else if (g.clipRegionIntersects (iconArea (t)) && linkedToAudioTrack (song, t))
                 ui::drawTrackIconCached (g, trackicons::Icon::audio, iconArea (t).toFloat(), ink()); // (from the picture cache)
         }
 
