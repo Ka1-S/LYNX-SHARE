@@ -23,7 +23,7 @@
             checks << "     " << what << "\n";
             juce::File (prefix + "-checks.txt").replaceWithText (checks);
         };
-        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), lynx::shot::file (juce::File (prefix + "-" + name + ".png")).getFullPathName()); };
+        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png"); };
         const auto area = [&prefix] (juce::Component& c, juce::Rectangle<int> r, const juce::String& name) {
             r = r.getIntersection (c.getLocalBounds());
             if (! r.isEmpty())
