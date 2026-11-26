@@ -12335,7 +12335,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             updateEmptyHint();
         });
         menu.addSeparator();
-        menu.addItem (tr ("Search actions...") + "\t?", [this] { showActionSearch(); }); // #228 (round 190nq)
+        // #228 (round 190nq); round 190rs (G-12): in Live's look "?" toggles the Info View, so the item shows the key that
+        // opens the search there (Ctrl+Shift+Y)
+        menu.addItem (tr ("Search actions...") + (theme::livelook::active() ? shortcutText ("view.commandPalette") : juce::String ("\t?")),
+                      [this] { showActionSearch(); });
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
