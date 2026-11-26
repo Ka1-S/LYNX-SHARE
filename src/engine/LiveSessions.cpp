@@ -1414,9 +1414,6 @@ void LiveSessionManager::accept (int from)
          ++n)
         name = peer.name + " " + juce::String (n);
     peer.name = name;
-    // round 190rj: a guest of 0.1.31.x keeps his own tempo and project settings against the host's: say who should update
-    if (onHint && live::keepsOwnSettings (utf8 (peer.version), JUCE_APPLICATION_VERSION_STRING))
-        onHint (tr ("{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync", { name, peer.version }));
     // every place taken, some by guests who are away: the one away longest gives theirs up (someone coming back under
     // the same name takes their own place again, below)
     for (;;)
@@ -1460,7 +1457,11 @@ void LiveSessionManager::accept (int from)
     peer.accepted = true;
     sendSnapshot (from);
     sendPeople (true);
-    if (onHint)
+    // round 190rj: a guest of 0.1.31.x keeps his own tempo and project settings against the host's: say who should update
+    // (in place of the "joined" hint, which would replace it at once in the one hint line)
+    if (onHint && live::keepsOwnSettings (utf8 (peer.version), JUCE_APPLICATION_VERSION_STRING))
+        onHint (tr ("{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync", { name, peer.version }));
+    else if (onHint)
         onHint (tr ("{0} joined the live session", { name }));
     setState (State::live, tr ("Live"));
 }
