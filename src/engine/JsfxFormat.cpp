@@ -1,4 +1,5 @@
 #include "engine/JsfxFormat.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <array>
@@ -251,7 +252,7 @@ juce::StringArray userFolders()
 
 void setUserFolders (const juce::StringArray& folders)
 {
-    settingsList().replaceWithText (folders.joinIntoString ("\n") + (folders.isEmpty() ? "" : "\n"));
+    safewrite::replaceWithText (settingsList(), folders.joinIntoString ("\n") + (folders.isEmpty() ? "" : "\n"));
     refreshPolicy();
 }
 
@@ -288,15 +289,15 @@ int installPack()
             continue;
         const auto target = folder.getChildFile (fromUtf8 (f.path));
         target.getParentDirectory().createDirectory();
-        if (target.replaceWithData (data->data(), data->size()))
+        if (safewrite::replaceWithData (target, data->data(), data->size()))
             ++written;
         now.add (fromUtf8 (f.path));
     }
     for (const auto& old : before)
         if (old.isNotEmpty() && ! now.contains (old) && ! old.contains (".."))
             folder.getChildFile (old).deleteFile();
-    folder.getChildFile (".lynx-pack-files").replaceWithText (now.joinIntoString ("\n") + "\n");
-    stamp.replaceWithText (juce::String (jsfxpack::hash) + "\n");
+    safewrite::replaceWithText (folder.getChildFile (".lynx-pack-files"), now.joinIntoString ("\n") + "\n");
+    safewrite::replaceWithText (stamp, juce::String (jsfxpack::hash) + "\n");
     return written;
 }
 
@@ -1054,9 +1055,9 @@ juce::String selfTest (const juce::File& reportFolder)
         const auto files = format.searchPathsForPlugins (roots(), true, false);
         require (files.contains (clipper.getFullPathName()), "the scan did not find the bundled soft_clipper.jsfx");
         const auto plain = temp.getChildFile ("volume");
-        plain.replaceWithText ("// a REAPER effect without an extension\ndesc:Plain volume\nslider1:v=0<-12,12,1>Volume\n@sample\nspl0=spl0;\n");
+        safewrite::replaceWithText (plain, "// a REAPER effect without an extension\ndesc:Plain volume\nslider1:v=0<-12,12,1>Volume\n@sample\nspl0=spl0;\n");
         require (format.fileMightContainThisPluginType (plain.getFullPathName()), "an extensionless JSFX was not recognised");
-        temp.getChildFile ("README").replaceWithText ("not a script\n");
+        safewrite::replaceWithText (temp.getChildFile ("README"), "not a script\n");
         require (! format.fileMightContainThisPluginType (temp.getChildFile ("README").getFullPathName()), "a text file was taken for a JSFX");
         const auto fx = describe (clipper, false);
         require (fx.uniqueId == uniqueIdOf ("chokehold/Clipper/soft_clipper.jsfx", false) && fx.pluginFormatName == "JSFX", "the soft clipper's id");
@@ -1160,8 +1161,8 @@ juce::String selfTest (const juce::File& reportFolder)
 
         // PDC from pdc_delay, @serialize, import, a log slider, a hidden slider (own test script)
         const auto gainFile = temp.getChildFile ("lynx_test_gain.jsfx");
-        gainFile.replaceWithText (gainScript);
-        temp.getChildFile ("lynx_test_lib.jsfx-inc").replaceWithText (libScript);
+        safewrite::replaceWithText (gainFile, gainScript);
+        safewrite::replaceWithText (temp.getChildFile ("lynx_test_lib.jsfx-inc"), libScript);
         auto gain = make (describe (gainFile, false), 48000.0, PluginHost::maxBlockSize, error);
         require (gain != nullptr, "the gain test script did not load: " + error);
         require (gain->getLatencySamples() == 32, "pdc_delay 32 is the plugin's latency (" + juce::String (gain->getLatencySamples()) + ")");
@@ -1189,7 +1190,7 @@ juce::String selfTest (const juce::File& reportFolder)
         // a script changed after the project was saved: it still loads, and the panel says so
         {
             const auto st = gainSlot.captureState();
-            gainFile.replaceWithText (juce::String (gainScript) + "// edited\n");
+            safewrite::replaceWithText (gainFile, juce::String (gainScript) + "// edited\n");
             auto edited = make (describe (gainFile, false), 48000.0, PluginHost::maxBlockSize, error);
             require (edited != nullptr, "the edited script: " + error);
             juce::MemoryBlock bytes;
@@ -1200,7 +1201,7 @@ juce::String selfTest (const juce::File& reportFolder)
 
         // MIDI in and out: a generator plays the note it gets (440 Hz for A4) and sends it on an octave up
         const auto synthFile = temp.getChildFile ("lynx_test_synth.jsfx");
-        synthFile.replaceWithText (synthScript);
+        safewrite::replaceWithText (synthFile, synthScript);
         auto synth = make (describe (synthFile, true), 48000.0, 256, error);
         require (synth != nullptr, "the synth test script did not load: " + error);
         {
@@ -1235,9 +1236,9 @@ juce::String selfTest (const juce::File& reportFolder)
         const auto secretFolder = temp.getChildFile ("elsewhere");
         secretFolder.createDirectory();
         const auto secret = secretFolder.getChildFile ("secret.txt");
-        secret.replaceWithText ("not for scripts\n");
+        safewrite::replaceWithText (secret, "not for scripts\n");
         const auto readerFile = temp.getChildFile ("lynx_test_reader.jsfx");
-        readerFile.replaceWithText (juce::String (readerScript).replace ("%PATH%", secret.getFullPathName().replaceCharacter ('\\', '/')));
+        safewrite::replaceWithText (readerFile, juce::String (readerScript).replace ("%PATH%", secret.getFullPathName().replaceCharacter ('\\', '/')));
         require (mayRead (clipper) && ! mayRead (secret), "the policy's folders");
         {
             auto reader = make (describe (readerFile, false), 48000.0, 512, error);
@@ -1255,7 +1256,7 @@ juce::String selfTest (const juce::File& reportFolder)
         // a script that does not compile fails with the compiler's message
         {
             const auto broken = temp.getChildFile ("lynx_test_broken.jsfx");
-            broken.replaceWithText ("desc:LYNX test - broken\n@sample\nspl0 = (;\n");
+            safewrite::replaceWithText (broken, "desc:LYNX test - broken\n@sample\nspl0 = (;\n");
             auto none = make (describe (broken, false), 48000.0, 512, error);
             require (none == nullptr && error.startsWith ("JSFX"), "a broken script: " + error);
         }
@@ -1293,7 +1294,7 @@ juce::String selfTest (const juce::File& reportFolder)
         return "ERROR " + juce::String::fromUTF8 (e.what());
     }
     if (reportFolder != juce::File())
-        reportFolder.getChildFile ("jsfx-selftest.txt").replaceWithText (notes.joinIntoString ("\n") + "\n");
+        safewrite::replaceWithText (reportFolder.getChildFile ("jsfx-selftest.txt"), notes.joinIntoString ("\n") + "\n");
     return "OK (" + notes.joinIntoString ("; ") + ")";
 }
 
@@ -1360,7 +1361,7 @@ juce::String bench (const juce::File& output)
         const auto perFrame = ns / (blocks * block);
         lines.add (fromUtf8 (name.c_str()) + "\t" + juce::String (perFrame, 1) + "\t" + juce::String (perFrame * rate / 1.0e7, 3));
     }
-    output.replaceWithText (lines.joinIntoString ("\n") + "\n");
+    safewrite::replaceWithText (output, lines.joinIntoString ("\n") + "\n");
     return "OK " + juce::String (files.size()) + " scripts";
 }
 } // namespace jsfx

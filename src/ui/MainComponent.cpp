@@ -1,4 +1,5 @@
 #include "ui/AutoLookEditor.h"
+#include "engine/SafeWrite.h"
 #include "ui/ControllerBridge.h"
 #include "ui/KeyFocus.h"
 #include "ui/TrackIcons.h"
@@ -3991,7 +3992,7 @@ void MainComponent::saveUiSettings()
     if (! persistent)
         return;
 
-    uiSettingsFile().replaceWithText ("typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
+    safewrite::replaceWithText (uiSettingsFile(), "typingPiano=" + juce::String (typingPiano ? 1 : 0) + "\ntypingOctave=" + juce::String (typingOctave)
                                       + "\ntypingRoot=" + juce::String (typingRoot)
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
@@ -4418,7 +4419,7 @@ void MainComponent::showWindowsTip()
     const auto shown = counter.existsAsFile() ? counter.loadFileAsString().trim().getIntValue() : 0;
     if (shown >= 3)
         return;
-    counter.replaceWithText (juce::String (shown + 1));
+    safewrite::replaceWithText (counter, juce::String (shown + 1));
 
     auto key = [this] (Panel p) {
         const auto chords = keyMap.chordsFor (panelAction (p));
@@ -4817,7 +4818,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     const auto layoutFile = [] (Style s) { return platform::settingsFile (layoutstyle::workspaceFile (s)); };
     if (persistent && swapLayout && style != from)
     {
-        layoutFile (from).replaceWithText (workspace.getLayoutText());
+        safewrite::replaceWithText (layoutFile (from), workspace.getLayoutText());
         if (const auto saved = layoutFile (style); saved.existsAsFile())
             workspace.applyLayoutText (saved.loadFileAsString());
         else
@@ -8793,7 +8794,8 @@ void MainComponent::keepOverwrittenCopy (const juce::File& file)
         return;
     folder.createDirectory();
     const auto stem = projectStem (file.getFileNameWithoutExtension());
-    if (file.copyFileTo (newBackupFile (folder, stem, safety::BackupKind::overwritten)))
+    // (round 190rm: a checked copy; the rotation, which deletes the oldest backups, runs only after a good one)
+    if (juce::String why; safewrite::copyFile (file, newBackupFile (folder, stem, safety::BackupKind::overwritten), why))
         rotateBackups (stem);
 }
 
@@ -8999,14 +9001,14 @@ void MainComponent::startLiveFromCommandLine()
             if (safe == nullptr)
                 return;
             if (safe->live->getState() == LiveSessionManager::State::live)
-                return (void) juce::File (codeFile).replaceWithText (safe->live->getInviteCode());
+                return (void) safewrite::replaceWithText (juce::File (codeFile), safe->live->getInviteCode());
             if (safe->live->isActive() && left > 0)
                 juce::Timer::callAfterDelay (200, [poll = weak.lock(), left] {
                     if (poll != nullptr)
                         (*poll) (left - 1);
                 });
             else
-                juce::File (codeFile).replaceWithText ("ERROR " + safe->live->getStatus());
+                safewrite::replaceWithText (juce::File (codeFile), "ERROR " + safe->live->getStatus());
         };
         (*poll) (150);
         // round 190ai: --live-share file.vst3 — once live, the host shares that plugin and shows its list
@@ -9289,7 +9291,7 @@ void MainComponent::startSession()
         });
     }
     sessionMarker.getParentDirectory().createDirectory();
-    sessionMarker.replaceWithText (juce::String (juce::Time::getCurrentTime().toMilliseconds()));
+    safewrite::replaceWithText (sessionMarker, juce::String (juce::Time::getCurrentTime().toMilliseconds()));
     // takes that were recording when LYNX stopped (crash, power loss, closed while recording): after the backup offer
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
@@ -9625,12 +9627,14 @@ void MainComponent::saveCopyForOlder()
                                           return;
                                       file = ProjectFile::withProjectExtension (file);
                                       const auto copy = olderlynx::forRelease (json, release);
-                                      juce::TemporaryFile temp (file);
-                                      if (! copy.ok || ! temp.getFile().replaceWithText (copy.json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary()
-                                          || file.loadFileAsString() != copy.json)
+                                      // (round 190rm: the checked writer; an existing file is left as it was on a failure)
+                                      juce::String why;
+                                      if (! copy.ok || ! safewrite::writeText (file, copy.json, why, false, false, nullptr) || file.loadFileAsString() != copy.json)
                                       {
                                           juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
-                                                                                  copy.ok ? file.getFullPathName() : copy.error);
+                                                                                  ! copy.ok ? copy.error
+                                                                                  : why.isNotEmpty() ? tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() })
+                                                                                                     : file.getFullPathName());
                                           return;
                                       }
                                       ui::postHint ({ tr ("Saved a copy for LYNX SHARE {0}", { release }), file.getFileName() }, 6000);
@@ -10432,7 +10436,7 @@ void MainComponent::showSmartDisableTip (int off, int total, bool firstTimeNotic
     const auto shown = PluginHost::settingsFolder().getChildFile ("smart-disable-tip.txt");
     if (shown.existsAsFile())
         return;
-    shown.replaceWithText ("1");
+    safewrite::replaceWithText (shown, "1");
     ui::postNotice ({ text }, 20000);
 }
 
@@ -11861,7 +11865,7 @@ void MainComponent::openRecent (int index)
 void MainComponent::rememberRecent (const juce::File& file)
 {
     recent.addFile (file);
-    PluginHost::settingsFolder().getChildFile ("recentes.txt").replaceWithText (recent.toString());
+    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("recentes.txt"), recent.toString());
     menuItemsChanged();
 }
 

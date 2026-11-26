@@ -1,4 +1,5 @@
 #include "ui/AudioClipboard.h"
+#include "engine/SafeWrite.h"
 
 #include "platform/Paths.h"
 
@@ -74,6 +75,6 @@ juce::File save (const juce::String& baseName, const juce::String& extension, co
     if (! dir.createDirectory().wasOk() || data == nullptr || size == 0)
         return {};
     const auto file = dir.getNonexistentChildFile (baseName, extension, false);
-    return file.replaceWithData (data, size) ? file : juce::File();
+    return safewrite::replaceWithData (file, data, size) ? file : juce::File();
 }
 } // namespace lynx::audioclipboard

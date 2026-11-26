@@ -793,7 +793,7 @@
                                    return;
                                const auto file = c.getResult().withFileExtension ("fnv");
                                const auto bytes = grossbeat::writeEnvelopeFile (safe->gbState().slots[(std::size_t) safe->gbSlotIndex()]);
-                               if (! file.replaceWithData (bytes.data(), bytes.size()))
+                               if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
                                    ui::postHint ({ tr ("Could not write {0}", { file.getFullPathName() }), {} }, 3000);
                            });
     }

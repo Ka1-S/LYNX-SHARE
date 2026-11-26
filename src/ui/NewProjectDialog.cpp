@@ -1,4 +1,5 @@
 #include "ui/NewProjectDialog.h"
+#include "engine/SafeWrite.h"
 #include "platform/Paths.h"
 
 #include "core/Preferences.h"
@@ -55,7 +56,7 @@ void saveRemembered (const Remembered& r)
     if (r.startupProject.isNotEmpty())
         text << "startupProject=" << r.startupProject << "\n";
     newProjectSettingsFile().getParentDirectory().createDirectory();
-    newProjectSettingsFile().replaceWithText (text);
+    safewrite::replaceWithText (newProjectSettingsFile(), text);
 }
 
 struct TemplateItem

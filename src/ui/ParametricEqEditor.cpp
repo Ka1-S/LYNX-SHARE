@@ -1,4 +1,5 @@
 #include "ui/ParametricEqEditor.h"
+#include "engine/SafeWrite.h"
 #include "ui/PluginEditors.h"
 #include "core/ParametricEqFl.h"
 
@@ -287,7 +288,7 @@ DisplaySettings& displaySettings()
 void saveDisplaySettings()
 {
     const auto& d = displaySettings();
-    displayFile().replaceWithText ("spectrum=" + juce::String ((int) d.spectrum) + "\nheatmap=" + juce::String ((int) d.heatmap) + "\nposition="
+    safewrite::replaceWithText (displayFile(), "spectrum=" + juce::String ((int) d.spectrum) + "\nheatmap=" + juce::String ((int) d.heatmap) + "\nposition="
                                    + juce::String (d.position) + "\nsoloOnShift=" + juce::String ((int) d.soloOnShift)
                                    + "\nmonitorInput=" + juce::String ((int) d.monitorInput) + "\n");
 }

@@ -1,4 +1,5 @@
 #include "ui/ActionSearch.h"
+#include "engine/SafeWrite.h"
 
 #include "platform/Paths.h"
 #include "ui/I18n.h"
@@ -334,7 +335,7 @@ bool ActionSearchOverlay::runSelected()
     for (const auto& r : recentIds())
         lines.add (juce::String::fromUTF8 (r.c_str()));
     if (! platform::testMode())
-        recentFile().replaceWithText (lines.joinIntoString ("\n"));
+        safewrite::replaceWithText (recentFile(), lines.joinIntoString ("\n"));
     if (close)
         close();
     return true;

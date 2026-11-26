@@ -1,4 +1,5 @@
 #include "ui/ModRing.h"
+#include "engine/SafeWrite.h" // (round 190ru: GrossBeatEditor.inc saves .fnv state files through the checked writer)
 #include "ui/SlotWatch.h"
 #include "ui/WindowPlaces.h"
 #include "ui/FrameTicker.h"

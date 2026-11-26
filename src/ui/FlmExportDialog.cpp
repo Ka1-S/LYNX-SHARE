@@ -1,4 +1,5 @@
 #include "ui/FlmExportDialog.h"
+#include "engine/SafeWrite.h"
 
 #include <map>
 
@@ -95,18 +96,17 @@ bool writeFlmCopy (const Song& song, const juce::File& target, FlmExportResult& 
         if (to.existsAsFile() && to.getSize() == from.getSize() && to.hasIdenticalContentTo (from))
             continue;
         to.getParentDirectory().createDirectory();
-        if (! from.copyFileTo (to))
+        if (juce::String why; ! safewrite::copyFile (from, to, why)) // (round 190rm: checked)
         {
-            error = tr ("Could not write {0}", { to.getFullPathName() });
+            error = tr ("Not written: {0}. {1} was not changed.", { tr (why), to.getFileName() });
             return false;
         }
     }
     if (missing > 0)
         result.lost.push_back ({ "Samples not found on this computer ({0}): their notes stay, FL Studio Mobile plays nothing for them", std::to_string (missing), true });
-    juce::TemporaryFile temp (target);
-    if (! temp.getFile().replaceWithData (result.bytes.data(), result.bytes.size()) || ! temp.overwriteTargetFileWithTemporary())
+    if (juce::String why; ! safewrite::writeData (target, result.bytes.data(), result.bytes.size(), why)) // (round 190rm: checked)
     {
-        error = tr ("Could not write {0}", { target.getFullPathName() });
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), target.getFileName() });
         return false;
     }
     return true;

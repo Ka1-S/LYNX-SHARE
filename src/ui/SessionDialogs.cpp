@@ -1,4 +1,5 @@
 #include "ui/SessionDialogs.h"
+#include "engine/SafeWrite.h"
 
 #include <memory>
 
@@ -36,7 +37,7 @@ juce::String myName()
 void rememberName (const juce::String& name)
 {
     nameFile().getParentDirectory().createDirectory();
-    nameFile().replaceWithText (name.trim());
+    safewrite::replaceWithText (nameFile(), name.trim());
 }
 
 // each guest's area colour (the host's own things keep theirs)

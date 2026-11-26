@@ -1,4 +1,5 @@
 #include "ui/TiltViewport.h"
+#include "engine/SafeWrite.h"
 #include "ui/TypeAhead.h"
 #include "ui/DemoMode.h" // round 190pl
 #include "ui/PluginPresetMenu.h"
@@ -333,7 +334,7 @@ void saveIndexText (const std::string& text)
 {
     const auto f = indexFile();
     const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
-    if (temp.replaceWithData (text.data(), text.size()))
+    if (safewrite::replaceWithData (temp, text.data(), text.size()))
         temp.moveFileTo (f);
 }
 
@@ -366,7 +367,7 @@ public:
         juce::StringArray lines;
         for (const auto& r : roots)
             lines.add (juce::String::fromUTF8 (r.c_str()));
-        if (! indexRootsFile().replaceWithText (lines.joinIntoString ("\n") + "\n"))
+        if (! safewrite::replaceWithText (indexRootsFile(), lines.joinIntoString ("\n") + "\n"))
             return false;
        #if JUCE_WINDOWS
         signal = CreateEventW (nullptr, FALSE, FALSE, indexerSignalName (thisProcessId()).toWideCharPointer());
@@ -632,7 +633,7 @@ struct BrowserComponent::SimilarShared
         cb.save = [] (const std::string& bytes) {
             const auto f = file();
             const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
-            if (temp.replaceWithData (bytes.data(), bytes.size()))
+            if (safewrite::replaceWithData (temp, bytes.data(), bytes.size()))
                 temp.moveFileTo (f);
         };
         cb.statusChanged = [raw = s.get()] { raw->statusChanged.sendChangeMessage(); };
@@ -4040,11 +4041,11 @@ void BrowserComponent::saveCollections()
 {
     const auto& store = collectionStore();
     collectionsFile().getParentDirectory().createDirectory();
-    collectionsFile().replaceWithText (juce::String::fromUTF8 (store.toText().c_str()));
+    safewrite::replaceWithText (collectionsFile(), juce::String::fromUTF8 (store.toText().c_str()));
     juce::String starredText; // (an older LYNX SHARE reads this one)
     for (const auto& path : store.starredPaths())
         starredText << juce::String::fromUTF8 (path.c_str()) << "\n";
-    starredFile().replaceWithText (starredText);
+    safewrite::replaceWithText (starredFile(), starredText);
 }
 
 juce::String BrowserComponent::collectionName (int collection)
@@ -4575,7 +4576,7 @@ void BrowserComponent::saveView() const
         v.x = old.x, v.y = old.y, v.width = old.width, v.height = old.height;
     }
     file.getParentDirectory().createDirectory();
-    file.replaceWithText (juce::String::fromUTF8 (v.toText().c_str()));
+    safewrite::replaceWithText (file, juce::String::fromUTF8 (v.toText().c_str()));
 }
 
 bool BrowserComponent::lists (const juce::File& file) const
@@ -5028,7 +5029,7 @@ public:
             v.height = b.getHeight();
         }
         file().getParentDirectory().createDirectory();
-        file().replaceWithText (juce::String::fromUTF8 (v.toText().c_str()));
+        safewrite::replaceWithText (file(), juce::String::fromUTF8 (v.toText().c_str()));
     }
 
     void resized() override { browser.setBounds (getLocalBounds()); }
@@ -5117,7 +5118,7 @@ std::unique_ptr<juce::Component> BrowserComponent::makeSampleBrowserContent (Aud
     auto v = host->browser.getView();
     v.open = true; // (written at once: a crash keeps it open next time too)
     SampleBrowserHost::file().getParentDirectory().createDirectory();
-    SampleBrowserHost::file().replaceWithText (juce::String::fromUTF8 (v.toText().c_str()));
+    safewrite::replaceWithText (SampleBrowserHost::file(), juce::String::fromUTF8 (v.toText().c_str()));
     return host;
 }
 
@@ -5556,7 +5557,7 @@ void BrowserComponent::addUserFolder()
         auto lines = juce::StringArray::fromLines (userFoldersFile().loadFileAsString());
         lines.removeEmptyStrings();
         lines.addIfNotAlreadyThere (folder.getFullPathName());
-        userFoldersFile().replaceWithText (lines.joinIntoString ("\n"));
+        safewrite::replaceWithText (userFoldersFile(), lines.joinIntoString ("\n"));
         setTab (allTab);
         rebuildRoots();
     });
@@ -5585,7 +5586,7 @@ int BrowserComponent::addUserFolders (const juce::StringArray& paths)
     for (const auto& l : list)
         lines.add (juce::String::fromUTF8 (l.c_str()));
     userFoldersFile().getParentDirectory().createDirectory();
-    userFoldersFile().replaceWithText (lines.joinIntoString ("\n"));
+    safewrite::replaceWithText (userFoldersFile(), lines.joinIntoString ("\n"));
     setTab (allTab);
     rebuildRoots();
     for (auto* other : liveBrowsers()) // (the other Browsers list the same folders)
@@ -5635,7 +5636,7 @@ void BrowserComponent::removeUserFolder (const juce::File& folder)
     for (int i = lines.size(); --i >= 0;)
         if (juce::File (lines[i].trim()) == folder)
             lines.remove (i);
-    userFoldersFile().replaceWithText (lines.joinIntoString ("\n"));
+    safewrite::replaceWithText (userFoldersFile(), lines.joinIntoString ("\n"));
     if (view.hidden.erase (folder.getFullPathName().toStdString()) > 0) // (a hidden mark of a folder no longer listed)
         saveView();
     rebuildRoots();
@@ -7101,7 +7102,7 @@ void BrowserComponent::loadTags()
 void BrowserComponent::saveTags()
 {
     tagsFile().getParentDirectory().createDirectory();
-    tagsFile().replaceWithText (juce::String::fromUTF8 (tagStore().toText().c_str()));
+    safewrite::replaceWithText (tagsFile(), juce::String::fromUTF8 (tagStore().toText().c_str()));
 }
 
 void BrowserComponent::tagsChanged()
@@ -7580,7 +7581,7 @@ void BrowserComponent::savePrefs() const
     for (const auto& t : picked)
         text << "tag=" << juce::String::fromUTF8 (t.c_str()) << "\n";
     prefsFile().getParentDirectory().createDirectory();
-    prefsFile().replaceWithText (text);
+    safewrite::replaceWithText (prefsFile(), text);
 }
 #include "ui/LoopBrowserParts.inc" // round gaps190kf
 } // namespace lynx

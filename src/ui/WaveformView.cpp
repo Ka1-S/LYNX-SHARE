@@ -1,4 +1,5 @@
 #include "ui/WaveformView.h"
+#include "engine/SafeWrite.h"
 
 #include "core/SamplerPage.h"
 #include "core/Spectrogram.h"
@@ -108,7 +109,7 @@ private:
         {
             const auto bytes = wave::serialise (s);
             const auto temp = cacheFile.withFileExtension ("tmp");
-            if (temp.replaceWithData (bytes.data(), bytes.size()))
+            if (safewrite::replaceWithData (temp, bytes.data(), bytes.size()))
                 temp.moveFileTo (cacheFile);
             pruneDiskCache (folder);
         }

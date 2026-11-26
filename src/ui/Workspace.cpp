@@ -1,4 +1,5 @@
 #include "ui/Workspace.h"
+#include "engine/SafeWrite.h"
 #include "ui/Motion.h"
 #include "ui/ThemeSettings.h"
 
@@ -1830,7 +1831,7 @@ bool Workspace::saveLayoutAs (const juce::String& name)
 {
     const auto folder = layoutsFolder();
     folder.createDirectory();
-    return folder.getChildFile (juce::File::createLegalFileName (name) + ".txt").replaceWithText (getLayoutText());
+    return safewrite::replaceWithText (folder.getChildFile (juce::File::createLegalFileName (name) + ".txt"), getLayoutText());
 }
 
 bool Workspace::loadLayout (const juce::File& file)
@@ -1849,6 +1850,6 @@ void Workspace::setPersistent (bool shouldPersist)
 void Workspace::saveState()
 {
     if (persistent && layoutReady)
-        stateFile().replaceWithText (getLayoutText());
+        safewrite::replaceWithText (stateFile(), getLayoutText());
 }
 } // namespace lynx

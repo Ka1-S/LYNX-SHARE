@@ -1,4 +1,5 @@
 #include "ui/SamplerImportUi.h"
+#include "engine/SafeWrite.h"
 
 #include "core/NativeEngines.h"
 #include "core/SamplerImport.h"
@@ -49,7 +50,7 @@ msimport::Access diskAccess (const juce::File& source)
             juce::String::createStringFromData (wav.data(), (int) std::min<std::size_t> (wav.size(), 65536)) + juce::String ((juce::int64) wav.size()),
             0x7FFFFFFF));
         const auto file = folder.getChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())).substring (0, 80) + "-" + hash + ".wav");
-        if (! file.existsAsFile() && ! file.replaceWithData (wav.data(), wav.size()))
+        if (! file.existsAsFile() && ! safewrite::replaceWithData (file, wav.data(), wav.size()))
             return {};
         return file.getFullPathName().toStdString();
     };

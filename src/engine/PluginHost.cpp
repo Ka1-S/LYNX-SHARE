@@ -1,4 +1,5 @@
 #include "engine/PluginHost.h"
+#include "engine/SafeWrite.h"
 #include "core/FlSettings.h"
 #include "platform/PrefaultMemory.h"
 #include "platform/Paths.h"
@@ -2474,7 +2475,7 @@ PluginHost::PluginHost (bool keep)
                 known.clearBlacklistedFiles();
                 save();
             }
-            retried.replaceWithText ("3\n");
+            safewrite::replaceWithText (retried, "3\n");
         }
     }
     if (persistent)
@@ -2553,7 +2554,7 @@ void PluginHost::setPluginFolders (const juce::FileSearchPath& folders)
     juce::StringArray lines;
     for (int i = 0; i < folders.getNumPaths(); ++i)
         lines.add (folders[i].getFullPathName());
-    settingsFolder().getChildFile ("plugin-folders.txt").replaceWithText (lines.joinIntoString ("\n") + "\n");
+    safewrite::replaceWithText (settingsFolder().getChildFile ("plugin-folders.txt"), lines.joinIntoString ("\n") + "\n");
 }
 
 const FlPluginDb& PluginHost::flPluginDatabase()
@@ -2694,7 +2695,7 @@ public:
               while (! done)
               {
                   const auto a = ownActivity();
-                  file.replaceWithText (juce::String (a.cpuMs) + " " + juce::String (a.readBytes) + " " + juce::String (a.faults) + " "
+                  safewrite::replaceWithText (file, juce::String (a.cpuMs) + " " + juce::String (a.readBytes) + " " + juce::String (a.faults) + " "
                                         + juce::String (a.windows));
                   for (int i = 0; i < 5 && ! done; ++i)
                       std::this_thread::sleep_for (std::chrono::milliseconds (100));
@@ -2879,7 +2880,7 @@ bool PluginHost::describeLv2 (const juce::FileSearchPath& paths, const std::func
         format->searchPathsForPlugins (folders, true, false); // this process's own list learns the new bundles
         save(); // before the stamp: the stamp says these plugins are in the list on disk
         if (persistent)
-            saved.replaceWithText (stamp + listed(), false, false, "\n");
+            safewrite::replaceWithText (saved, stamp + listed(), false, false, "\n");
         return true;
     }
     return false;
@@ -3031,7 +3032,7 @@ void PluginHost::forgetFile (const juce::String& file)
             if (emptyScanFile (lines[i]) == file)
                 lines.remove (i);
         if (persistent)
-            list.replaceWithText (lines.joinIntoString ("\n"));
+            safewrite::replaceWithText (list, lines.joinIntoString ("\n"));
     }
     if (persistent && ! juce::File::isAbsolutePath (file)) // an LV2 URI: the next scan describes the LV2 folders again
         settingsFolder().getChildFile ("scan-lv2.txt").deleteFile();
@@ -3074,7 +3075,7 @@ void PluginHost::rememberEmptyScan (const juce::String& file)
         if (lines[i].trim().isEmpty() || emptyScanFile (lines[i]) == file)
             lines.remove (i);
     lines.add (juce::String (juce::File (file).getLastModificationTime().toMilliseconds()) + "|" + file + (isModule32Bit (file) ? "|bridge32" : ""));
-    list.replaceWithText (lines.joinIntoString ("\n"));
+    safewrite::replaceWithText (list, lines.joinIntoString ("\n"));
 }
 
 namespace
@@ -3129,7 +3130,7 @@ void PluginHost::rememberMisses (const std::vector<FlpPluginUse>& uses)
                 lines.remove (i);
         lines.add (now + "|" + key);
     }
-    list.replaceWithText (lines.joinIntoString ("\n"));
+    safewrite::replaceWithText (list, lines.joinIntoString ("\n"));
 }
 
 void PluginHost::forgetMisses()
@@ -3145,7 +3146,7 @@ void PluginHost::setFavourite (const std::string& id, bool favourite)
     else
         favouriteIds.erase (id);
     if (persistent)
-        settingsFolder().getChildFile ("plugin-favourites.txt").replaceWithText (juce::String (prefs::formatFavourites (favouriteIds)));
+        safewrite::replaceWithText (settingsFolder().getChildFile ("plugin-favourites.txt"), juce::String (prefs::formatFavourites (favouriteIds)));
 }
 
 void PluginHost::setPluginName (const std::string& key, const std::string& name)
@@ -3156,7 +3157,7 @@ void PluginHost::setPluginName (const std::string& key, const std::string& name)
     else
         userNames[key] = clean;
     if (persistent)
-        settingsFolder().getChildFile ("plugin-names.txt").replaceWithText (juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
+        safewrite::replaceWithText (settingsFolder().getChildFile ("plugin-names.txt"), juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
     if (onDatabaseEdited)
         onDatabaseEdited();
 }
@@ -3167,7 +3168,7 @@ void PluginHost::setDatabaseFolders (const plugincatalog::Folders& folders)
                           && folders.hidden == userFolders.hidden && folders.top == userFolders.top;
     userFolders = folders;
     if (persistent)
-        settingsFolder().getChildFile ("plugin-database.txt").replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
+        safewrite::replaceWithText (settingsFolder().getChildFile ("plugin-database.txt"), juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
     if (onDatabaseEdited && ! viewOnly)
         onDatabaseEdited();
 }
@@ -3184,9 +3185,9 @@ void PluginHost::adoptDatabase (const plugincatalog::Folders& folders, const std
         return;
     const auto databaseFile = settingsFolder().getChildFile ("plugin-database.txt");
     if (foldersChanged || ! databaseFile.existsAsFile())
-        databaseFile.replaceWithText (juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
+        safewrite::replaceWithText (databaseFile, juce::String::fromUTF8 (plugincatalog::formatFolders (userFolders).c_str()));
     if (namesChanged)
-        settingsFolder().getChildFile ("plugin-names.txt").replaceWithText (juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
+        safewrite::replaceWithText (settingsFolder().getChildFile ("plugin-names.txt"), juce::String::fromUTF8 (prefs::formatPluginNames (userNames).c_str()));
 }
 
 void PluginHost::startBackgroundScan (const juce::FileSearchPath& paths)
@@ -3228,7 +3229,7 @@ int PluginHost::scanOneFile (const juce::String& formatName, const juce::String&
     // first tell the parent how many plugins this file holds, so it waits long enough for a large bundle
     if (formatName == "VST3")
         if (const auto classes = countVst3Classes (file); classes > 1)
-            classCountFile (output).replaceWithText (juce::String (classes));
+            safewrite::replaceWithText (classCountFile (output), juce::String (classes));
 
     juce::AudioPluginFormatManager manager;
     addPluginFormats (manager);
@@ -3252,7 +3253,7 @@ int PluginHost::scanOneFile (const juce::String& formatName, const juce::String&
                 }
             auto ids = format->searchPathsForPlugins (juce::FileSearchPath (file.fromFirstOccurrenceOf (lv2BatchPrefix, false, false)), true, false);
             ids.removeDuplicates (false); // newer JUCE lists a bundle once per plugin, and describes all of them each time
-            classCountFile (output).replaceWithText (juce::String (ids.size())); // (a large collection gets the time it needs)
+            safewrite::replaceWithText (classCountFile (output), juce::String (ids.size())); // (a large collection gets the time it needs)
             for (const auto& id : ids)
                 format->findAllTypesForFile (found, id);
         }
@@ -3992,7 +3993,7 @@ bool pluginSubstitutesEnabled()
 
 void setPluginSubstitutesEnabled (bool enabled)
 {
-    PluginHost::settingsFolder().getChildFile ("substitutes.txt").replaceWithText (enabled ? "1" : "0");
+    safewrite::replaceWithText (PluginHost::settingsFolder().getChildFile ("substitutes.txt"), enabled ? "1" : "0");
 }
 
 std::string PluginHost::preloadKey (const PluginRef& ref, double sampleRate)

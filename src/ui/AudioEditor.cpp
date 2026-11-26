@@ -1,4 +1,5 @@
 #include "ui/AudioEditor.h"
+#include "engine/SafeWrite.h"
 
 #include "core/TransientNav.h" // round 190on (P8)
 #include "ui/AudioEditorTools.h"
@@ -2317,7 +2318,7 @@ public:
         const auto whole = range.start == 0 && range.end == doc.audio.frames();
         const auto file = folder.getNonexistentChildFile (safeTitle() + (whole ? " (edit)" : " (part)"), ".wav");
         const auto bytes = ae::encodeWav (part, bits);
-        if (! file.replaceWithData (bytes.data(), bytes.size()))
+        if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
         {
             setStatus (tr ("Could not write {0}", { file.getFullPathName() }), true);
             return {};
@@ -3928,7 +3929,7 @@ private:
             if (! file.existsAsFile())
             {
                 file.getParentDirectory().createDirectory();
-                file.replaceWithText (juce::String::fromUTF8 (lastScript.source.c_str()), false, false, "\n");
+                safewrite::replaceWithText (file, juce::String::fromUTF8 (lastScript.source.c_str()), false, false, "\n");
             }
             lastScript.file = file;
             lastScript.key = file.getFullPathName();
@@ -4568,7 +4569,7 @@ private:
     bool writeWav (const juce::File& file, ae::WavFormat format)
     {
         const auto bytes = ae::encodeWav (doc, format);
-        if (! file.replaceWithData (bytes.data(), bytes.size()))
+        if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
         {
             setStatus (tr ("Could not write {0}", { file.getFullPathName() }), true);
             return false;
@@ -4661,7 +4662,7 @@ private:
                                       const auto name = names[i].empty() ? self->safeTitle() + " " + juce::String (i + 1).paddedLeft ('0', 2)
                                                                          : juce::File::createLegalFileName (juce::String::fromUTF8 (names[i].c_str()));
                                       const auto bytes = ae::encodeWav (part, self->bits);
-                                      written += fc.getResult().getNonexistentChildFile (name, ".wav").replaceWithData (bytes.data(), bytes.size()) ? 1 : 0;
+                                      written += safewrite::replaceWithData (fc.getResult().getNonexistentChildFile (name, ".wav"), bytes.data(), bytes.size()) ? 1 : 0;
                                   }
                                   self->setStatus (tr ("{0} files written", { juce::String (written) }), false);
                               });
@@ -4726,7 +4727,7 @@ private:
         folder.createDirectory();
         const auto file = folder.getNonexistentChildFile (safeTitle() + " (part)", ".wav");
         const auto bytes = ae::encodeWav (part, bits);
-        if (! file.replaceWithData (bytes.data(), bytes.size()))
+        if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
         {
             setStatus (tr ("Could not write {0}", { file.getFullPathName() }), true);
             return;

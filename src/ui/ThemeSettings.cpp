@@ -1,4 +1,5 @@
 #include "ui/ThemeSettings.h"
+#include "engine/SafeWrite.h"
 
 #include <array>
 #include <map>
@@ -239,7 +240,7 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
 bool saveFile (const themes::Spec& spec, const juce::File& file)
 {
     file.getParentDirectory().createDirectory();
-    return file.replaceWithText (toJson (spec));
+    return safewrite::replaceWithText (file, toJson (spec));
 }
 
 std::optional<themes::Spec> loadFile (const juce::File& file)
@@ -266,7 +267,7 @@ juce::File backgroundsFolder()
         if (beside.isDirectory() || beside.createDirectory().wasOk())
         {
             const auto probe = beside.getChildFile (".lynx-write-test");
-            const auto ok = probe.replaceWithText ("x") && probe.existsAsFile();
+            const auto ok = safewrite::replaceWithText (probe, "x") && probe.existsAsFile();
             probe.deleteFile();
             if (ok)
                 return beside;

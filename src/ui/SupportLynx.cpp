@@ -1,4 +1,5 @@
 #include "ui/SupportLynx.h"
+#include "engine/SafeWrite.h"
 
 #include <cmath>
 #include <tuple>
@@ -128,7 +129,7 @@ supportnote::State loadState()
 
 void saveState (const supportnote::State& state)
 {
-    stateFile().replaceWithText (juce::String (supportnote::toText (state)));
+    safewrite::replaceWithText (stateFile(), juce::String (supportnote::toText (state)));
 }
 
 bool noteEnabled()

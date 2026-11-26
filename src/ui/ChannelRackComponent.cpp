@@ -1,4 +1,5 @@
 #include "core/SelectionRename.h"
+#include "engine/SafeWrite.h"
 #include "core/FlSettings.h"
 #include <unordered_map>
 #include "ui/Motion.h"
@@ -4381,7 +4382,7 @@ void ChannelRackComponent::saveChannelState (int channel)
                                      return;
                                  file = file.withFileExtension ("lynxchannel");
                                  const auto bytes = ProjectFile::channelStateBytes (engine.getSong().channels[(std::size_t) channel]);
-                                 if (! file.replaceWithData (bytes.data(), bytes.size()))
+                                 if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
                                      juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save channel state as..."),
                                                                              tr ("Could not write {0}", { file.getFullPathName() }));
                              });
