@@ -4711,6 +4711,8 @@ public: // (the class stays public from here, as before)
             return 0;
         if (menuButton().expanded (2.0f).contains (p))
             return 1;
+        if (pluginheader::ledHitArea (slots()).contains (p)) // (issue #317: the power LED)
+            return 7;
         if (! sidechainChip.isEmpty() && sidechainChip.contains (p))
             return 6;
         if (usesBar())
@@ -4793,6 +4795,14 @@ public: // (the class stays public from here, as before)
             if (h == 6)
             {
                 pluginheader::showSidechainPicker (engine, track, slot, this, sidechainChip.getSmallestIntegerContainer());
+                return;
+            }
+            if (h == 7 && ! e.mods.isPopupMenu()) // issue #317: the power LED turns the effect off / on, as the Mixer slot's
+            {
+                if (node.locate) // (a Patcher node's effect: on / off only)
+                    editSlot ([] (EffectSlot& fx) { fx.enabled = ! fx.enabled; });
+                else
+                    pluginheader::clickLed (engine, track, slot, e.mods);
                 return;
             }
             if (h == 5)
@@ -6009,6 +6019,7 @@ private:
             case 5: return { bar.hintFor (bar.partAt (p)), bar.presetLabel(), false, true };
             case 6: return { tr ("Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose"),
                              {}, false, true };
+            case 7: return { pluginheader::ledHint(), {}, false, false };
             default: break;
         }
         const auto index = itemAt (p);

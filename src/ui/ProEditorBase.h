@@ -401,6 +401,13 @@ protected:
             bar.click (part, *this);
             return;
         }
+        // issue #317: the header's power LED turns the effect off / on, as the Mixer slot's LED
+        if (! e.mods.isPopupMenu() && pluginheader::ledHitArea (pluginheader::headerSlots (headerArea())).contains (e.position))
+        {
+            if (current() != nullptr)
+                pluginheader::clickLed (engine, track, slot, e.mods);
+            return;
+        }
         // round 126: the editor's style; round 190in (FW-9): also from the header's ▸ slot, as in every native editor
         const auto onMenu = pluginheader::headerSlots (headerArea()).menu.expanded (2.0f).contains (e.position);
         if ((e.mods.isPopupMenu() && headerArea().contains (e.position)) || onMenu)
@@ -563,6 +570,8 @@ protected:
         const auto p = position.toFloat();
         if (const auto part = bar.partAt (p); part != pluginheader::Part::none)
             return { bar.hintFor (part), bar.presetLabel(), false, true };
+        if (pluginheader::ledHitArea (pluginheader::headerSlots (headerArea())).contains (p)) // (issue #317)
+            return { pluginheader::ledHint(), {}, false, false };
         Ctl c;
         if (controlAt (p, c))
         {

@@ -52,6 +52,13 @@ HeaderSlots headerSlots (juce::Rectangle<float> header);
 constexpr float ledDiameter = 7.0f;
 // undo / redo / A / B / A→B of an editor without them (its setting is not its parameters): 35 % and no hover
 void paintDisabledSlots (juce::Graphics& g, const HeaderSlots& slots);
+// Issue #317 (round 190rv): the header's power LED is the slot's on / off switch, the same as the Mixer slot's LED: in
+// `ledHitArea` (the LED and a few pixels around it, between the ▸ / mark and the title) a click turns the effect off or
+// on again, Ctrl+click or Alt+click solos it, Shift+click locks its state (one undo step each); `ledHint` is the Mixer
+// LED's hint bar text.
+juce::Rectangle<float> ledHitArea (const HeaderSlots& slots);
+void clickLed (AudioEngine& engine, int track, int slot, const juce::ModifierKeys& mods);
+juce::String ledHint();
 
 class PresetBar
 {

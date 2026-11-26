@@ -12,6 +12,7 @@
 #include "engine/PluginHost.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
+#include "ui/FlMods.h"
 #include "ui/I18n.h"
 #include "ui/PluginSkin.h"
 #include "ui/Theme.h"
@@ -252,6 +253,33 @@ HeaderSlots headerSlots (juce::Rectangle<float> header)
     x -= c ? 4.0f : 6.0f;
     s.title = { titleX, header.getY(), juce::jmax (0.0f, x - titleX), header.getHeight() };
     return s;
+}
+
+juce::Rectangle<float> ledHitArea (const HeaderSlots& slots)
+{
+    // 14 px wide: from the end of the ▸ (compact grid) or of LYNX's mark to the title's start
+    return juce::Rectangle<float> (14.0f, 18.0f).withCentre (slots.led);
+}
+
+void clickLed (AudioEngine& engine, int track, int slot, const juce::ModifierKeys& mods)
+{
+    if (mods.isShiftDown()) // (the Mixer slot LED's Shift+click: FL's "Lock/Unlock State")
+        engine.editSong ([track, slot] (Song& song) { mixerops::toggleSlotLock (song, track, slot); });
+    else if (flmods::ctrl (mods) || mods.isAltDown()) // (its Ctrl / Alt+click: FL's "Solo/Unsolo")
+        engine.editSong ([track, slot] (Song& song) { mixerops::soloSlot (song, track, slot); });
+    else
+        engine.editSong ([track, slot] (Song& song) {
+            if (track >= 0 && track < (int) song.mixer.size() && slot >= 0 && slot < (int) song.mixer[(std::size_t) track].effects.size())
+            {
+                auto& fx = song.mixer[(std::size_t) track].effects[(std::size_t) slot];
+                fx.enabled = ! fx.enabled;
+            }
+        });
+}
+
+juce::String ledHint()
+{
+    return tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on).  Shift+click: lock its state");
 }
 
 void paintDisabledSlots (juce::Graphics& g, const HeaderSlots& slots)
