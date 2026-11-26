@@ -825,21 +825,26 @@ void EmptyHintCard::attachTo (juce::Component* parent)
         watched = nullptr;
         return;
     }
-    if (getParentComponent() != parent)
+    const auto fresh = getParentComponent() != parent;
+    if (fresh)
     {
         parent->addAndMakeVisible (*this);
         parent->addComponentListener (this);
         watched = parent;
     }
     toFront (false);
-    place();
+    place (fresh || ! pinned);
 }
 
-void EmptyHintCard::place()
+void EmptyHintCard::place (bool force)
 {
     auto* parent = getParentComponent();
     if (parent == nullptr)
         return;
+    // issue #313: a card already laid out for this size of its parent stays where it is
+    if (! force && pinned && placedFor == parent->getLocalBounds())
+        return;
+    placedFor = parent->getLocalBounds();
     auto area = where ? where() : parent->getLocalBounds();
     area = area.getIntersection (parent->getLocalBounds()).reduced (12);
     const auto w = juce::jmin (width, area.getWidth()), h = juce::jmin (idealHeight(), area.getHeight());

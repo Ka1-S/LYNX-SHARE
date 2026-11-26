@@ -120,7 +120,10 @@ public:
     onboarding::EmptyHint getKind() const noexcept { return kind; }
     // shown over `parent` (or hidden: nullptr); placed again when the parent is resized
     void attachTo (juce::Component* parent);
-    void place();
+    // Issue #313 (round 190rs): the card is laid out when it is attached and when its parent changes size, never again in
+    // between (a zoom or scroll step of the view under it re-asked for its place and the card jumped). `force`: lay out now.
+    void place (bool force = true);
+    static inline bool pinned = true; // (false: the old rule, every update re-centres it; the #313 route's "before")
     static constexpr int width = 520;
     int idealHeight() const;
     void paint (juce::Graphics&) override;
@@ -128,7 +131,12 @@ public:
     bool hitTest (int x, int y) override; // only the buttons take the mouse
 
 private:
-    void componentMovedOrResized (juce::Component&, bool, bool) override { place(); }
+    void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
+    {
+        if (wasResized)
+            place();
+    }
+    juce::Rectangle<int> placedFor; // the parent's bounds the card was laid out for
     onboarding::EmptyHint kind;
     std::function<juce::Rectangle<int>()> where;
     juce::OwnedArray<juce::TextButton> buttons;

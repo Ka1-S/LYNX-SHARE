@@ -3895,6 +3895,14 @@ public:
             return;
         }
 
+        // --emptyhint313shot <prefix> (issue #313, round 190rs): the empty-state card while the view zooms: src/Q5fix190rsShot.inc
+        if (args.contains ("--emptyhint313shot"))
+        {
+            setApplicationReturnValue (runEmptyHint313Shot (args[args.indexOf ("--emptyhint313shot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --q5fix190rsshot <prefix> <project.flp> (round 190rs, 0.1.32 stage Q5 fixes): src/Q5fix190rsShot.inc
         if (args.contains ("--q5fix190rsshot"))
         {

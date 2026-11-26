@@ -236,3 +236,100 @@
         line (allOk ? "result=OK" : "result=FAIL");
         return allOk;
     }
+
+    // --emptyhint313shot <prefix> (issue #313, round 190rs): the empty-state card ("Your song is built here") while the
+    // view under it is zoomed with the wheel (Ctrl+wheel and Alt+wheel, as FL), in the three layouts, with and without the
+    // Browser docked; the old rule (EmptyHintCard::pinned off) first, then the fix. <prefix>-checks.txt has every position.
+    bool runEmptyHint313Shot (const juce::String& prefix)
+    {
+        using namespace lynx;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (ui::showingForShots(), true);
+        juce::String checks;
+        bool allOk = true;
+        const auto check = [&checks, &allOk, &prefix] (const juce::String& what, bool ok) {
+            checks << (ok ? "ok   " : "FAIL ") << what << "\n";
+            allOk = allOk && ok;
+            juce::File (prefix + "-checks.txt").replaceWithText (checks);
+        };
+        const auto line = [&checks, &prefix] (const juce::String& what) {
+            checks << "     " << what << "\n";
+            juce::File (prefix + "-checks.txt").replaceWithText (checks);
+        };
+        AudioEngine offline (false);
+        MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        ui.setVisible (true);
+        const auto settle = [&offline] {
+            for (int k = 0; k < 4; ++k)
+                offline.dispatchPendingMessages();
+#if JUCE_LINUX || JUCE_WINDOWS
+            for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
+#endif
+        };
+        const auto wheel = [] (juce::Component& target, juce::ModifierKeys mods, float delta) {
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            const auto p = target.getLocalBounds().getCentre().toFloat();
+            const juce::MouseEvent e (source, p, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &target, &target, now, p, now, 0, false);
+            juce::MouseWheelDetails w;
+            w.deltaX = 0.0f;
+            w.deltaY = delta;
+            w.isReversed = false;
+            w.isSmooth = false;
+            w.isInertial = false;
+            target.mouseWheelMove (e, w);
+        };
+        const std::pair<layoutstyle::Style, const char*> styles[] = { { layoutstyle::Style::pattern, "pattern" },
+                                                                      { layoutstyle::Style::clipLaunch, "cliplaunch" },
+                                                                      { layoutstyle::Style::simple, "simple" } };
+        for (const auto pinned : { false, true })
+        {
+            onboardui::EmptyHintCard::pinned = pinned;
+            for (const auto& [style, name] : styles)
+                for (const auto browser : { false, true })
+                {
+                    ui.setOnboardingForSnapshot (false);
+                    ui.setLayoutStyle (layoutstyle::Style::pattern);
+                    auto song = makeNewProject();
+                    song.playlist.clear();
+                    offline.setSong (song);
+                    settle();
+                    ui.setLayoutStyle (style);
+                    ui.showDesktopForSnapshot (browser);
+                    settle();
+                    ui.setOnboardingForSnapshot (true);
+                    settle();
+                    auto* card = ui.emptyHintForSnapshot();
+                    const auto where = [&ui, card] {
+                        return card != nullptr && card->getParentComponent() != nullptr && card->isVisible()
+                                   ? ui.getLocalArea (card, card->getLocalBounds())
+                                   : juce::Rectangle<int>();
+                    };
+                    const auto first = where();
+                    const auto tag = juce::String (name) + (browser ? "-browser" : "") + (pinned ? "-after" : "-before");
+                    juce::StringArray seen { first.toString() };
+                    if (card != nullptr && card->isVisible())
+                        saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-0.png");
+                    auto& view = ui.getPlaylistForSnapshot();
+                    for (int k = 0; k < 8; ++k)
+                    {
+                        const auto mods = k < 4 ? juce::ModifierKeys (juce::ModifierKeys::ctrlModifier) : juce::ModifierKeys (juce::ModifierKeys::altModifier);
+                        wheel (view, mods, (k % 2) == 0 ? 0.25f : 0.25f);
+                        if (auto* grid = ui.getClipGridForSnapshot(); grid != nullptr && style == layoutstyle::Style::clipLaunch)
+                            wheel (*grid, mods, 0.25f);
+                        settle();
+                        seen.addIfNotAlreadyThere (where().toString());
+                    }
+                    if (card != nullptr && card->isVisible())
+                        saveArea (ui, ui.getLocalBounds(), prefix + "-" + tag + "-8.png");
+                    line (tag + ": card " + (card != nullptr ? juce::String (card->isVisible() ? "shown" : "hidden") : "none") + ", positions over 8 zoom steps: "
+                          + seen.joinIntoString (" | "));
+                    if (pinned)
+                        check (tag + ": the card stays put while the view zooms", seen.size() == 1);
+                }
+        }
+        onboardui::EmptyHintCard::pinned = true;
+        line (allOk ? "result=OK" : "result=FAIL");
+        return allOk;
+    }
