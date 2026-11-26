@@ -88,7 +88,7 @@ A second hotfix for 0.1.31.
   projects; each lane now plays exactly what its clips played (FL's clip range and mapped controls, the value held
   between clips, muted and overlapping clips) and stays within the engine's automation slots (Discord).
 - Fixed: "Manage shortcuts" and the other search windows opened without the caret in their search box on desktops that
-  activate a new window late (Linux, Wayland) (#244).
+  activate a new window late (Linux, Wayland) (#244). They should now open with it; tested by simulation only.
 - New: Options › *Typing keyboard settings* (and the same in the View menu): the typing keyboard button's right-click
   menu (Root note, Octave, Layout), also for windows of 1280-1440 px whose toolbar has no room for that button (#270).
 - Fixed: Export to FL Studio wrote back the project data folder of an .flp made on another computer; FL 2026 stopped

@@ -51,7 +51,7 @@ LYNX SHARE est en version alpha : attendez-vous à quelques imperfections, et me
 
 ## What's new
 
-LYNX SHARE 0.1.31.2 corrige un plantage de la page d'accueil, le clavier de saisie au-dessus des plugins ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.
+LYNX SHARE 0.1.31.2 corrige une cause probable d'un plantage de la page d'accueil, le réglage de clavier « LYNX d'abord » au-dessus des plugins VST3 ancrés, les clips étirés qui bouclaient leur première mesure, les pistes d'automation créées depuis des projets FL, les .flp exportés que FL refusait, les presets des synthés de FL dans le Browser et quelques problèmes mineurs.
 
 LYNX SHARE 0.1.31 : un Tracker intégré qui ouvre aussi les modules tracker (.mod, .xm, .s3m, .it) ; LYNX Model, des
 modèles physiques de marimba, vibraphone, xylophone, glockenspiel, cloches tubulaires et kalimba ; des scripts JSFX

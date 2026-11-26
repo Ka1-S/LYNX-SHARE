@@ -1,10 +1,10 @@
 {
 "u.0.1.31.2.t": "0.1.31 için daha fazla düzeltme",
-"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmeyi, yerleştirilmiş eklentiler üzerindeki klavyeden piyanoyu, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini FL'nin reddettiği dışa aktarılmış .flp dosyalarını, Browser'daki FL synth preset'lerini ve birkaç küçük sorunu düzeltiyor.",
+"u.0.1.31.2.s": "LYNX SHARE 0.1.31.2 başlangıç sayfasındaki bir çökmenin olası nedenini, yerleştirilmiş VST3 eklentileri üzerindeki \"önce LYNX\" klavye ayarını, ilk ölçüsünü tekrarlayan uzatılmış klipleri, FL projelerinden oluşturulan otomasyon şeritlerini, FL'nin reddettiği dışa aktarılmış .flp dosyalarını, Browser'daki FL synth preset'lerini ve birkaç küçük sorunu düzeltiyor.",
 "u.0.1.31.2.f0": "Başlangıç sayfasındaki \"Yeni proje başlat\" listesini kaydırmak listenin sonundan ötesini okuyabiliyordu; bu, Windows'ta bildirilen bir çökmenin olası nedeniydi ve artık olmuyor.",
-"u.0.1.31.2.f1": "Yerleştirilmiş bir eklentinin üzerinde, pencerenin klavye düğmesi öyle diyorsa klavyeden piyano yine önce çalıyor, ayrık bir pencerede olduğu gibi.",
+"u.0.1.31.2.f1": "Bir eklenti penceresinin klavye düğmesi \"önce LYNX\" durumundayken (\"Eklentinin tuş basışlarını ana uygulamadan önce işlemesine izin ver\" kapalı), klavyeden piyano artık tuşlarını yerleştirilmiş bir VST3 eklentisinden önce alıyor.",
 "u.0.1.31.2.f2": "\"Uzatılmış pattern klipleri pattern'lerini döngüler\" açıkken bir klibin ilk ölçüsünden sonra çizilen, yapıştırılan veya taşınan notalar duyuluyor: pattern onları içerecek kadar uzuyor.",
 "u.0.1.31.2.f3": "Playlist › \"Otomasyon kliplerini parçalarının şeritlerine taşı\" kliplerin çaldığı değerleri büyük FL projelerinde de koruyor.",
-"u.0.1.31.2.f4": "\"Kısayolları yönet\" pencereleri geç etkinleştiren Linux masaüstlerinde imleç arama kutusunda açılıyor (#244); Seçenekler › Klavyeden piyano ayarları her pencere boyutunda Kök nota / Oktav / Düzen menüsünü açıyor (#270).",
+"u.0.1.31.2.f4": "\"Kısayolları yönet\" artık yeni pencereleri geç etkinleştiren masaüstlerinde imleç arama kutusunda açılmalı (#244; yalnızca simülasyonla test edildi); Seçenekler › Klavyeden piyano ayarları her pencere boyutunda Kök nota / Oktav / Düzen menüsünü açıyor (#270).",
 "u.0.1.31.2.f5": "FL Studio'ya dışa aktarma, bu bilgisayarda olmayan bir proje veri klasörünü yazmıyor (FL 2026 \"Invalid project data folder\" hatasında duruyordu); Browser'da tıklanan yerleşik bir synth'in FL preset'i o synth'i preset ile açıyor (#288); Playlist'e bırakılan MIDI dosyaları varsayılan olarak pattern klibine dönüşüyor (#287)."
 }
