@@ -1,5 +1,7 @@
 #include "engine/SessionPack.h"
 
+#include <mutex>
+
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_events/juce_events.h>
 
@@ -73,23 +75,6 @@ juce::String hashFileImpl (const juce::File& file)
     return str (hash.hex());
 }
 
-// the message thread runs `fn` (it is the caller in command-line modes, else it is asked and waited for)
-void onMessageThread (const std::function<void()>& fn)
-{
-    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
-    if (mm == nullptr || mm->isThisTheMessageThread())
-    {
-        fn();
-        return;
-    }
-    juce::WaitableEvent done;
-    juce::MessageManager::callAsync ([&] {
-        fn();
-        done.signal();
-    });
-    done.wait();
-}
-
 double ticksToSeconds (const Song& song, std::int64_t ticks) { return (double) ticks * 60.0 / (std::max (song.bpm, 1.0) * ppq); }
 
 exportopts::Options stemOptions (double sampleRate, double tailSeconds)
@@ -111,12 +96,63 @@ exportopts::Options stemOptions (double sampleRate, double tailSeconds)
 }
 
 // renders `song` into `file` with its own engine; false when cancelled / failed
+// Round 190rp (BUGS 13, the Linux UI monkey: "Freezing ..." cancelled, LYNX aborted): this runs on a progress window's
+// thread, and a cancel makes the message thread wait for that thread to end (ThreadWithProgressWindow: stopThread, then
+// after 10 s a kill, which glibc turns into an abort). A worker that then waited for the message thread (the job made
+// or freed there) never ended. Now the job is made there only while the thread is not cancelled (a cancel gives it up),
+// and it is freed there without waiting (messages run in order: a later job of this thread is made after it is gone).
 bool renderSong (const Song& song, const exportopts::Options& options, const juce::File& file, const std::function<bool (double)>& progress, juce::String& error)
 {
     std::unique_ptr<ExportJob> job;
-    onMessageThread ([&] { job = std::make_unique<ExportJob> (song, options, file); });
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr || mm->isThisTheMessageThread())
+        job = std::make_unique<ExportJob> (song, options, file);
+    else
+    {
+        struct Hop
+        {
+            std::mutex lock;
+            bool givenUp = false;
+            std::unique_ptr<ExportJob> job;
+            juce::WaitableEvent made;
+        };
+        auto hop = std::make_shared<Hop>();
+        juce::MessageManager::callAsync ([hop, &song, &options, &file] {
+            const std::lock_guard<std::mutex> l (hop->lock); // (the caller's song is alive while this runs: it waits for the lock)
+            if (hop->givenUp)
+                return;
+            hop->job = std::make_unique<ExportJob> (song, options, file);
+            hop->made.signal();
+        });
+        while (! hop->made.wait (20))
+            if (juce::Thread::currentThreadShouldExit())
+            {
+                const std::lock_guard<std::mutex> l (hop->lock);
+                if (hop->job == nullptr) // (not made yet: it never will be)
+                {
+                    hop->givenUp = true;
+                    error = "cancelled";
+                    return false;
+                }
+                break;
+            }
+        const std::lock_guard<std::mutex> l (hop->lock);
+        job = std::move (hop->job);
+    }
     const auto ok = job->run (progress, error);
-    onMessageThread ([&] { job.reset(); });
+    if (mm != nullptr && ! mm->isThisTheMessageThread())
+    {
+        // freed on the message thread (plugins need it), waited for as before (the live engine's plugins are back
+        // before the caller goes on), unless the thread is cancelled: then it is left to that message
+        auto freed = std::make_shared<juce::WaitableEvent>();
+        juce::MessageManager::callAsync ([j = std::shared_ptr<ExportJob> (std::move (job)), freed]() mutable {
+            j.reset();
+            freed->signal();
+        });
+        while (! freed->wait (20))
+            if (juce::Thread::currentThreadShouldExit())
+                break;
+    }
     return ok;
 }
 

@@ -74,6 +74,45 @@
             backup.deleteFile();
         }
 
+        // ---- BUGS 13 (the Linux UI monkey: "Freezing ..." cancelled, LYNX aborted): a freeze's thread cancelled while the
+        //      message thread waits for it, as a progress window's Cancel does (stopThread, no messages handled), must
+        //      end by itself; it used to wait for the message thread (its render job made / freed there) until JUCE
+        //      killed it after 10 s (glibc then aborts). Three times: cancelled at once, after 30 ms and after 200 ms
+        for (const int afterMs : { 0, 30, 200 })
+        {
+            struct FreezeWorker final : juce::Thread
+            {
+                FreezeWorker() : juce::Thread ("stab190rp freeze") {}
+                void run() override
+                {
+                    auto song = Song::makeDefault();
+                    for (int k = 0; k < 64; ++k)
+                        song.patterns[0].notes.push_back ({ (std::int64_t) k * ppq / 4, ppq / 8, 4, 48 + k % 24, 0.8f });
+                    song.patterns[0].sortNotes();
+                    folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-stab190rp-freeze-" + juce::String (juce::Random::getSystemRandom().nextInt (1 << 30)));
+                    folder.createDirectory();
+                    std::vector<StandIn> stems;
+                    juce::String error;
+                    sessionpack::renderFreeze (song, 4, 48000.0, folder, stems, [this] (double) { return ! threadShouldExit(); }, error);
+                }
+                juce::File folder;
+            } worker;
+            worker.startThread();
+            if (afterMs > 0)
+                juce::Thread::sleep (afterMs);
+            worker.signalThreadShouldExit();
+            const auto t0 = juce::Time::getMillisecondCounter();
+            const auto ended = worker.waitForThreadToExit (8000); // (the message thread handles nothing meanwhile)
+            const auto ms = juce::Time::getMillisecondCounter() - t0;
+            if (! ended) // (the old code: let it finish now, so the check itself ends)
+                pump (15000, [&worker] { return ! worker.isThreadRunning(); });
+            pump (200, {});
+            worker.folder.deleteRecursively();
+            check ("a cancelled freeze ends while the message thread waits for it (cancelled after " + juce::String (afterMs) + " ms: "
+                       + (ended ? "ended in " + juce::String ((int) ms) + " ms" : juce::String ("still waiting after 8 s")) + ")",
+                   ended);
+        }
+
         // ---- the audio device in use unplugged and plugged in again (stand-in devices)
         {
             const auto r = AudioEngine::deviceLostSelfTest();
