@@ -4,6 +4,7 @@
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/SongBytes.h" // round 190rn (src/Perf190rnCheck.inc)
 #include "core/SectionOps.h"    // round 190ol (P1: the Sections lane)
 #include "core/SignatureEdit.h" // round 190ol (P6)
 #include "ui/SectionsLane190ol.h" // round 190ol (P1: the shot route drives the lane)
@@ -2177,6 +2178,16 @@ public:
             juce::String log;
             const auto result = iox190rmCheck (log);
             juce::File (args[args.indexOf ("--iox190rmtest") + 1].unquoted()).replaceWithText (log + "iox190rm=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
+        if (args.contains ("--perf190rntest"))
+        {
+            // LYNX --perf190rntest report.txt (round 190rn, the undo history's memory cap; also in --selftest): src/Perf190rnCheck.inc
+            juce::String log;
+            const auto result = perf190rnCheck (log);
+            juce::File (args[args.indexOf ("--perf190rntest") + 1].unquoted()).replaceWithText (log + "perf190rn=" + result + "\n");
             setApplicationReturnValue (result == "OK" ? 0 : 1);
             quit();
             return;
@@ -5120,9 +5131,10 @@ public:
             playStartupSound();
         splash->setStatus (lynx::tr ("Loading the workspace..."));
         splash->startClock();
-        // the minimum counts from the process start (the window and the audio device took part of it already); a card
-        // on its own thread stays for the drop (round 190hd)
-        splashDuration = ownThread ? landingSeconds : lynx::SplashScreen::remainingDuration (startupTrace.seconds());
+        // the card stays for the logo's drop, then the window shows (round 190hd: a card on its own thread; round 190rn:
+        // the card on the message thread too, so Linux and macOS no longer hold a window that is ready for a 2.1 s
+        // minimum counted from the process start: the window was built at 0.15 s and the audio device open at 0.87 s)
+        splashDuration = landingSeconds;
         splash->setBarDuration (splashDuration);
 
         splash->whenLanded (splashDuration, [this] {
@@ -5587,6 +5599,9 @@ public:
             return; // the copy that ran owns the session (its crash notes stay for the next start)
 
         lynx::crashguard::note ("closing");
+        // round 190rn: with LYNX_TRACE_STARTUP the quit's steps go to startup.log too (where a slow quit's time goes)
+        const auto quitMark = [] (const char* step) { if (startupTrace.eachStep) startupTrace.mark (step); };
+        quitMark ("quit: starts");
         lynx::shutdownPluginSandboxWorker();
         splash = nullptr;
         lynx::shutdownStemExtraction(); // (a separation in flight stops before its window and the engine go)
@@ -5596,11 +5611,14 @@ public:
         lynx::remoteui::shutdown();
         lynx::closeModalWindows(); // (round 190rf: a call-out box or dialog still open goes before the UI and the engine)
         remoteControl = nullptr; // cancels queued control work before its engine and UI go
+        quitMark ("quit: window state saved, remote control closed");
         mainWindow = nullptr; // the UI goes before the engine
+        quitMark ("quit: main window deleted");
         graphicsDeviceJob = {}; // (round 190hd: the graphics device's holder, after every window)
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
         engine = nullptr;
+        quitMark ("quit: engine deleted");
         // separate-process plugins end on threads of their own (issue #159): a moment for them, never the 10 s a dead
         // child's pipe can take
         lynx::finishSandboxTeardowns (2000);
@@ -5612,6 +5630,7 @@ public:
         lynx::crashguard::stopHangWatch();
         lynx::crashguard::stopMainProfiler();
         lynx::crashguard::endSession(); // a clean exit: no breadcrumb left behind
+        quitMark ("quit: done");
 
         // everything is saved and closed: a process that loaded third-party plugins ends here, before the DLLs' own
         // teardown runs (some crash in it at exit, round 111)
@@ -10340,6 +10359,9 @@ private:
         // round 190rm (0.1.32 import / export sweep): MIDI tempo map / chunks / meter, FLM losses, DAWproject samples (src/Iox190rmCheck.inc)
         juce::String iox190rmLog;
         const auto iox190rmResult = iox190rmCheck (iox190rmLog);
+        // round 190rn (perf round 10): the undo history's memory cap (src/Perf190rnCheck.inc)
+        juce::String perf190rnLog;
+        const auto perf190rnResult = perf190rnCheck (perf190rnLog);
 
         // round 190rb (0.1.32 quality release): the crash / memory fixes of the crash reports, the sanitizer build and the
         // UI monkey test (src/Qa190rbCheck.inc)
@@ -11766,7 +11788,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11894,6 +11916,7 @@ private:
                << "backlog190rc=" << backlog190rcResult << "\n"
                << "community190ri=" << community190riResult << "\n"
                << "iox190rm=" << iox190rmResult << "\n"
+               << "perf190rn=" << perf190rnResult << "\n"
                << "qa190rb=" << qa190rbResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
@@ -22029,6 +22052,7 @@ private:
 #include "Issues190qrCheck.inc" // round 190qr: issues #274-#281 (markers, rack meter, zoom, extras)
 #include "TrialMark190qtCheck.inc" // round 190qt: a project from an FL trial save goes back to FL as one (option A)
 #include "Community190riCheck.inc" // round 190ri: the 0.1.32 community batch
+#include "Perf190rnCheck.inc" // round 190rn: the undo history's memory cap
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "Iox190rmCheck.inc" // round 190rm: the 0.1.32 import / export sweep (--convert190rm)
