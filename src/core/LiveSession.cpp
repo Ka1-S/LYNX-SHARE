@@ -1,4 +1,5 @@
 #include "core/LiveSession.h"
+#include "core/ProjectSafety.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1578,6 +1579,12 @@ const char* keptLocalName (KeptLocal item)
         case KeptLocal::masterLook: return "Master looks";
     }
     return "";
+}
+
+// a guest of a release before settingsSyncSince (round 190rj)
+bool keepsOwnSettings (const std::string& guestVersion, const std::string& hostVersion)
+{
+    return ! guestVersion.empty() && guestVersion != hostVersion && safety::compareVersions (guestVersion, settingsSyncSince) < 0;
 }
 
 } // namespace lynx::live

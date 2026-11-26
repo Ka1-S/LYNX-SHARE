@@ -13076,4 +13076,5 @@ countries: tr
 "Tab completes the Browser's search" = "Tab, Browser aramasını tamamlar"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "Browser aramasına yazarken bir etiketin (#word) veya klasör adının geri kalanı metnin ardında gri görünür ve Tab onu kabul eder. Kapalı: hiçbir şey tamamlanmaz. Tek anahtarı burada."
 "Every LYNX extra at its default" = "Her LYNX ekstrası varsayılanında"
+"{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync" = "{0}, LYNX SHARE {1} kullanıyor: tempo ve proje ayarlarının eşit kalması için güncelleyin"
 "{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0} çevrimiçi oturumlarda henüz paylaşılmıyor: diğerleri bu değişikliği duymayacak"

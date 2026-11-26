@@ -13076,4 +13076,5 @@ countries: kr
 "Tab completes the Browser's search" = "Tab으로 브라우저 검색 자동 완성"
 "While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here." = "브라우저 검색창에 입력하는 동안 태그(#word)나 폴더 이름의 나머지가 글자 뒤에 회색으로 표시되고, Tab으로 확정합니다. 끔: 아무것도 완성되지 않습니다. 전환은 여기에서만 할 수 있습니다."
 "Every LYNX extra at its default" = "모든 LYNX 추가 기능을 기본값으로"
+"{0} uses LYNX SHARE {1}: update it so the tempo and project settings stay in sync" = "{0}님이 LYNX SHARE {1}을(를) 사용 중입니다. 템포와 프로젝트 설정이 맞춰지도록 업데이트하세요"
 "{0} isn't shared in Online sessions yet: the others won't hear this change" = "{0}은(는) 아직 온라인 세션에서 공유되지 않습니다. 다른 사람에게는 이 변경이 들리지 않습니다"
