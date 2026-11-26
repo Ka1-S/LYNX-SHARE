@@ -1,5 +1,7 @@
 #include "ui/Onboarding.h"
 
+#include <map>
+
 #include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/NativeChild.h"
@@ -843,6 +845,11 @@ void EmptyHintCard::place (bool force)
         return;
     // issue #313: a card already laid out for this size of its parent stays where it is, also when it is shown again (the
     // area it centres in moved by a lane's height while the view was scrolled, and the card jumped with it)
+    // (a card made again for the same view, after a hide, takes the place the last one of its kind had there)
+    static std::map<int, std::pair<juce::Rectangle<int>, juce::Rectangle<int>>> lastPlace;
+    if (pinned && placed.isEmpty())
+        if (const auto it = lastPlace.find ((int) kind); it != lastPlace.end() && it->second.first == parent->getLocalBounds())
+            placedFor = it->second.first, placed = it->second.second;
     if (pinned && ! placed.isEmpty() && placedFor == parent->getLocalBounds())
     {
         if (getBounds() != placed)
@@ -857,6 +864,7 @@ void EmptyHintCard::place (bool force)
     setVisible (w >= 260 && h >= 120); // (a tiny view: no hint)
     setBounds (area.withSizeKeepingCentre (w, h));
     placed = getBounds();
+    lastPlace[(int) kind] = { placedFor, placed };
 }
 
 void EmptyHintCard::paint (juce::Graphics& g)
