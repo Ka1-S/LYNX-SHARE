@@ -65,7 +65,9 @@ private:
     MasterLookSettings shown;
     Saving saving;
     std::unique_ptr<LookTile> tiles[8];
-    std::unique_ptr<SaveRow> saveRows[2]; // WAV, MP3
+    std::unique_ptr<SaveRow> saveRows[3]; // WAV, MP3, M4A (round 190rs G-35: only where the system has an AAC encoder)
+    int saveRowCount() const noexcept { return saveRows[2] != nullptr ? 3 : 2; }
+    static int saveRowFormat (int row) noexcept { return row == 0 ? 0 : row == 1 ? 1 : 5; } // (exportopts::Format: wav, mp3, aac)
     juce::Label title, status, intensityLabel, toneLabel, levelInfo, peakHint, saveLabel;
     juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps, matchButton;
     juce::Slider intensity, tone[3];

@@ -6,6 +6,7 @@
 #include "core/MasterLooks.h"
 #include "core/Mastering.h"
 #include "core/SongFade.h"
+#include "engine/AacEncoder.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "ui/I18n.h"
@@ -361,9 +362,12 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         addAndMakeVisible (saveLabel);
         saveRows[0] = std::make_unique<SaveRow> ("WAV", tr ("Best quality, larger file"));
         saveRows[1] = std::make_unique<SaveRow> ("MP3", tr ("Small, for sharing"));
-        for (int i = 0; i < 2; ++i)
+        // round 190rs (G-35, BandLab's Mixdown As: M4A, MP3, WAV): M4A where the system can encode AAC (Windows, macOS)
+        if (aac::available())
+            saveRows[2] = std::make_unique<SaveRow> ("M4A", tr ("Small, plays on phones and Apple devices"));
+        for (int i = 0; i < saveRowCount(); ++i)
         {
-            saveRows[i]->onClick = [this, i] { save (i); };
+            saveRows[i]->onClick = [this, i] { save (saveRowFormat (i)); };
             addAndMakeVisible (*saveRows[i]);
         }
         if (saving.exportOtherApps)
@@ -511,11 +515,11 @@ void FinishDock::refresh()
     if (measuring->load() == 0)
         levelInfo.setText (has ? tr ("Input level: {0}", { db (shown.inputDb) }) : juce::String(), juce::dontSendNotification);
     // about how big each file will be, from the song's length and the Export window's own defaults
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < saveRowCount(); ++i)
         if (saveRows[i] != nullptr)
         {
             exportopts::Options o;
-            o.format = i == 0 ? exportopts::Format::wav : exportopts::Format::mp3;
+            o.format = (exportopts::Format) saveRowFormat (i);
             const auto seconds = exportMusicSeconds (song, o);
             saveRows[i]->setSize (seconds > 0.0 ? juce::File::descriptionOfSizeInBytes (exportopts::estimatedBytes (o, seconds)) : juce::String());
         }
@@ -671,7 +675,7 @@ void FinishDock::resized()
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
     // (a short window: the look tiles give way so that the Save rows stay in view)
-    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0)
+    const auto saveH = (saveRows[0] != nullptr ? 22 + saveRowCount() * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0)
                        + fadeRowHeight; // (round 190ke: the fade-out row)
     const auto gap = 6;
     const auto tileH = juce::jlimit (46, 76, (r.getHeight() - 306 - saveH) / 4 - gap); // (round 190jc, SG-16: up to 76 px)
@@ -729,9 +733,9 @@ void FinishDock::resized()
     {
         r.removeFromTop (10);
         saveLabel.setBounds (r.removeFromTop (22));
-        for (auto& row : saveRows)
+        for (int i = 0; i < saveRowCount(); ++i)
         {
-            row->setBounds (r.removeFromTop (32));
+            saveRows[i]->setBounds (r.removeFromTop (32));
             r.removeFromTop (4);
         }
         if (otherApps.isVisible())
