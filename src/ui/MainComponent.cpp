@@ -9900,25 +9900,55 @@ void MainComponent::checkPreviousSession (juce::Time sessionStart)
         return; // nothing was saved in that session
     const auto backup = folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ProjectFile::extension);
 
-    auto* w = new juce::AlertWindow (tr ("LYNX SHARE did not close properly"),
-                                     tr ("The last session ended unexpectedly. Open the newest backup it saved?\n{0}  ({1})",
-                                         { backup.getFileName(), backup.getLastModificationTime().formatted ("%Y-%m-%d %H:%M") }),
-                                     juce::MessageBoxIconType::WarningIcon);
-    w->addButton (tr ("Open backup"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    // round 190rp (0.1.32 Q4, decision O-2 (a)): "Open backup without third-party plugins" is always offered, and is the
+    // default when the session ended while a plugin's window was open (Main.cpp's uncleanCause): a backup that holds
+    // the plugin that crashed it would crash again as it opens. The plugins stay in the project, switched off with their
+    // settings kept (the title and the "Third-party plugins" window say so); its "Switch all on" turns them back on.
+    juce::StringArray buttons;
+    const auto message = recoveryBoxForTest (backup, buttons);
+    const auto pluginNamed = recoveryPlugin.isNotEmpty();
+    platform::testModeLog ("recovery box: " + backup.getFileName() + (pluginNamed ? " (plugin " + recoveryPlugin + ")" : juce::String()));
+    auto* w = new juce::AlertWindow (tr ("LYNX SHARE did not close properly"), message, juce::MessageBoxIconType::WarningIcon);
+    if (pluginNamed)
+    {
+        w->addButton (tr ("Open backup without third-party plugins"), 3, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Open backup"), 1);
+    }
+    else
+    {
+        w->addButton (tr ("Open backup"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Open backup without third-party plugins"), 3);
+    }
     w->addButton (tr ("Open backup folder"), 2);
     w->addButton (tr ("Ignore"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<MainComponent> (this), backup, folder] (int result) {
                             if (safe == nullptr)
                                 return;
-                            if (result == 1)
-                                safe->confirmDiscard ([safe, backup] {
+                            if (result == 1 || result == 3)
+                                safe->confirmDiscard ([safe, backup, withoutPlugins = result == 3] {
                                     if (safe != nullptr)
-                                        safe->openLynxProject (backup);
+                                        safe->openLynxProject (backup, withoutPlugins);
                                 });
                             else if (result == 2)
                                 folder.startAsProcess();
                         }),
                         true);
+}
+
+juce::String MainComponent::recoveryBoxForTest (const juce::File& backup, juce::StringArray& buttons) const
+{
+    const auto when = backup.getLastModificationTime().formatted ("%Y-%m-%d %H:%M");
+    buttons.clear();
+    if (recoveryPlugin.isNotEmpty())
+    {
+        buttons.addArray ({ tr ("Open backup without third-party plugins"), tr ("Open backup"), tr ("Open backup folder"), tr ("Ignore") });
+        return tr ("The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without "
+                   "third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the "
+                   "Third-party plugins window turns them back on.\n{1}  ({2})",
+                   { recoveryPlugin, backup.getFileName(), when });
+    }
+    buttons.addArray ({ tr ("Open backup"), tr ("Open backup without third-party plugins"), tr ("Open backup folder"), tr ("Ignore") });
+    return tr ("The last session ended unexpectedly. Open the newest backup it saved?\n{0}  ({1})", { backup.getFileName(), when });
 }
 
 void MainComponent::newProject (bool askAlways)

@@ -5317,6 +5317,11 @@ public:
     {
         bindExportDoneSound(); // (round 190qr, #280)
         mainWindow = std::make_unique<MainWindow> ("LYNX SHARE", *engine); // the brand; getApplicationName() stays "LYNX" (an id: instance lock, X11 WM_CLASS, ALSA client)
+        // round 190rp (decision O-2): the recovery box (MainComponent::checkPreviousSession, 2.5 s after the session
+        // starts) names the plugin whose window was open when the last session ended and opens the backup without
+        // third-party plugins by default
+        if (uncleanLastStep.isNotEmpty())
+            mainWindow->getContent().setRecoveryPlugin (uncleanCause().editorPlugin);
         lynx::setMainWindowForOwnership (mainWindow.get());
         lynx::crashguard::watchDisplayConnection (onDisplayLost); // (round 190rf, Linux: the display is open now)
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)

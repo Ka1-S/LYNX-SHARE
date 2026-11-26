@@ -13094,3 +13094,5 @@ countries: kr
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [LMB] drag: move it  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "마커: [LMB] 해당 위치로 이동(재생 중: 다음 송 점프 퀀타이즈 단계에서)  [LMB] 드래그: 이동  [Ctrl][LMB] 다음 마커까지 선택  [RMB] 동작, 이름 바꾸기, 삭제"
 "Chord detection: play notes (MIDI keyboard or the typing keyboard) or select notes in the Piano roll and the chord's name shows here  [RMB] chord style and display delay" = "코드 감지: 노트를 연주하거나(MIDI 키보드 또는 타이핑 키보드) Piano roll에서 노트를 선택하면 여기에 코드 이름이 표시됩니다  [RMB] 코드 표기 방식과 표시 지연"
 "Writing {0}..." = "{0} 쓰는 중..."
+"Open backup without third-party plugins" = "서드파티 플러그인 없이 백업 열기"
+"The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "{0} 창이 열려 있는 동안 지난 세션이 예기치 않게 종료되었습니다. 저장된 최신 백업을 서드파티 플러그인 없이 열까요? 플러그인은 설정이 유지된 채 꺼진 상태로 프로젝트에 남습니다. 서드파티 플러그인 창의 \"모두 켜기\"로 다시 켤 수 있습니다.\n{1}  ({2})"

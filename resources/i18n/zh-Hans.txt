@@ -13094,3 +13094,5 @@ countries: cn sg
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [LMB] drag: move it  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "标记：[LMB] 跳到此处（播放时：在下一个跳转量化步）  [LMB] 拖动：移动  [Ctrl][LMB] 选择到下一个标记  [RMB] 动作、重命名、删除"
 "Chord detection: play notes (MIDI keyboard or the typing keyboard) or select notes in the Piano roll and the chord's name shows here  [RMB] chord style and display delay" = "和弦检测：演奏音符（MIDI 键盘或打字键盘）或在 Piano roll 中选择音符，和弦名称会显示在这里  [RMB] 和弦样式和显示延迟"
 "Writing {0}..." = "正在写入 {0}..."
+"Open backup without third-party plugins" = "不加载第三方插件打开备份"
+"The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the Third-party plugins window turns them back on.\n{1}  ({2})" = "上次会话在 {0} 的窗口打开时意外结束。是否不加载第三方插件打开它保存的最新备份？插件会保留在工程中，处于关闭状态并保留设置；在“第三方插件”窗口中点击“全部开启”即可重新开启。\n{1}  （{2}）"

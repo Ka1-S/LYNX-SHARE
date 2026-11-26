@@ -21,3 +21,19 @@ TEST (stab190rp_recovery_never_offers_a_half_written_save)
     CHECK (crashRecoveryCandidate (files, 50) == "Beat (autosaved on 2026-11-26 at 07h00)");
     CHECK (crashRecoveryCandidate (files, 101).empty()); // (only half-written files since then: nothing to offer)
 }
+
+// The recovery box (decision O-2 (a)): "Open backup without third-party plugins" always there, the default (Return)
+// when the session ended while a plugin's window was open; the plugin's name comes from Main.cpp's uncleanCause.
+TEST (stab190rp_recovery_box_offers_plugins_off)
+{
+    const auto main = i18ntest::readFile ("src/ui/MainComponent.cpp");
+    const auto box = main.find ("void MainComponent::checkPreviousSession (juce::Time sessionStart)");
+    const auto end = main.find ("juce::String MainComponent::recoveryBoxForTest", box);
+    CHECK (box != std::string::npos && end != std::string::npos);
+    const auto body = main.substr (box, end - box);
+    CHECK (body.find ("w->addButton (tr (\"Open backup without third-party plugins\"), 3, juce::KeyPress (juce::KeyPress::returnKey));") != std::string::npos);
+    CHECK (body.find ("w->addButton (tr (\"Open backup without third-party plugins\"), 3);") != std::string::npos);
+    CHECK (body.find ("safe->openLynxProject (backup, withoutPlugins);") != std::string::npos);
+    const auto app = i18ntest::readFile ("src/Main.cpp");
+    CHECK (app.find ("mainWindow->getContent().setRecoveryPlugin (uncleanCause().editorPlugin);") != std::string::npos);
+}
