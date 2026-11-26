@@ -13111,3 +13111,4 @@ countries: id
 # round 190rt (issue #310): the clips in Link to controller's Internal controller list
 "Automation clips" = "Clip otomasi"
 "The voice's envelopes and LFOs (Panning, Volume, Mod X, Mod Y, Pitch) and its filter" = "Envelope dan LFO suara (Panning, Volume, Mod X, Mod Y, Pitch) dan filternya"
+"Mix level" = "Level mix"

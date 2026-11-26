@@ -13111,3 +13111,4 @@ countries: de at ch li lu
 # round 190rt (issue #310): the clips in Link to controller's Internal controller list
 "Automation clips" = "Automationsclips"
 "The voice's envelopes and LFOs (Panning, Volume, Mod X, Mod Y, Pitch) and its filter" = "Hüllkurven und LFOs der Stimme (Panning, Lautstärke, Mod X, Mod Y, Tonhöhe) und ihr Filter"
+"Mix level" = "Mix-Pegel"

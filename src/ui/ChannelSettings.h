@@ -86,6 +86,10 @@ bool pressChannelHeaderGear (juce::Component& root);
 // the tab does; false: no channel frame there
 bool showChannelWindowTab (juce::Component& root, int tab);
 int channelHeaderControlsWidth() noexcept;
+// Issue #321 (round 190rv): FL's ON / MIX LEVEL of mixer slot `slot` of insert `track` (the right end of an effect's
+// wrapper strip, FL's "Detailed settings"), for a hosted effect's wrapper header; `effectHeaderControlsWidth` wide.
+std::unique_ptr<juce::Component> makeEffectHeaderControls (AudioEngine& engine, int track, int slot);
+int effectHeaderControlsWidth() noexcept;
 // The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
 // of its layout (0 = no pages)
 int showChannelLayoutPage (juce::Component& frame, int page);

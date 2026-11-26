@@ -13111,3 +13111,4 @@ countries: ru by kz
 # round 190rt (issue #310): the clips in Link to controller's Internal controller list
 "Automation clips" = "Клипы автоматизации"
 "The voice's envelopes and LFOs (Panning, Volume, Mod X, Mod Y, Pitch) and its filter" = "Огибающие и LFO голоса (Панорама, Громкость, Mod X, Mod Y, Высота) и его фильтр"
+"Mix level" = "Уровень микса"
