@@ -328,11 +328,24 @@
             check ("read-only folder: a first save", ProjectFile::save (song, project, error));
             const auto before = project.loadFileAsString();
             ro.setReadOnly (true);
-            juce::String saveError;
-            const auto saved = ProjectFile::save (song, project, saveError);
-            ro.setReadOnly (false);
-            check ("read-only folder: Save fails and says why (" + saveError + ")", ! saved && saveError.contains ("Your project file was not changed."));
-            check ("read-only folder: the project file is byte-identical", project.loadFileAsString() == before);
+            // (rollup 0.1.32 step 5: root ignores a folder's permissions - the Linux arm64 CI job runs as root - so the case only
+            // holds where a file can not be made in the read-only folder)
+            const auto probe = ro.getChildFile ("probe.tmp");
+            const auto permissionsHold = probe.create().failed();
+            probe.deleteFile();
+            if (permissionsHold)
+            {
+                juce::String saveError;
+                const auto saved = ProjectFile::save (song, project, saveError);
+                ro.setReadOnly (false);
+                check ("read-only folder: Save fails and says why (" + saveError + ")", ! saved && saveError.contains ("Your project file was not changed."));
+                check ("read-only folder: the project file is byte-identical", project.loadFileAsString() == before);
+            }
+            else
+            {
+                ro.setReadOnly (false);
+                check ("read-only folder: not checked, this user writes into read-only folders (root)", true);
+            }
            #endif
         }
 
