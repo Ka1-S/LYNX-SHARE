@@ -286,6 +286,7 @@
 #include "core/NoteTools.h"
 #include "engine/ProjectPackage.h"
 #include "engine/SafeWrite.h" // round 190rm (src/Iox190rmCheck.inc)
+#include "core/FlVoiceBlock.h" // round 190rt (src/Issues190rtShot.inc)
 #include "ui/SetupWizard.h"
 #include "ui/DemoMode.h" // (round 190np)
 #if JUCE_LINUX || JUCE_WINDOWS // (rollup 0.1.31 step 2: Windows too, so --onboard190npshot runs its async callbacks there)
@@ -2169,6 +2170,25 @@ public:
             const auto i = args.indexOf ("--feel190qetest");
             const auto arg = [&args] (int k) { return k < args.size() && ! args[k].startsWith ("--") ? args[k].unquoted() : juce::String(); };
             setApplicationReturnValue (runFeel190qeTest (arg (i + 1), arg (i + 2), arg (i + 3)) ? 0 : 1);
+            quit();
+            return;
+        }
+        if (args.contains ("--issues190rtshot"))
+        {
+            // LYNX --issues190rtshot <prefix> <sample.wav> [--shot-scale 1.5 --shot-suffix @150] (round 190rt, issues #309 /
+            // #311: the channel windows of the Sampler, 3x Osc, DX10, Granulizer, BeepMap, every tab): src/Issues190rtShot.inc
+            const auto i = args.indexOf ("--issues190rtshot");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runIssues190rtShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+        if (args.contains ("--issues190rttest"))
+        {
+            // LYNX --issues190rttest report.txt (round 190rt; also in --selftest): src/Issues190rtShot.inc
+            juce::String log;
+            const auto result = issues190rtCheck (log);
+            juce::File (args[args.indexOf ("--issues190rttest") + 1].unquoted()).replaceWithText (log + "issues190rt=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
             quit();
             return;
         }
@@ -10372,6 +10392,10 @@ private:
         // round 190rm (0.1.32 import / export sweep): MIDI tempo map / chunks / meter, FLM losses, DAWproject samples (src/Iox190rmCheck.inc)
         juce::String iox190rmLog;
         const auto iox190rmResult = iox190rmCheck (iox190rmLog);
+        // round 190rt (issues #310 / #311): an existing clip linked from Link to controller; the voice block's tab of
+        // 3x Osc, DX10, Granulizer and BeepMap (src/Issues190rtShot.inc)
+        juce::String issues190rtLog;
+        const auto issues190rtResult = issues190rtCheck (issues190rtLog);
         // round 190rn (perf round 10): the undo history's memory cap (src/Perf190rnCheck.inc)
         juce::String perf190rnLog;
         const auto perf190rnResult = perf190rnCheck (perf190rnLog);
@@ -11801,7 +11825,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11929,6 +11953,7 @@ private:
                << "backlog190rc=" << backlog190rcResult << "\n"
                << "community190ri=" << community190riResult << "\n"
                << "iox190rm=" << iox190rmResult << "\n"
+               << "issues190rt=" << issues190rtResult << "\n" << issues190rtLog
                << "perf190rn=" << perf190rnResult << "\n"
                << "qa190rb=" << qa190rbResult << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
@@ -22071,6 +22096,7 @@ private:
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "Iox190rmCheck.inc" // round 190rm: the 0.1.32 import / export sweep (--convert190rm)
+#include "Issues190rtShot.inc" // round 190rt: issues #309 / #310 / #311 (--issues190rtshot, --issues190rttest)
 #include "DetailsShot190mr.inc" // round 190mr
 #include "DetailsShot190mv.inc" // round 190mv
 #include "DetailsShot190my.inc" // round 190my

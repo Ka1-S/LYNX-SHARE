@@ -1,4 +1,5 @@
 #include "core/ThreeOsc.h"
+#include "core/FlVoiceSettings.h"
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -1035,7 +1036,10 @@ public:
         flmLevel.store (threeOscIsFlm (channel) ? (channel.modelParams.size() > 2 ? std::clamp (channel.modelParams[2], 0.0f, 4.0f) : 1.0f) : -1.0f);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
         const auto mobile = threeOscIsFlm (channel);
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath && mobile == lastMobile)
+        // round 190rt (issue #311): the Misc tab's Levels adjustment Mod X / Y offsets add to the block's Mod X / Y (FL render)
+        const auto levelX = mobile ? 0.0f : channel.misc.levels.modX, levelY = mobile ? 0.0f : channel.misc.levels.modY;
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && channel.samplePath == wavePath && mobile == lastMobile
+            && levelX == lastLevelX && levelY == lastLevelY)
             return;
         Params p;
         if (! parseNormalised (channel.pluginState, p))
@@ -1045,6 +1049,8 @@ public:
         std::memcpy (s->snap.data(), channel.pluginState.data() + 0x60, snapshotSize);
         s->ppq = ppq, s->tempo = tempo, s->mobile = mobile;
         std::memcpy (s->raw.data(), channel.pluginState.data(), (std::size_t) stateSize); // (parseNormalised: ≥ stateSize)
+        flvoice::addLevelOffsets (s->snap.data(), levelX, levelY);
+        flvoice::addLevelOffsets (s->raw.data() + 0x60, levelX, levelY);
         if (channel.samplePath == wavePath)
             s->custom = uiCustom;
         else if (auto w = channel.samplePath.empty() ? std::vector<float> {} : threeOscCustomWave (channel.samplePath); ! w.empty())
@@ -1055,6 +1061,7 @@ public:
         if (p.hq && s->custom != nullptr)
             s->hq = hqCustom (*s->custom); // (the custom wave's band-limited tables: only for HQ states)
         state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, wavePath = channel.samplePath, lastMobile = mobile;
+        lastLevelX = levelX, lastLevelY = levelY;
         delete incoming.exchange (s.release());
     }
 
@@ -1386,6 +1393,7 @@ private:
     int lastPpq = -1;
     double lastTempo = -1.0;
     bool lastMobile = false;
+    float lastLevelX = 0.0f, lastLevelY = 0.0f; // (round 190rt)
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
     std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's note id (round 190ej)

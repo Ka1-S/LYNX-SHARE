@@ -1,5 +1,6 @@
 // FL Studio's BeepMap (REA_rodada65 §2). See BeepMap.h.
 
+#include "core/FlVoiceSettings.h"
 #include "core/BeepMap.h"
 #include "core/Vfx.h"
 #include "core/HostSlide.h"
@@ -570,7 +571,8 @@ public:
         maxPoly.store (channel.maxPolyphony == 1 ? 1 : 0 /* FL tells the generator its Max polyphony, not the Mono box (round 168l) */);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo)
+        const auto levelX = channel.misc.levels.modX, levelY = channel.misc.levels.modY; // (round 190rt, issue #311)
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && levelX == lastLevelX && levelY == lastLevelY)
             return;
         Params p;
         std::size_t at = 0;
@@ -586,8 +588,9 @@ public:
         lastMaxHeight = p.P[14];
         auto s = std::make_unique<Setup>();
         s->P = std::move (p);
+        flvoice::addLevelOffsets (s->P.snap.data(), levelX, levelY);
         s->ppq = ppq, s->tempo = tempo;
-        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo;
+        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, lastLevelX = levelX, lastLevelY = levelY;
         delete incoming.exchange (s.release());
     }
 
@@ -795,6 +798,7 @@ private:
     int lastMaxHeight = -1;
     int lastPpq = -1;
     double lastTempo = -1.0;
+    float lastLevelX = 0.0f, lastLevelY = 0.0f; // (round 190rt: Levels adjustment Mod X / Y)
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
     std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's note id (round 190ej)

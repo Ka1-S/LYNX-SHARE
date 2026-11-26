@@ -1,3 +1,4 @@
+#include "core/ClipLinks.h"
 #include "core/FlCurve.h"
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
@@ -2176,11 +2177,35 @@ std::vector<ControllerOutput> controllerOutputs (const Song& song)
                 out.push_back ({ t, s, 0, -1, tr ("Peak Controller") + " " + where + " - " + tr ("Peak + LFO") });
             }
         }
+    // round 190rt (issue #310): FL's "Automation clips" group of the list, each clip by its name
+    for (int a = 0; a < (int) song.automations.size(); ++a)
+        if (const auto& clip = song.automations[(std::size_t) a]; cliplinks::linkable (clip))
+        {
+            ControllerOutput o;
+            o.automation = a;
+            o.label = juce::String::fromUTF8 (clip.name.c_str());
+            out.push_back (o);
+        }
     return out;
 }
 
-void linkToController (AudioEngine& engine, const AutomationTarget& target, const ControllerOutput& source)
+void linkToController (AudioEngine& engine, const AutomationTarget& target, const ControllerOutput& source, bool removeConflicts)
 {
+    if (source.automation >= 0) // round 190rt (issue #310): the clip drives the control (FL: one controller per control)
+    {
+        engine.editSong ([&] (Song& s) {
+            auto clip = source.automation;
+            for (int i = (int) s.automations.size() - 1; i >= 0; --i)
+                if (i != clip && s.automations[(std::size_t) i].isLive() && s.automations[(std::size_t) i].target == target)
+                {
+                    s.removeAutomation (i);
+                    if (i < clip)
+                        --clip; // (the clip's index moves down with each live link removed before it)
+                }
+            cliplinks::link (s, clip, target, removeConflicts);
+        });
+        return;
+    }
     const auto name = describeAutomationTarget (engine, target).toStdString() + " <- " + source.label.toStdString();
     engine.editSong ([&] (Song& s) {
         // one controller per target (FL's Link dialog replaces the old link)
@@ -2205,8 +2230,18 @@ void addControllerLinkItems (juce::PopupMenu& menu, AudioEngine& engine, const A
     const auto current = std::find_if (song.automations.begin(), song.automations.end(),
                                        [&] (const Automation& a) { return a.isLive() && a.target == target; });
     juce::PopupMenu sub;
+    bool clipsHeader = false;
     for (const auto& o : outputs)
     {
+        if (o.automation >= 0) // round 190rt (issue #310): the clips, under FL's group title
+        {
+            if (! clipsHeader)
+                sub.addSectionHeader (tr ("Automation clips"));
+            clipsHeader = true;
+            const auto ticked = o.automation < (int) song.automations.size() && cliplinks::drives (song.automations[(std::size_t) o.automation], target);
+            sub.addItem (o.label, true, ticked, [&engine, target, o] { linkToController (engine, target, o); });
+            continue;
+        }
         const auto ticked = current != song.automations.end() && current->source.track == o.track && current->source.slot == o.slot
                             && current->source.output == o.output && current->source.channel == o.channel;
         sub.addItem (o.label, true, ticked, [&engine, target, o] { linkToController (engine, target, o); });

@@ -7,6 +7,7 @@
 #include "ui/ChannelSettings.h"
 #include "core/EditorScale.h"
 #include "core/FlControlMenus.h"
+#include "core/FlVoiceBlock.h"
 #include "core/FlmDwSampler.h"
 #include "core/SamplerPage.h"
 #include "ui/NewtoneEditor.h"
@@ -6943,8 +6944,16 @@ public:
                 addPage (std::move (instrumentPage), tr ("Plugin"), tip, Icon::pluginPicker);
             }
         }
+        // round 190rt (issue #311): a plugin generator's page of FL's plugin voice processor is FL 2026's "Plugin options"
+        // tab (3x Osc, DX10, Fruity Slicer: the tab's hint, live check 190rt); the Sampler / Synth keep LYNX's page name
+        const auto pluginVoice = [&] {
+            const auto* d = channel >= 0 && channel < (int) engine.getSong().channels.size() ? &engine.getSong().channels[(std::size_t) channel] : nullptr;
+            return d != nullptr && (d->instrument == InstrumentKind::fruityslicer || flvoiceblock::has (*d));
+        }();
         if (envelopePage != nullptr)
-            addPage (std::move (envelopePage), tr ("Envelope / instrument"), tr ("Envelope / instrument settings: the filter and pitch envelopes and the LFOs"),
+            addPage (std::move (envelopePage), pluginVoice ? tr ("Plugin options") : tr ("Envelope / instrument"),
+                     pluginVoice ? tr ("The voice's envelopes and LFOs (Panning, Volume, Mod X, Mod Y, Pitch) and its filter")
+                                 : tr ("Envelope / instrument settings: the filter and pitch envelopes and the LFOs"),
                      Icon::envelope);
         if (node)
         {
@@ -7258,6 +7267,23 @@ std::unique_ptr<juce::Component> makeEnvelopePage (AudioEngine& engine, const Ch
             });
     if (hasEnvelopeTab (kind))
         return std::make_unique<ModulationPanel> (engine, ref);
+    // round 190rt (issue #311): 3x Osc, DX10, Granulizer and BeepMap carry the plugin voice processor's block in their
+    // state (core/FlVoiceBlock.h) and had no tab for it, so their envelopes (a pluck's volume decay) could not be set
+    if (const auto* def = ref.get (engine); def != nullptr && def->instrument == kind && flvoiceblock::has (*def))
+        return makeFlVoicePanel (
+            engine,
+            [&engine, ref, kind] () -> std::optional<flvoice::Settings> {
+                const auto* d = ref.get (engine);
+                if (d == nullptr || d->instrument != kind)
+                    return std::nullopt;
+                return flvoiceblock::read (*d);
+            },
+            [&engine, ref, kind] (const flvoice::Settings& settings) {
+                ref.edit (engine, [settings, kind] (ChannelDef& d) {
+                    if (d.instrument == kind)
+                        flvoiceblock::write (d, settings);
+                });
+            });
     if (kind != InstrumentKind::fruityslicer)
         return nullptr;
     return makeFlVoicePanel (

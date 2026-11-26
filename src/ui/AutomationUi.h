@@ -99,12 +99,18 @@ extern std::function<void (const AutomationTarget&)> onEditEventsInPianoRoll;
 struct ControllerOutput
 {
     int track = -1, slot = 0, output = 0; // a mixer slot's controller effect, or
-    int channel = -1;                     // a controller channel
+    int channel = -1;                     // a controller channel, or
     juce::String label;
+    // round 190rt (issue #310): an automation clip (index into Song::automations) — FL lists every clip under
+    // "Automation clips" in "Link to controller"'s Internal controller list
+    int automation = -1;
 };
 std::vector<ControllerOutput> controllerOutputs (const Song& song);
-// Drives `target` live from that output (replaces the target's previous controller link).
-void linkToController (AudioEngine& engine, const AutomationTarget& target, const ControllerOutput& source);
+// Drives `target` live from that output (replaces the target's previous controller link). An automation clip output
+// links the clip to `target` as FL's Accept does: with `removeConflicts` (FL's "Remove conflicts", on by default) the
+// clip drives `target` alone (its other targets go: a re-target), without it `target` joins the clip's target links.
+void linkToController (AudioEngine& engine, const AutomationTarget& target, const ControllerOutput& source, bool removeConflicts = true);
+// (the clip side: core/ClipLinks.h)
 // "Link to internal controller" submenu.
 void addControllerLinkItems (juce::PopupMenu& menu, AudioEngine& engine, const AutomationTarget& target);
 

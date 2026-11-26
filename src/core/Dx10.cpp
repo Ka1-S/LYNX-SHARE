@@ -1,3 +1,4 @@
+#include "core/FlVoiceSettings.h"
 #include "core/Dx10.h"
 #include "core/HostSlide.h"
 #include "core/Vfx.h"
@@ -568,15 +569,17 @@ public:
         voiceProps.store (channel.engineRev >= 5);
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo)
+        const auto levelX = channel.misc.levels.modX, levelY = channel.misc.levels.modY; // (round 190rt, issue #311)
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && levelX == lastLevelX && levelY == lastLevelY)
             return;
-        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo;
+        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, lastLevelX = levelX, lastLevelY = levelY;
         if (auto p = parseState (state))
         {
             auto s = std::make_unique<Setup>();
             s->P = *p;
             static const auto defaults = defaultSnapshot();
             std::memcpy (s->snap.data(), snapshotOf (state, defaults), snapshotSize);
+            flvoice::addLevelOffsets (s->snap.data(), levelX, levelY);
             s->ppq = ppq, s->tempo = tempo;
             delete incoming.exchange (s.release());
         }
@@ -778,6 +781,7 @@ private:
     std::vector<std::uint8_t> state;
     int lastPpq = -1;
     double lastTempo = -1.0;
+    float lastLevelX = 0.0f, lastLevelY = 0.0f; // (round 190rt: Levels adjustment Mod X / Y)
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
     std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's note id (round 190ej)

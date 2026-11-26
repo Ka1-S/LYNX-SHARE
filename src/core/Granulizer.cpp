@@ -1,3 +1,4 @@
+#include "core/FlVoiceSettings.h"
 #include "core/Granulizer.h"
 #include "core/Vfx.h"
 #include "core/HostSlide.h"
@@ -1070,7 +1071,9 @@ public:
         const auto ppq = channel.modelParams.empty() ? 96 : std::clamp ((int) channel.modelParams[0], 1, 1 << 16);
         const auto tempo = bpm > 0.0 ? bpm : 140.0;
         const auto beats = hostBeats (channel, sample.get());
-        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && beats == lastBeats)
+        const auto levelX = channel.misc.levels.modX, levelY = channel.misc.levels.modY; // (round 190rt, issue #311)
+        if (channel.pluginState == state && ppq == lastPpq && tempo == lastTempo && beats == lastBeats && levelX == lastLevelX
+            && levelY == lastLevelY)
             return;
         Params p;
         if (! parseNormalised (channel.pluginState, p))
@@ -1079,8 +1082,9 @@ public:
         auto s = std::make_unique<Setup>();
         s->P = p;
         std::memcpy (s->snap.data(), channel.pluginState.data() + 64, snapshotSize);
+        flvoice::addLevelOffsets (s->snap.data(), levelX, levelY);
         s->ppq = ppq, s->tempo = tempo, s->beats = beats;
-        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, lastBeats = beats;
+        state = channel.pluginState, lastPpq = ppq, lastTempo = tempo, lastBeats = beats, lastLevelX = levelX, lastLevelY = levelY;
         delete incoming.exchange (s.release());
     }
 
@@ -1327,6 +1331,7 @@ private:
     std::vector<std::uint8_t> state;
     int lastPpq = -1;
     double lastTempo = -1.0;
+    float lastLevelX = 0.0f, lastLevelY = 0.0f; // (round 190rt: Levels adjustment Mod X / Y)
     float lastBeats = -1.0f;
     std::array<std::vector<std::int64_t>, 2> slices; // written once each (configure), then read by the audio thread
     std::array<bool, 2> slicesReady { false, false };
