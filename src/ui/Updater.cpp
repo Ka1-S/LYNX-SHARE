@@ -1,4 +1,5 @@
 #include "ui/Updater.h"
+#include "engine/SafeWrite.h"
 
 #include <atomic>
 #include <memory>
@@ -72,7 +73,7 @@ juce::File settingsPath() { return platform::settingsFile ("updates.txt"); }
 juce::File cachePath() { return platform::settingsFile ("update-cache.json"); }
 
 update::Settings loadSettings() { return update::parseSettings (utf8 (settingsPath().loadFileAsString())); }
-void saveSettings (const update::Settings& s) { settingsPath().replaceWithText (fromUtf8 (update::formatSettings (s))); }
+void saveSettings (const update::Settings& s) { safewrite::replaceWithText (settingsPath(), fromUtf8 (update::formatSettings (s))); }
 
 update::Version runningVersion()
 {
@@ -423,7 +424,7 @@ void check (bool manual)
             failure = fromUtf8 (parseError);
         if (fetched && failure.isEmpty() && ! fixture)
         {
-            cachePath().replaceWithText (text);
+            safewrite::replaceWithText (cachePath(), text);
             settings.lastCheckMs = now;
             saveSettings (settings);
         }
@@ -602,8 +603,8 @@ void installAndRestart (const juce::File& setup)
         note.version = c.release.version.text();
         note.from = runningVersion().text();
         note.rollback = c.rollingBack;
-        updateFolder().getChildFile ("installing.txt").replaceWithText (fromUtf8 (update::formatInstalling (note)));
-        updateFolder().getChildFile ("installing-notes.md").replaceWithText (fromUtf8 (c.release.body));
+        safewrite::replaceWithText (updateFolder().getChildFile ("installing.txt"), fromUtf8 (update::formatInstalling (note)));
+        safewrite::replaceWithText (updateFolder().getChildFile ("installing-notes.md"), fromUtf8 (c.release.body));
         // round 190hl: going back skips the version left NOW, in the settings every older version reads; the older
         // version that starts after the installer may not know about going back (0.1.27 and older) and would offer
         // this one again at once. (The previous version is used up after the restart, by versions that know it.)
@@ -1050,7 +1051,7 @@ bool runApplyHelper (const juce::StringArray& args)
     const auto resultFile = setup.getSiblingFile ("result.txt");
     auto finish = [&] (bool ok, const juce::String& detail) {
         log (juce::String ("helper: ") + (ok ? "installed" : "FAILED") + (detail.isNotEmpty() ? " (" + detail + ")" : juce::String()));
-        resultFile.replaceWithText ("result=" + juce::String (ok ? "ok" : "failed") + "\ndetail=" + detail + "\n");
+        safewrite::replaceWithText (resultFile, "result=" + juce::String (ok ? "ok" : "failed") + "\ndetail=" + detail + "\n");
         // LYNX SHARE starts again (the old one when the installation failed: it shows why)
         const auto exe = folder.getChildFile ("LYNX.exe");
         if (exe.existsAsFile())

@@ -1,4 +1,5 @@
 #include "ui/FlVoicePanel.h"
+#include "engine/SafeWrite.h"
 
 #include <array>
 #include <cmath>
@@ -473,7 +474,7 @@ public:
         if (clean.isEmpty() || ! envelopePresetFolder().createDirectory())
             return false;
         const auto bytes = chenv::write (current.articulators[(std::size_t) target]);
-        return envelopePresetFolder().getChildFile (clean + ".CHENV").replaceWithData (bytes.data(), bytes.size());
+        return safewrite::replaceWithData (envelopePresetFolder().getChildFile (clean + ".CHENV"), bytes.data(), bytes.size());
     }
 
 private:

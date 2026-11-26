@@ -1,4 +1,5 @@
 #include "engine/Exporter.h"
+#include "engine/SafeWrite.h"
 #include "core/AraRegions.h"
 #include "engine/AraHost.h"
 #include "core/MixerOps.h" // (round 190my: the Current track)
@@ -561,6 +562,9 @@ struct ExportJob::Sink
     std::unique_ptr<juce::TemporaryFile> temp;
     std::unique_ptr<juce::AudioFormatWriter> writer;
     std::vector<float> left, right;
+    // (round 190rm) the file stream's own failures (a full disk): the FLAC, MP3-less, Ogg and AIFF writers ignore them, so
+    // a cut file "exported"; checked when the writer is closed
+    std::shared_ptr<safewrite::StreamState> state = std::make_shared<safewrite::StreamState>();
 };
 
 bool ExportJob::run (const std::function<bool (double)>& progress, juce::String& error)
@@ -639,9 +643,9 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
         format = std::make_unique<juce::WavAudioFormat>();
 
     sink.temp = std::make_unique<juce::TemporaryFile> (output);
-    auto stream = sink.temp->getFile().createOutputStream();
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<safewrite::CheckedFileStream> (sink.temp->getFile(), sink.state);
 
-    if (stream == nullptr)
+    if (sink.state->failed)
     {
         error = tr ("could not create {0}", { output.getFullPathName() });
         return false;
@@ -682,6 +686,11 @@ bool ExportJob::closeSink (Sink& sink, float renderedPeak, juce::String& error)
     if (renderedPeak < 0.0f)
     {
         error = "cancelled"; // (the temporary file goes away; an older file of that name stays)
+        return false;
+    }
+    if (const auto& state = sink.state; state->failed)
+    {
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (state->reason), output.getFileName() });
         return false;
     }
     if (extraData && options.format == exportopts::Format::wav && ! appendWavExtras (sink.temp->getFile().getFullPathName().toStdString(), extras, options.sampleRate))
@@ -785,9 +794,9 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
             encoder.encode (left + done, right + done, juce::jmin (block, frames - done), bytes);
         encoder.finish (bytes);
 
-        if (! temp.getFile().replaceWithData (bytes.data(), bytes.size()))
+        if (juce::String why; ! safewrite::writeData (temp.getFile(), bytes.data(), bytes.size(), why)) // (round 190rm: checked)
         {
-            error = tr ("could not create {0}", { file.getFullPathName() });
+            error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
             return false;
         }
         return replaceTarget (temp, file, error);
@@ -847,8 +856,9 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
     else
         format = std::make_unique<juce::WavAudioFormat>();
 
-    auto stream = temp.getFile().createOutputStream();
-    if (stream == nullptr)
+    auto state = std::make_shared<safewrite::StreamState>(); // (round 190rm: the stream's own failures, checked at the end)
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<safewrite::CheckedFileStream> (temp.getFile(), state);
+    if (state->failed)
     {
         error = tr ("could not create {0}", { file.getFullPathName() });
         return false;
@@ -868,6 +878,11 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
     const auto ok = writer->writeFromAudioSampleBuffer (view, 0, frames);
     writer.reset();
 
+    if (state->failed)
+    {
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (state->reason), file.getFileName() });
+        return false;
+    }
     if (! ok || (extraData && o.format == exportopts::Format::wav && ! appendWavExtras (temp.getFile().getFullPathName().toStdString(), extras, o.sampleRate)))
     {
         error = tr ("could not write {0}", { file.getFullPathName() });

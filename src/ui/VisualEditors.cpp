@@ -1,4 +1,5 @@
 #include "ui/VisualEditors.h"
+#include "engine/SafeWrite.h"
 #include "ui/WindowPlaces.h"
 
 #include <algorithm>
@@ -2049,7 +2050,7 @@ juce::File findFfmpeg()
 
 void setFfmpegLocation (const juce::File& exe)
 {
-    platform::settingsFile ("ffmpeg-location.txt").replaceWithText (exe.getFullPathName());
+    safewrite::replaceWithText (platform::settingsFile ("ffmpeg-location.txt"), exe.getFullPathName());
 }
 
 namespace
@@ -2299,8 +2300,8 @@ public:
         {
             // the audio next to the images, and how to join them
             wav.copyFileTo (framesFolder.getChildFile ("audio.wav"));
-            framesFolder.getChildFile ("how to make the video.txt")
-                .replaceWithText ("LYNX SHARE did not find ffmpeg, so it wrote the video's frames as PNG images and its sound as audio.wav.\n"
+            safewrite::replaceWithText (framesFolder.getChildFile ("how to make the video.txt"),
+                                "LYNX SHARE did not find ffmpeg, so it wrote the video's frames as PNG images and its sound as audio.wav.\n"
                                   "Install ffmpeg (https://ffmpeg.org) and run this in this folder:\n\n" "ffmpeg -framerate "
                                   + juce::String (settings.fps) + " -i frame_%06d.png -i audio.wav -c:v libx264 -pix_fmt yuv420p -crf "
                                   + juce::String (settings.crf) + " -c:a aac -b:a 320k -shortest video.mp4\n");
@@ -3817,7 +3818,7 @@ private:
         report << "GPU views: " << gpuViews << (visualgl::failedThisSession() ? ", GPU failed: " + visualgl::failureReason() : juce::String()) << "\n";
         gpuWindow.reset();
         report << "result=" << (ok ? "OK" : "ERROR") << "\n";
-        folder.getChildFile ("report.txt").replaceWithText (report);
+        safewrite::replaceWithText (folder.getChildFile ("report.txt"), report);
         juce::MessageManager::callAsync ([d = done, ok] { d (ok); });
     }
 

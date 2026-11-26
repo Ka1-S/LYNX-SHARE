@@ -1,4 +1,5 @@
 #include "ui/FlMods.h"
+#include "engine/SafeWrite.h"
 #include "ui/EventEditor.h"
 #include "core/MidiControls.h"
 
@@ -880,7 +881,7 @@ private:
                                      const auto* l = eventedit::findLane (safe->currentPattern(), safe->target);
                                      const auto bytes = prtools::writeEventScore (l != nullptr ? l->events : std::vector<PatternEvent> {},
                                                                                   safe->target.kind == AutomationTargetKind::tempo ? 5u : 0u);
-                                     if (l == nullptr || l->events.empty() || ! file.replaceWithData (bytes.data(), bytes.size()))
+                                     if (l == nullptr || l->events.empty() || ! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
                                          juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save automation as"),
                                                                                  tr ("There are no events to save, or the file could not be written."));
                                  });

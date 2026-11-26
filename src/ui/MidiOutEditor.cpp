@@ -5,6 +5,7 @@
 // stay: "Send to a plugin...", "Automate MIDI controller..." and the list of the plugins its port plays.
 
 #include "ui/ControllerEditors.h"
+#include "engine/SafeWrite.h"
 
 #include <algorithm>
 #include <array>
@@ -769,7 +770,7 @@ private:
                     return;
                 file = file.withFileExtension ("fst");
                 const auto bytes = midiout::writeFst (state);
-                if (! file.replaceWithData (bytes.data(), bytes.size()))
+                if (! safewrite::replaceWithData (file, bytes.data(), bytes.size()))
                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Presets"), tr ("Could not write {0}", { file.getFullPathName() }));
             });
         });

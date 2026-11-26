@@ -1,4 +1,5 @@
 #include "ui/RemoteControlSettings.h"
+#include "engine/SafeWrite.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
 #include "ui/DemoMode.h"
@@ -36,7 +37,7 @@ juce::String status()
 void setEnabled (bool on)
 {
     if (on == enabled()) return;
-    if (! settingsFile().replaceWithText (on ? "1\n" : "0\n"))
+    if (! safewrite::replaceWithText (settingsFile(), on ? "1\n" : "0\n"))
     {
         if (! on)
         {

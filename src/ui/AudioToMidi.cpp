@@ -1,4 +1,5 @@
 #include "ui/AudioToMidi.h"
+#include "engine/SafeWrite.h"
 #include "ui/BasicPitchSession.h"
 
 #include <atomic>
@@ -781,7 +782,7 @@ juce::String fileToCsv (AudioEngine& engine, const juce::File& input, const Requ
     for (std::size_t i = 0; i < notes.size(); ++i)
         for (const auto& b : notes[i].bends)
             text << "bend," << (int) i << "," << juce::String (b.seconds, 4) << "," << juce::String (b.cents, 1) << "\n";
-    return csv.replaceWithText (text) ? juce::String() : "can't write " + csv.getFullPathName();
+    return safewrite::replaceWithText (csv, text) ? juce::String() : "can't write " + csv.getFullPathName();
 }
 } // namespace
 

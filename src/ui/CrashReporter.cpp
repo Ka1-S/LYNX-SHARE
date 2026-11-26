@@ -1,4 +1,5 @@
 #include "core/Offline.h"
+#include "engine/SafeWrite.h"
 #include "engine/FileSort.h"
 #include "ui/CrashReporter.h"
 
@@ -46,7 +47,7 @@ cr::Consent consent()
 
 void setConsent (cr::Consent c)
 {
-    consentFile().replaceWithText (cr::consentName (c));
+    safewrite::replaceWithText (consentFile(), cr::consentName (c));
 }
 
 // ================================================================================================================
@@ -377,7 +378,7 @@ Outcome post (const juce::MemoryBlock& body, juce::String& message)
    #if JUCE_LINUX || JUCE_BSD
     // (LYNX is built without libcurl, JUCE_USE_CURL=0: the curl program sends it)
     const auto file = juce::File::createTempFile (".json.gz");
-    file.replaceWithData (body.getData(), body.getSize());
+    safewrite::replaceWithData (file, body.getData(), body.getSize());
     juce::ChildProcess curl;
     juce::StringArray args { "curl", "-sS", "-m", "20", "-X", "POST", "-H", "Content-Type: application/json", "-H", "Content-Encoding: gzip",
                              "--data-binary", "@" + file.getFullPathName(), "-w", "\n%{http_code}", endpoint() };
@@ -483,7 +484,7 @@ private:
                     tries.deleteFile();
                 }
                 else
-                    tries.replaceWithText ("1"); // once more at the next start
+                    safewrite::replaceWithText (tries, "1"); // once more at the next start
                 callBack (id, outcome == Outcome::sent, outcome == Outcome::sent ? id : message);
             }
             working = false;
@@ -525,7 +526,7 @@ void send (const juce::String& json, const juce::String& id, std::function<void 
 {
     pendingFolder().createDirectory();
     const auto body = gzip (json);
-    pendingFolder().getChildFile (id + ".json.gz").replaceWithData (body.getData(), body.getSize());
+    safewrite::replaceWithData (pendingFolder().getChildFile (id + ".json.gz"), body.getData(), body.getSize());
     uploader().wake (std::move (done), id);
 }
 

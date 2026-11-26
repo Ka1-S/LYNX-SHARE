@@ -1,4 +1,6 @@
 #include "platform/Paths.h"
+#include "ui/I18n.h"
+#include "engine/SafeWrite.h"
 #include "engine/ProjectPackage.h"
 
 #include "core/MissingFiles.h"
@@ -48,18 +50,11 @@ bool exportZip (const Song& song, const juce::String& projectName, const juce::F
     builder.addEntry (new juce::MemoryInputStream (json.toRawUTF8(), json.getNumBytesAsUTF8(), true), 9, name + ProjectFile::extension,
                       juce::Time::getCurrentTime());
 
-    juce::TemporaryFile temp (zip);
+    // (round 190rm: engine/SafeWrite.h: checked before the swap; a full disk left a cut .zip that "saved" before)
+    juce::String why;
+    if (! safewrite::writeWith (zip, [&builder] (juce::OutputStream& out) { return builder.writeToStream (out, nullptr); }, why))
     {
-        juce::FileOutputStream out (temp.getFile());
-        if (! out.openedOk() || ! builder.writeToStream (out, nullptr))
-        {
-            error = "could not write " + zip.getFullPathName();
-            return false;
-        }
-    }
-    if (! temp.overwriteTargetFileWithTemporary())
-    {
-        error = "could not write " + zip.getFullPathName();
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), zip.getFileName() });
         return false;
     }
     return true;

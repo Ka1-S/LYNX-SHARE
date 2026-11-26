@@ -1,4 +1,5 @@
 #include <optional>
+#include "engine/SafeWrite.h"
 #include "ui/ModRing.h"
 #include "ui/DemoMode.h" // round 190pl
 #include "ui/WindowOwner.h"
@@ -2948,7 +2949,7 @@ private:
                                          return;
                                      if (! file.hasFileExtension ("mid;midi"))
                                          file = file.withFileExtension ("mid");
-                                     if (! file.replaceWithData (smf->getData(), smf->getSize()))
+                                     if (! safewrite::replaceWithData (file, smf->getData(), smf->getSize()))
                                          juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, juce::String ("MIDI"),
                                                                                  tr ("Could not write {0}", { file.getFullPathName() }));
                                  });
@@ -4260,7 +4261,7 @@ private:
                                                          : sample->bitsPerSample > 16                    ? audioedit::WavFormat::int24
                                                                                                          : audioedit::WavFormat::int16;
                                      const auto bytes = audioedit::encodeWav (doc, format);
-                                     target.withFileExtension ("wav").replaceWithData (bytes.data(), bytes.size());
+                                     safewrite::replaceWithData (target.withFileExtension ("wav"), bytes.data(), bytes.size());
                                  });
     }
 
