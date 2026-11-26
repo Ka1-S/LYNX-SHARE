@@ -1,6 +1,7 @@
 #include "ui/Workspace.h"
 #include "ui/HowTo.h" // round 190qx
 #include "ui/Motion.h"
+#include "ui/TextCache.h"
 #include "ui/ThemeSettings.h"
 
 #include "engine/PluginHost.h"
@@ -1767,17 +1768,43 @@ void Workspace::paint (juce::Graphics& g)
     using namespace theme;
     themeui::paintWorkspaceBackdrop (g, getLocalBounds()); // the theme's colour and image (Options › Theme, round 162d)
 
-    // an empty desktop says how to bring the panels back
+    // an empty desktop says how to bring the panels back (issue #305, round 190ri: also beside a docked Browser alone, in the
+    // room it leaves)
     bool any = false;
     for (int i = 0; i < workspace::panelCount; ++i)
-        any = any || (layout[(Panel) i].visible && ! layout[(Panel) i].detached);
+        if ((Panel) i != Panel::browser)
+            any = any || (layout[(Panel) i].visible && ! layout[(Panel) i].detached);
+    auto room = getLocalBounds();
+    if (const auto& browserPanel = layout[Panel::browser]; browserPanel.visible && ! browserPanel.detached)
+    {
+        if (browserPanel.maximised)
+            any = true;
+        else
+        {
+            const auto b = juce::Rectangle<int> (browserPanel.bounds.x, browserPanel.bounds.y, browserPanel.bounds.w, browserPanel.bounds.h);
+            room = b.getCentreX() < room.getCentreX() ? room.withLeft (juce::jmax (room.getX(), b.getRight()))
+                                                       : room.withRight (juce::jmin (room.getRight(), b.getX()));
+        }
+    }
 
     if (! any)
     {
-        g.setColour (colour::textDisabled);
-        g.setFont (font (type::body));
-        g.drawFittedText (tr ("F5 Playlist   F6 Channel Rack   F7 Piano Roll   F9 Mixer   Alt+F8 Browser"), getLocalBounds().reduced (20),
-                          juce::Justification::centred, 2);
+        // issue #305 (round 190ri, yannikthegenius): the only useful thing on an empty desktop was a small line in the disabled
+        // text colour, lost on the dark backdrop and on any workspace image. Now LYNX's empty-state card (Onboarding.cpp's
+        // EmptyHintCard: bg2, the strong border, 8 px corners) with the line at the title size in the primary text colour
+        const auto text = tr ("F5 Playlist   F6 Channel Rack   F7 Piano Roll   F9 Mixer   Alt+F8 Browser");
+        const auto area = room.reduced (20);
+        const juce::Font lineFont (font (type::title));
+        const auto textWidth = textcache::stringWidth (lineFont, text);
+        const auto width = juce::jmin ((float) area.getWidth(), textWidth + 48.0f);
+        const auto card = area.toFloat().withSizeKeepingCentre (width, lineFont.getHeight() + 30.0f);
+        g.setColour (colour::bg2.withAlpha (0.96f));
+        g.fillRoundedRectangle (card, 8.0f);
+        g.setColour (colour::borderStrong);
+        g.drawRoundedRectangle (card.reduced (0.5f), 8.0f, 1.0f);
+        g.setFont (lineFont);
+        g.setColour (colour::textPrimary);
+        g.drawFittedText (text, card.toNearestInt().reduced (16, 0), juce::Justification::centred, 1, 0.6f);
     }
 }
 

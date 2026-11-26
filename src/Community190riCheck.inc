@@ -14,6 +14,8 @@
     //  14 #247: a letter typed just after a text field lost the keyboard goes back into it
     //  15 #296 / #301: a cut hint (or a cut name in its value) shows whole in the bar's bubble and comes back on the bar
     //  17 #299: a knob's value bubbles close when the knob is hidden or no longer under the pointer
+    //  19 #305: the empty workspace's line on the default backdrop and over a bright and a dark workspace image, in the three
+    //     layouts and beside a docked Browser (shots "-19-<layout>-<default|bright|dark>[-browser]")
     juce::String community190riCheck (juce::String& log, const juce::String& shots = {})
     {
         using namespace lynx;
@@ -137,12 +139,12 @@
             const auto* selected = find (rackMenu, tr ("Transpose selected..."), kept);
             check ("Channel rack menu: Transpose selected...", selected != nullptr && selected->isEnabled);
             check ("Pattern menu: Transpose...", find (rackMenu, tr ("Transpose..."), kept) != nullptr);
-            if (shots.isNotEmpty())
-            {
             // (FL's in-place box: a signed whole number; anything else does nothing)
             check ("Transpose box: signed whole numbers", transposeSemitones ("-12") == -12 && transposeSemitones (" +7 ") == 7 && transposeSemitones ("5") == 5
                                                              && transposeSemitones ("") == 0 && transposeSemitones ("1.5") == 0 && transposeSemitones ("x") == 0
                                                              && transposeSemitones ("99999") == 1000);
+            if (shots.isNotEmpty())
+            {
                 saveMenus (juce::StringArray { tr ("Channel Rack") }, std::vector<juce::PopupMenu> { rackMenu }, shots + "-2-rack-menu.png");
                 auto box = makeTransposeBoxForSnapshot();
                 savePng (shot::snapshot (*box), shots + "-2-transpose.png");
@@ -428,6 +430,55 @@
             check ("#299 ... and when the control is hidden", ui::checkValueTipNow() && ! ui::valueTipShown());
             ui::hideValueTip();
             window.removeFromDesktop();
+        }
+
+        // 19: the empty workspace's line over a workspace image (issue #305)
+        if (shots.isNotEmpty())
+        {
+            const auto themeWas = themeui::current();
+            const juce::ScopeGuard themeBack { [themeWas] { themeui::apply (themeWas, false); } };
+            const auto picture = [&folder] (const juce::String& name, bool bright) {
+                juce::Image image (juce::Image::RGB, 640, 360, true);
+                juce::Graphics g (image);
+                g.setGradientFill (bright ? juce::ColourGradient (juce::Colour (0xfff6f0d8), 0.0f, 0.0f, juce::Colour (0xff9fd3ff), 640.0f, 360.0f, false)
+                                          : juce::ColourGradient (juce::Colour (0xff10131c), 0.0f, 0.0f, juce::Colour (0xff3a1f4a), 640.0f, 360.0f, false));
+                g.fillAll();
+                juce::Random r (7);
+                for (int i = 0; i < 400; ++i) // (a busy picture, as a photo)
+                {
+                    g.setColour (juce::Colour ((juce::uint8) r.nextInt (256), (juce::uint8) r.nextInt (256), (juce::uint8) r.nextInt (256), 0.35f));
+                    g.fillEllipse ((float) r.nextInt (640), (float) r.nextInt (360), 6.0f + (float) r.nextInt (40), 6.0f + (float) r.nextInt (40));
+                }
+                const auto file = folder.getChildFile (name);
+                juce::PNGImageFormat png;
+                if (auto out = file.createOutputStream())
+                    png.writeImageToStream (image, *out);
+                return file;
+            };
+            const auto bright = picture ("bright.png", true), dark = picture ("dark.png", false);
+            const juce::File none; // (the default backdrop, no image: yannik's case)
+            for (const auto style : { layoutstyle::Style::pattern, layoutstyle::Style::clipLaunch, layoutstyle::Style::simple })
+                for (const auto* which : { &none, &bright, &dark })
+                    for (const auto withBrowser : { false, true })
+                    {
+                        auto spec = themeWas;
+                        spec.image = which == &none ? std::string() : which->getFullPathName().toStdString();
+                        themeui::apply (spec, false);
+                        AudioEngine offline (false);
+                        MainComponent main (offline, false);
+                        main.setSize (1400, 800);
+                        main.setVisible (true);
+                        main.setLayoutStyle (style);
+                        offline.dispatchPendingMessages();
+                        for (int p = 0; p < workspace::panelCount; ++p)
+                            main.hidePanelForCheck ((workspace::Panel) p);
+                        if (withBrowser)
+                            main.runActionForSnapshot ("panel.browser");
+                        const auto name = juce::String (style == layoutstyle::Style::pattern ? "pattern" : style == layoutstyle::Style::clipLaunch ? "cliplaunch" : "simple")
+                                          + (which == &none ? "-default" : which == &bright ? "-bright" : "-dark") + (withBrowser ? "-browser" : "");
+                        savePng (shot::snapshot (main), shots + "-19-" + name + ".png");
+                    }
+            layoutstyle::setCurrent (layoutstyle::Style::pattern);
         }
 
         // 13 and 16: the Playlist's marker menu and the track menu on a selection
