@@ -54,6 +54,19 @@ The short version of each release. The full notes, with measurements, known issu
   imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
 
 **Fixed**
+- **Saving on a full disk no longer destroys the project.** Since 0.1.30 a save (and Save as, autosave, every export and
+  settings file) could replace the project with a cut file when the disk filled up, and only said so afterwards. Every file
+  LYNX writes now goes through one checked writer: if anything fails, the old file is left as it was and LYNX says why
+  ("Not saved: the disk is full. Your project file was not changed.").
+- Export to FL Studio: plugin values at the song's start are written on the plugin's own range (FL rendered LYNX's export of
+  Thief as silence with a DC offset). DAWproject: every sample gets its real format (FL's Ogg-in-WAV and .wv are written as
+  WAV), clip gain and pitch are kept. MIDI files carry the tempo map, time signatures and the name; File › Open takes the
+  meter. FL Studio Mobile export lists tempo and signature changes and markers, and leaves out clips of muted tracks.
+- Hosted plugins: a plugin window resizing itself in a loop no longer freezes LYNX; CLAP plugins get a buffer per audio port
+  (FabFilter's CLAP effects crashed), a Sidechain input and the transport; a plugin installed in several formats loads VST3,
+  then CLAP, then VST2.
+- The undo history is capped at 1 GB as well as its step count (a big project's 100 steps reached ~1 GB); the splash goes at
+  the logo drop on Linux and macOS.
 - Track-only mode and the Simple layout: a clip moved or copied onto another instrument's track plays that instrument (Discord).
 - Undo and redo keep the project's working time; Export to FL Studio's report names each mixer slot it left out; audio clips of
   GarageBand and BandLab imports keep their exact start after a save.
