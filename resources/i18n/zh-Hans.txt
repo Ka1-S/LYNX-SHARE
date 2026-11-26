@@ -13115,3 +13115,8 @@ countries: cn sg
 "On by default." = "默认打开。"
 "Zoom keys: LYNX's anchor, and Shift+5 again goes back (LYNX)" = "缩放键：LYNX 的锚点，再按 Shift+5 返回 (LYNX)"
 "PgUp and PgDn zoom the Playlist and the Piano roll around the playhead while it plays on screen, else around the selected clips or notes, else around the view's centre, and the zoom-to-selection key (Shift+5) pressed again goes back to the view before. Off, as in FL Studio: the keys zoom around the mouse pointer (or keep the view's left edge when the pointer is elsewhere) and Shift+5 pressed again changes nothing. Always on in the Clip-launch and Simple layouts. Also in the Playlist ruler's right-click menu › Zoom." = "PgUp 和 PgDn 在播放头于屏幕上播放时围绕播放头缩放播放列表和钢琴卷帘，否则围绕所选片段或音符，再否则围绕视图中心；再次按下缩放到所选内容的键（Shift+5）会回到之前的视图。关闭时与 FL Studio 相同：按键围绕鼠标指针缩放（指针在别处时保持视图左边缘），再次按 Shift+5 不会改变任何东西。在 Clip-launch 和 Simple 布局中始终开启。也在播放列表标尺的右键菜单 › 缩放中。"
+"The audio driver did not answer" = "音频驱动没有响应"
+"LYNX SHARE waited {0} s for {1} to open and uses {2} for now. The driver may be busy in another program or need a restart." = "LYNX SHARE 等待 {1} 打开 {0} 秒，暂时改用 {2}。驱动可能正被其他程序占用，或需要重新启动。"
+"Choose another..." = "选择其他..."
+"{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} 仍然没有响应。LYNX SHARE 暂时使用 {1}。"
+"no audio device" = "无音频设备"

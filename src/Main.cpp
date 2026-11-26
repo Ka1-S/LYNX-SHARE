@@ -112,6 +112,7 @@
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
 #include "engine/RecoveryTest.h" // round 190rp
+#include "engine/DeviceGuard.h" // round 190rp
 #include "engine/ProjectDowngrade.h"
 #include "engine/RemoteNotes.h" // (round 190pm: --selftest repeats190pm)
 #include "core/NoteConditions.h" // (round 190pm)

@@ -621,6 +621,7 @@ if(LYNX_BUILD_APP)
         src/engine/DeviceChangeTest.cpp
         src/engine/ShortExportTest.cpp
         src/engine/ExportParityTest.cpp
+        src/engine/DeviceGuard.cpp
         src/engine/RecoveryTest.cpp
         src/engine/SampleZeroTest.cpp
         src/engine/MidiHotplugTest.cpp

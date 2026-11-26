@@ -152,6 +152,7 @@
 #include "ui/ActionSearch.h" // round 190nq (#228)
 #include "ui/HowTo.h" // round 190qx
 #include "ui/Notices.h" // round 190qx
+#include "engine/DeviceGuard.h" // round 190rp
 #include "ui/TrackerComponent.h"
 #include "core/ExtrasDefaults.h" // round 190qk: which extras are on by default, the user-set list
 #include "core/LynxExtras.h" // round 190on (P2: the command palette lists the extras)
@@ -1208,6 +1209,45 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         n.holdMs = recordingStopped ? 10 * 60 * 1000 : 0;
         ui::notify (std::move (n));
     };
+    // round 190rp (crash group G1, engine/DeviceGuard.h): the saved device's driver did not answer within the time limit
+    engine.onAudioDeviceHung = [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::String& hung) {
+        if (safe == nullptr)
+            return;
+        platform::testModeLog ("audio device hung: " + hung);
+        auto& self = *safe;
+        auto* now = self.engine.getDeviceManager().getCurrentAudioDevice();
+        const auto device = hung.fromFirstOccurrenceOf (": ", false, false);
+        const auto instead = now != nullptr ? now->getName() : tr ("no audio device");
+        auto* w = new juce::AlertWindow (tr ("The audio driver did not answer"),
+                                         tr ("LYNX SHARE waited {0} s for {1} to open and uses {2} for now. The driver may be busy in another "
+                                             "program or need a restart.",
+                                             { juce::String (deviceguard::timeoutMs() / 1000), device, instead }),
+                                         juce::MessageBoxIconType::WarningIcon);
+        w->addButton (tr ("Try again"), 1);
+        w->addButton (tr ("Choose another..."), 2);
+        w->addButton (tr ("OK"), 0, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, device] (int result) {
+                                if (safe == nullptr)
+                                    return;
+                                if (result == 2)
+                                    safe->showAudioSettings();
+                                if (result != 1)
+                                    return;
+                                if (const auto error = safe->engine.retryHungAudioDevice(); error.isNotEmpty())
+                                {
+                                    auto* d = safe->engine.getDeviceManager().getCurrentAudioDevice();
+                                    platform::testModeLog ("audio device still hung: " + error);
+                                    ui::Notice n;
+                                    n.kind = ui::Notice::Kind::problem;
+                                    n.id = "audio.deviceHung";
+                                    n.text = tr ("{0} still did not answer. LYNX SHARE uses {1} for now.", { device, d != nullptr ? d->getName() : tr ("no audio device") });
+                                    ui::notify (std::move (n));
+                                }
+                                else
+                                    platform::testModeLog ("audio device opened on the second try: " + device);
+                            }),
+                            true);
+    };
     engine.onAudioDeviceBack = [] (const juce::String& device) {
         platform::testModeLog ("audio device back: " + device);
         ui::Notice n;
@@ -1292,6 +1332,7 @@ MainComponent::~MainComponent()
     engine.onMidiDevicesChanged = nullptr;
     engine.onAudioDeviceLost = nullptr;
     engine.onAudioDeviceBack = nullptr;
+    engine.onAudioDeviceHung = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     liveui::setRemoteSession (nullptr, nullptr);

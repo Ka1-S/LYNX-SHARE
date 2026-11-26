@@ -1,5 +1,6 @@
 #include "engine/AudioEngine.h"
 #include "platform/CrashGuard.h" // round 190rp: session steps around the device open
+#include "engine/DeviceGuard.h" // round 190rp: bounded device opens
 #include "engine/SafeWrite.h"
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
@@ -651,7 +652,7 @@ void AudioEngine::openAudioDevice()
     deviceManager.getAvailableDeviceTypes(); // the standard types first (round 190hd: its own trace line)
     mark ("  engine: standard device types (the prewarmed ASIO device handed over)");
     if (auto lynxAsio = makeBuiltInLynxAsioType())
-        deviceManager.addAudioDeviceType (std::move (lynxAsio));
+        deviceManager.addAudioDeviceType (deviceguard::wrap (std::move (lynxAsio))); // (round 190rp: bounded opens)
     // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
     if (auto pipeWire = makePipeWireDeviceType())
     {
@@ -673,6 +674,7 @@ void AudioEngine::openAudioDevice()
         saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
     }
     auto fresh = saved == nullptr;
+    const auto hungBefore = deviceguard::hungCount();
     if (saved != nullptr) // (round 190rp: a hang or a crash in the driver's open leaves this as the session's last step)
         crashguard::note (std::string (openingDeviceStep) + saved->getStringAttribute ("deviceType").toStdString() + ": "
                           + saved->getStringAttribute ("audioOutputDeviceName").toStdString());
@@ -692,6 +694,16 @@ void AudioEngine::openAudioDevice()
     }
     if (saved != nullptr)
         crashguard::note ("audio device opened");
+    // round 190rp (crash group G1): the saved device's driver did not answer within the time limit (DeviceGuard.h): the
+    // default device opened instead (above); the window says which driver hung, with "Try again" and "Choose another"
+    if (deviceguard::hungCount() != hungBefore)
+    {
+        hungDeviceSetup = saved != nullptr ? saved->toString() : juce::String();
+        juce::MessageManager::callAsync ([this, hung = deviceguard::lastHung()] {
+            if (onAudioDeviceHung)
+                onAudioDeviceHung (hung);
+        });
+    }
     mark ("  engine: device opened");
     deviceManager.addAudioCallback (this);
     deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
@@ -6677,6 +6689,28 @@ void AudioEngine::timerCallback()
         ++latencyRepublishes;
         publishSong();
     }
+}
+
+juce::String AudioEngine::retryHungAudioDevice()
+{
+    const auto xml = juce::XmlDocument::parse (hungDeviceSetup);
+    if (xml == nullptr)
+        return "no device to try again";
+    const auto type = xml->getStringAttribute ("deviceType");
+    const auto name = xml->getStringAttribute ("audioOutputDeviceName").isNotEmpty() ? xml->getStringAttribute ("audioOutputDeviceName")
+                                                                                     : xml->getStringAttribute ("audioInputDeviceName");
+    deviceguard::allowAgain (type, name);
+    const auto hungBefore = deviceguard::hungCount();
+    auto error = deviceManager.initialise (0, 2, xml.get(), false);
+    if (deviceguard::hungCount() != hungBefore || error.isNotEmpty())
+    {
+        deviceManager.initialise (0, 2, nullptr, true); // (the default device again)
+        if (error.isEmpty())
+            error = deviceguard::hungError (name);
+        return error;
+    }
+    saveAudioDeviceState();
+    return {};
 }
 
 // Round 190rp (0.1.32 Q4, decision O-4 (a)): the device in use went away or came back (core/DeviceLoss.h). FL shows

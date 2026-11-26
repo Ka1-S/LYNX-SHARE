@@ -1,4 +1,5 @@
 #include "engine/DllAsioDevice.h"
+#include "engine/DeviceGuard.h" // round 190rp
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #if JUCE_WINDOWS
@@ -588,7 +589,7 @@ bool asioPrewarmQuickInit()
     return p.quickInit && p.taken;
 }
 
-void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types)
+void LynxDeviceManager::addPlatformTypes (juce::OwnedArray<juce::AudioIODeviceType>& types)
 {
     juce::AudioDeviceManager::createAudioDeviceTypes (types);
     auto& p = prewarm();
@@ -610,13 +611,22 @@ void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODe
     const auto waitFrom = juce::Time::getMillisecondCounterHiRes();
     // (normally long done: the window was built meanwhile). Messages sent to this thread's windows are answered
     // while it waits: a driver being made on the ASIO thread may send one to JUCE's message window (its init gets it)
-    while (! p.done)
+    // (round 190rp, crash group G1: a driver that never answers its open kept the start-up waiting for ever: the wait is
+    // bounded, the device is then marked hung and the ASIO type made new, deviceguard)
+    const auto giveUpAt = waitFrom + deviceguard::timeoutMs();
+    while (! p.done && juce::Time::getMillisecondCounterHiRes() < giveUpAt)
     {
         l.unlock();
         MsgWaitForMultipleObjectsEx (0, nullptr, 5, QS_SENDMESSAGE, 0);
         MSG m;
         PeekMessageW (&m, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
         l.lock();
+    }
+    if (! p.done)
+    {
+        p.report = "ASIO prewarm: " + p.name + " did not answer within " + juce::String (deviceguard::timeoutMs() / 1000.0, 1) + " s";
+        deviceguard::markHungForPrewarm ("ASIO", p.name);
+        return;
     }
     p.report = "ASIO prewarm: " + p.name + (p.device != nullptr ? (p.quickInit ? " made (quick init) and opened in " : " made and opened in ") : " not made, ") + juce::String (p.doneMs - p.startMs, 0)
                + " ms, waited " + juce::String (juce::jmax (0.0, juce::Time::getMillisecondCounterHiRes() - waitFrom), 0) + " ms";
@@ -640,7 +650,24 @@ std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType() { return null
 void prewarmAsioDevice (const juce::File&) {}
 juce::String asioPrewarmReport() { return {}; }
 bool asioPrewarmQuickInit() { return false; }
-void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types) { juce::AudioDeviceManager::createAudioDeviceTypes (types); }
+void LynxDeviceManager::addPlatformTypes (juce::OwnedArray<juce::AudioIODeviceType>& types) { juce::AudioDeviceManager::createAudioDeviceTypes (types); }
 } // namespace lynx
 
 #endif
+
+namespace lynx
+{
+void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types)
+{
+    addPlatformTypes (types);
+    // round 190rp (crash group G1): an ASIO driver that never returns from its open hung LYNX at every start
+    for (int i = 0; i < types.size(); ++i)
+        if (types[i]->getTypeName() == "ASIO")
+        {
+            std::unique_ptr<juce::AudioIODeviceType> inner (types.removeAndReturn (i));
+            types.insert (i, deviceguard::wrap (std::move (inner)).release());
+        }
+    if (auto test = deviceguard::makeHangTestType()) // (test mode, LYNX_TEST_DEVICE_HANG=1: the checks' hanging device)
+        types.add (deviceguard::wrap (std::move (test)).release());
+}
+} // namespace lynx

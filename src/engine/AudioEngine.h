@@ -928,6 +928,11 @@ public:
     // onAudioDeviceBack gets its name. Checked twice a second from the engine's timer. UI thread.
     std::function<void (const juce::String& device, bool recordingStopped)> onAudioDeviceLost;
     std::function<void (const juce::String& device)> onAudioDeviceBack;
+    // Round 190rp (crash group G1, engine/DeviceGuard.h): the saved device's driver did not answer within the time limit
+    // at start ("<type>: <name>"); the default device is open instead. retryHungAudioDevice: one more bounded attempt
+    // with the saved setup ("" = it opened; else why not, and the default device is open again). Message thread.
+    std::function<void (const juce::String& device)> onAudioDeviceHung;
+    juce::String retryHungAudioDevice();
     // --selftest "device_lost" (engine/DeviceChangeTest.cpp): the stand-in device in use unplugged while recording,
     // while playing, and while stopped, then plugged in again; and a device chosen while the lost one is away.
     // "OK (...)" or "ERROR ..."
@@ -1730,6 +1735,7 @@ private:
     void watchAudioDevice();
     deviceloss::Watch deviceWatch;
     juce::AudioDeviceManager::AudioDeviceSetup runningDeviceSetup, lostDeviceSetup;
+    juce::String hungDeviceSetup; // (round 190rp: the saved setup whose open hung, for retryHungAudioDevice)
     int deviceWatchTicks = 0, deviceReopenTries = 0;
     juce::uint32 deviceReopenMs = 0;
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };

@@ -113,6 +113,46 @@
                    ended);
         }
 
+        // ---- crash group G1: a device whose driver never returns from its open (engine/DeviceGuard.h, the test type):
+        //      the open is given up after the time limit and the default device ("Answers") opens; a second open of it
+        //      fails at once; "Try again" makes one more bounded attempt; the manager is deleted at once (a quit does not
+        //      wait for the stuck driver)
+        {
+            deviceguard::setTimeoutForChecks (1500);
+            const auto limit = deviceguard::timeoutMs();
+            const auto before = deviceguard::hungCount();
+            auto devices = std::make_unique<juce::AudioDeviceManager>();
+            devices->addAudioDeviceType (deviceguard::wrap (deviceguard::makeHangTestType (true)));
+            juce::XmlElement saved ("DEVICESETUP");
+            saved.setAttribute ("deviceType", deviceguard::hangTestTypeName);
+            saved.setAttribute ("audioOutputDeviceName", "Hangs on open");
+            auto t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto error = devices->initialise (0, 2, &saved, true);
+            const auto first = juce::Time::getMillisecondCounterHiRes() - t0;
+            auto* now = devices->getCurrentAudioDevice();
+            check ("device hang: the start gave up after " + juce::String (first / 1000.0, 1) + " s (limit " + juce::String (limit / 1000.0, 1)
+                       + " s) and opened \"" + (now != nullptr ? now->getName() : juce::String ("none")) + "\" (" + error + ")",
+                   first < limit + 3000.0 && now != nullptr && now->getName() == "Answers" && deviceguard::hungCount() == before + 1
+                       && deviceguard::lastHung() == juce::String (deviceguard::hangTestTypeName) + ": Hangs on open");
+            auto setup = devices->getAudioDeviceSetup();
+            setup.outputDeviceName = "Hangs on open";
+            t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto again = devices->setAudioDeviceSetup (setup, true);
+            const auto second = juce::Time::getMillisecondCounterHiRes() - t0;
+            check ("device hang: choosing it again fails at once (" + juce::String (second, 0) + " ms: " + again + ")", second < 1000.0 && again.isNotEmpty());
+            deviceguard::allowAgain (deviceguard::hangTestTypeName, "Hangs on open");
+            t0 = juce::Time::getMillisecondCounterHiRes();
+            devices->setAudioDeviceSetup (setup, true);
+            const auto third = juce::Time::getMillisecondCounterHiRes() - t0;
+            check ("device hang: \"Try again\" waits once more, bounded (" + juce::String (third / 1000.0, 1) + " s)",
+                   third >= limit * 0.8 && third < limit + 3000.0 && deviceguard::hungCount() == before + 2);
+            t0 = juce::Time::getMillisecondCounterHiRes();
+            devices.reset();
+            const auto gone = juce::Time::getMillisecondCounterHiRes() - t0;
+            check ("device hang: the device manager is deleted at once (" + juce::String (gone, 0) + " ms)", gone < 2000.0);
+            deviceguard::setTimeoutForChecks (0);
+        }
+
         // ---- the audio device in use unplugged and plugged in again (stand-in devices)
         {
             const auto r = AudioEngine::deviceLostSelfTest();

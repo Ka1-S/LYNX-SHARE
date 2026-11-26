@@ -291,7 +291,7 @@ APP_SOURCES+=(src/core/RemotePlugins.cpp src/engine/LiveRemotePlugins.cpp src/ui
 APP_SOURCES+=(src/engine/DeviceChangeTest.cpp src/engine/ShortExportTest.cpp)
 APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp src/engine/MidiOutPortTest.cpp src/engine/PadRecordTest.cpp src/engine/ShareMemoryTest.cpp)
 # round 190rp: the crash-recovery round trip and the sample-0 start with latency (--selftest "stab190rp", --recoverytest)
-APP_SOURCES+=(src/engine/RecoveryTest.cpp src/engine/SampleZeroTest.cpp)
+APP_SOURCES+=(src/engine/RecoveryTest.cpp src/engine/SampleZeroTest.cpp src/engine/DeviceGuard.cpp)
 # round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
 APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
 APP_SOURCES+=(src/engine/RenderAgainTest.cpp) # round 190ou: offline renders made again (--renderagaintest, --selftest)
