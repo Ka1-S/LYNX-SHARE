@@ -72,3 +72,99 @@ TEST (iox190rm_dawproject_audio_format_never_zero)
     CHECK (plain.projectXml.find ("path=\"audio/riser.wv\"") != std::string::npos);
 }
 
+TEST (iox190rm_dawproject_audio_clip_level_and_pitch)
+{
+    // Thief → DAWproject → LYNX was +3.3 dB louder on its audio clips: the clip gain (DAWproject has none) and the sample
+    // channel's volume were left out, and a resampling channel's pitch (+6 st on 741 of 1,351 clips) played the file at
+    // its own speed and pitch. Now a level every clip of a row shares goes into its track's Volume, and the pitch is the
+    // speed it is (a "repitch" warp); the round trip plays the same.
+    using namespace lynx;
+    Song s;
+    s.channels.clear();
+    s.patterns.clear();
+    s.playlist.clear();
+    s.playlistTracks.clear();
+    s.mixer = Song::defaultMixer (3);
+    s.mode = PlayMode::song;
+    s.bpm = 120.0;
+    ChannelDef a;
+    a.name = "Riser";
+    a.instrument = InstrumentKind::audioClip;
+    a.samplePath = "/samples/riser.wav";
+    a.mixerTrack = 1;
+    a.volume = 0.6f;
+    a.sampler.pitch = 12.0f; // (resamples: twice as fast)
+    s.channels.push_back (a);
+    a.name = "Loop";
+    a.samplePath = "/samples/loop.wav";
+    a.mixerTrack = 2;
+    a.volume = audioClipUnityVolume;
+    a.sampler.pitch = 0.0f;
+    s.channels.push_back (a);
+    for (const auto* name : { "Riser", "Loop" })
+    {
+        PlaylistTrack t;
+        t.name = name;
+        s.playlistTracks.push_back (t);
+    }
+    Clip c;
+    c.kind = ClipKind::audio;
+    c.channel = 0;
+    c.track = 0;
+    c.length = 1920;
+    c.gain = 0.5f;
+    s.playlist.push_back (c);
+    c.start = 3840; // (a second clip of the row, the same level)
+    s.playlist.push_back (c);
+    c.channel = 1;
+    c.track = 1;
+    c.start = 0;
+    c.gain = 0.25f;
+    s.playlist.push_back (c);
+    c.start = 1920;
+    c.gain = 1.0f; // (a row whose clips differ: said in the notes)
+    s.playlist.push_back (c);
+    DawProjectExportOptions o;
+    o.sampleFormat = [] (const std::string&, double& seconds, int& rate, int& channels) {
+        seconds = 4.0, rate = 44100, channels = 2;
+        return true;
+    };
+    const auto r = exportDawProject (s, o);
+    CHECK (! r.bytes.empty());
+    // the Riser row: 0.5 × channelGain (0.6) / channelGain (unity) on its track's Volume
+    const auto want = 0.5 * channelGain (0.6f) / channelGain (audioClipUnityVolume) * faderGain (s.mixer[1].volume);
+    const auto riser = r.projectXml.find ("name=\"Riser\"");
+    CHECK (riser != std::string::npos);
+    const auto vol = r.projectXml.find ("<Volume", riser);
+    CHECK (vol != std::string::npos);
+    const auto at = r.projectXml.find ("value=\"", vol);
+    const auto value = std::atof (r.projectXml.c_str() + at + 7);
+    CHECK (std::abs (value - want) < 1.0e-4);
+    // the pitch: 4 s of file are 8 beats at 120 BPM, twice as fast 4 beats ("repitch"); the Loop plays at its own speed
+    CHECK (r.projectXml.find ("algorithm=\"repitch\"") != std::string::npos);
+    CHECK (r.projectXml.find ("<Warp time=\"4\" contentTime=\"4\"/>") != std::string::npos);
+    CHECK (r.projectXml.find ("<Warp time=\"8\" contentTime=\"4\"/>") == std::string::npos);
+    bool levelsNote = false;
+    for (const auto& n : r.notes)
+        levelsNote = levelsNote || n.find ("different levels") != std::string::npos;
+    CHECK (levelsNote);
+    // and back: the Riser channel plays its 4 s in 4 beats (twice as fast), its insert at the folded level
+    DawProjectImportOptions io;
+    io.common.fileExists = [] (const std::string&) { return true; };
+    const auto back = importDawProject (r.bytes, io);
+    CHECK (back.has_value());
+    if (back)
+    {
+        bool found = false;
+        for (const auto& ch : back->channels)
+            if (ch.samplePath == "/samples/riser.wav")
+            {
+                found = true;
+                CHECK (std::abs (ch.sampler.stretchBeats - 4.0f) < 1.0e-4f && ! ch.sampler.keepPitch);
+                CHECK (ch.mixerTrack > 0 && ch.mixerTrack < (int) back->mixer.size());
+                if (ch.mixerTrack > 0 && ch.mixerTrack < (int) back->mixer.size())
+                    CHECK (std::abs (faderGain (back->mixer[(std::size_t) ch.mixerTrack].volume) - want) < 2.0e-3);
+            }
+        CHECK (found);
+    }
+}

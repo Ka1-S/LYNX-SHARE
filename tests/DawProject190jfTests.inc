@@ -932,6 +932,7 @@ TEST (dawproject190jf_what_does_not_map)
     s.patterns[0].notes[0].pan = 0.5f;
     s.patterns[0].notes[1].muted = true;
     s.playlist[3].gain = 0.5f;
+    s.playlist[3].pan = 0.5f; // (round 190rm: a clip's gain alone is folded into its track's level; its pan is not written)
     s.loopStart = 0;
     s.loopEnd = 3840;
     s.vcas.push_back ({});
@@ -947,7 +948,7 @@ TEST (dawproject190jf_what_does_not_map)
     s.playlistTracks[0].lanes.push_back ({ (int) s.automations.size() - 1, 0 });
     const auto out = exportDawProject (s); // (no readFile: the audio is referenced where it is)
     CHECK (! out.bytes.empty() && out.projectXml.find ("external=\"true\"") != std::string::npos);
-    for (const auto* part : { "Note pan", "Muted notes", "Audio clip gain", "song's loop", "VCA faders", "clip grid", "other than the current",
+    for (const auto* part : { "Note pan", "Muted notes", "Audio clip pan", "song's loop", "VCA faders", "clip grid", "other than the current",
                               "Insert-to-Master", "arpeggiators", "Curved automation", "has no parameter for", "length was not known" })
     {
         const auto found = hasNote (out.notes, part);
