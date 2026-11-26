@@ -106,6 +106,23 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     if (before.patterns.size() != after.patterns.size())
         return label (after.patterns.size() > before.patterns.size() ? TR_NOOP ("Add pattern") : TR_NOOP ("Delete pattern"));
 
+    // round 190rw (Q1): channels added, deleted or moved are named before the notes they renumber (a clone, a delete or a
+    // move of a channel with notes read "Edit notes: Pattern 1")
+    if (before.channels.size() != after.channels.size())
+        return label (after.channels.size() > before.channels.size() ? TR_NOOP ("Add channel") : TR_NOOP ("Delete channel"));
+    {
+        bool reordered = false, allIds = true;
+        for (std::size_t c = 0; c < after.channels.size(); ++c)
+        {
+            allIds = allIds && before.channels[c].uid != 0 && after.channels[c].uid != 0;
+            reordered = reordered || before.channels[c].uid != after.channels[c].uid;
+        }
+        if (allIds && reordered
+            && std::is_permutation (before.channels.begin(), before.channels.end(), after.channels.begin(), after.channels.end(),
+                                    [] (const ChannelDef& a, const ChannelDef& b) { return a.uid == b.uid; }))
+            return label (TR_NOOP ("Move channels"));
+    }
+
     for (std::size_t p = 0; p < after.patterns.size(); ++p)
     {
         const auto& a = before.patterns[p];

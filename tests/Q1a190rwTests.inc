@@ -134,3 +134,40 @@ TEST (q1a190rw_missing_files_saved_project_video)
     const auto state = song.channels[1].pluginState;
     CHECK (lynx::applyRelocations (song, moved) == 0 && song.channels[1].pluginState == state);
 }
+
+// Channel rack edits that renumber notes were labelled by the notes: moving, cloning or deleting a channel that has
+// notes read "Edit notes: Pattern 1" / "Delete notes: Pattern 1" in Edit › Undo and the Undo history.
+TEST (q1a190rw_history_labels_channel_moves)
+{
+    auto before = lynx::Song::makeDefault();
+    lynx::uids::normalize (before);
+    CHECK (before.channels.size() >= 3 && ! before.patterns.empty());
+    if (before.channels.size() < 3 || before.patterns.empty())
+        return;
+    for (int ch = 0; ch < 3; ++ch) // notes on the first three channels
+        before.patterns[0].notes.push_back ({ ch * 240, 240, ch, 60, 0.8f });
+
+    auto moved = before;
+    std::vector<int> selection { 0 };
+    CHECK (lynx::moveChannels (moved, selection, 1));
+    CHECK (std::string (lynx::describeChange (before, moved).text) == "Move channels");
+
+    auto cloned = before;
+    lynx::cloneChannel (cloned, 0);
+    lynx::uids::normalize (cloned);
+    CHECK (std::string (lynx::describeChange (before, cloned).text) == "Add channel");
+
+    auto removed = before;
+    lynx::removeChannels (removed, { 0 });
+    CHECK (std::string (lynx::describeChange (before, removed).text) == "Delete channel");
+
+    // a note edit is still a note edit
+    auto edited = before;
+    edited.patterns[0].notes[0].key = 62;
+    CHECK (lynx::describeChangeText (before, edited) == "Edit notes: " + before.patterns[0].name);
+    // a project without channel ids (an old test song): a rename is not a move
+    auto bare = lynx::Song::makeDefault();
+    auto renamed = bare;
+    renamed.channels[0].name = "Renamed";
+    CHECK (std::string (lynx::describeChange (bare, renamed).text) != std::string ("Move channels"));
+}
