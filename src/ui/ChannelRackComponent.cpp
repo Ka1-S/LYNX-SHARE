@@ -1438,7 +1438,16 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // as LYNX drew it before 190jp
                 const auto left = nameAlignLeft || theme::soft(); // (round 190qw: the Soft look's names start after the strip)
                 const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : left ? 5.0f : 6.0f;
-                const auto textArea = nameArea.withTrimmedLeft (theme::soft() ? 11.0f : left ? 7.0f : 6.0f).withTrimmedRight (rightTrim);
+                auto leftTrim = theme::soft() ? 11.0f : left ? 7.0f : 6.0f;
+                // round 190rs (G-06, FL 2026 pairs/92b): a channel linked to an instrument track carries a mark left of its
+                // name, as FL's (LYNX's own keyboard glyph); an icon of the channel's own wins (it shows at the right)
+                if (iconWidth == 0.0f && linkedToInstrumentTrack (row))
+                {
+                    ui::drawTrackIcon (g, trackicons::Icon::keyboard, juce::Rectangle<float> (nameArea.getX() + leftTrim, nameArea.getCentreY() - 6.0f, 12.0f, 12.0f),
+                                       (theme::soft() ? textSecondary : onAccent).withAlpha (channel.muted ? 0.45f : 0.85f));
+                    leftTrim += 15.0f;
+                }
+                const auto textArea = nameArea.withTrimmedLeft (leftTrim).withTrimmedRight (rightTrim);
                 textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
                                      left ? juce::Justification::centredLeft : juce::Justification::centred, false);
                 g.setFont (theme::font (theme::type::body));
@@ -2029,6 +2038,20 @@ juce::Rectangle<int> ChannelRackComponent::previewMuteBounds (int row) const
 }
 
 // --- the control contract for the knobs and the route box ----------------------------------------
+
+bool ChannelRackComponent::linkedToInstrumentTrack (int row) const
+{
+    if (instrumentTrackLinksStamp != engine.getSongStamp())
+    {
+        const auto& song = engine.getSong();
+        instrumentTrackLinksStamp = engine.getSongStamp();
+        instrumentTrackLinks.assign (song.channels.size(), 0);
+        for (const auto& track : song.playlistTracks)
+            if (track.mode == PlaylistTrackMode::instrument && track.channel >= 0 && track.channel < (int) instrumentTrackLinks.size())
+                instrumentTrackLinks[(std::size_t) track.channel] = 1;
+    }
+    return row >= 0 && row < (int) instrumentTrackLinks.size() && instrumentTrackLinks[(std::size_t) row] != 0;
+}
 
 ui::ValueSpec ChannelRackComponent::specFor (Area area, int row) const
 {

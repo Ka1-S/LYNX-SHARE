@@ -436,6 +436,10 @@ private:
 
     // the control contract for the row's knobs and route box
     ui::ValueSpec specFor (Area area, int row) const;
+    // round 190rs (G-06): whether channel `row` is linked to a Playlist instrument track (cached per song stamp)
+    bool linkedToInstrumentTrack (int row) const;
+    mutable std::vector<char> instrumentTrackLinks;
+    mutable std::uint64_t instrumentTrackLinksStamp = 0;
     double valueOf (Area area, int row) const;
     void setValue (Area area, int row, double value);
 

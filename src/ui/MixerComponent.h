@@ -437,6 +437,11 @@ private:
     Rows rows() const noexcept;
     juce::Rectangle<int> nameArea (int track) const;
     juce::Rectangle<int> iconArea (int track) const;
+    // round 190rs (G-06): whether a Playlist audio track is linked to insert `t` (cached per song stamp: the strips
+    // repaint at 30 Hz, no scan of every track per frame)
+    bool linkedToAudioTrack (const Song& song, int t) const;
+    mutable std::vector<char> audioTrackLinks;
+    mutable std::uint64_t audioTrackLinksStamp = 0;
     int trackAt (int x) const noexcept;
     Part partAt (int track, juce::Point<int> p) const;
     juce::Rectangle<int> faderArea (int track) const;

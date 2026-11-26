@@ -3260,7 +3260,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     const auto nameFont = labelFont (type::body, true); // (round 190je: condensed with FL-style labels on)
                     g.setFont (nameFont);
                     const auto name = custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : tr ("Track {0}", { juce::String (t + 1) });
-                    const auto nameLeft = (int) left + 6;
+                    auto nameLeft = (int) left + 6;
+                    // round 190rs (G-06, FL 2026 pairs/92b): an instrument track without an icon of its own carries a mark
+                    // before its name, as FL's (LYNX's own keyboard glyph)
+                    if (t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::instrument
+                        && trackicons::iconFor (song.playlistTracks[(std::size_t) t].icon) == trackicons::Icon::none && trackHeight >= 16)
+                    {
+                        const auto size = (float) juce::jmin (12, trackHeight - 6);
+                        const auto midY = flTall ? (float) y + 11.0f : (float) y + (float) (trackHeight - 1) * 0.5f;
+                        ui::drawTrackIcon (g, trackicons::Icon::keyboard, juce::Rectangle<float> ((float) nameLeft, midY - size * 0.5f, size, size),
+                                           muted ? colour::textDisabled : flHeaderInk (plate).withMultipliedAlpha (0.85f));
+                        nameLeft += (int) size + 3;
+                    }
                     const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;
                     const auto nameBox = flTall ? juce::Rectangle<int> (nameLeft, y + 3, juce::jmax (8, nameRight - nameLeft), 16)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
