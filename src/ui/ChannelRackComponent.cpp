@@ -3377,7 +3377,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                     menu.addItem (tr ("Next free insert"), [this, row] {
                         engine.editSong ([row] (Song& s) { s.channels[(std::size_t) row].mixerTrack = s.claimFreeInsert(); });
                     });
-                    menu.addItem (tr ("Send the selected channels to free inserts") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
+                    menu.addItem (tr ("Route to free mixer track") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
 
                     if (onOpenMixerInsert)
                         menu.addItem (tr ("Show this insert in the Mixer"), [this, row] {
@@ -4342,7 +4342,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     menu.addSeparator();
     menu.addItem (tr ("Move up") + "\tAlt+Up", engine.getSelectedChannels().front() > 0, false, [this] { moveSelected (-1); });
     menu.addItem (tr ("Move down") + "\tAlt+Down", engine.getSelectedChannels().back() < count - 1, false, [this] { moveSelected (1); });
-    menu.addItem (tr ("Send to free mixer inserts") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
+    menu.addItem (tr ("Route to free mixer track") + "\tCtrl+L", [this] { sendSelectedToInserts(); });
     {
         juce::PopupMenu sort;
         sort.addItem (tr ("By name"), [this] { sortChannels (ChannelSort::name); });

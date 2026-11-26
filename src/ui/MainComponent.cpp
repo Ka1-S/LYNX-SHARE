@@ -6024,8 +6024,8 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "mixer.moveLeft", tr ("Move the selected inserts left"));
             action (menu, "mixer.moveRight", tr ("Move the selected inserts right"));
             menu.addSeparator();
-            action (menu, "mixer.linkChannels", tr ("Link the selected channels to the selected insert"));
-            action (menu, "mixer.linkChannelsFrom", tr ("Link the selected channels to inserts starting from the selected one"));
+            action (menu, "mixer.linkChannels", tr ("Route selected channels to this track"));
+            action (menu, "mixer.linkChannelsFrom", tr ("Route selected channels starting from this track"));
             action (menu, "mixer.selectLinkedChannels", tr ("Select the channels linked to the selected insert"));
             break;
         case Panel::browser:
@@ -12618,7 +12618,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
             { TR_NOOP ("Selector / Up, Down"), TR_NOOP ("Select (Ctrl: add, Shift: range)") },
             { "Alt+Up / Alt+Down", TR_NOOP ("Move the selected channels") },
             { "Alt+C / Alt+Del", TR_NOOP ("Clone / delete the selected channels") },
-            { "Ctrl+L", TR_NOOP ("Send the selected channels to free mixer inserts") },
+            { "Ctrl+L", TR_NOOP ("Route to free mixer track") },
             { TR_NOOP ("1..0 / Ctrl+1..0"), TR_NOOP ("Mute / solo channels 1-10 (typing piano off)") },
             { TR_NOOP ("Knobs and faders"), TR_NOOP ("Drag (Ctrl: fine), wheel, Alt+click or middle-click resets") },
             { TR_NOOP ("Right-click a knob/fader"), TR_NOOP ("Type value, reset, automation, MIDI link") },

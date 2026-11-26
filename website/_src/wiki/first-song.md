@@ -62,7 +62,7 @@ To add a sound that is not there, click the `+ add channel` box under the last r
 | Playlist | `F5` | Shows or hides the Playlist |
 | Pattern or Song mode | `L` | Switches what `Space` plays |
 | Mixer | `F9` | Shows or hides the Mixer |
-| Send to free inserts | `Ctrl+L` | Gives the selected channels their own Mixer inserts |
+| Route to free mixer track | `Ctrl+L` | Gives the selected channels their own Mixer inserts |
 | Save | `Ctrl+S` | Saves the project as `.lynx` |
 | Export | `Ctrl+R` | Opens the export window with the last used format |
 

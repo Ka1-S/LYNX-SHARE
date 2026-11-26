@@ -120,7 +120,7 @@ These keys work in the Clip-launch layout only.
 | `Alt+C` | Clone the selected channels |
 | `Alt+Del` | Delete the selected channels |
 | `Alt+G` | Group the selected channels |
-| `Ctrl+L` | Send the selected channels to free Mixer inserts |
+| `Ctrl+L` | Route to free mixer track (the selected channels get free Mixer inserts) |
 | `Ctrl+K` | Step graph lanes on or off |
 | `1` to `0` | Mute or unmute channels 1 to 10 |
 | `Ctrl+1` to `Ctrl+0` | Solo channels 1 to 10 |
@@ -241,8 +241,8 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `F2` | Rename and colour the selected insert |
 | `S` | Solo the selected inserts |
 | `Alt+S` | Solo the selected inserts with the inserts that feed them |
-| `Ctrl+L` | Link the selected channels to the selected insert |
-| `Ctrl+Shift+L` | Link the selected channels to inserts starting from the selected one |
+| `Ctrl+L` | Route selected channels to this track (the selected insert) |
+| `Ctrl+Shift+L` | Route selected channels starting from this track (the selected insert) |
 | `Alt+L` | Select the channels linked to the selected insert |
 | `Del` | Delete the selected inserts. LYNX SHARE asks first |
 | `Ctrl+E` | Open the audio editor |

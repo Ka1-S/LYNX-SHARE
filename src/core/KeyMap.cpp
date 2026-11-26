@@ -223,7 +223,7 @@ std::vector<Action> makeActions()
         { "rack.cut", TR_NOOP ("Cut the selected channels' steps"), Context::channelRack, { chord ('X', ctrl) } },
         { "rack.copy", TR_NOOP ("Copy the selected channels' steps"), Context::channelRack, { chord ('C', ctrl) } },
         { "rack.paste", TR_NOOP ("Paste steps into the selected channels"), Context::channelRack, { chord ('V', ctrl) } },
-        { "rack.sendToInserts", TR_NOOP ("Send the selected channels to free mixer inserts"), Context::channelRack, { chord ('L', ctrl) } },
+        { "rack.sendToInserts", TR_NOOP ("Route to free mixer track"), Context::channelRack, { chord ('L', ctrl) } },
         { "rack.graphEditor", TR_NOOP ("Step graph lanes on/off"), Context::channelRack, { chord ('K', ctrl) } },
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
         { "rack.follow", TR_NOOP ("Follow the playhead (page along with the playing step) on/off"), Context::channelRack, {} },
@@ -540,8 +540,8 @@ std::vector<Action> makeActions()
         // too (checked in FL, [SHOT] 190nq mixkeys); Alt moves the tracks (above)
         { "mixer.selectPrevious", TR_NOOP ("Select the previous mixer track"), Context::mixer, { chord (left), chord (left, ctrl), chord (left, shift) } },
         { "mixer.selectNext", TR_NOOP ("Select the next mixer track"), Context::mixer, { chord (right), chord (right, ctrl), chord (right, shift) } },
-        { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
-        { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
+        { "mixer.linkChannels", TR_NOOP ("Route selected channels to this track"), Context::mixer, { chord ('L', ctrl) } },
+        { "mixer.linkChannelsFrom", TR_NOOP ("Route selected channels starting from this track"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
         { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
