@@ -143,7 +143,7 @@ U canon (const Song& in)
     s.currentArrangement = -1; // (so Song::forEachClipList visits every arrangement's clips here)
     s.mode = PlayMode::pattern;
     s.loopStart = s.loopEnd = 0;
-    s.info.workSeconds = 0.0;
+    s.info.workSeconds = s.info.created = 0.0; // (each copy's own clock: a copy dates itself when it is saved, round 190rj)
     s.nextUid = 0;
     s.session.me = 0;
     for (auto& a : s.arrangements)
@@ -259,9 +259,10 @@ void copyGlobals (const Song& from, Song& to)
     to.swing = from.swing;
     to.channelGroups = from.channelGroups;
     to.masterPitch = from.masterPitch;
-    const auto work = to.info.workSeconds;
+    const auto work = to.info.workSeconds, created = to.info.created;
     to.info = from.info;
     to.info.workSeconds = work;
+    to.info.created = created > 0.0 ? created : from.info.created;
     to.projectId = from.projectId;
     to.performanceMode = from.performanceMode;
     to.substitutesBypassed = from.substitutesBypassed;
@@ -272,6 +273,7 @@ void copyGlobals (const Song& from, Song& to)
     to.playTruncatedNotes = from.playTruncatedNotes;
     to.muteRunsEffects = from.muteRunsEffects;
     to.slideNoteProps = from.slideNoteProps;
+    to.exportMarkers = from.exportMarkers; // (round 190rj: compared above, so a change of it has to arrive)
     to.patternClipTakeover = from.patternClipTakeover;
     to.mutedInsertsSkip = from.mutedInsertsSkip;
     to.fastDeclick = from.fastDeclick;
@@ -1021,6 +1023,7 @@ void copyLocalView (const Song& from, Song& to)
     for (std::size_t i = 0; i < to.mixer.size() && i < from.mixer.size(); ++i)
         to.mixer[i].flInput = from.mixer[i].flInput;
     to.info.workSeconds = from.info.workSeconds;
+    to.info.created = from.info.created;
     to.nextUid = std::max (to.nextUid, from.nextUid);
     to.session.me = from.session.me;
 }
