@@ -87,6 +87,15 @@ std::set<Key> keysOf (const Song& song);
 
 // The song's local view, copied from `from` onto `to` (what apply keeps): what each person has on screen.
 void copyLocalView (const Song& from, Song& to);
+// Round 190rj: the song-level things an Online Session does not share yet (VCAs, main volume, modulators, the clip
+// grid, the groove pool, mix snapshots, Master look). Each copy keeps its own: the rebase on a commit rebuilt the song
+// from the shared state and put them back to their session-start values, so a change of them was lost at the next edit
+// anyone made. A guest gets the host's at join. Sharing them is 0.1.33 work (tracker/QUEUE-0.1.33.md item 11).
+enum class KeptLocal : std::uint8_t { vcas, mainVolume, modulators, clipGrid, grooves, mixSnapshots, masterLook };
+constexpr int keptLocalCount = 7;
+void copyKeptLocal (const Song& from, Song& to);
+// the kept-local things that differ between a and b
+std::vector<KeptLocal> keptLocalChanges (const Song& a, const Song& b);
 
 // --- ownership (§2.2) -------------------------------------------------------------------------------------------------
 

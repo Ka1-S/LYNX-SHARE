@@ -1459,6 +1459,7 @@ void LiveSessionManager::sendSnapshot (int to, bool resumed)
     if (it == peers.end())
         return;
     Song song = authority->confirmed();
+    live::copyKeptLocal (engine.getSong(), song); // (round 190rj: not shared yet, but a guest starts from the host's)
     if (! ensureHashed (song))
     {
         pendingSnapshots[to] = resumed; // (a big sample is still being hashed: in a moment)
