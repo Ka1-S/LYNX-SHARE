@@ -1,5 +1,8 @@
 #include "ui/TrackIcons.h"
 
+#include <map>
+#include <tuple>
+
 #include <array>
 #include <cmath>
 
@@ -674,6 +677,33 @@ void drawTrackIcon (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<fl
         g.setFont (theme::font (size * 0.55f, true));
         g.drawText (shape.text, box, juce::Justification::centred, false);
     }
+}
+
+void drawTrackIconCached (juce::Graphics& g, trackicons::Icon icon, juce::Rectangle<float> area, juce::Colour colour)
+{
+    if (icon == Icon::none || area.isEmpty())
+        return;
+    const auto scale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const auto size = std::floor (juce::jmin (area.getWidth(), area.getHeight()));
+    const auto box = juce::Rectangle<float> (std::round (area.getCentreX() - size * 0.5f), std::round (area.getCentreY() - size * 0.5f), size, size);
+    const auto pixels = juce::roundToInt (size * scale);
+    if (pixels <= 0)
+        return;
+    static std::map<std::tuple<int, int, std::uint32_t>, juce::Image> cache;
+    const auto key = std::make_tuple ((int) icon, pixels, colour.getARGB());
+    auto it = cache.find (key);
+    if (it == cache.end())
+    {
+        if (cache.size() > 256) // (a theme change makes new colours: start again)
+            cache.clear();
+        juce::Image image (juce::Image::ARGB, pixels, pixels, true);
+        {
+            juce::Graphics ig (image);
+            drawTrackIcon (ig, icon, { 0.0f, 0.0f, (float) pixels, (float) pixels }, colour);
+        }
+        it = cache.emplace (key, image).first;
+    }
+    g.drawImage (it->second, box, juce::RectanglePlacement::stretchToFit);
 }
 
 // --- the picker: the search box over the grid (issue #220, round 190ng) ----------------------------------------------
