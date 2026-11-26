@@ -572,11 +572,22 @@ std::string freezeSource (const Song& song, int channel, double sampleRate, int 
 {
     if (channel < 0 || channel >= (int) song.channels.size())
         return {};
+    // a levels freeze (round 190rp, FreezeState::levels): the channel's volume / pan are in the stems
+    bool levels = false;
     if (insert < 0)
+    {
         insert = song.channels[(std::size_t) channel].freeze.insert;
+        levels = insert == 0 && song.channels[(std::size_t) channel].freeze.levels;
+    }
+    else
+        levels = insert == 0 && freeze::levelsShapeSound (song.channels[(std::size_t) channel]);
     // a track freeze (round 190ff): the volume / pan and the insert's effects are in the stems, and so is what drives them
     const bool track = insert > 0 && insert < (int) song.mixer.size();
     auto drivesTrack = [&] (const AutomationTarget& t) {
+        if (levels)
+            return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                    || (t.kind == AutomationTargetKind::channelAdjust && (t.param == leveladjust::pan || t.param == leveladjust::volume)))
+                   && t.index == channel;
         if (! track)
             return false;
         const bool level = (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
@@ -602,7 +613,7 @@ std::string freezeSource (const Song& song, int channel, double sampleRate, int 
     c.name.clear();
     c.colour = 0;
     c.icon = 0;
-    if (! track)
+    if (! track && ! levels)
     {
         c.volume = 1.0f; // (volume, pan, mute and the insert apply live)
         c.pan = 0.0f;
@@ -784,7 +795,9 @@ bool renderFreeze (const Song& song, int channel, double sampleRate, const juce:
         standins::pluginsOf (song.mixer[(std::size_t) insert], refs);
     const auto plugins = pluginNames (refs);
     // the pattern stems share one render: it is the shorter part unless the song is very short
-    auto plan = timelineOnly ? standins::ChannelRender() : standins::channelPatternRender (song, channel, track);
+    // (round 190rp: an instrument that takes the channel's volume / pan inside renders them into a channel freeze's stems)
+    const bool levels = ! track && freeze::levelsShapeSound (def);
+    auto plan = timelineOnly ? standins::ChannelRender() : standins::channelPatternRender (song, channel, track, levels);
     const auto songTicks = (double) std::max<std::int64_t> (1, song.songLength()), loopTicks = (double) plan.end;
     const auto share = songTicks / (songTicks + loopTicks);
     auto fail = [&] {
@@ -796,7 +809,7 @@ bool renderFreeze (const Song& song, int channel, double sampleRate, const juce:
 
     // Song mode: the whole song
     {
-        auto renderSongCopy = standins::channelTimelineRender (song, channel, track);
+        auto renderSongCopy = standins::channelTimelineRender (song, channel, track, levels);
         freeze::lighten (renderSongCopy, channel, track ? insert : -1);
         const auto file = folder.getChildFile (base + ".wav");
         if (! renderSong (renderSongCopy, stemOptions (sampleRate, tailSeconds), file, [&] (double p) { return ! progress || progress (share * p); }, error))

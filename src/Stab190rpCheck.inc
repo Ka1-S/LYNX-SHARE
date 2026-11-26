@@ -113,6 +113,42 @@
                    ended);
         }
 
+        // ---- coordinator item 4 (Thief's freeze did not null): a Harmless channel's freeze holds its volume / pan
+        //      (FreezeState::levels; the sound itself: lynx_tests stab190rp_a_harmless_channel_freezes_with_its_levels and
+        //      --freezetest perchannel): moving them puts it out of date, the project file keeps it under its own key
+        {
+            auto song = Song::makeDefault();
+            auto& h = song.channels[0];
+            h.instrument = InstrumentKind::harmless;
+            banks::bankOf (InstrumentKind::harmless).front().apply (h);
+            h.volume = 0.55f;
+            h.pan = -0.35f;
+            song.patterns[0].notes.push_back ({ 0, ppq, 0, 48, 0.8f });
+            uids::normalize (song);
+            const auto fresh = sessionpack::freezeSource (song, 0, 48000.0, 0);
+            freeze::apply (song, song.channels[0].uid, { StandIn { 0, false, "stab190rp-levels.wav", "", ppq, "", "" } }, fresh, 0);
+            const auto& f = song.channels[0].freeze;
+            check ("a Harmless channel freeze holds its levels", f.on() && f.levels && f.insert == 0);
+            check ("its source is the one it was frozen from", sessionpack::freezeSource (song, 0, 48000.0) == fresh);
+            auto moved = song;
+            moved.channels[0].volume = 0.7f;
+            auto panned = song;
+            panned.channels[0].pan = 0.2f;
+            check ("its volume or pan moved: out of date", sessionpack::freezeSource (moved, 0, 48000.0) != fresh && sessionpack::freezeSource (panned, 0, 48000.0) != fresh);
+            auto plain = Song::makeDefault(); // (another instrument's channel freeze: the volume applies live)
+            uids::normalize (plain);
+            const auto plainSource = sessionpack::freezeSource (plain, 1, 48000.0, 0);
+            plain.channels[1].volume = 0.2f;
+            check ("another instrument's volume is not part of its freeze", sessionpack::freezeSource (plain, 1, 48000.0, 0) == plainSource);
+            const auto played = standins::project (song, [] (const PluginRef&) { return false; });
+            check ("it plays its stems at unity", played.channels[0].instrument == InstrumentKind::audioClip && played.channels[0].volume == 1.0f && played.channels[0].pan == 0.0f);
+            const auto json = ProjectFile::toJson (song);
+            juce::String error;
+            const auto back = ProjectFile::fromJson (json, error);
+            check ("saved under \"levelsFreeze\" and read back", json.contains ("\"levelsFreeze\"") && back.has_value() && back->channels[0].freeze.levels
+                                                                    && back->channels[0].freeze.on());
+        }
+
         // ---- crash group G1: a device whose driver never returns from its open (engine/DeviceGuard.h, the test type):
         //      the open is given up after the time limit and the default device ("Answers") opens; a second open of it
         //      fails at once; "Try again" makes one more bounded attempt; the manager is deleted at once (a quit does not

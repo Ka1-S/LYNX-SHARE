@@ -2357,7 +2357,10 @@ juce::var channelToVar (const ChannelDef& c)
         // through the insert's effects a second time; not knowing the key, it plays the channel live instead
         if (c.freeze.insert != 0)
             f->setProperty ("insert", c.freeze.insert);
-        o->setProperty (c.freeze.insert != 0 ? "trackFreeze" : "freeze", juce::var (f.release()));
+        // stems holding the channel's volume / pan (round 190rp): a key of their own too, so a LYNX SHARE from before
+        // plays the channel live instead of applying the levels a second time
+        const bool levels = c.freeze.insert == 0 && c.freeze.levels;
+        o->setProperty (c.freeze.insert != 0 ? "trackFreeze" : levels ? "levelsFreeze" : "freeze", juce::var (f.release()));
     }
     if (c.deactivated) // round 190op (P4): written only when on
         o->setProperty ("deactivated", true);
@@ -2745,12 +2748,13 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.polyEdit.assign (bytes, bytes + decoded.getDataSize());
         }
     }
-    for (const auto* key : { "freeze", "trackFreeze" })
+    for (const auto* key : { "freeze", "trackFreeze", "levelsFreeze" })
         if (const auto& f = c[key]; f.isObject())
         {
             def.freeze.stems = standInsFromVar (f["stems"]);
             def.freeze.source = f["source"].toString().toStdString();
             def.freeze.insert = juce::String (key) == "trackFreeze" ? (int) f.getProperty ("insert", -1) : 0;
+            def.freeze.levels = juce::String (key) == "levelsFreeze";
         }
     def.deactivated = (bool) c.getProperty ("deactivated", false); // round 190op (P4)
     // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was

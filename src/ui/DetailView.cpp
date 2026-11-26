@@ -951,7 +951,8 @@ private:
         {
             if (c.index < 0 || c.index >= (int) song.channels.size() || ! song.channels[(std::size_t) c.index].freeze.on())
                 return false;
-            const auto levelsLive = song.channels[(std::size_t) c.index].freeze.insert == 0; // (a channel freeze: they apply live)
+            const auto& fz = song.channels[(std::size_t) c.index].freeze;
+            const auto levelsLive = fz.insert == 0 && ! fz.levels; // (a channel freeze: they apply live; not in a levels freeze, round 190rp)
             return ! (levelsLive && knob >= 0);
         }
         return freeze::frozenByInsert (song, insert) >= 0;

@@ -1030,11 +1030,17 @@ struct StandIn
 // stay live). The insert's effects are not loaded while it plays the stems. It holds only while the channel still
 // plays into that insert and nothing else does (freeze::trackFreezeHolds); otherwise the channel and the insert play
 // live. -1 = its insert was deleted (it plays live). 0 = the channel freeze of round 190ay.
+//
+// Round 190rp (coordinator: Thief's frozen mix did not null): `levels` = a channel freeze whose stems hold the channel's
+// volume and pan (and what drives them), for an instrument they shape inside (freeze::levelsShapeSound: Harmless and
+// Harmor add their level / pan modulators to FL's channel level, so rendering at unity and scaling after does not give
+// the same sound). Its volume and pan then wait for the next freeze, as a track freeze's.
 struct FreezeState
 {
     std::vector<StandIn> stems;
     std::string source;
     int insert = 0;
+    bool levels = false;
     bool on() const noexcept { return ! stems.empty(); }
     bool operator== (const FreezeState&) const = default;
 };

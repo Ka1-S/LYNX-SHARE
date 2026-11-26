@@ -117,3 +117,55 @@ TEST (stab190rp_only_the_allocators_abort_skips_the_save)
     CHECK (at != std::string::npos && guard.find ("return allocatorMessage (abortMessage());", at) != std::string::npos);
     CHECK (guard.find ("RaiseException (abortExceptionCode, EXCEPTION_NONCONTINUABLE, 0, nullptr)") != std::string::npos);
 }
+
+// Thief's frozen mix did not null against live (round 190rp, coordinator item 4): per channel, only the Harmless bass
+// differed (+2.3 dB; -135 dB with its volume / pan neutral on both sides). Harmless and Harmor add their level / pan
+// modulators to FL's channel level, so a stem rendered at unity and scaled after is another sound: their channel freeze
+// renders the volume / pan into the stems (FreezeState::levels), which then play at unity.
+TEST (stab190rp_a_harmless_channel_freezes_with_its_levels)
+{
+    auto song = freeze190aySong();
+    auto& h = song.channels[0];
+    h.instrument = lynx::InstrumentKind::harmless;
+    lynx::banks::bankOf (lynx::InstrumentKind::harmless).front().apply (h);
+    h.volume = 0.55f;
+    h.pan = -0.35f;
+    CHECK (lynx::freeze::levelsShapeSound (h) && ! lynx::freeze::levelsShapeSound (song.channels[1]));
+    const auto end = song.songLength();
+
+    // what sessionpack::renderFreeze does for it (the whole song with the channel's levels)
+    auto frozen = song;
+    Freeze190ayFiles files;
+    {
+        const auto tps = lynx::ticksPerSample (song.bpm, freeze190ayRate);
+        const auto tail = lynx::standins::tailTicks (song);
+        auto renderSong = lynx::standins::channelTimelineRender (song, 0, false, true);
+        CHECK (renderSong.channels[0].volume == 0.55f && renderSong.channels[0].pan == -0.35f && renderSong.channels[0].mixerTrack == 0);
+        lynx::freeze::lighten (renderSong, 0);
+        std::int64_t music = 0;
+        const auto exported = lynx::makeExportSong (renderSong, true, tail, music);
+        files["h whole"] = freeze190ayCut (freeze190ayRender (exported, music + tail, {}, true), tps, 0, music + tail);
+        lynx::StandIn s;
+        s.path = "h whole";
+        s.lengthTicks = song.songLength() + tail;
+        lynx::freeze::apply (frozen, frozen.channels[0].uid, { s }, "test");
+    }
+    CHECK (frozen.channels[0].freeze.on() && frozen.channels[0].freeze.levels && frozen.channels[0].freeze.insert == 0);
+    const auto played = lynx::standins::project (frozen, [] (const lynx::PluginRef&) { return false; });
+    CHECK (played.channels[0].instrument == lynx::InstrumentKind::audioClip && played.channels[0].volume == 1.0f && played.channels[0].pan == 0.0f);
+    CHECK (played.channels[0].mixerTrack == song.channels[0].mixerTrack); // (the insert stays live)
+    auto provider = [&] (const std::string& path) -> std::shared_ptr<const lynx::SampleData> {
+        auto it = files.find (path);
+        return it != files.end() ? it->second : nullptr;
+    };
+    auto soloLive = song, soloIce = played;
+    for (std::size_t c = 1; c < soloLive.channels.size(); ++c)
+        soloLive.channels[c].muted = true;
+    for (std::size_t c = 1; c < soloIce.channels.size(); ++c)
+        soloIce.channels[c].muted = true;
+    const auto alone = freeze190ayCompare (freeze190ayRender (soloLive, end, {}, true), freeze190ayRender (soloIce, end, provider, true));
+    std::printf ("  Harmless frozen with its levels, alone: peak %.4f, residual %.1f dB\n", alone.peak, alone.dB());
+    CHECK (alone.peak > 0.01f && alone.dB() < -100.0);
+
+    // (what freezeSource and the project file do with it: the --selftest check "stab190rp")
+}

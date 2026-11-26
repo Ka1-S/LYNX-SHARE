@@ -116,17 +116,23 @@ void neutralise (Song& s)
                            s.initialValues.end());
 }
 
-// only `channel` heard, raw: its volume / pan at unity and centre (they apply live), straight to the Master
-void soloChannelRaw (Song& s, int channel)
+// only `channel` heard, raw: its volume / pan at unity and centre (they apply live), straight to the Master; keepLevels
+// (round 190rp, FreezeState::levels): with its volume / pan and what drives them
+void soloChannelRaw (Song& s, int channel, bool keepLevels = false)
 {
     for (int j = 0; j < (int) s.channels.size(); ++j)
         s.channels[(std::size_t) j].muted = j != channel;
     auto& c = s.channels[(std::size_t) channel];
+    c.mixerTrack = 0;
+    if (keepLevels)
+    {
+        neutralise (s);
+        return;
+    }
     c.volume = 1.0f; // channelGain (1) = 1
     c.pan = 0.0f;
     c.misc.levels.pan = 0.0f; // (the Levels adjustment's level and pan too, round 190dz)
     c.misc.levels.volume = 1.0f;
-    c.mixerTrack = 0;
     auto own = [channel] (const AutomationTarget& t) {
         return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
                 || (t.kind == AutomationTargetKind::channelAdjust && (t.param == leveladjust::pan || t.param == leveladjust::volume)))
@@ -316,7 +322,7 @@ const StandIn* find (const std::vector<StandIn>& list, std::uint64_t patternUid,
     return nullptr;
 }
 
-ChannelRender channelPatternRender (const Song& song, int channel, bool withInsert)
+ChannelRender channelPatternRender (const Song& song, int channel, bool withInsert, bool keepLevels)
 {
     ChannelRender r;
     if (channel < 0 || channel >= (int) song.channels.size())
@@ -326,7 +332,7 @@ ChannelRender channelPatternRender (const Song& song, int channel, bool withInse
     if (withInsert)
         soloChannelThroughInsert (s, channel);
     else
-        soloChannelRaw (s, channel);
+        soloChannelRaw (s, channel, keepLevels);
     s.playlist.clear();
     std::int64_t at = 0;
     for (int p = 0; p < (int) song.patterns.size(); ++p)
@@ -375,7 +381,7 @@ bool needsTimeline (const Song& song, int channel)
     return false;
 }
 
-Song channelTimelineRender (const Song& song, int channel, bool withInsert)
+Song channelTimelineRender (const Song& song, int channel, bool withInsert, bool keepLevels)
 {
     auto s = song;
     if (channel >= 0 && channel < (int) s.channels.size())
@@ -383,7 +389,7 @@ Song channelTimelineRender (const Song& song, int channel, bool withInsert)
         if (withInsert)
             soloChannelThroughInsert (s, channel);
         else
-            soloChannelRaw (s, channel);
+            soloChannelRaw (s, channel, keepLevels);
     }
     return s;
 }
@@ -528,8 +534,10 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
             out.channels[(std::size_t) c].freeze = {};
             frozen = false;
         }
-        // its stems hold the channel's volume and pan and the insert's effects
-        const bool baked = frozen && channel.freeze.insert > 0;
+        // its stems hold the channel's volume and pan and the insert's effects; a levels freeze (round 190rp) the
+        // channel's volume and pan only
+        const bool effectsBaked = frozen && channel.freeze.insert > 0;
+        const bool baked = effectsBaked || (frozen && channel.freeze.insert == 0 && channel.freeze.levels);
         const auto& stems = frozen ? channel.freeze.stems : channel.standIns;
         if (! frozen)
         {
@@ -558,7 +566,11 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
             const auto* timeline = find (stems, 0, false);
             const bool patternStems = std::any_of (stems.begin(), stems.end(), [] (const StandIn& s) { return s.pattern != 0 && ! s.loop; });
             dropNotes (c);
-            if (timeline != nullptr && (needsTimeline (song, c) || ! patternStems))
+            // (stems holding the levels follow the channel's Playlist level automation only on the timeline)
+            const bool levelClips = baked && std::any_of (song.automations.begin(), song.automations.end(), [&, c] (const Automation& a) {
+                                        return drivesChannelLevel (a.target, c) && hasClips (song, (int) (&a - song.automations.data()));
+                                    });
+            if (timeline != nullptr && (needsTimeline (song, c) || levelClips || ! patternStems))
             {
                 out.channels[(std::size_t) c] = standInChannel (channel, timeline->path, baked);
                 out.playlist.push_back (stemClip (c, hiddenRow, 0, std::max<std::int64_t> (1, timeline->lengthTicks), 0));
@@ -651,11 +663,12 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
             }
         }
         if (baked)
+            detach (out, [c] (const AutomationTarget& t) { return drivesChannelLevel (t, c); });
+        if (effectsBaked)
         {
             // the volume / pan and the insert's effects are in the stems: what drove them has nothing to drive, and
             // the effects are not built at all (their plugins unloaded); the insert's EQ, fader, pan and sends stay
             const auto insert = channel.freeze.insert;
-            detach (out, [c] (const AutomationTarget& t) { return drivesChannelLevel (t, c); });
             detach (out, [insert] (const AutomationTarget& t) { return drivesInsertEffects (t, insert); });
             auto& track = out.mixer[(std::size_t) insert];
             track.effects.clear();
@@ -737,8 +750,17 @@ void apply (Song& song, std::uint64_t channelUid, std::vector<StandIn> stems, st
             c.freeze.stems = std::move (stems);
             c.freeze.source = std::move (source);
             c.freeze.insert = insert;
+            c.freeze.levels = insert == 0 && levelsShapeSound (c);
             return;
         }
+}
+
+bool levelsShapeSound (const ChannelDef& c) noexcept
+{
+    // (a voice's level is FL's channel level plus the level modulator, its pan the channel pan plus the pan modulator:
+    // at unity the modulators weigh differently; round 190rp's per-channel null: Thief's Synth Bass +2.3 dB, -135 dB
+    // with the levels in the stem)
+    return c.instrument == InstrumentKind::harmless || c.instrument == InstrumentKind::harmor;
 }
 
 void clear (Song& song, int channel)
@@ -916,7 +938,8 @@ bool flatten (Song& song, int channel)
     const auto* whole = standins::find (old.freeze.stems, 0, false);
     if (whole == nullptr)
         return false;
-    const bool baked = old.freeze.insert > 0;
+    const bool effectsBaked = old.freeze.insert > 0;
+    const bool baked = effectsBaked || old.freeze.levels; // (round 190rp: a levels freeze holds the volume / pan)
 
     // where the channel played: the unmuted pattern clips (and FL's legacy pattern blocks) holding its notes
     std::vector<Clip> placed;
@@ -991,9 +1014,10 @@ bool flatten (Song& song, int channel)
     flat.name = old.name + " (Bounce)"; // (the reference names the bounced track and its clips so: Live 12 manual)
     song.channels[(std::size_t) channel] = std::move (flat);
     if (baked)
+        detach (song, [channel] (const AutomationTarget& t) { return drivesChannelLevel (t, channel); });
+    if (effectsBaked)
     {
         const auto insert = old.freeze.insert;
-        detach (song, [channel] (const AutomationTarget& t) { return drivesChannelLevel (t, channel); });
         detach (song, [insert] (const AutomationTarget& t) { return drivesInsertEffects (t, insert); });
         song.mixer[(std::size_t) insert].effects.clear();
         song.mixer[(std::size_t) insert].chainBlend = 1.0f;
