@@ -13,6 +13,8 @@ The short version of each release. The full notes, with measurements, known issu
   warning; the routing stays. PR #284 by @codewithamoako.
 
 **Added**
+- *Transpose...* (Patterns, picker and Channel rack menus, FL's small "Semitones" box) and *Make unique as sample* with progress
+  and Cancel; DAWproject export runs in the background with a progress window.
 - Easier options: every Settings page has **Reset this page** (with Undo); the **?** command palette finds every Settings
   option and every window's own menu items, and opens Settings with the option outlined; every switch and box in Settings
   says what it does when you point at it; *Settings › LYNX extras* is grouped by area, keeps **FL-exact** and
@@ -46,6 +48,18 @@ The short version of each release. The full notes, with measurements, known issu
 - Track-only mode and the Simple layout: a clip moved or copied onto another instrument's track plays that instrument (Discord).
 - Undo and redo keep the project's working time; Export to FL Studio's report names each mixer slot it left out; audio clips of
   GarageBand and BandLab imports keep their exact start after a save.
+- Crashes and races found by crash reports, sanitizers and a UI stress test on Windows: Helix sample voices, quitting with a
+  box open, the Project picker, the worker pool and render-ahead, Parametric EQ / Maximus / limiter latency reads, a lost X
+  display, DrumGizmo's LV2 editor and u-he VST3 plugins on Linux.
+- Online Sessions: the host's tempo and project settings reach every guest again, and VCAs, main volume, modulators, the clip
+  grid, grooves, mix snapshots and the Master look stay as each copy set them (a hint says they aren't shared yet); the host is
+  told when a guest's LYNX is too old to follow. PipeWire channels are used in the device's port order (left and right could be
+  swapped). Remote Control's project.edit works on new projects again.
+- Community reports: Alt+R renders as FL does (a WAV in Audio\Recorded, on the first free track); FL's marker menu on a
+  marker's right-click; Alt+C and the other Alt shortcuts as in FL; clone names (#2, #3...); a whole selection of Playlist tracks
+  takes the header menu; slide notes of no length from an .flp (#272); markers that skip in a row; Settings search keeps the
+  keyboard (#247); value bubbles close (#299); cut hints and shortened names show whole (#296, #301, #303); no folders made from
+  Windows paths on Linux.
 
 ## 0.1.31.2 alpha — fixes
 
