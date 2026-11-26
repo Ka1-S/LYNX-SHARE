@@ -124,6 +124,21 @@ juce::String embeddedSampleFileName (const std::string& name, const juce::String
             stem = stem.substring (0, dot);
             ext = e == ".wave" ? juce::String (".wav") : e;
         }
+    // a sample that came from an earlier import keeps one hash, not one more per export → import cycle
+    // ("Loop 90.wav-1012f59c-1012f59c" in round 190rj's corpus): an earlier "-<8 hex digits>" (and a type before it) goes
+    for (auto again = true; again;)
+    {
+        again = false;
+        const auto dash = stem.lastIndexOfChar ('-');
+        if (dash > 0 && stem.length() - dash == 9 && stem.substring (dash + 1).containsOnly ("0123456789abcdef"))
+        {
+            stem = stem.substring (0, dash);
+            again = true;
+            const auto inner = stem.lastIndexOfChar ('.');
+            if (inner > 0 && juce::StringArray { ".wav", ".wave", ".flac", ".aif", ".aiff", ".mp3", ".ogg", ".wv", ".m4a", ".opus" }.contains (stem.substring (inner).toLowerCase()))
+                stem = stem.substring (0, inner);
+        }
+    }
     return juce::File::createLegalFileName (stem) + "-" + hash + ext;
 }
 
