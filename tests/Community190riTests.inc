@@ -177,3 +177,34 @@ TEST (community190ri_step_slides)
         CHECK (found == 101);
     }
 }
+
+// kainproctor (Discord 11-25): FL 2026 live with skips at bars 3 and 5, a plain marker at 7, a skip at 9, a pause at 11, a plain
+// marker at 13, a skip at 15 and a marker loop at 17 (flmark/m1.flp): bars 1-2, 7-8, stop at 11; Play: 11-14, 17-18, 17-18...
+TEST (community190ri_marker_skips_chain)
+{
+    using namespace markers165;
+    lynx::Song song;
+    song.patterns.emplace_back().name = "P";
+    lynx::Clip clip;
+    clip.pattern = 0;
+    clip.length = 24 * 4 * lynx::ppq;
+    song.playlist.push_back (clip);
+    song.mode = lynx::PlayMode::song;
+    for (const auto [b, action] : { std::pair { 3, lynx::Marker::markerSkip }, { 5, lynx::Marker::markerSkip }, { 7, lynx::Marker::none },
+                                     { 9, lynx::Marker::markerSkip }, { 11, lynx::Marker::markerPause }, { 13, lynx::Marker::none },
+                                     { 15, lynx::Marker::markerSkip }, { 17, lynx::Marker::markerLoop }, { 19, lynx::Marker::none } })
+        song.addMarker (marker (bar (b), action));
+    const auto first = play (song, 3000);
+    auto expected = range (0, 8);
+    for (auto b : range (24, 32))
+        expected.push_back (b);
+    CHECK (first.beats == expected);
+    CHECK (first.paused && first.at == (double) bar (11));
+    const auto second = play (song, 3000, first.at); // (Play again: from the pause)
+    CHECK (second.beats.size() > 40 && second.beats[0] == 40 && second.beats[15] == 55 && second.beats[16] == 64 && second.beats[24] == 64 && second.beats[23] == 71);
+    // the render: the same sections, straight through (FL's render plays no pause or loop)
+    song.exportMarkers = true;
+    const auto spans = lynx::exportopts::exportSpans (song);
+    CHECK (spans.size() == 4 && spans[0].second == bar (3) && spans[1].first == bar (7) && spans[1].second == bar (9) && spans[2].first == bar (11)
+           && spans[2].second == bar (15) && spans[3].first == bar (17));
+}

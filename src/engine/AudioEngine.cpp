@@ -8337,10 +8337,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             else if (markerJump != nullptr && transportReached (position, (double) markerJump->at))
             {
                 markerEvents.fetch_add (1, std::memory_order_relaxed);
-                if (markerJump->kind == MarkerJump::Kind::pause)
+                if (markerJump->kind != MarkerJump::Kind::jump)
                 {
-                    // FL's "Marker pause": playback stops at the marker; Play goes on from there
-                    position = (double) markerJump->at;
+                    // FL's "Marker pause": playback stops at the marker; Play goes on from there (a skip that lands on one:
+                    // from where it landed, round 190ri)
+                    position = (double) markerJump->to;
                     transport.positionTicks.store (position, std::memory_order_relaxed);
                     transport.playing.store (false, std::memory_order_relaxed); // the rest of the block plays stopped
                 }

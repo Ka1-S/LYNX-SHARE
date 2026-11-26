@@ -22,6 +22,8 @@ struct MarkerJump
     {
         jump = 1,  // the position goes to `to` (Marker loop, Marker skip)
         pause = 2, // playback stops at `at` (Marker pause); Play continues from there
+        // round 190ri (FL 2026 live): a Marker skip whose section ends on a Marker pause lands there and stops
+        jumpThenPause = 3,
     };
 
     std::int64_t at = 0;

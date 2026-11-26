@@ -503,7 +503,7 @@ std::vector<std::pair<std::int64_t, std::int64_t>> exportSpans (const Song& song
         for (int i = 0; i < plan.count && next == nullptr; ++i)
         {
             const auto& j = plan.jumps[(std::size_t) i];
-            if ((j.at > pos || (jumped && j.at == pos)) && j.at < end && j.kind == MarkerJump::Kind::jump && j.to > j.at)
+            if ((j.at > pos || (jumped && j.at == pos)) && j.at < end && j.kind != MarkerJump::Kind::pause && j.to > j.at)
                 next = &j;
         }
         if (next == nullptr)
