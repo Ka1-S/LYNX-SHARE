@@ -6,6 +6,7 @@
 //         hosts no CLAP). Round 190rk changes the order to VST3 > CLAP > VST2; until that lands the check names the gap.
 
 #include "core/AlsExport.h"
+#include "core/EditorFeel.h"
 #include "core/FlpExport.h"
 #include "core/PluginPicks.h"
 #include "core/Templates.h"
@@ -155,4 +156,35 @@ TEST (extras190ro_one_row_pick_reaches_an_als_export)
         CHECK (picked == "CLAP");
         CHECK (dropped (exportWith (picked)));
     }
+}
+
+// D-2 (FL 2026 checked live 11-26): round 190qe's zoom keys are a LYNX extra, off as FL in the Pattern layout
+TEST (extras190ro_zoom_keys_are_an_extra)
+{
+    using namespace lynx;
+    CHECK (! extras::defaultOn ("editing.zoomKeysLynx") && ! extras::flExactOn ("editing.zoomKeysLynx") && ! zoomanchor::lynxKeys());
+    bool listed = false;
+    for (const auto& item : extras::items)
+        listed = listed || (item.id == "editing.zoomKeysLynx" && extras::uiKeyOf (item) == "zoomKeysLynx");
+    CHECK (listed);
+    // off: FL's way in the Pattern layout, LYNX's in the other two; on: LYNX's everywhere
+    CHECK (! zoomanchor::lynxKeysNow (true) && zoomanchor::lynxKeysNow (false));
+    {
+        const auto kept = zoomanchor::lynxKeys();
+        zoomanchor::lynxKeys() = true;
+        CHECK (zoomanchor::lynxKeysNow (true));
+        zoomanchor::lynxKeys() = kept;
+    }
+    // FL's anchor: the pointer over the view, else the view's left edge (the scroll stays)
+    CHECK (zoomanchor::flKeyAnchorPx (250.0, 1000.0) == 250.0 && zoomanchor::flKeyAnchorPx (std::nullopt, 1000.0) == 0.0
+           && zoomanchor::flKeyAnchorPx (1200.0, 1000.0) == 0.0);
+    CHECK (zoomanchor::scrollFor (100.0, 1.0, 2.0, zoomanchor::flKeyAnchorPx (std::nullopt, 1000.0)) == 100.0);
+    // FL's Shift+5 again: the view stays; "Previous view" still goes back to the view before the first press
+    using viewstack::View;
+    viewstack::Stack s;
+    const View wide { 0.0, 1.0, 0.0 }, sel { 40.0, 4.0, 0.0 };
+    CHECK (viewstack::same (s.push (wide, sel), sel) && s.depth() == 1);
+    CHECK (viewstack::same (s.push (sel, sel), sel) && s.depth() == 1);
+    const auto back = s.back();
+    CHECK (back.has_value() && viewstack::same (*back, wide) && s.depth() == 0);
 }

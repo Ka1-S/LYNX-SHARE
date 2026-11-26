@@ -236,6 +236,18 @@ public:
             entries.pop_front();
         return target;
     }
+    // Round 190ro (FL 2026 checked 11-26: a second Shift+5 leaves the view as it is): the target view, kept on the stack
+    // for "Previous view", without going back when pressed again
+    View push (const View& current, const View& target)
+    {
+        if (! same (current, target))
+        {
+            entries.emplace_back (current, target);
+            if (entries.size() > maxDepth)
+                entries.pop_front();
+        }
+        return target;
+    }
     // "Previous view": the view before the last zoom to a selection, whatever the view is now
     std::optional<View> back()
     {
@@ -330,6 +342,23 @@ inline double anchorPx (Source source, double pointerPx, double viewWidthPx, boo
     if (onScreen (selectionCentrePx))
         return *selectionCentrePx;
     return viewWidthPx * 0.5;
+}
+
+// Round 190ro (EXTRAS-2.md D-2; FL 2026 checked live 11-26, /mnt/e/lynx-work/extras2_190ro): round 190qe's zoom keys are a
+// LYNX extra, "editing.zoomKeysLynx" (ui-options.txt "zoomKeysLynx"), off by default, always on outside the Pattern layout.
+// On: the anchor above (the playhead while playing on screen, the selection's centre, the view's centre) and the
+// zoom-to-selection key pressed again goes back. Off, as FL 2026: PgUp / PgDn zoom around the mouse pointer when it is
+// over the view, else keep the view's left edge, and Shift+5 pressed again changes nothing.
+inline bool& lynxKeys() noexcept
+{
+    static bool on = false;
+    return on;
+}
+inline bool lynxKeysNow (bool patternLayout) noexcept { return lynxKeys() || ! patternLayout; }
+// FL 2026's zoom-key anchor, in px from the view's left edge: the pointer over the view, else the left edge
+inline double flKeyAnchorPx (std::optional<double> pointerPx, double viewWidthPx) noexcept
+{
+    return pointerPx.has_value() && *pointerPx >= 0.0 && *pointerPx <= viewWidthPx ? *pointerPx : 0.0;
 }
 
 // The new scroll (first visible unit) after zooming from `oldPpu` to `newPpu` px per unit around `anchor` px (the

@@ -216,6 +216,11 @@ inline constexpr Item items[] = {
     { "editing.zoomAtSongPosition", TR_NOOP ("Editing"), TR_NOOP ("Zoom around the song position"),
       TR_NOOP ("The wheel and the zoom keys of the Playlist and the Piano roll keep the song position (the playhead) where it is on screen while it is in view, so an exact edit point stays under the eye. Off, as in FL Studio: the wheel zooms around the mouse pointer. Also in the Playlist ruler's right-click menu › Zoom."),
       "ui-options.txt:zoomAtSongPosition" },
+    // round 190ro (EXTRAS-2.md D-2; FL 2026 checked live 11-26): round 190qe's zoom keys, which had no switch. FL zooms around
+    // the pointer and a second Shift+5 changes nothing, so the LYNX behaviour is an extra, off in the Pattern layout
+    { "editing.zoomKeysLynx", TR_NOOP ("Editing"), TR_NOOP ("Zoom keys: LYNX's anchor, and Shift+5 again goes back (LYNX)"),
+      TR_NOOP ("PgUp and PgDn zoom the Playlist and the Piano roll around the playhead while it plays on screen, else around the selected clips or notes, else around the view's centre, and the zoom-to-selection key (Shift+5) pressed again goes back to the view before. Off, as in FL Studio: the keys zoom around the mouse pointer (or keep the view's left edge when the pointer is elsewhere) and Shift+5 pressed again changes nothing. Always on in the Clip-launch and Simple layouts. Also in the Playlist ruler's right-click menu › Zoom."),
+      "ui-options.txt:zoomKeysLynx" },
     // round 190qr (issue #274): FL draws the clip gain handle in the clip's middle, off screen when zoomed in on a long clip
     { "playlist.gainHandleFollowsView", TR_NOOP ("Playlist"), TR_NOOP ("The clip gain handle stays in view"),
       TR_NOOP ("An audio clip's gain handle (the half circle on its bottom edge) moves to the middle of the part of the clip that shows when the clip's own middle is scrolled out of view, so it can be reached at any zoom. Off, as in FL Studio: it stays in the clip's middle. Also in the gain handle's right-click menu."),

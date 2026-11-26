@@ -42,6 +42,7 @@ TEST (extras190qk_default_lists)
                             // rollup 0.1.32 step 2: rounds 190qo, 190qr, 190ld's audio editor wheel, 190qg's Grouped toolbar
                             "file.alwaysCollect", "export.noDialog", "editing.zoomAtSongPosition",
                             "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped",
+                            "editing.zoomKeysLynx", // round 190ro (D-2): FL 2026 zooms around the pointer, a second Shift+5 does nothing
                             // round 190ro (EXTRAS-2.md OFF-1): 19 px off every FL Mixer fader and meter, +1.6 % a column
                             "mixer.peakValues", "mixer.correlation" })
         CHECK (! extras::defaultOn (id) && ! extras::flExactOn (id));

@@ -27,6 +27,7 @@
 #include "core/WheelZones.h"
 #include "core/RangeEdit.h" // round 190pa (P14)
 #include "core/ZoomAnchor.h" // round 190qr (#276)
+#include "core/EditorFeel.h" // round 190ro (D-2: zoomanchor::lynxKeys)
 #include "core/ExportDone.h" // round 190qr (#280)
 #include "core/ClipHandle.h" // round 190qr (#274)
 #include "core/PluginPicks.h" // round 190qi (rollup 0.1.32 step 3: the extras' switches)
@@ -144,6 +145,8 @@ bool readUiOption (const juce::String& key, bool on)
         ruler::seekWithAnyTool() = on;
     else if (key == "zoomAtSongPosition") // issue #276 (round 190qr, LYNX extra)
         zoomanchor::atSongPosition() = on;
+    else if (key == "zoomKeysLynx") // round 190ro (D-2): round 190qe's zoom keys, a LYNX extra
+        zoomanchor::lynxKeys() = on;
     else if (key == "exportDoneSound") // issue #280 (round 190qr, LYNX extra)
         exportdone::sound() = on;
     else if (key == "exportDoneWindow")
@@ -211,6 +214,7 @@ juce::String uiOptionsText()
            + "\ntrackClipsShown=" + juce::String (trackclips::shownInSelector() ? 1 : 0) // (round 190ne)
            + "\nrulerSeeksAnyTool=" + juce::String (ruler::seekWithAnyTool() ? 1 : 0) // (round 190nq, issue #227)
            + "\nzoomAtSongPosition=" + juce::String (zoomanchor::atSongPosition() ? 1 : 0) // (round 190qr, issue #276)
+           + "\nzoomKeysLynx=" + juce::String (zoomanchor::lynxKeys() ? 1 : 0) // (round 190ro, D-2)
            + "\nexportDoneSound=" + juce::String (exportdone::sound() ? 1 : 0) + "\nexportDoneWindow=" + juce::String (exportdone::window() ? 1 : 0) // (#280)
            + "\ngainHandleFollowsView=" + juce::String (cliphandle::gainFollowsView() ? 1 : 0) // (round 190qr, issue #274)
            + "\nsectionsLane=" + juce::String (sections::patternLaneOn() ? 1 : 0) // (round 190ol, P1)
@@ -257,6 +261,8 @@ std::optional<bool> extraOn (std::string_view id)
         return ruler::seekWithAnyTool();
     if (id == "editing.zoomAtSongPosition") // round 190qr (issue #276)
         return zoomanchor::atSongPosition();
+    if (id == "editing.zoomKeysLynx") // round 190ro (D-2)
+        return zoomanchor::lynxKeys();
     if (id == "export.doneSound") // round 190qr (issue #280)
         return exportdone::sound();
     if (id == "export.doneWindow")
@@ -330,6 +336,8 @@ bool setExtra (std::string_view id, bool on)
         ruler::seekWithAnyTool() = on;
     else if (id == "editing.zoomAtSongPosition") // round 190qr (issue #276)
         zoomanchor::atSongPosition() = on;
+    else if (id == "editing.zoomKeysLynx") // round 190ro (D-2)
+        zoomanchor::lynxKeys() = on;
     else if (id == "export.doneSound") // round 190qr (issue #280)
         exportdone::sound() = on;
     else if (id == "export.doneWindow")

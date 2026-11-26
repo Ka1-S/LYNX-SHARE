@@ -182,7 +182,10 @@
         }
 
         // ---- B. the view stack, the zoom keys' anchor and the glide (Playlist) --------------------------------------
+        // (round 190ro, D-2: the LYNX zoom keys are an extra, "editing.zoomKeysLynx", off as FL in the Pattern layout: on here,
+        // FL's way checked after this block)
         {
+            const juce::ScopedValueSetter<bool> lynxKeys (zoomanchor::lynxKeys(), true);
             pl.setViewForSnapshot (32.0, 8, 0);
             const auto start = pl.viewNowForTests();
             const auto one = clipOf (6, 3 * bar);
@@ -231,6 +234,29 @@
             ui::motion::enabled() = false;
             pl.runAction ("playlist.zoomOut");
             check ("Playlist: with Animations off the zoom key jumps", ! pl.viewGlideRunning() && std::abs (pl.viewNowForTests().pixelsPerUnit - from.pixelsPerUnit) < 1.0e-9);
+        }
+        // round 190ro (D-2, FL 2026 checked live 11-26): the extra off, as FL in the Pattern layout — the same key again keeps the
+        // view, and PageUp with the pointer away from the Playlist keeps the view's left edge
+        {
+            const juce::ScopedValueSetter<bool> lynxKeys (zoomanchor::lynxKeys(), false);
+            pl.setViewForSnapshot (32.0, 8, 0);
+            const auto one = clipOf (6, 3 * bar);
+            pl.selectClipsForSnapshot ({ one });
+            pl.runAction ("playlist.zoomSelection");
+            const auto zoomed = pl.viewNowForTests();
+            pl.runAction ("playlist.zoomSelection");
+            check ("Playlist, FL's zoom keys: Shift+5 again keeps the view (FL 2026)", viewstack::same (pl.viewNowForTests(), zoomed) && pl.viewStackDepth() == 1);
+            pl.runAction ("playlist.previousView");
+            pl.setViewForSnapshot (32.0, 4, 0);
+            const auto before = pl.viewNowForTests();
+            pl.runAction ("playlist.zoomIn");
+            check ("Playlist, FL's zoom keys: PageUp with the pointer elsewhere keeps the left edge (scroll " + juce::String (before.scroll, 1) + " -> "
+                       + juce::String (pl.viewNowForTests().scroll, 1) + ")",
+                   std::abs (pl.viewNowForTests().scroll - before.scroll) < 1.0e-6 && pl.viewNowForTests().pixelsPerUnit > before.pixelsPerUnit);
+            check ("FL's zoom key anchor: the pointer over the view, else the left edge",
+                   zoomanchor::flKeyAnchorPx (250.0, 1000.0) == 250.0 && zoomanchor::flKeyAnchorPx (std::nullopt, 1000.0) == 0.0
+                       && zoomanchor::flKeyAnchorPx (-3.0, 1000.0) == 0.0);
+            pl.selectClipsForSnapshot ({});
         }
 
         // ---- C. FL's "Keep labels on screen", three layouts -----------------------------------------------------------

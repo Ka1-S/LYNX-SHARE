@@ -47,6 +47,9 @@ The short version of each release. The full notes, with measurements, known issu
   away (FL Studio then shows none; a press beside it still moves the clip), and a new project made in the Clip-launch
   layout gets a mixer track for every track, as a new Live set. *Settings › LYNX extras* now says which extras are on by
   default and names the two that change the sound; the first start's card for FL Studio users points to the page.
+- The zoom keys work as in FL Studio 2026 in the Pattern layout: PgUp / PgDn zoom around the mouse pointer and Shift+5
+  pressed again leaves the view as it is. LYNX's own way (around the playhead or the selection, Shift+5 again goes back)
+  is the LYNX extra *Zoom keys: LYNX's anchor, and Shift+5 again goes back*, always on in the Clip-launch and Simple layouts.
 - Export to FL Studio keeps FL Studio's trial-save mark: a project that came from a trial save (also after a .lynx save,
   imported tracks or a paste) goes back as one, so FL Studio's trial treats it as its own save; other projects are unchanged.
 
