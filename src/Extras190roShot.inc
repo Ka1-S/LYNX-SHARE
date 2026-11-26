@@ -229,6 +229,44 @@
             for (int t = 0; t < 16; ++t)
                 patternLinked += autolink::linkedInsertOf (engine.getSong(), t) >= 0 ? 1 : 0;
             check ("ON-2: a new Pattern-layout project is FL's (no links)", patternLinked == 0 && ! engine.getSong().linkTracksToMixer);
+            // for the round's gate script: the same content in a new project, unlinked and with the Clip-launch strips
+            // (<prefix>-on2-plain.lynx / -on2-linked.lynx; rendered, and exported to .flp / .als and rendered again, the WAVs
+            // must be identical)
+            if (prefix.isNotEmpty())
+            {
+                auto plain = makeNewProject();
+                auto linkedSong = plain;
+                linkClipLaunchStrips (linkedSong, 16);
+                for (auto* s : { &plain, &linkedSong })
+                {
+                    s->mode = PlayMode::song;
+                    for (int ch = 0; ch < 2 && ch < (int) s->channels.size(); ++ch)
+                    {
+                        Pattern p;
+                        p.name = "Part " + std::to_string (ch + 1);
+                        for (int k = 0; k < 8; ++k)
+                        {
+                            Note n;
+                            n.start = k * bar / 2;
+                            n.length = bar / 4;
+                            n.channel = ch;
+                            n.key = 60 + 2 * k;
+                            p.notes.push_back (n);
+                        }
+                        s->patterns.push_back (p);
+                        Clip clip;
+                        clip.kind = ClipKind::pattern;
+                        clip.pattern = (int) s->patterns.size() - 1;
+                        clip.track = ch;
+                        clip.start = ch * bar;
+                        clip.length = 4 * bar;
+                        s->playlist.push_back (clip);
+                    }
+                }
+                juce::String error;
+                check ("ON-2: the gate's two projects written",
+                       ProjectFile::save (plain, juce::File (prefix + "-on2-plain.lynx"), error) && ProjectFile::save (linkedSong, juce::File (prefix + "-on2-linked.lynx"), error));
+            }
         }
 
         // --- the extras page: its intro and the "On by default." of the switches on by default (EXTRAS-2.md § 7) ---------------
