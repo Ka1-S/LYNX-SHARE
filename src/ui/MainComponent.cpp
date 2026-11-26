@@ -8634,18 +8634,17 @@ void MainComponent::dumpAudioLog()
     juce::Component::SafePointer<MainComponent> self (this);
     // (a long log takes a moment to write: not on the UI thread)
     juce::Thread::launch ([self, dump, target] {
-        auto saved = false;
-        {
+        // (rollup 0.1.32 step 6: round 190rm's checked writer)
+        juce::String why;
+        const auto saved = safewrite::writeWithHandedStream (target, [&] (std::unique_ptr<juce::OutputStream>& stream) {
             juce::WavAudioFormat wav;
-            std::unique_ptr<juce::OutputStream> stream (target.createOutputStream().release());
-            if (stream != nullptr)
-                if (std::unique_ptr<juce::AudioFormatWriter> writer { wav.createWriterFor (stream.get(), dump->rate, 2, 32, {}, 0) }; writer != nullptr)
-                {
-                    stream.release(); // owned by the writer now
-                    const float* channels[] = { dump->left.data(), dump->right.data() };
-                    saved = writer->writeFromFloatArrays (channels, 2, (int) dump->left.size());
-                }
-        }
+            std::unique_ptr<juce::AudioFormatWriter> writer { wav.createWriterFor (stream.get(), dump->rate, 2, 32, {}, 0) };
+            if (writer == nullptr)
+                return false;
+            stream.release(); // owned by the writer now
+            const float* channels[] = { dump->left.data(), dump->right.data() };
+            return writer->writeFromFloatArrays (channels, 2, (int) dump->left.size());
+        }, why);
         juce::MessageManager::callAsync ([self, target, saved] {
             if (self == nullptr)
                 return;

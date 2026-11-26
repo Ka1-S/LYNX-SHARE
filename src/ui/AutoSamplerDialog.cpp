@@ -7,6 +7,7 @@
 #include "core/RackOps.h"
 #include "engine/Exporter.h"
 #include "ui/I18n.h"
+#include "engine/SafeWrite.h" // (rollup 0.1.32 step 6)
 
 namespace lynx
 {
@@ -88,21 +89,20 @@ private:
         for (std::size_t i = 0; i < cuts.size() && ! threadShouldExit(); ++i)
         {
             const auto file = folder.getChildFile (juce::String::fromUTF8 (autosample::takeFileName (baseName, plan.takes[i]).c_str()));
-            auto stream = file.createOutputStream();
+            // (rollup 0.1.32 step 6: round 190rm's checked writer; createOutputStream appended to a take of the same name)
             const auto chans = cuts[i].right.empty() ? 1 : 2;
-            std::unique_ptr<juce::AudioFormatWriter> writer (
-                stream == nullptr ? nullptr : wav.createWriterFor (stream.get(), sampleRate, (unsigned int) chans, options.float32 ? 32 : 16, {}, 0));
-            if (writer == nullptr)
-            {
-                error = tr ("could not write {0}", { file.getFullPathName() });
-                return false;
-            }
-            stream.release();
             float* data[2] = { const_cast<float*> (cuts[i].left.data()), const_cast<float*> (cuts[i].right.data()) };
             juce::AudioBuffer<float> view (data, chans, (int) cuts[i].left.size());
-            if (! writer->writeFromAudioSampleBuffer (view, 0, view.getNumSamples()))
+            juce::String why;
+            if (! safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+                    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), sampleRate, (unsigned int) chans, options.float32 ? 32 : 16, {}, 0));
+                    if (writer == nullptr)
+                        return false;
+                    stream.release();
+                    return writer->writeFromAudioSampleBuffer (view, 0, view.getNumSamples());
+                }, why))
             {
-                error = tr ("could not write {0}", { file.getFullPathName() });
+                error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
                 return false;
             }
             paths.push_back (file.getFullPathName().toStdString());

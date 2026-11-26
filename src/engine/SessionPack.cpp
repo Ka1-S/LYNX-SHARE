@@ -16,6 +16,7 @@
 #include "engine/Exporter.h"
 #include "engine/ProjectFile.h"
 #include "platform/Paths.h"
+#include "engine/SafeWrite.h" // (rollup 0.1.32 step 6)
 
 namespace lynx::sessionpack
 {
@@ -141,16 +142,16 @@ bool writeWav (const juce::File& file, const juce::AudioBuffer<float>& source, i
     for (int ch = 0; ch < 2; ++ch)
         if (from < source.getNumSamples())
             slice.copyFrom (ch, 0, source, std::min (ch, source.getNumChannels() - 1), from, std::max (0, std::min (count, source.getNumSamples() - from)));
-    file.deleteFile();
-    std::unique_ptr<juce::OutputStream> out (file.createOutputStream().release());
-    if (out == nullptr)
-        return false;
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (out.get(), rate, 2, 32, {}, 0));
-    if (writer == nullptr)
-        return false;
-    out.release();
-    return writer->writeFromAudioSampleBuffer (slice, 0, slice.getNumSamples());
+    // (rollup 0.1.32 step 6: round 190rm's checked writer)
+    juce::String why;
+    return safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& out) {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (out.get(), rate, 2, 32, {}, 0));
+        if (writer == nullptr)
+            return false;
+        out.release();
+        return writer->writeFromAudioSampleBuffer (slice, 0, slice.getNumSamples());
+    }, why);
 }
 
 // the last sample above −100 dB at or after `from` within [from, to)
@@ -880,18 +881,10 @@ bool write (const Song& song, Manifest manifest, PluginHost& host, const juce::F
     builder.addEntry (new juce::MemoryInputStream (manifestJson.toRawUTF8(), manifestJson.getNumBytesAsUTF8(), true), 9, "manifest.json",
                       juce::Time::getCurrentTime());
 
-    juce::TemporaryFile temp (file);
+    // (rollup 0.1.32 step 6: round 190rm's checked writer; the unflushed, unchecked temporary file replaced the pack)
+    if (juce::String why; ! safewrite::writeWith (file, [&builder] (juce::OutputStream& out) { return builder.writeToStream (out, nullptr); }, why))
     {
-        juce::FileOutputStream out (temp.getFile());
-        if (! out.openedOk() || ! builder.writeToStream (out, nullptr))
-        {
-            error = "could not write " + file.getFullPathName();
-            return false;
-        }
-    }
-    if (! temp.overwriteTargetFileWithTemporary())
-    {
-        error = "could not write " + file.getFullPathName();
+        error = "could not write " + file.getFullPathName() + ": " + why;
         return false;
     }
     return true;

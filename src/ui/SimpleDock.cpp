@@ -2954,16 +2954,16 @@ private:
         buffer.copyFrom (0, 0, recL.data(), (int) recL.size());
         if (recStereo)
             buffer.copyFrom (1, 0, recR.data(), (int) juce::jmin (recR.size(), recL.size()));
-        bool written = false;
-        if (auto out = std::unique_ptr<juce::FileOutputStream> (file.createOutputStream()))
-        {
+        // (rollup 0.1.32 step 6: round 190rm's checked writer)
+        juce::String why;
+        const auto written = safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& out) {
             juce::WavAudioFormat wav;
-            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (out.get(), recRate, (unsigned) buffer.getNumChannels(), 24, {}, 0)))
-            {
-                out.release();
-                written = writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
-            }
-        }
+            auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (out.get(), recRate, (unsigned) buffer.getNumChannels(), 24, {}, 0));
+            if (writer == nullptr)
+                return false;
+            out.release();
+            return writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+        }, why);
         recL.clear();
         recR.clear();
         if (written)

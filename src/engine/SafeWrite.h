@@ -17,6 +17,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <algorithm>
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -84,6 +85,36 @@ inline bool writeWith (const juce::File& target, const std::function<bool (juce:
         return false;
     }
     return true;
+}
+
+// writeWith for a writer that takes its stream and deletes it (juce::AudioFormatWriter, the zip builder; rollup 0.1.32
+// step 6): `write` gets `stream` to hand over (release() it once the writer owns it) and must have destroyed that writer
+// before it returns. The furthest byte written is the file's end (a WAV writer seeks back to its header when it closes).
+inline bool writeWithHandedStream (const juce::File& target, const std::function<bool (std::unique_ptr<juce::OutputStream>& stream)>& write,
+                                   juce::String& error)
+{
+    return writeWith (target, [&write] (juce::OutputStream& out) {
+        struct Borrowed final : juce::OutputStream
+        {
+            Borrowed (juce::OutputStream& o, juce::int64& e) : to (o), end (e) {}
+            void flush() override { to.flush(); }
+            bool setPosition (juce::int64 pos) override { return to.setPosition (pos); }
+            juce::int64 getPosition() override { return to.getPosition(); }
+            bool write (const void* data, size_t n) override
+            {
+                const auto ok = to.write (data, n);
+                end = std::max (end, to.getPosition());
+                return ok;
+            }
+            juce::OutputStream& to;
+            juce::int64& end;
+        };
+        juce::int64 end = out.getPosition();
+        std::unique_ptr<juce::OutputStream> stream = std::make_unique<Borrowed> (out, end);
+        const auto ok = write (stream);
+        stream.reset();
+        return ok && out.setPosition (end);
+    }, error);
 }
 
 inline bool writeData (const juce::File& target, const void* data, size_t size, juce::String& error)

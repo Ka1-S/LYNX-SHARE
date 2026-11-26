@@ -183,17 +183,18 @@ private:
 
 bool writeWav (const juce::File& file, const std::array<std::vector<float>, 2>& channels)
 {
-    juce::WavAudioFormat wav;
-    auto stream = file.createOutputStream();
-    if (stream == nullptr)
-        return false;
-    // 32-bit float: a stem of a loud master can peak above 0 dB
-    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), stemsplit::sampleRate, 2, 32, {}, 0));
-    if (writer == nullptr)
-        return false;
-    stream.release(); // (the writer owns it now)
-    const float* data[] { channels[0].data(), channels[1].data() };
-    return writer->writeFromFloatArrays (data, 2, (int) channels[0].size()) && writer->flush();
+    // (rollup 0.1.32 step 6: round 190rm's checked writer; createOutputStream appended to a stem file of the same name)
+    juce::String why;
+    return safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+        juce::WavAudioFormat wav;
+        // 32-bit float: a stem of a loud master can peak above 0 dB
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), stemsplit::sampleRate, 2, 32, {}, 0));
+        if (writer == nullptr)
+            return false;
+        stream.release(); // (the writer owns it now)
+        const float* data[] { channels[0].data(), channels[1].data() };
+        return writer->writeFromFloatArrays (data, 2, (int) channels[0].size()) && writer->flush();
+    }, why);
 }
 
 // Separates a sample with the options' passes and writes "<name> - <stem>.wav" into `folder` (round 190jr: only the

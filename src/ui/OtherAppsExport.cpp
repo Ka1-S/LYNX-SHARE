@@ -52,12 +52,10 @@ bool writeMidi (const Song& song, const std::vector<Note>& notes, const juce::Fi
         seq.updateMatchedPairs();
         midi.addTrack (seq);
     }
-    file.getParentDirectory().createDirectory();
-    file.deleteFile();
-    juce::FileOutputStream out (file);
-    if (out.failedToOpen() || ! midi.writeTo (out))
+    // (rollup 0.1.32 step 6: round 190rm's checked writer; the old file was deleted before a write that could fail)
+    if (juce::String why; ! safewrite::writeWith (file, [&midi] (juce::OutputStream& out) { return midi.writeTo (out); }, why))
     {
-        error = tr ("Could not write {0}", { file.getFullPathName() });
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
         return false;
     }
     return true;
@@ -81,31 +79,17 @@ bool padWav (const juce::File& file, juce::int64 frames, juce::String& error)
     const auto rate = reader->sampleRate;
     const auto bits = (int) reader->bitsPerSample;
     reader.reset();
-    const auto temp = file.getSiblingFile (file.getFileName() + ".part");
+    // (rollup 0.1.32 step 6: round 190rm's checked writer; the ".part" file was moved over the original unchecked)
+    juce::String why;
+    if (! safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+            std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), rate, (unsigned int) channels, bits, {}, 0));
+            if (writer == nullptr)
+                return false;
+            stream.release(); // (the writer owns it)
+            return writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+        }, why))
     {
-        auto stream = std::make_unique<juce::FileOutputStream> (temp);
-        if (stream->failedToOpen())
-        {
-            error = tr ("Could not write {0}", { temp.getFullPathName() });
-            return false;
-        }
-        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), rate, (unsigned int) channels, bits, {}, 0));
-        if (writer == nullptr)
-        {
-            error = tr ("Could not write {0}", { temp.getFullPathName() });
-            return false;
-        }
-        stream.release(); // (the writer owns it)
-        if (! writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples()))
-        {
-            error = tr ("Could not write {0}", { temp.getFullPathName() });
-            return false;
-        }
-    }
-    if (! temp.moveFileTo (file))
-    {
-        temp.deleteFile();
-        error = tr ("Could not write {0}", { file.getFullPathName() });
+        error = tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() });
         return false;
     }
     return true;
@@ -311,21 +295,15 @@ bool write (const Song& original, const juce::String& projectName, const exportb
         juce::ZipFile::Builder zip;
         addToZip (zip, folder, folder.getParentDirectory());
         const auto target = parent.getNonexistentChildFile (folder.getFileName(), ".zip", true);
-        bool ok = false;
-        {
-            juce::FileOutputStream out (target);
-            ok = ! out.failedToOpen() && zip.writeToStream (out, nullptr);
-        }
-        if (ok)
+        // (rollup 0.1.32 step 6: round 190rm's checked writer: the folder is deleted only after a zip that is all on the disk)
+        juce::String why;
+        if (safewrite::writeWith (target, [&zip] (juce::OutputStream& out) { return zip.writeToStream (out, nullptr); }, why))
         {
             folder.deleteRecursively();
             result.folder = target;
         }
         else
-        {
-            target.deleteFile();
-            result.failed.add (target.getFileName() + ": " + tr ("Could not write {0}", { target.getFullPathName() }));
-        }
+            result.failed.add (target.getFileName() + ": " + tr ("Not written: {0}. {1} was not changed.", { tr (why), target.getFileName() }));
     }
     return true;
 }

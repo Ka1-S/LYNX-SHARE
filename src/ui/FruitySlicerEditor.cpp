@@ -810,18 +810,21 @@ private:
                                  [self, data] (const juce::FileChooser& fc) {
             if (self == nullptr || fc.getResult() == juce::File())
                 return;
-            auto file = fc.getResult().withFileExtension ("wav");
-            file.deleteFile();
-            std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
-            juce::WavAudioFormat wav;
+            const auto file = fc.getResult().withFileExtension ("wav");
             const auto channels = data->isStereo() ? 2 : 1;
-            std::unique_ptr<juce::AudioFormatWriter> writer (
-                stream != nullptr ? wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 24, {}, 0) : nullptr);
-            if (writer == nullptr)
-                return;
-            stream.release();
             const float* chans[2] { data->leftData(), data->isStereo() ? data->rightData() : data->leftData() };
-            writer->writeFromFloatArrays (chans, channels, (int) data->frames());
+            // (rollup 0.1.32 step 6: round 190rm's checked writer; the old file was deleted before a write that could fail)
+            juce::String why;
+            if (! safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+                    juce::WavAudioFormat wav;
+                    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), data->sampleRate, (unsigned int) channels, 24, {}, 0));
+                    if (writer == nullptr)
+                        return false;
+                    stream.release();
+                    return writer->writeFromFloatArrays (chans, channels, (int) data->frames());
+                }, why))
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                        tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() }));
         });
     }
 

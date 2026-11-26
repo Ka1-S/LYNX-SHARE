@@ -1,4 +1,5 @@
 #include "ui/ModRing.h"
+#include "engine/SafeWrite.h" // (rollup 0.1.32 step 6: Gross Beat's .fnv save, ui/GrossBeatEditor.inc)
 #include "ui/SlotWatch.h"
 #include "ui/WindowPlaces.h"
 #include "ui/FrameTicker.h"

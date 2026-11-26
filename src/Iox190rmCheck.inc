@@ -321,6 +321,47 @@
             check ("checked writer: no temporary file is left", folder.findChildFiles (juce::File::findFiles, false, "*.tmp").isEmpty()
                                                                     && folder.findChildFiles (juce::File::findFiles, false, ".keep*").isEmpty());
             check ("checked writer: a good write replaces it", safewrite::writeText (target, "new", why, false, false, nullptr) && target.loadFileAsString() == "new");
+            // (rollup 0.1.32 step 6) a writer that takes its stream (a WAV writer seeks back to its header when it closes): the
+            // whole file, over a file of that name (JUCE's createOutputStream appended to it), and a failure keeps that file
+            {
+                const auto wavFile = folder.getChildFile ("take.wav");
+                wavFile.replaceWithText ("an older take");
+                const int frames = 48000;
+                std::vector<float> left ((std::size_t) frames), right ((std::size_t) frames);
+                for (int i = 0; i < frames; ++i)
+                {
+                    left[(std::size_t) i] = 0.5f * std::sin ((float) i * 0.01f);
+                    right[(std::size_t) i] = -left[(std::size_t) i];
+                }
+                const auto wrote = safewrite::writeWithHandedStream (wavFile, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+                    juce::WavAudioFormat wav;
+                    std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), 48000.0, 2, 24, {}, 0));
+                    if (writer == nullptr)
+                        return false;
+                    stream.release();
+                    const float* ch[2] { left.data(), right.data() };
+                    return writer->writeFromFloatArrays (ch, 2, frames);
+                }, why);
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (wavFile.createInputStream().release(), true));
+                auto same = false;
+                if (reader != nullptr && reader->lengthInSamples == frames && reader->numChannels == 2)
+                {
+                    juce::AudioBuffer<float> back (2, frames);
+                    reader->read (&back, 0, frames, 0, true, true);
+                    same = std::abs (back.getSample (0, 1234) - left[1234]) < 1.0e-4f && std::abs (back.getSample (1, 47999) - right[47999]) < 1.0e-4f;
+                }
+                reader.reset();
+                check ("checked writer, handed stream: a whole WAV over a file of that name", wrote && same);
+                const auto size = wavFile.getSize();
+                juce::String whyNot;
+                const auto failed = ! safewrite::writeWithHandedStream (wavFile, [] (std::unique_ptr<juce::OutputStream>& stream) {
+                    stream->write ("half", 4);
+                    return false;
+                }, whyNot);
+                check ("checked writer, handed stream: a failing writer leaves the file and says why", failed && whyNot.isNotEmpty() && wavFile.getSize() == size);
+                wavFile.deleteFile();
+            }
            #if ! JUCE_WINDOWS
             const auto ro = folder.getChildFile ("ro");
             ro.createDirectory();

@@ -1206,20 +1206,22 @@ private:
 
     static bool writeWav (const SampleData& out, const juce::File& file)
     {
-        file.deleteFile();
-        std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
-        juce::WavAudioFormat wav;
+        // (rollup 0.1.32 step 6: round 190rm's checked writer; the old file was deleted before a write that could fail)
         const auto channels = out.isStereo() ? 2 : 1;
-        std::unique_ptr<juce::AudioFormatWriter> writer (
-            stream != nullptr ? wav.createWriterFor (stream.get(), out.sampleRate, (unsigned int) channels, 24, {}, 0) : nullptr);
-        if (writer == nullptr)
-        {
-            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save"), tr ("Could not write {0}", { file.getFullPathName() }));
-            return false;
-        }
-        stream.release();
         const float* data[2] { out.leftData(), out.isStereo() ? out.rightData() : out.leftData() };
-        return writer->writeFromFloatArrays (data, channels, (int) out.frames());
+        juce::String why;
+        if (safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), out.sampleRate, (unsigned int) channels, 24, {}, 0));
+                if (writer == nullptr)
+                    return false;
+                stream.release();
+                return writer->writeFromFloatArrays (data, channels, (int) out.frames());
+            }, why))
+            return true;
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save"),
+                                                tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() }));
+        return false;
     }
 
     // the offered name: beside the sample, or in Music when its folder is not on this computer (an imported project's Windows

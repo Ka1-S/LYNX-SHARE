@@ -10,6 +10,7 @@
 #include "platform/Paths.h"
 #include "ui/I18n.h"
 #include "ui/VisualEditors.h"
+#include "engine/SafeWrite.h" // (rollup 0.1.32 step 6)
 
 namespace lynx::media
 {
@@ -242,30 +243,30 @@ bool extractAudioToWav (const juce::File& video, const juce::File& wav)
     if (p.backend != "ffmpeg")
         if (auto t = decodeNativeAudio (video, trackRate))
         {
-            wav.deleteFile();
-            std::unique_ptr<juce::OutputStream> stream (wav.createOutputStream().release());
-            if (stream == nullptr)
-                return false;
-            juce::WavAudioFormat format;
-            std::unique_ptr<juce::AudioFormatWriter> writer (format.createWriterFor (stream.get(), t->rate, 2, 16, {}, 0));
-            if (writer == nullptr)
-                return false;
-            stream.release(); // (the writer owns it)
-            constexpr int block = 8192;
-            juce::AudioBuffer<float> buf (2, block);
-            for (std::int64_t f = 0; f < t->frames(); f += block)
-            {
-                const auto n = (int) std::min<std::int64_t> (block, t->frames() - f);
-                for (int i = 0; i < n; ++i)
-                {
-                    buf.setSample (0, i, t->samples[(std::size_t) ((f + i) * 2)] / 32768.0f);
-                    buf.setSample (1, i, t->samples[(std::size_t) ((f + i) * 2 + 1)] / 32768.0f);
-                }
-                if (! writer->writeFromAudioSampleBuffer (buf, 0, n))
+            // (rollup 0.1.32 step 6: round 190rm's checked writer; the old file was deleted before a write that could fail)
+            juce::String why;
+            const auto ok = safewrite::writeWithHandedStream (wav, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::AudioFormatWriter> writer (format.createWriterFor (stream.get(), t->rate, 2, 16, {}, 0));
+                if (writer == nullptr)
                     return false;
-            }
-            writer = nullptr;
-            return wav.getSize() > 44;
+                stream.release(); // (the writer owns it)
+                constexpr int block = 8192;
+                juce::AudioBuffer<float> buf (2, block);
+                for (std::int64_t f = 0; f < t->frames(); f += block)
+                {
+                    const auto n = (int) std::min<std::int64_t> (block, t->frames() - f);
+                    for (int i = 0; i < n; ++i)
+                    {
+                        buf.setSample (0, i, t->samples[(std::size_t) ((f + i) * 2)] / 32768.0f);
+                        buf.setSample (1, i, t->samples[(std::size_t) ((f + i) * 2 + 1)] / 32768.0f);
+                    }
+                    if (! writer->writeFromAudioSampleBuffer (buf, 0, n))
+                        return false;
+                }
+                return true;
+            }, why);
+            return ok && wav.getSize() > 44;
         }
     const auto ffmpeg = findFfmpeg();
     if (! ffmpeg.existsAsFile())

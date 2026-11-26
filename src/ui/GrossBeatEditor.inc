@@ -793,8 +793,9 @@
                                    return;
                                const auto file = c.getResult().withFileExtension ("fnv");
                                const auto bytes = grossbeat::writeEnvelopeFile (safe->gbState().slots[(std::size_t) safe->gbSlotIndex()]);
-                               if (! file.replaceWithData (bytes.data(), bytes.size()))
-                                   ui::postHint ({ tr ("Could not write {0}", { file.getFullPathName() }), {} }, 3000);
+                               // (rollup 0.1.32 step 6: round 190rm's checked writer; JUCE's replaceWithData left a cut file)
+                               if (juce::String why; ! safewrite::writeData (file, bytes.data(), bytes.size(), why))
+                                   ui::postHint ({ tr ("Not written: {0}. {1} was not changed.", { tr (why), file.getFileName() }), {} }, 6000);
                            });
     }
 

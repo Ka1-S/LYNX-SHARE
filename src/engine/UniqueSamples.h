@@ -19,6 +19,7 @@
 #include "core/RackRenderer.h"
 #include "engine/SampleLibrary.h"
 #include "platform/Paths.h"
+#include "engine/SafeWrite.h" // (rollup 0.1.32 step 6)
 
 namespace lynx::uniquesamples
 {
@@ -99,13 +100,16 @@ inline bool writeWav (const ClipAudio& audio, const juce::File& file)
     buffer.copyFrom (0, 0, audio.left.data(), frames);
     if (stereo)
         buffer.copyFrom (1, 0, audio.right.data(), frames);
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::OutputStream> stream (file.createOutputStream());
-    std::unique_ptr<juce::AudioFormatWriter> writer (stream != nullptr ? wav.createWriterFor (stream.get(), audio.sampleRate, (unsigned int) buffer.getNumChannels(), 32, {}, 0) : nullptr);
-    if (writer == nullptr)
-        return false;
-    stream.release(); // (the writer owns it now)
-    return writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+    // (rollup 0.1.32 step 6: round 190rm's checked writer)
+    juce::String why;
+    return safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), audio.sampleRate, (unsigned int) buffer.getNumChannels(), 32, {}, 0));
+        if (writer == nullptr)
+            return false;
+        stream.release(); // (the writer owns it now)
+        return writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+    }, why);
 }
 
 // Any thread but the audio thread. `progress (0..1)` after each clip; false = cancelled: every file made is deleted and nothing

@@ -105,17 +105,17 @@ std::vector<float> resample (const std::vector<float>& x, double from, double to
 
 bool writeWav (const juce::File& file, const std::vector<float>& mono, double rate)
 {
-    file.deleteFile();
-    std::unique_ptr<juce::OutputStream> stream (file.createOutputStream().release());
-    if (stream == nullptr)
-        return false;
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (stream.get(), rate, 1, 24, {}, 0));
-    if (w == nullptr)
-        return false;
-    stream.release();
-    const float* ch[] = { mono.data() };
-    return w->writeFromFloatArrays (ch, 1, (int) mono.size());
+    // (rollup 0.1.32 step 6: round 190rm's checked writer; the old take was deleted before a write that could fail)
+    juce::String why;
+    return safewrite::writeWithHandedStream (file, [&] (std::unique_ptr<juce::OutputStream>& stream) {
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (stream.get(), rate, 1, 24, {}, 0));
+        if (w == nullptr)
+            return false;
+        stream.release();
+        const float* ch[] = { mono.data() };
+        return w->writeFromFloatArrays (ch, 1, (int) mono.size());
+    }, why);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
