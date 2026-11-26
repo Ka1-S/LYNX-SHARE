@@ -107,6 +107,13 @@ void changeToMarkerLoop (Song& song);
 // is made then all markers are deleted."): the markers in the song's time selection [loopStart, loopEnd) go, or every
 // marker when there is no selection. The number of markers removed.
 int deleteInSelection (Song& song);
+// FL's marker menu "Move content left / right" (round 190ri, FL 2026 live, flmark/m2*.flp; FL's manual: "moves this content to the
+// left or right of the next markers content region. A markers 'content' is defined as those Clips between the current
+// marker and the next"): the section from marker `index` to the next marker (or the song's end) and the section next to it
+// (right: the following one; left: the one before, from the previous marker or bar 1) change places, with the clips that
+// start in them and their markers. False (nothing changed) when there is no section on that side.
+bool canMoveContent (const Song& song, int index, int direction);
+bool moveContent (Song& song, int index, int direction);
 
 // The Playlist's Time markers keys (round 167k, FL 2026's EEMarkerMainMenu):
 // Ctrl+T "Add auto" (FUN_0122a070 → FUN_00e546a0): a plain marker at `tick` named "Auto", "Auto #2", "Auto #3"... (the

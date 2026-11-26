@@ -2686,7 +2686,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         for (const auto& m : song.markers())
         {
-            const auto x = (float) tickToX ((double) m.tick);
+            const auto dragged = drag == Drag::marker && markerDragMoved && &m - song.markers().data() == markerDragIndex;
+            const auto x = (float) tickToX ((double) (dragged ? markerDragTick : m.tick));
 
             if (x < (float) ruler.getX() - 200.0f || x > (float) ruler.getRight())
                 continue;
@@ -6913,16 +6914,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 return;
 
             case ruler::Action::marker:
-            {
-                // a click on a marker's tag goes to the marker (LYNX), quantized while playing like any song jump
-                const auto markerTick = song.markers()[(std::size_t) markerHit].tick;
-                const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
-                engine.jumpToMarker (markerHit);
-                if (! waits)
-                    playheadTick = (double) markerTick;
-                repaint();
+                // FL's manual: "Left-click, hold & drag a marker to reposition it" (round 190ri). Released without a drag:
+                // LYNX goes to the marker (FL does nothing), on the release
+                drag = Drag::marker;
+                markerDragIndex = markerHit;
+                markerDragTick = song.markers()[(std::size_t) markerHit].tick;
+                markerDragMoved = false;
                 return;
-            }
 
             case ruler::Action::seek:
                 break;
@@ -7918,6 +7916,14 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
                 rulerMark = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
             return;
 
+        case Drag::marker: // (round 190ri: the tag follows the mouse once it has moved 3 px; the marker moves on release)
+            if (! markerDragMoved && std::abs (e.getDistanceFromDragStartX()) < 3)
+                return;
+            markerDragMoved = true;
+            markerDragTick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
+            repaint (0, rulerTop, getWidth(), timelineHeight);
+            return;
+
         case Drag::tempoMarker: // (round 190hq: the tag follows the mouse; the marker moves on release)
             tempoDragTick = juce::jmax<std::int64_t> (1, snap (xToTick (e.x), snapOn));
             repaint (0, rulerTop, getWidth(), timelineHeight);
@@ -8349,6 +8355,12 @@ bool PlaylistComponent::makeDragHint (ui::Hint& hint)
             hint.text = tr ("Tension: {0}%", { juce::String (juce::roundToInt (clipops::fadeTensionHandle (fadeSide == 0 ? clip->fadeInTension : clip->fadeOutTension) * 100.0)) });
             break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
+        case Drag::marker:
+            if (! markerDragMoved)
+                break;
+            hint.text = tr ("Moving the marker  [Alt] no snap");
+            hint.value = position (markerDragTick);
+            break;
         case Drag::tempoMarker:
             hint.text = tr ("Moving the tempo change  [Alt] no snap");
             hint.value = position (tempoDragTick);
@@ -8608,6 +8620,38 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         engine.performanceCommand (c);
         drag = Drag::none;
         perfTrack = -1;
+        return;
+    }
+    if (drag == Drag::marker)
+    {
+        drag = Drag::none;
+        const auto& song = engine.getSong();
+        if (markerDragIndex >= 0 && markerDragIndex < (int) song.markers().size())
+        {
+            if (markerDragMoved)
+            {
+                if (song.markers()[(std::size_t) markerDragIndex].tick != markerDragTick)
+                    engine.editSong ([i = markerDragIndex, t = markerDragTick] (Song& s) {
+                        if (i >= (int) s.markers().size())
+                            return;
+                        auto m = s.markers()[(std::size_t) i];
+                        s.markers().erase (s.markers().begin() + i);
+                        m.tick = t;
+                        s.addMarker (m);
+                    });
+            }
+            else
+            {
+                // a click on a marker's tag goes to the marker (LYNX), quantized while playing like any song jump
+                const auto markerTick = song.markers()[(std::size_t) markerDragIndex].tick;
+                const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
+                engine.jumpToMarker (markerDragIndex);
+                if (! waits)
+                    playheadTick = (double) markerTick;
+            }
+        }
+        markerDragIndex = -1;
+        repaint();
         return;
     }
     if (drag == Drag::tempoMarker)
@@ -11401,8 +11445,9 @@ juce::String PlaylistComponent::markerLabel (const Marker& m)
 
 int PlaylistComponent::markerTagAt (int x, int y) const
 {
-    // the tags hang at the bottom of the ruler (see paint)
-    if (y < rulerTop + timelineHeight - 12 || y >= headerHeight)
+    // the tags hang at the bottom of the ruler (see paint); round 190ri (kainproctor): 3 px above the 11 px tag count too,
+    // the right-click on a tag's top edge gave the ruler menu
+    if (y < rulerTop + timelineHeight - 14 || y >= headerHeight)
         return -1;
     const auto& list = engine.getSong().markers();
     const auto f = theme::font (theme::type::caption, true);
@@ -11460,6 +11505,68 @@ void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
                                  repaint();
                              }),
                              true);
+}
+
+// Round 190ri (kainproctor, Discord 11-25; FL 2026 live, raw/mg3.png and his k5): a right-click on a marker's tag gives FL's
+// marker menu — Add marker..., Add time signature..., Place loop, the marker ("name at 11:01:00"), Delete, Rename..., Move
+// content left / right, then the Action list. LYNX showed its whole ruler menu with the marker's part at its far end, below the
+// screen on a laptop; that menu stays one level down (LYNX's "Ruler" submenu)
+juce::PopupMenu PlaylistComponent::markerMenu (int index, int x)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.markers().size())
+        return menu;
+    const auto& marker = song.markers()[(std::size_t) index];
+    const auto tick = marker.tick;
+    menu.addItem (tr ("Add marker..."), [this, at = juce::jmax<std::int64_t> (0, snap (xToTick (x), true))] { editMarkerName (at, -1); });
+    menu.addItem (tr ("Add time signature..."), [this] { runAction ("playlist.markerSignature"); });
+    menu.addItem (tr ("Place loop"), [this, tick] {
+        engine.editSong ([tick] (Song& s) { markers::placeSongLoop (s, tick); });
+        repaint();
+    });
+    {
+        const auto bar = song.barAt (tick);
+        const auto rest = tick - bar.tick;
+        const auto two = [] (std::int64_t v) { return juce::String (v).paddedLeft ('0', 2); };
+        const auto at = juce::String (bar.number) + ":" + two (rest / ticksPerStep + 1) + ":" + two ((rest % ticksPerStep) * 96 / ppq);
+        const auto name = marker.name.empty() ? markerLabel (marker) : juce::String::fromUTF8 (marker.name.c_str());
+        menu.addSectionHeader (tr ("{0} at {1}", { name, at }));
+    }
+    menu.addItem (tr ("Delete"), [this, index] {
+        engine.editSong ([index] (Song& s) {
+            if (index < (int) s.markers().size())
+                s.markers().erase (s.markers().begin() + index);
+        });
+        repaint();
+    });
+    menu.addItem (tr ("Rename..."), [this, index] { editMarkerName (0, index); });
+    menu.addSeparator();
+    for (const auto direction : { -1, 1 })
+        menu.addItem (direction < 0 ? tr ("Move content left") : tr ("Move content right"), markers::canMoveContent (song, index, direction), false,
+                      [this, index, direction] {
+                          setSelection ({});
+                          engine.editSong ([index, direction] (Song& s) { markers::moveContent (s, index, direction); });
+                          sortClips();
+                          repaint();
+                      });
+    menu.addSectionHeader (tr ("Action"));
+    const auto current = marker.isSignature() ? Marker::timeSignature : marker.action;
+    for (auto [value, text] : { std::pair { Marker::none, TR_NOOP ("None") }, { Marker::start, TR_NOOP ("Start") }, { Marker::songLoop, TR_NOOP ("Loop") },
+                                { Marker::markerLoop, TR_NOOP ("Marker loop") }, { Marker::markerSkip, TR_NOOP ("Marker skip") },
+                                { Marker::markerPause, TR_NOOP ("Marker pause") }, { Marker::timeSignature, TR_NOOP ("Time signature") },
+                                { Marker::punchIn, TR_NOOP ("Start recording") }, { Marker::punchOut, TR_NOOP ("Stop recording") } })
+        quickpick::addRadioItem (menu, tr (text), current == value, [this, index, value = value] {
+            engine.editSong ([index, value] (Song& s) {
+                if (index < (int) s.markers().size())
+                    markers::setAction (s, s.markers()[(std::size_t) index], value);
+            });
+            repaint();
+        });
+    // LYNX: the rest of its ruler menu (loop region, time markers, tempo changes, LYNX's extras)
+    menu.addSeparator();
+    menu.addSubMenu (tr ("Ruler"), rulerMenu (x, -1));
+    return menu;
 }
 
 juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
@@ -11741,6 +11848,8 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
 
 void PlaylistComponent::showRulerMenu (int x, int y)
 {
+    if (const auto marker = y >= 0 ? markerTagAt (x, y) : -1; marker >= 0)
+        return markerMenu (marker, x).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     rulerMenu (x, y).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
@@ -15433,7 +15542,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         if (const auto m = markerTagAt (p.x, p.y); m >= 0)
         {
             const auto& marker = song.markers()[(std::size_t) m];
-            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete");
+            hint.text = tr ("Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [LMB] drag: move it  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete");
             hint.value = markerLabel (marker);
             if (const auto* action = markers::actionName (marker.isSignature() ? Marker::timeSignature : marker.action); *action != 0)
                 hint.value += " (" + tr (action) + ")";

@@ -208,3 +208,30 @@ TEST (community190ri_marker_skips_chain)
     CHECK (spans.size() == 4 && spans[0].second == bar (3) && spans[1].first == bar (7) && spans[1].second == bar (9) && spans[2].first == bar (11)
            && spans[2].second == bar (15) && spans[3].first == bar (17));
 }
+
+// FL 2026 live (flmark/m2.flp: markers a 1, b 3, c 7, d 9; clips at 1, 3, 4, 6, 7, 9): b › Move content right puts c's section
+// (7-8) at 3 and b's (3-6) after it; c (now at 3) › Move content left swaps it with a's section
+TEST (community190ri_marker_move_content)
+{
+    using namespace markers165;
+    lynx::Song s;
+    s.patterns.emplace_back();
+    for (const auto [b, n, t] : { std::tuple { 1, 1, 0 }, { 3, 2, 0 }, { 4, 1, 1 }, { 6, 2, 2 }, { 7, 1, 0 }, { 9, 1, 0 } })
+    {
+        lynx::Clip c;
+        c.start = bar (b), c.length = n * 4 * lynx::ppq, c.track = t;
+        s.playlist.push_back (c);
+    }
+    for (const auto [b, name] : { std::pair { 1, "a" }, { 3, "b" }, { 7, "c" }, { 9, "d" } })
+        s.addMarker (marker (bar (b), lynx::Marker::none, name));
+    CHECK (lynx::markers::canMoveContent (s, 1, 1) && ! lynx::markers::canMoveContent (s, 3, 1) && ! lynx::markers::canMoveContent (s, 0, -1));
+    CHECK (lynx::markers::moveContent (s, 1, 1));
+    std::vector<std::int64_t> starts;
+    for (const auto& c : s.playlist)
+        starts.push_back (c.start);
+    CHECK ((starts == std::vector<std::int64_t> { bar (1), bar (5), bar (6), bar (8), bar (3), bar (9) }));
+    CHECK (s.markers()[1].name == "c" && s.markers()[1].tick == bar (3) && s.markers()[2].name == "b" && s.markers()[2].tick == bar (5));
+    CHECK (lynx::markers::moveContent (s, 1, -1));
+    CHECK (s.markers()[0].name == "c" && s.markers()[0].tick == bar (1) && s.markers()[1].name == "a" && s.markers()[1].tick == bar (3)
+           && s.playlist[4].start == bar (1) && s.playlist[0].start == bar (3));
+}

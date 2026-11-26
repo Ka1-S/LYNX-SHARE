@@ -295,6 +295,70 @@ void addJumpToNextBar (Song& song, std::int64_t tick)
     }
 }
 
+namespace
+{
+// the sections around marker `index`: [a0, a1) then [a1, b1) (the one before and this one for `direction` < 0)
+bool contentSections (const Song& song, int index, int direction, std::int64_t& a0, std::int64_t& a1, std::int64_t& b1)
+{
+    const auto& list = song.markers();
+    if (index < 0 || index >= (int) list.size() || direction == 0)
+        return false;
+    const auto end = std::max<std::int64_t> (song.songLength(), list.back().tick);
+    const auto tick = list[(std::size_t) index].tick;
+    const auto after = [&list, end] (std::int64_t t) {
+        for (const auto& m : list)
+            if (m.tick > t)
+                return m.tick;
+        return end;
+    };
+    if (direction > 0)
+    {
+        a0 = tick;
+        a1 = after (tick);
+        if (a1 >= end)
+            return false; // (no marker after this one: nothing on the right)
+        b1 = after (a1);
+    }
+    else
+    {
+        if (tick <= 0)
+            return false;
+        a0 = 0;
+        for (const auto& m : list)
+            if (m.tick < tick)
+                a0 = std::max (a0, m.tick);
+        a1 = tick;
+        b1 = after (tick);
+    }
+    return a1 > a0 && b1 > a1;
+}
+} // namespace
+
+bool canMoveContent (const Song& song, int index, int direction)
+{
+    std::int64_t a0 = 0, a1 = 0, b1 = 0;
+    return contentSections (song, index, direction, a0, a1, b1);
+}
+
+bool moveContent (Song& song, int index, int direction)
+{
+    std::int64_t a0 = 0, a1 = 0, b1 = 0;
+    if (! contentSections (song, index, direction, a0, a1, b1))
+        return false;
+    const auto lengthA = a1 - a0, lengthB = b1 - a1;
+    const auto moved = [&] (std::int64_t t) { return t >= a0 && t < a1 ? t + lengthB : t >= a1 && t < b1 ? t - lengthA : t; };
+    for (auto& c : song.playlist)
+        c.start = moved (c.start);
+    auto list = song.markers();
+    song.markers().clear();
+    for (auto m : list)
+    {
+        m.tick = moved (m.tick);
+        song.addMarker (m);
+    }
+    return true;
+}
+
 int deleteInSelection (Song& song)
 {
     auto& list = song.markers();

@@ -571,7 +571,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker, headerMove, regionLoop, headerWidth, fadeTension,
+                      tempoMarker, marker, headerMove, regionLoop, headerWidth, fadeTension,
                       pointBand, pointsMove, pen, // (round 190lw, issue #207)
                       range, rangeMove }; // (round 190pa, P14)
     void swipeTimeSelectionToComp (int lane);
@@ -845,7 +845,11 @@ private:
     std::vector<int> sortClips (std::vector<int> placed = {}, bool changedTrack = false); // returns where the placed clips are now
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
-    void showRulerMenu (int x, int y = -1);               // markers, time signature and loop
+    void showRulerMenu (int x, int y = -1);
+    juce::PopupMenu markerMenu (int index, int x); // FL's marker menu (round 190ri)
+public:
+    juce::PopupMenu markerMenuForSnapshot (int index) { return markerMenu (index, 0); }
+private:
 public:
     // (round 190ol: the menu itself, also for the shots). Issue #281 (round 190qr): `y` is the press; on a marker's tag
     // (markerTagAt) the menu is that marker's, wherever on the tag, as FL's
@@ -860,6 +864,9 @@ private:
     int tempoTagAt (int x, int y) const;
     void editTempoMarker (std::int64_t tick, int existing);
     int tempoDragMarker = -1;
+    int markerDragIndex = -1; // (round 190ri) a time marker's tag pressed: dragged = moved, released in place = go to it
+    std::int64_t markerDragTick = 0;
+    bool markerDragMoved = false;
     std::int64_t tempoDragTick = 0;
     // FL 2026's Playlist › Time markers keys (round 167k): Alt+T, Ctrl+T, Shift+Alt+T, Shift+T
     std::int64_t songPositionTick() const;      // the playhead (song position), wrapped like centreOnPlayhead
