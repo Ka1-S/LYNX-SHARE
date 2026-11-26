@@ -3233,6 +3233,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.shadeFadedAudio") return PlaylistComponent::shadeFadedAudio; // (round 190oo O-1)
     if (id == "playlist.dimUnselectedTracks") return PlaylistComponent::dimUnselectedTracks; // (PR #267, round 190qj)
     if (id == "playlist.darkenMutedTracks") return PlaylistComponent::darkenMutedTracks; // (PR #268, round 190qm)
+    if (id == "playlist.routingHints") return PlaylistComponent::routingHints; // (round 190rs, G-01)
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "pianoRoll.stackedLanes") return PianoRollComponent::stackedLanesExtra; // (round 190on, P10)
     if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
@@ -3372,6 +3373,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     else if (id == "playlist.darkenMutedTracks") // PR #268 (round 190qm): Playlist › View › Darken switched-off tracks
     {
         PlaylistComponent::darkenMutedTracks = on;
+        saved();
+    }
+    else if (id == "playlist.routingHints") // round 190rs (G-01): the unassigned track header's routing hint
+    {
+        PlaylistComponent::routingHints = on;
         saved();
     }
     else if (id == "pianoRoll.songBarsRuler")

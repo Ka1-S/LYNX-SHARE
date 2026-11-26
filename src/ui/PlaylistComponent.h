@@ -160,6 +160,10 @@ public:
     // a visual extra that changes no gesture, file or sound); off = FL-exact. Playlist › View and Settings › LYNX extras
     // ("darkenMutedTracks").
     static inline bool darkenMutedTracks = true;
+    // Round 190rs (G-01, queue item 92), a LYNX extra on by default (text only): an unassigned track's header hint says
+    // where its clips are heard ("plays Kick → insert 1 (KICK)"); off = FL's bare name ("routingHints")
+    static inline bool routingHints = true;
+    static juce::String routeHintFor (const Song& song, int track);
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 

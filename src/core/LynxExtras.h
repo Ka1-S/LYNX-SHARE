@@ -176,6 +176,10 @@ inline constexpr Item items[] = {
     { "playlist.darkenMutedTracks", TR_NOOP ("Playlist"), TR_NOOP ("Darken switched-off tracks (LYNX)"),
       TR_NOOP ("In the Pattern layout, a Playlist track switched off (its LED dark) also steps back as a whole row: its lane and clips go under a dark veil. FL Studio greys only the track's clips and header: switch this off for FL's look. Also in Playlist › View."),
       "ui-options.txt:darkenMutedTracks" },
+    // round 190rs (G-01, queue item 92; on by default: text only, the owner's 2026-11-23 rule): FL's hint shows the name only
+    { "playlist.routingHints", TR_NOOP ("Playlist"), TR_NOOP ("Routing hints (LYNX)"),
+      TR_NOOP ("A Playlist track holds clips only: each clip plays through its channels' mixer inserts. Pointing at a track header that has no instrument or audio link says where its clips are heard, for example \"plays Kick → insert 1\". FL Studio shows only the track's name: switch this off for FL's hint. Its only switch is here."),
+      "ui-options.txt:routingHints" },
     // round 190oo (CS O-3): Live folds a track's automation lanes; LYNX's Clip-launch arrangement shows them open
     { "playlist.clipLanesFolded", TR_NOOP ("Playlist"), TR_NOOP ("Automation lanes start folded when a project opens (Clip-launch layout)"),
       TR_NOOP ("As in Live, a project opened or imported shows its tracks' automation lanes folded the first time the Clip-launch arrangement shows it; each track's lane arrow unfolds them. Also in the Playlist menu of the Clip-launch layout."),

@@ -9928,6 +9928,44 @@ juce::Rectangle<int> PlaylistComponent::trackSharedMark (int track) const
     return { leftmost - 4 - size, led.getCentreY() - size / 2, size, size };
 }
 
+// Round 190rs (G-01, queue item 92): an unassigned Playlist track holds clips only, and each clip plays through its
+// channels' mixer inserts, so the header hint says where the track's clips are heard (FL's hint bar shows the name only;
+// the LYNX extra "Routing hints", on by default, text only)
+juce::String PlaylistComponent::routeHintFor (const Song& song, int track)
+{
+    const auto r = trackmodes::routeSummary (song, track);
+    if (! r.clips)
+        return tr ("(a lane for clips: they play through their channels' inserts)");
+    if (r.channels.empty())
+        return {};
+    if (r.channels.size() == 1)
+    {
+        const auto& ch = song.channels[(std::size_t) r.channels.front()];
+        const auto name = ch.name.empty() ? tr ("Channel {0}", { juce::String (r.channels.front() + 1) }) : juce::String::fromUTF8 (ch.name.c_str());
+        const auto t = r.inserts.front();
+        if (t == 0)
+            return tr ("plays {0} → Master", { name });
+        const auto own = t < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()).trim() : juce::String();
+        return own.isEmpty() || own == "Insert " + juce::String (t) ? tr ("plays {0} → insert {1}", { name, juce::String (t) })
+                                                                      : tr ("plays {0} → insert {1} ({2})", { name, juce::String (t), own });
+    }
+    const auto count = juce::String ((int) r.channels.size());
+    if (r.inserts.size() == 1)
+        return r.inserts.front() == 0 ? tr ("plays {0} channels → Master", { count })
+                                      : tr ("plays {0} channels → insert {1}", { count, juce::String (r.inserts.front()) });
+    juce::StringArray list;
+    for (const auto t : r.inserts)
+    {
+        if (list.size() == 8)
+        {
+            list.add ("...");
+            break;
+        }
+        list.add (t == 0 ? tr ("Master") : juce::String (t));
+    }
+    return tr ("plays {0} channels → inserts {1}", { count, list.joinIntoString (", ") });
+}
+
 bool PlaylistComponent::linkedHeaders() const
 {
     return ! simpleHeaders && engine.getSong().linkTracksToMixer;
@@ -15640,8 +15678,15 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                 hint.value += " " + tr ("(bus: {0} mixer track(s) send into it; \"+A\" adds its volume and pan lanes)", { juce::String (sources) });
         }
         else if (linkedHeaders()) // issue #170 (round 190ib): a track that only repeats a track above it
+        {
             if (const auto repeats = autolink::repeatedTracks (song); h.track >= 0 && h.track < (int) repeats.size() && repeats[(std::size_t) h.track] >= 0)
                 hint.value += " " + tr ("(repeats Track {0}'s instruments: plays through insert {0})", { juce::String (repeats[(std::size_t) h.track] + 1) });
+        }
+        else if (routingHints && ! simpleHeaders && ! h.led) // round 190rs (G-01, LYNX extra): where an unassigned track is heard
+        {
+            if (const auto route = routeHintFor (song, h.track); route.isNotEmpty())
+                hint.value += "  " + route;
+        }
         hint.hasMenu = ! h.led && ! h.arrow && ! h.arm && ! h.input;
         return hint;
     }

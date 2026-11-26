@@ -807,6 +807,43 @@ std::string describe (const Song& song, int track)
     return {};
 }
 
+RouteSummary routeSummary (const Song& song, int track)
+{
+    RouteSummary r;
+    const auto channelCount = song.channels.size();
+    std::vector<char> plays (channelCount, 0), patternSeen (song.patterns.size(), 0);
+    for (const auto& c : song.playlist)
+    {
+        if (c.track != track)
+            continue;
+        if (c.kind == ClipKind::audio)
+        {
+            r.clips = true;
+            if (c.channel >= 0 && (std::size_t) c.channel < channelCount)
+                plays[(std::size_t) c.channel] = 1;
+        }
+        else if (c.kind == ClipKind::pattern)
+        {
+            r.clips = true;
+            if (c.pattern < 0 || (std::size_t) c.pattern >= song.patterns.size() || patternSeen[(std::size_t) c.pattern])
+                continue;
+            patternSeen[(std::size_t) c.pattern] = 1;
+            for (const auto& n : song.patterns[(std::size_t) c.pattern].notes)
+                if (n.channel >= 0 && (std::size_t) n.channel < channelCount)
+                    plays[(std::size_t) n.channel] = 1;
+        }
+    }
+    for (std::size_t ch = 0; ch < channelCount; ++ch)
+        if (plays[ch])
+        {
+            r.channels.push_back ((int) ch);
+            r.inserts.push_back (std::max (0, song.channels[ch].mixerTrack));
+        }
+    std::sort (r.inserts.begin(), r.inserts.end());
+    r.inserts.erase (std::unique (r.inserts.begin(), r.inserts.end()), r.inserts.end());
+    return r;
+}
+
 int armableInsert (const Song& song, int track)
 {
     if (track < 0 || track >= (int) song.playlistTracks.size())

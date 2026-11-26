@@ -3881,6 +3881,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::dimUnselectedTracks = on;
         else if (key == "darkenMutedTracks") // PR #268 (round 190qm): Playlist › View › Darken switched-off tracks (LYNX)
             PlaylistComponent::darkenMutedTracks = on;
+        else if (key == "routingHints") // round 190rs (G-01): Settings › LYNX extras › Routing hints (LYNX)
+            PlaylistComponent::routingHints = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -4322,6 +4324,7 @@ void MainComponent::saveUiSettings()
                                       + "\nshadeFadedAudio=" + juce::String (PlaylistComponent::shadeFadedAudio ? 1 : 0)
                                       + "\ndimUnselectedTracks=" + juce::String (PlaylistComponent::dimUnselectedTracks ? 1 : 0)
                                       + "\ndarkenMutedTracks=" + juce::String (PlaylistComponent::darkenMutedTracks ? 1 : 0)
+                                      + "\nroutingHints=" + juce::String (PlaylistComponent::routingHints ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu

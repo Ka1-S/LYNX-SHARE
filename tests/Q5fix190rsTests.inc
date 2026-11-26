@@ -83,3 +83,57 @@ TEST (q5fix190rs_playlist_selection_kept_by_content_over_undo_of_a_move)
     CHECK (lynx::selkeep::remap (moved, { 3 }, before) == std::vector<int> ({ 1 }));
     CHECK (lynx::selkeep::remap (before, { 1 }, moved) == std::vector<int> ({ 3 }));
 }
+
+// G-01: where an unassigned Playlist track's clips are heard (the header hint's facts). The starter project: Kick,
+// Clap, Hat, Snare and Synth on inserts 1-5, the beat on Playlist track 1
+#include "core/PlaylistOps.h"
+TEST (q5fix190rs_route_summary_of_an_unassigned_track)
+{
+    using namespace lynx;
+    Song s;
+    s.channels.resize (3);
+    s.channels[0].mixerTrack = 1;
+    s.channels[1].mixerTrack = 2;
+    s.channels[2].mixerTrack = 0; // the Master
+    s.patterns.resize (2);
+    Note kick;
+    kick.channel = 0;
+    s.patterns[0].notes.push_back (kick);
+    for (int ch : { 0, 1, 2 })
+    {
+        Note n;
+        n.channel = ch;
+        s.patterns[1].notes.push_back (n);
+    }
+    // nothing on track 4: a lane for clips
+    auto r = trackmodes::routeSummary (s, 4);
+    CHECK (! r.clips && r.channels.empty() && r.inserts.empty());
+    // one pattern of the Kick only on track 0 (twice: counted once)
+    Clip c;
+    c.kind = ClipKind::pattern;
+    c.pattern = 0;
+    c.track = 0;
+    s.playlist.push_back (c);
+    c.start = 384;
+    s.playlist.push_back (c);
+    r = trackmodes::routeSummary (s, 0);
+    CHECK (r.clips && r.channels == std::vector<int> ({ 0 }) && r.inserts == std::vector<int> ({ 1 }));
+    // the three channels on track 1: inserts Master, 1, 2
+    c.pattern = 1;
+    c.track = 1;
+    s.playlist.push_back (c);
+    r = trackmodes::routeSummary (s, 1);
+    CHECK (r.channels == std::vector<int> ({ 0, 1, 2 }) && r.inserts == std::vector<int> ({ 0, 1, 2 }));
+    // an audio clip plays its own channel; an automation clip alone is not a sound clip
+    Clip a;
+    a.kind = ClipKind::audio;
+    a.channel = 1;
+    a.track = 2;
+    s.playlist.push_back (a);
+    CHECK (trackmodes::routeSummary (s, 2).inserts == std::vector<int> ({ 2 }));
+    Clip au;
+    au.kind = ClipKind::automation;
+    au.track = 3;
+    s.playlist.push_back (au);
+    CHECK (! trackmodes::routeSummary (s, 3).clips);
+}
