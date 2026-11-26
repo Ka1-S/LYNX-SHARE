@@ -1,8 +1,10 @@
 #include "core/MissingFiles.h"
+#include "core/VideoPlayer.h"
 
 #include <algorithm>
 #include <cctype>
 #include <set>
+#include <type_traits>
 
 namespace lynx
 {
@@ -88,6 +90,19 @@ void channelSamples (Channel& c, const std::string& user, Fn& fn)
         fn (s.path, (user.empty() ? c.name : user) + ": stand-in");
     for (auto& s : c.freeze.stems) // a frozen channel's audio (round 190ay)
         fn (s.path, (user.empty() ? c.name : user) + ": frozen audio");
+    // round 190rw: the Video Player's video (its path is inside FL's state)
+    if (c.instrument == InstrumentKind::videoplayer)
+        if (auto vs = video::read (c.pluginState); vs && ! vs->path.empty())
+        {
+            auto path = vs->path;
+            fn (path, (user.empty() ? c.name : user) + ": video");
+            if constexpr (! std::is_const_v<Channel>)
+                if (path != vs->path)
+                {
+                    vs->path = path;
+                    c.pluginState = video::write (*vs);
+                }
+        }
     docSamples (c.patcher, inPatcher (user.empty() ? c.name : user), fn);
 }
 
@@ -111,6 +126,10 @@ void forEachSample (SongT& song, Fn&& fn)
 {
     for (auto& c : song.channels)
         channelSamples (c, {}, fn);
+    // round 190rw: the video tracks' files
+    for (std::size_t t = 0; t < song.videoTracks.size(); ++t)
+        for (auto& clip : song.videoTracks[t].clips)
+            fn (clip.path, song.videoTracks[t].name.empty() ? "Video " + std::to_string (t + 1) : song.videoTracks[t].name);
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
     {
         auto& track = song.mixer[t];

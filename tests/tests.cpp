@@ -18148,3 +18148,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Sweep190reTests.inc" // round 190re (0.1.32 regression sweep): the defects it found and fixed
 #include "Sweep190rjTests.inc" // round 190rj (0.1.32 regression sweep 2): the defects it found and fixed
 #include "Plugsweep190rkTests.inc" // round 190rk (0.1.32 hosted plugin sweep): the defects it found and fixed
+#include "Q1a190rwTests.inc" // round 190rw (0.1.32 stage Q1 part A: Playlist, Piano roll, Channel rack): the defects it found and fixed
