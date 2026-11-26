@@ -476,16 +476,43 @@ public:
         setVisible (true);
         repaint();
 
-        if (transient)
-            startTimer (900);
-        else
-            stopTimer();
+        // issue #299 (round 190ri): the tip is the window's, not the control's — it stays where it was put. It is watched
+        // while it shows: it goes once its control moves (the page scrolled), is hidden (the page or window changed), its
+        // window loses the focus, or — no button held — the pointer is no longer on the control (a drag whose release was
+        // missed left it on screen for good)
+        owner = &over;
+        controlArea = control;
+        shownAt = over.localAreaToGlobal (control);
+        focused = over.getPeer() != nullptr && over.getPeer()->isFocused();
+        hideAt = transient ? juce::Time::getMillisecondCounterHiRes() + 900.0 : 0.0;
+        startTimer (60);
     }
 
     void hide()
     {
         stopTimer();
+        owner = nullptr;
         setVisible (false);
+    }
+
+    // one pass of the watch (the timer's; tests call it); true when it hid the tip
+    bool check()
+    {
+        if (! isVisible())
+            return false;
+        auto* over = owner.getComponent();
+        const auto pointerOff = [over] {
+            const auto pointer = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition().roundToInt();
+            return ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown() && ! theme::pointOnVisiblePart (*over, pointer);
+        };
+        if ((hideAt > 0.0 && juce::Time::getMillisecondCounterHiRes() >= hideAt) || over == nullptr || ! over->isShowing()
+            || over->localAreaToGlobal (controlArea) != shownAt || (focused && (over->getPeer() == nullptr || ! over->getPeer()->isFocused()))
+            || (hideAt == 0.0 && pointerOff()))
+        {
+            hide();
+            return true;
+        }
+        return false;
     }
 
     void paint (juce::Graphics& g) override
@@ -508,9 +535,13 @@ public:
     }
 
 private:
-    void timerCallback() override { hide(); }
+    void timerCallback() override { check(); }
 
     juce::String text;
+    juce::Component::SafePointer<juce::Component> owner;
+    juce::Rectangle<int> controlArea, shownAt;
+    bool focused = false;
+    double hideAt = 0.0; // (a flash: when it goes)
 };
 
 // Owns the tip; deleted by JUCE before the message loop goes away.
@@ -542,6 +573,18 @@ void showValueTip (juce::Component& over, juce::Rectangle<int> control, const ju
 void flashValueTip (juce::Component& over, juce::Rectangle<int> control, const juce::String& text)
 {
     valueTip().show (over, control, text, true);
+}
+
+bool checkValueTipNow()
+{
+    auto* holder = ValueTipHolder::instance();
+    return holder != nullptr && holder->tip.check();
+}
+
+bool valueTipShown()
+{
+    auto* holder = ValueTipHolder::instance();
+    return holder != nullptr && holder->tip.isVisible();
 }
 
 void hideValueTip()
@@ -675,7 +718,8 @@ void configure (juce::Slider& s)
 // sliders that show no value of their own get the floating read-out
 bool wantsValueTip (juce::Slider& s)
 {
-    return s.getTextBoxPosition() == juce::Slider::NoTextBox;
+    // (issue #299, round 190ri: a slider showing JUCE's own value bubble — setPopupDisplayEnabled — gets no second one)
+    return s.getTextBoxPosition() == juce::Slider::NoTextBox && s.getCurrentPopupDisplay() == nullptr;
 }
 
 // `scale` = controls::fineScale: 1 plain, fineFactor with Ctrl, ultraFineFactor with Ctrl+Shift

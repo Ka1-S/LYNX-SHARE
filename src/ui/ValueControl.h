@@ -130,6 +130,9 @@ void typeValue (juce::Component& target, const ValueSpec& spec, double current, 
 // `control` is the control's area in `over`'s coordinates; the tip sits above it.
 void showValueTip (juce::Component& over, juce::Rectangle<int> control, const juce::String& text);
 void flashValueTip (juce::Component& over, juce::Rectangle<int> control, const juce::String& text);
+// (issue #299, round 190ri; tests) one pass of the tip's watch now — true when it hid the tip — and whether it shows
+bool checkValueTipNow();
+bool valueTipShown();
 void hideValueTip();
 
 // --- hints -----------------------------------------------------------------------------------------
