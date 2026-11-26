@@ -38,11 +38,12 @@ The short version of each release. The full notes, with measurements, known issu
 - Opening a plugin or instrument window on Linux takes about half the work, and long paints of the Playlist (audio clips whose
   sample was not loaded) are gone.
 - LYNX extras that only change the look are now on by default (the Chord lane's chord in the Piano roll, effects on
-  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, dimmed
-  unselected and darkened switched-off Playlist tracks); extras you switched
+  linked track headers, the project name in the Simple layout, Live's scale control in the Clip-launch layout, darkened
+  switched-off Playlist tracks); extras you switched
   yourself keep your choice, and *Settings › LYNX extras* has **FL-exact** and **Recommended** buttons.
 - The Mixer's peak values and correlation bars (*Mixer › View*) are off by default: with them on, every fader and meter is
-  19 px shorter than FL Studio's. If you switched them on yourself, they stay on.
+  19 px shorter than FL Studio's. *Dim unselected tracks* (*Playlist › View*) is off by default too, until it draws for
+  less. If you switched them on yourself, they stay on.
 - Two more LYNX extras are on by default: an audio clip's gain handle stays in view while the clip's middle is scrolled
   away (FL Studio then shows none; a press beside it still moves the clip), and a new project made in the Clip-launch
   layout gets a mixer track for every track, as a new Live set. *Settings › LYNX extras* now says which extras are on by

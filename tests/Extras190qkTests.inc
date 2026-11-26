@@ -18,11 +18,11 @@ TEST (extras190qk_default_lists)
         CHECK (ids.count (id) == 1 && named.insert (id).second);
     for (const auto id : extras::onInFlExact)
         CHECK (ids.count (id) == 1 && extras::defaultOnBefore0132 (id)); // FL's own: on before 0.1.32 already
-    CHECK (std::size (extras::onSince0132) == 14);
-    // the six turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #267's
-    // and PR #268's veils; round 190ro took round 190qh's two Mixer views out again, below)
+    CHECK (std::size (extras::onSince0132) == 13);
+    // the five turned on are views only (none changes a key, click, file or sound; rollup 0.1.32 step 2 added PR #268's
+    // veil; round 190ro took round 190qh's two Mixer views and PR #267's veil out again, below)
     for (const auto* id : { "pianoRoll.chordHighlight", "playlist.trackInserts",
-                            "simple.projectName", "controlBar.liveScale", "playlist.dimUnselectedTracks", "playlist.darkenMutedTracks" })
+                            "simple.projectName", "controlBar.liveScale", "playlist.darkenMutedTracks" })
         CHECK (extras::defaultOn (id) && ! extras::defaultOnBefore0132 (id) && ! extras::flExactOn (id));
     // rollup 0.1.32 step 3, the owner's decisions: #287's MIDI drop (FL ignores a .mid dropped there), #238's track colors
     // and round 190qi's LYNX-only plugin / Browser lists are on too; FL-exact turns them off
@@ -44,7 +44,9 @@ TEST (extras190qk_default_lists)
                             "export.doneSound", "export.doneWindow", "audioEditor.wheelScrolls", "toolbar.grouped",
                             "editing.zoomKeysLynx", // round 190ro (D-2): FL 2026 zooms around the pointer, a second Shift+5 does nothing
                             // round 190ro (EXTRAS-2.md OFF-1): 19 px off every FL Mixer fader and meter, +1.6 % a column
-                            "mixer.peakValues", "mixer.correlation" })
+                            "mixer.peakValues", "mixer.correlation",
+                            // round 190ro: +17.7 % / +24.5 % a Playlist frame with a track selected (0.1.33: a cached veil)
+                            "playlist.dimUnselectedTracks" })
         CHECK (! extras::defaultOn (id) && ! extras::flExactOn (id));
     // FL-exact: FL's own two on, the stretched clips' loop (issue #25) off
     CHECK (extras::flExactOn ("general.escCloses") && extras::flExactOn ("general.startPage"));
@@ -135,5 +137,24 @@ TEST (extras190ro_mixer_extras_off_again)
     CHECK (old == std::vector<std::string> { "wheelZones=0" } && extras::userSet().empty());
     // switched on from the page later: it joins the list when written
     CHECK (extras::noteUserChoices ("\nmixerPeakValues=1\nmixerCorrelation=0") == "\nextrasUserSet=mixer.peakValues");
+    extras::userSet() = kept;
+}
+
+// Round 190ro (the coordinator's option (c), 11-26): PR #267's "Dim unselected tracks" is off by default again (its veil cost
+// +17.7 % / +24.5 % a Playlist frame with a track selected). A profile from a 0.1.32 rollup build that never switched it follows
+// the new off; one whose user switched it (in the user-set list) keeps the choice; a 0.1.31 file never had the key.
+TEST (extras190ro_dim_unselected_off_again)
+{
+    using namespace lynx;
+    const auto kept = extras::userSet();
+    CHECK (! extras::defaultOn ("playlist.dimUnselectedTracks") && ! extras::defaultOnBefore0132 ("playlist.dimUnselectedTracks"));
+    std::vector<std::string> followed { "dimUnselectedTracks=1", "darkenMutedTracks=1", "extrasUserSet=playlist.trackInserts" };
+    extras::followDefaults (followed);
+    CHECK (followed[0] == "dimUnselectedTracks=0" && followed[1] == "darkenMutedTracks=1");
+    std::vector<std::string> chosen { "dimUnselectedTracks=1", "extrasUserSet=playlist.dimUnselectedTracks" };
+    extras::followDefaults (chosen);
+    CHECK (chosen[0] == "dimUnselectedTracks=1" && extras::userSet().count ("playlist.dimUnselectedTracks") == 1);
+    extras::userSet().clear();
+    CHECK (extras::noteUserChoices ("\ndimUnselectedTracks=1") == "\nextrasUserSet=playlist.dimUnselectedTracks");
     extras::userSet() = kept;
 }
