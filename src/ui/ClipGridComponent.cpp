@@ -27,6 +27,7 @@
 #include "core/GrooveAudio.h"
 #include "core/SessionKeys.h"
 #include "core/SessionOps.h"
+#include "core/NoteEdit.h"
 #include "engine/SampleLibrary.h"
 #include "ui/BrowserComponent.h"
 #include "ui/ColourPicker.h"
@@ -2982,6 +2983,28 @@ public:
         const auto channel = detailchain::forTrack (song, track).channel;
         const auto valid = channel >= 0 && channel < (int) song.channels.size();
         juce::PopupMenu menu;
+        // round 190rs (G-30, ref/live-l06): Live's track title menu, in Live's order, over LYNX's own operations (one undo
+        // step each); LYNX's own items after a line at the end
+        // (no copy of the song to test them on: the enabling rules are the operations' own, checked here directly)
+        const auto gridClips = song.clipGrid != nullptr
+                               && std::any_of (song.clipGrid->clips.begin(), song.clipGrid->clips.end(), [track] (const Clip& c) { return c.track == track; });
+        {
+            const auto* info = track < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) track] : nullptr;
+            const auto canDuplicate = (info != nullptr && (! info->name.empty() || info->colour != 0 || info->mode != PlaylistTrackMode::unassigned))
+                                      || std::any_of (song.playlist.begin(), song.playlist.end(), [track] (const Clip& c) { return c.track == track; });
+            menu.addItem (tr ("Duplicate"), canDuplicate, false, [this, track] {
+                engine.editSong ([track] (Song& s) { session::duplicateTrack (s, track); });
+                repaint();
+            });
+        }
+        menu.addItem (tr ("Delete"), [this, track] {
+            engine.editSong ([track] (Song& s) { noteedit::removeTrack (s, track); });
+            selectedTrack = juce::jmax (0, juce::jmin (selectedTrack, track - 1));
+            clearRange();
+            repaint();
+            notify (GridPick::select);
+        });
+        menu.addSeparator();
         menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track] { renameTrack (track); });
         menu.addSeparator();
         const auto frozen = valid && song.channels[(std::size_t) channel].freeze.on();
@@ -2999,8 +3022,70 @@ public:
             bounceTrackInPlace (engine, channel);
             repaint();
         });
+        // round 190rs (G-30): Live's Insert Audio / MIDI / Return Track (a new track right of this one: an audio track on a
+        // free mixer track, an empty track for notes — dropping an instrument on it makes it a MIDI track, as Live's empty
+        // MIDI track says; a return after the others)
+        menu.addSeparator();
+        {
+            menu.addItem (tr ("Insert Audio Track"), [this, track] {
+                auto trial = engine.getSong(); // (no free mixer track: nothing changes, no undo step)
+                noteedit::insertTrack (trial, track + 1);
+                if (! trackmodes::makeAudioTrack (trial, track + 1))
+                    return;
+                engine.editSong ([track] (Song& s) {
+                    noteedit::insertTrack (s, track + 1);
+                    trackmodes::makeAudioTrack (s, track + 1);
+                });
+                selectedTrack = track + 1;
+                clearRange();
+                repaint();
+                notify (GridPick::select);
+            });
+        }
+        menu.addItem (tr ("Insert MIDI Track"), [this, track] {
+            engine.editSong ([track] (Song& s) { noteedit::insertTrack (s, track + 1); });
+            selectedTrack = track + 1;
+            clearRange();
+            repaint();
+            notify (GridPick::select);
+        });
+        menu.addItem (tr ("Insert Return Track"), (int) sessionmixer::returnsOf (song).size() < sessionmixer::maxReturns, false, [this] {
+            engine.editSong ([] (Song& s) {
+                launcher::ensureGrid (s);
+                sessionmixer::insertReturn (s, "Return");
+            });
+            if (auto* parent = getParentComponent())
+                parent->resized();
+            repaint();
+        });
+        menu.addSeparator();
+        // Live's Select Track Content: every slot of the column (the grid's rectangle selection)
+        menu.addItem (tr ("Select Track Content"), rowCount() > 0, false, [this, track] {
+            sceneSelected = titleSelected = false;
+            rangeTrack0 = track, rangeScene0 = 0, selectedTrack = track, selectedScene = juce::jmax (0, rowCount() - 1);
+            markRangeEnd();
+            repaint();
+            notify (GridPick::select);
+        });
+        menu.addSeparator();
+        const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
+        menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {
+            engine.editSong ([track, c] (Song& s) {
+                if ((int) s.playlistTracks.size() <= track)
+                    s.playlistTracks.resize ((std::size_t) track + 1);
+                s.playlistTracks[(std::size_t) track].colour = c;
+            });
+            repaint();
+        }, mouseArea()));
+        {
+            menu.addItem (tr ("Assign Track Color to Clips"), gridClips, false, [this, track] {
+                engine.editSong ([track] (Song& s) { session::assignTrackColourToClips (s, track); });
+                repaint();
+            });
+        }
         // round 190op (P4, LYNX extras; owner decision O-3): Deactivate Track unloads the track's devices (the Track
         // Activator stays Live's mute); Hide takes the column out of view (Show hidden tracks, Playlist menu)
+        menu.addSeparator();
         {
             const auto units = trackstates::unitsOfTrack (song, track);
             const auto off = trackstates::trackDeactivated (song, units);
@@ -3015,16 +3100,6 @@ public:
                 repaint();
             });
         }
-        menu.addSeparator();
-        const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
-        menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {
-            engine.editSong ([track, c] (Song& s) {
-                if ((int) s.playlistTracks.size() <= track)
-                    s.playlistTracks.resize ((std::size_t) track + 1);
-                s.playlistTracks[(std::size_t) track].colour = c;
-            });
-            repaint();
-        }, mouseArea()));
         return menu;
     }
 

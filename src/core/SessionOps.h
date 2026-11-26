@@ -84,6 +84,16 @@ bool moveClip (Song& song, int fromTrack, int fromScene, int toTrack, int toScen
 // Duplicate: a copy in the slot below (a new scene is added under the last one). Returns the copy's scene, −1: nothing.
 int duplicate (Song& song, int track, int scene);
 
+// Round 190rs (G-30): the Clip-launch track header's Live items, as wrappers over LYNX's own operations.
+// Duplicate (Live's, no question asked): the Playlist track cloned with every clip kind, its effects and routing
+// (pltracks::cloneTracks), right after it, and its clip grid slots copied into the clone's column; an instrument track's
+// clone plays a clone of its channel, so the copied pattern clips get their own patterns with the notes on that channel.
+// Returns the clone's track, or −1 (an empty track: nothing to clone, as the Playlist's Clone says).
+int duplicateTrack (Song& song, int track);
+// Assign Track Color to Clips: every clip grid slot of `track` takes the track's colour (0 = each clip's source colour
+// again). Returns how many slots changed.
+int assignTrackColourToClips (Song& song, int track);
+
 // Round 190lx (DL-29, Live manual 7.4 / capture 190lx LB1-LB3): a rectangle of slots on the clipboard. `tracks` x `scenes`
 // is the rectangle's size; `clips` hold the slots that had a clip, at their offset from its top-left corner (the empty
 // ones stay holes: a paste leaves what is under them alone).

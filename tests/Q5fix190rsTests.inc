@@ -179,3 +179,42 @@ TEST (q5fix190rs_ctrl_n_is_save_new_version_in_the_pattern_layout)
     // the Shortcut manager's "Reset to default" in the Pattern layout gives FL's keys back
     CHECK (next.defaultsFor ("file.saveNewVersion") == std::vector<Chord> ({ ctrlN, ctrlAltS }) && next.defaultsFor ("file.new").empty());
 }
+
+// G-30: the Clip-launch track header's Duplicate and Assign Track Color to Clips (Live's items over LYNX's operations)
+#include "core/ClipLauncher.h"
+#include "core/SessionOps.h"
+TEST (q5fix190rs_clip_launch_duplicate_track_and_track_colour)
+{
+    using namespace lynx;
+    Song s;
+    s.channels.resize (1);
+    s.channels[0].name = "Bass";
+    s.patterns.resize (1);
+    Note n;
+    n.channel = 0;
+    n.length = 96;
+    s.patterns[0].notes.push_back (n);
+    CHECK (trackmodes::makeInstrumentTrack (s, 0, 0));
+    launcher::ensureGrid (s);
+    Clip c;
+    c.kind = ClipKind::pattern;
+    c.pattern = 0;
+    c.length = 384;
+    CHECK (launcher::setClip (s, 0, 1, c) >= 0);
+
+    const auto at = session::duplicateTrack (s, 0);
+    CHECK (at == 1);
+    const auto newChannel = s.playlistTracks[1].channel;
+    CHECK (s.playlistTracks[1].mode == PlaylistTrackMode::instrument && newChannel > 0 && newChannel < (int) s.channels.size());
+    const auto* copy = launcher::clipAt (*s.clipGrid, 1, 1);
+    CHECK (copy != nullptr && copy->pattern != 0 && copy->pattern < (int) s.patterns.size());
+    if (copy != nullptr && copy->pattern < (int) s.patterns.size())
+        CHECK (! s.patterns[(std::size_t) copy->pattern].notes.empty() && s.patterns[(std::size_t) copy->pattern].notes.front().channel == newChannel);
+    const auto* original = launcher::clipAt (*s.clipGrid, 0, 1);
+    CHECK (original != nullptr && original->pattern == 0 && s.patterns[0].notes.front().channel == 0); // (the original plays on)
+
+    s.playlistTracks[1].colour = 0xff336699;
+    CHECK (session::assignTrackColourToClips (s, 1) == 1);
+    CHECK (launcher::settingsAt (*s.clipGrid, 1, 1) != nullptr && launcher::settingsAt (*s.clipGrid, 1, 1)->colour == 0xff336699u);
+    CHECK (session::assignTrackColourToClips (s, 1) == 0); // (already)
+}
