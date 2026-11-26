@@ -14,6 +14,10 @@
 //               handed out the editor window itself, deleted with the editor: the release went through freed memory
 //               (LYNX_TEST_CRASH=runloop LYNX --plugwintest "LYNX Test Crash.vst3" report.txt 2: the window opens, the
 //               plugin is removed, it must not crash)
+//   "editorclose" - (Linux; round 190rp) the same editor, but its IPlugView::removed() writes to a null pointer: a
+//               plugin that faults in its own window code while its editor closes (the Cakewalk SI-* VST2 crash reports,
+//               Vst2Editor::~Vst2Editor). LYNX_TEST_CRASH=editorclose LYNX --plugwintest "LYNX Test Crash.vst3" r.txt 2:
+//               LYNX must survive the editor's close (the teardown runs inside the plugin guard)
 //
 //   V=<JUCE>/modules/juce_audio_processors/format_types/VST3_SDK
 //   Linux:   B="LYNX Test Crash.vst3/Contents/x86_64-linux"; mkdir -p "$B"
@@ -321,7 +325,13 @@ public:
         return type != nullptr && std::strcmp (type, kPlatformTypeX11EmbedWindowID) == 0 ? kResultTrue : kResultFalse;
     }
     tresult PLUGIN_API attached (void*, FIDString) override { return kResultOk; }
-    tresult PLUGIN_API removed() override { return kResultOk; }
+    tresult PLUGIN_API removed() override
+    {
+        if (crashOnRemove)
+            *(volatile int*) nullptr = 1; // ("editorclose")
+        return kResultOk;
+    }
+    bool crashOnRemove = false;
     tresult PLUGIN_API onWheel (float) override { return kResultFalse; }
     tresult PLUGIN_API onKeyDown (char16, int16, int16) override { return kResultFalse; }
     tresult PLUGIN_API onKeyUp (char16, int16, int16) override { return kResultFalse; }
@@ -355,8 +365,13 @@ IPlugView* PLUGIN_API TestCrash::createView (FIDString name)
 #if defined(__linux__)
     char buffer[32];
     const auto* mode = environment ("LYNX_TEST_CRASH", buffer);
-    if (mode != nullptr && std::strcmp (mode, "runloop") == 0 && name != nullptr && std::strcmp (name, ViewType::kEditor) == 0)
-        return new RunLoopView (*this);
+    if (mode != nullptr && (std::strcmp (mode, "runloop") == 0 || std::strcmp (mode, "editorclose") == 0) && name != nullptr
+        && std::strcmp (name, ViewType::kEditor) == 0)
+    {
+        auto* view = new RunLoopView (*this);
+        view->crashOnRemove = std::strcmp (mode, "editorclose") == 0;
+        return view;
+    }
 #else
     (void) name;
 #endif
