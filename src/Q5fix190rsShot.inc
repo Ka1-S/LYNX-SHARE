@@ -211,7 +211,12 @@
         if (auto* grid = ui.getClipGridForSnapshot())
         {
             const auto menu = clipGridHeaderMenu (*grid, 0);
-            const auto items = texts (menu);
+            juce::StringArray items; // (the names without their keys)
+            for (const auto& text : texts (menu))
+                items.add (text.upToFirstOccurrenceOf ("\t", false, false));
+            check ("G-30: Live's keys shown where LYNX binds them (Ctrl+D, Del, Ctrl+Shift+T, Ctrl+Alt+T)",
+                   texts (menu).contains (tr ("Duplicate") + "\tCtrl+D") && texts (menu).contains (tr ("Delete") + "\tDel")
+                       && texts (menu).contains (tr ("Insert MIDI Track") + "\tCtrl+Shift+T") && texts (menu).contains (tr ("Insert Return Track") + "\tCtrl+Alt+T"));
             line ("grid header menu: " + items.joinIntoString (" | "));
             check ("G-30: Live's items, in Live's order", items.indexOf (tr ("Duplicate")) >= 0 && items.indexOf (tr ("Duplicate")) < items.indexOf (tr ("Delete"))
                                                              && items.indexOf (tr ("Delete")) < items.indexOf (tr ("Insert Audio Track"))
