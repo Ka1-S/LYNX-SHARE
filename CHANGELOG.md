@@ -34,6 +34,10 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- **Faster with FL Studio's data and big projects:** F8, the Add menu, layout switches and opening a project no longer walk
+  FL Studio's plugin database folders to know which FL engines LYNX has (F8 took 30.8 s with FL's data on a slow drive, now
+  19 ms; a layout switch 15-39 s, now under 0.5 s); an edit while a 1,728-bar song plays no longer pauses for 1.6 s (65 ms):
+  the tempo map reads only the tempo clips.
 - As FL Studio 2026: the Channel rack's Ctrl+L (Route to free mixer track) treats a named insert as taken and keeps a
   channel that is alone on its insert there; with a group filter on, the rack's selection keeps only the channels it shows; the
   Mixer slot menu's Browse presets, Save preset as..., Browse parameters and Help work where FL Studio's do.
