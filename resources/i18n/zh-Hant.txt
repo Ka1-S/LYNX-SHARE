@@ -13157,5 +13157,3 @@ countries: tw hk mo
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} 仍然沒有回應。LYNX SHARE 暫時使用 {1}。"
 "no audio device" = "無音訊裝置"
 "Continuous scrolling" = "連續捲動"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "跟隨：歌曲播放時播放清單隨播放頭一起捲動。右鍵點擊：連續捲動；關閉時可自由瀏覽"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "跟隨：播放歌曲時，播放清單會與播放游標一起捲動。按一下右鍵：連續捲動；關閉後，可自由瀏覽"

@@ -1326,7 +1326,12 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     followButton.setFlat (true);
     followButton.setClickingTogglesState (false);
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
-    followButton.setTooltip (tr ("Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely"));
+    // PR #308: the right-click's menu in the hint bar (FL's mouse glyph there; LYNX's [RMB] markup + the menu marker), the
+    // tooltip the same words in plain text
+    const auto followHint = tr ("Follow: the Playlist scrolls along with the playhead while the song plays; off, you can look around freely")
+                            + "  [RMB] " + tr ("Continuous scrolling");
+    ui::setHint (followButton, followHint, true);
+    followButton.setTooltip (ui::plainHint (followHint));
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("playlist.follow"); };
     followButton.onRightClick = [this] { showFollowMenu(); };
@@ -16589,17 +16594,24 @@ bool PlaylistComponent::liveFrame (double nowMs)
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
         const auto grid = gridArea();
-        const auto newStart = EditorGlobals::get().isContinuousScroll()
-                                    ? transportedit::followViewStartContinuous (tick, grid.getWidth() / 3.0 / pixelsPerTick, pixelsPerTick)
-                                    : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
-                                                                        20.0 / pixelsPerTick);
+        // PR #308, FL's Continuous scrolling: the playhead held at a third of the grid. Only with a playhead (Pattern mode
+        // has none here: the view stays put, as with the option off), and in whole steps of the screen's pixels (2 px at
+        // 150 %), so the cached picture is shifted and only the uncovered strip is painted (repaintScrolled)
+        const auto continuous = EditorGlobals::get().isContinuousScroll() && tick >= 0.0;
+        const auto quantum = continuous ? (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this)) : 1.0;
+        const auto newStart = continuous ? transportedit::followViewStartContinuous (tick, grid.getWidth() / 3.0 / pixelsPerTick, pixelsPerTick / quantum)
+                                         : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
+                                                                           20.0 / pixelsPerTick);
 
         if (EditorGlobals::get().followsNow (EditorGlobals::FollowView::playlist) && playing && newStart != scrollTicks)
         {
             scrollTicks = newStart;
             followSeenScroll = scrollTicks; // (round 190im: not a scroll by hand)
             updateScrollBars();
-            repaint();
+            if (continuous)
+                repaintScrolled();
+            else
+                repaint();
             if (gpuPlayhead.isShowing())
                 gpuPlayhead.show (playheadMark()); // (at its place in the new page)
         }

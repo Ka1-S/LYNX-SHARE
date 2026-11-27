@@ -13157,5 +13157,3 @@ countries: it ch sm
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} continua a non rispondere. LYNX SHARE per ora usa {1}."
 "no audio device" = "nessun dispositivo audio"
 "Continuous scrolling" = "Scorrimento continuo"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Segui: la Playlist scorre insieme alla testina di riproduzione mentre il brano è in esecuzione. Clic destro: Scorrimento continuo; disattivato, puoi esplorare liberamente"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Segui: la Playlist scorre insieme alla testina di riproduzione mentre il brano viene riprodotto. Tasto destro: Scorrimento continuo; disattivato, puoi esplorare liberamente"

@@ -13157,5 +13157,3 @@ countries: nl be
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} reageert nog steeds niet. LYNX SHARE gebruikt voorlopig {1}."
 "no audio device" = "geen audioapparaat"
 "Continuous scrolling" = "Continu scrollen"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Volgen: de Playlist scrolt mee met de afspeelkop terwijl het nummer speelt. Rechtsklik: Continu scrollen; uitgeschakeld kun je vrij rondkijken"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Volgen: de Playlist scrollt samen met de afspeelkop terwijl het nummer wordt afgespeeld. Klik met de rechtermuisknop: Doorlopend scrollen; uitgeschakeld kun je vrij rondkijken"
