@@ -12455,6 +12455,7 @@ countries: tr
 "{0}m ago" = "{0} dk önce"
 "{0}h {1}m ago" = "{0} sa {1} dk önce"
 "{0} days ago" = "{0} gün önce"
+"1 day ago" = "1 gün önce"
 "Close (Esc): keep the project that is open" = "Kapat (Esc): açık projeyi koru"
 "Search recent projects" = "Son projelerde ara"
 "Show the start page when LYNX starts" = "LYNX açılırken başlangıç sayfasını göster"

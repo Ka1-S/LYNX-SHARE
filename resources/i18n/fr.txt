@@ -12455,6 +12455,7 @@ countries: fr be ch ca lu
 "{0}m ago" = "il y a {0} min"
 "{0}h {1}m ago" = "il y a {0} h {1} min"
 "{0} days ago" = "il y a {0} jours"
+"1 day ago" = "il y a 1 jour"
 "Close (Esc): keep the project that is open" = "Fermer (Esc) : garder le projet ouvert"
 "Search recent projects" = "Rechercher dans les projets récents"
 "Show the start page when LYNX starts" = "Afficher la page de démarrage au lancement de LYNX"

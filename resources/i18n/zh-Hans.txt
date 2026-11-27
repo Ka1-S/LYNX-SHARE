@@ -12455,6 +12455,7 @@ countries: cn sg
 "{0}m ago" = "{0}分钟前"
 "{0}h {1}m ago" = "{0}小时{1}分钟前"
 "{0} days ago" = "{0}天前"
+"1 day ago" = "1天前"
 "Close (Esc): keep the project that is open" = "关闭 (Esc)：保留已打开的工程"
 "Search recent projects" = "搜索最近的工程"
 "Show the start page when LYNX starts" = "启动 LYNX 时显示起始页"

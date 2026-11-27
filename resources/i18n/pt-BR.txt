@@ -12605,6 +12605,7 @@ countries: br
 "{0}m ago" = "há {0} min"
 "{0}h {1}m ago" = "há {0} h {1} min"
 "{0} days ago" = "há {0} dias"
+"1 day ago" = "há 1 dia"
 "Close (Esc): keep the project that is open" = "Fechar (Esc): manter o projeto aberto"
 "Search recent projects" = "Buscar projetos recentes"
 "Show the start page when LYNX starts" = "Mostrar a página inicial ao iniciar o LYNX"

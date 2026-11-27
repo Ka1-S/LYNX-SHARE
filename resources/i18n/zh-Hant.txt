@@ -12455,6 +12455,7 @@ countries: tw hk mo
 "{0}m ago" = "{0}分鐘前"
 "{0}h {1}m ago" = "{0}小時{1}分鐘前"
 "{0} days ago" = "{0}天前"
+"1 day ago" = "1天前"
 "Close (Esc): keep the project that is open" = "關閉 (Esc)：保留已開啟的專案"
 "Search recent projects" = "搜尋最近的專案"
 "Show the start page when LYNX starts" = "啟動 LYNX 時顯示起始頁"

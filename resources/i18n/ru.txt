@@ -12455,6 +12455,7 @@ countries: ru by kz
 "{0}m ago" = "{0} мин назад"
 "{0}h {1}m ago" = "{0} ч {1} мин назад"
 "{0} days ago" = "{0} дн. назад"
+"1 day ago" = "1 дн. назад"
 "Close (Esc): keep the project that is open" = "Закрыть (Esc): оставить открытый проект"
 "Search recent projects" = "Поиск по недавним проектам"
 "Show the start page when LYNX starts" = "Показывать стартовую страницу при запуске LYNX"

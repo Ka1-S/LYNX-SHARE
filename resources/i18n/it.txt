@@ -12455,6 +12455,7 @@ countries: it ch sm
 "{0}m ago" = "{0} min fa"
 "{0}h {1}m ago" = "{0} h {1} min fa"
 "{0} days ago" = "{0} giorni fa"
+"1 day ago" = "1 giorno fa"
 "Close (Esc): keep the project that is open" = "Chiudi (Esc): mantieni il progetto aperto"
 "Search recent projects" = "Cerca nei progetti recenti"
 "Show the start page when LYNX starts" = "Mostra la pagina iniziale all'avvio di LYNX"

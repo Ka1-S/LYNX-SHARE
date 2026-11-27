@@ -12455,6 +12455,7 @@ countries: nl be
 "{0}m ago" = "{0} min geleden"
 "{0}h {1}m ago" = "{0} u {1} min geleden"
 "{0} days ago" = "{0} dagen geleden"
+"1 day ago" = "1 dag geleden"
 "Close (Esc): keep the project that is open" = "Sluiten (Esc): het geopende project behouden"
 "Search recent projects" = "Recente projecten zoeken"
 "Show the start page when LYNX starts" = "Startpagina tonen wanneer LYNX start"

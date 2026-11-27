@@ -12455,6 +12455,7 @@ countries: id
 "{0}m ago" = "{0} mnt lalu"
 "{0}h {1}m ago" = "{0} jam {1} mnt lalu"
 "{0} days ago" = "{0} hari lalu"
+"1 day ago" = "1 hari lalu"
 "Close (Esc): keep the project that is open" = "Tutup (Esc): pertahankan proyek yang terbuka"
 "Search recent projects" = "Cari proyek terbaru"
 "Show the start page when LYNX starts" = "Tampilkan halaman awal saat LYNX dimulai"

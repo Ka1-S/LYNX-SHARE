@@ -12455,6 +12455,7 @@ countries: es mx ar co cl pe ve
 "{0}m ago" = "hace {0} min"
 "{0}h {1}m ago" = "hace {0} h {1} min"
 "{0} days ago" = "hace {0} días"
+"1 day ago" = "hace 1 día"
 "Close (Esc): keep the project that is open" = "Cerrar (Esc): mantener el proyecto abierto"
 "Search recent projects" = "Buscar proyectos recientes"
 "Show the start page when LYNX starts" = "Mostrar la página de inicio al iniciar LYNX"

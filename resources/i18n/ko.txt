@@ -12455,6 +12455,7 @@ countries: kr
 "{0}m ago" = "{0}분 전"
 "{0}h {1}m ago" = "{0}시간 {1}분 전"
 "{0} days ago" = "{0}일 전"
+"1 day ago" = "1일 전"
 "Close (Esc): keep the project that is open" = "닫기 (Esc): 열려 있는 프로젝트 유지"
 "Search recent projects" = "최근 프로젝트 검색"
 "Show the start page when LYNX starts" = "LYNX 시작 시 시작 페이지 표시"
