@@ -17,7 +17,13 @@
             const auto start = juce::Time::getMillisecondCounter();
             while (juce::Time::getMillisecondCounter() - start < (juce::uint32) ms)
             {
+#if JUCE_LINUX || JUCE_WINDOWS
                 for (int i = 0; i < 256 && juce::detail::dispatchNextMessageOnSystemQueue (true); ++i) {}
+#elif JUCE_MAC
+                // (rollup 0.1.32 step 6: JUCE declares dispatchNextMessageOnSystemQueue only on Linux / Windows; on macOS
+                // its messages come from a CFRunLoop source, so the run loop is turned for them; the macOS build broke)
+                for (int i = 0; i < 256 && CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0, true) == kCFRunLoopRunHandledSource; ++i) {}
+#endif
                 if (done && done())
                     return;
                 juce::Thread::sleep (5);
