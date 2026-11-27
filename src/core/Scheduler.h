@@ -234,6 +234,10 @@ HostPositionWrap hostPositionWrap (const Song& song, std::int64_t songLength) no
 // song length and the longest note of each pattern. Requires notes sorted by start.
 struct ScheduleIndex
 {
+    // Where the song's time wraps for the scheduler, the automation and the tempo: the song's length, or the end of a
+    // looped time selection that reaches past it (issue #324, round 190se: a selection longer than the song played its
+    // clips again every song length inside it, a one-shot four times a bar; FL 2026 plays the selection once, silent
+    // after the song's last clip). scheduleIndexLength() below.
     std::int64_t songLength = 0;
     std::vector<std::int64_t> maxNoteLength; // per pattern
     std::vector<std::int64_t> patternLength; // per pattern: effectiveLength, the period of a long clip's repeats
@@ -270,6 +274,9 @@ PlayedTiming playedTiming (const Note& note, float swing, const ChannelDef* c) n
 std::int64_t maxChannelShift (const std::vector<ChannelDef>& channels) noexcept;
 
 ScheduleIndex makeScheduleIndex (const Song& song);
+// ScheduleIndex::songLength of a song: max (songLength(), loopEnd) while the time selection loops (loopPlays()), else
+// songLength(). The transport keeps the position inside [loopStart, loopEnd) then, so nothing wraps inside the selection.
+std::int64_t scheduleIndexLength (const Song& song) noexcept;
 
 // Generates the Playlist's events (playing the whole song in a loop). Each pattern clip
 // plays the pattern's notes that fall in [offset, offset + length), the pattern repeating along a clip longer than
