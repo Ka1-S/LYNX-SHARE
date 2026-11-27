@@ -1,4 +1,5 @@
 #include "core/VideoTrack.h"
+#include "core/TempoMap.h"
 
 #include <cctype>
 
@@ -91,12 +92,13 @@ double ticksForSeconds (const Song& song, double seconds)
                                           [] (const Automation& a) { return a.target.kind == AutomationTargetKind::tempo; });
     if (! hasTempo)
         return seconds * std::max (1.0, song.bpm) * ppq / 60.0;
-    // the same 1/16 steps as Song::secondsForTicks
+    // the same 1/16 steps as Song::secondsForTicks (round 190ry: over the tempo clips only, the same values)
     constexpr std::int64_t step = ticksPerStep;
+    const auto clips = tempomap::tempoClips (song);
     double at = 0.0;
     for (std::int64_t t = 0;; t += step)
     {
-        const auto perTick = 60.0 / (std::max (1.0, song.tempoAt ((double) t)) * ppq);
+        const auto perTick = 60.0 / (std::max (1.0, tempomap::tempoAtIn (song, clips, (double) t)) * ppq);
         const auto span = perTick * (double) step;
         if (at + span >= seconds || t > (std::int64_t) 1 << 40)
             return (double) t + (seconds - at) / perTick;
@@ -113,11 +115,12 @@ TempoMap::TempoMap (const Song& song, double maxSeconds)
     if (! hasTempo)
         return;
     constexpr std::int64_t step = ticksPerStep;
+    const auto clips = tempomap::tempoClips (song); // (round 190ry: as Song::secondsForTicks)
     double at = 0.0;
     stepStarts.push_back (0.0);
     for (std::int64_t t = 0; at <= maxSeconds && stepStarts.size() < 4000000; t += step)
     {
-        secondsPerTick = 60.0 / (std::max (1.0, song.tempoAt ((double) t)) * ppq);
+        secondsPerTick = 60.0 / (std::max (1.0, tempomap::tempoAtIn (song, clips, (double) t)) * ppq);
         at += secondsPerTick * (double) step;
         stepStarts.push_back (at);
     }

@@ -1651,14 +1651,18 @@ double Song::secondsForTicks (std::int64_t ticks) const
     if (! tempomap::active (*this))
         return (double) ticks * 60.0 / (std::max (1.0, bpm) * ppq);
 
-    // integrate in 1/16 steps (playback changes tempo block by block; the difference is minimal)
+    // integrate in 1/16 steps (playback changes tempo block by block; the difference is minimal). Round 190ry (Q3): each
+    // step's lookup reads the playlist's tempo clips only (tempomap::tempoClips: tempoAtIn over them is tempoAt, the same
+    // value): it walked every clip of the song per 16th, 1.6-1.8 s per call on a 1,728-bar project of 17,928 clips, paid
+    // by the message thread at every edit while the song played
     double seconds = 0.0;
     constexpr std::int64_t step = ticksPerStep;
+    const auto clips = tempomap::tempoClips (*this);
 
     for (std::int64_t t = 0; t < ticks; t += step)
     {
         const auto n = std::min (step, ticks - t);
-        seconds += (double) n * 60.0 / (std::max (1.0, tempoAt ((double) t)) * ppq);
+        seconds += (double) n * 60.0 / (std::max (1.0, tempomap::tempoAtIn (*this, clips, (double) t)) * ppq);
     }
 
     return seconds;

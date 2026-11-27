@@ -158,3 +158,38 @@ TEST (q3190ry_availability_memo)
     const auto copy = fl;
     CHECK (natives::available (*engine, copy) == first && *looks == once);
 }
+
+TEST (q3190ry_seconds_for_ticks_reads_the_tempo_clips_only)
+{
+    using namespace lynx;
+    // the automation project (a tempo automation clip among 528 clips) and the 1,728-bar case's shape: many more clips
+    Song song;
+    perfprojects::Samples samples;
+    CHECK (perfprojects::make ("automation", song, samples));
+    const auto copies = song.playlist;
+    for (int k = 1; k < 8; ++k)
+        for (auto c : copies)
+            if (c.kind != ClipKind::automation)
+            {
+                c.start += (std::int64_t) k * 32 * 4 * ppq;
+                song.playlist.push_back (c);
+            }
+    CHECK (tempomap::active (song));
+    // the integration as it was: every step's tempo through tempoAt (every clip)
+    const auto reference = [&song] (std::int64_t ticks) {
+        double seconds = 0.0;
+        for (std::int64_t t = 0; t < ticks; t += ticksPerStep)
+        {
+            const auto n = std::min<std::int64_t> (ticksPerStep, ticks - t);
+            seconds += (double) n * 60.0 / (std::max (1.0, tempomap::tempoAt (song, (double) t)) * ppq);
+        }
+        return seconds;
+    };
+    for (const std::int64_t ticks : { (std::int64_t) 0, (std::int64_t) 1, (std::int64_t) (7 * ppq + 5), (std::int64_t) (32 * 4 * ppq),
+                                      (std::int64_t) (256 * 4 * ppq + 3) })
+        CHECK (song.secondsForTicks (ticks) == reference (ticks)); // (bit for bit)
+    // pattern mode: the integration only when the pattern has a Tempo lane (else the constant tempo's formula, unchanged)
+    song.mode = PlayMode::pattern;
+    if (tempomap::active (song))
+        CHECK (song.secondsForTicks (64 * ppq) == reference (64 * ppq));
+}
