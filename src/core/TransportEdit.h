@@ -132,7 +132,7 @@ inline double followViewStart (double viewStart, double viewTicks, double tick, 
 // scrolling smoothly to match — instead of jumping a page once the playhead leaves it (followViewStart above).
 // Rounded to whole pixels: PlaylistComponent::cacheShift() only takes its cheap shift-the-picture path on a whole-
 // pixel scroll (FW review: a fractional scroll every frame forced a full repaint, 74.6M instructions a frame).
-inline double followViewStartContinuous (double tick, double leadTicks)
+inline double followViewStartContinuous (double tick, double leadTicks, double pixelsPerTick)
 {
     if (tick < 0.0)
         return 0.0;
