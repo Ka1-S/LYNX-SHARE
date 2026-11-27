@@ -661,9 +661,19 @@ private:
     bool askUnusedRecordings = true;                  // Settings › General › Backup
     void startSession();                              // crash detection: a marker that a clean exit removes
     void checkPreviousSession (juce::Time sessionStart);
+public:
+    // round 190rp (0.1.32 Q4, decision O-2): the plugin whose window was open when the last session ended (Main.cpp's
+    // uncleanCause), set before the recovery box shows: the box then names it and opens the backup without third-party
+    // plugins by default. Empty: no plugin named ("Open backup" stays the default)
+    void setRecoveryPlugin (const juce::String& plugin) { recoveryPlugin = plugin; }
+    // --selftest / --recoverytest: the recovery box for `backup` as checkPreviousSession builds it (not shown), its
+    // message and buttons (the default one first)
+    juce::String recoveryBoxForTest (const juce::File& backup, juce::StringArray& buttons) const;
+    void checkPreviousSessionForTest (juce::Time sessionStart) { checkPreviousSession (sessionStart); }
+private:
+    juce::String recoveryPlugin;
     void checkInterruptedTakes(); // round 163: takes left by a crash while recording
     void quickRecordAudio();      // round 163: one key from "record" to a clip
-    std::unique_ptr<juce::InterProcessLock> sessionLock;
     juce::File sessionMarker;
     int autosaveTicks = 0;
     std::shared_ptr<std::atomic<bool>> autosaveRunning = std::make_shared<std::atomic<bool>> (false); // the backup file is being written

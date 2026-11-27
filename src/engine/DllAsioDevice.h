@@ -41,6 +41,10 @@ bool asioPrewarmQuickInit();
 class LynxDeviceManager final : public juce::AudioDeviceManager
 {
 public:
+    // (round 190rp: JUCE's ASIO type and the test-mode hang type open their devices with a time limit, DeviceGuard.h)
     void createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types) override;
+
+private:
+    void addPlatformTypes (juce::OwnedArray<juce::AudioIODeviceType>& types);
 };
 } // namespace lynx

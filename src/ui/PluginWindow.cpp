@@ -2301,10 +2301,35 @@ std::map<juce::AudioPluginInstance*, std::unique_ptr<EditorHost>>& windows()
     return open;
 }
 
+// Round 190rp (crash reports since 0.1.31.2, G4: Cakewalk SI-* VST2 editors fault in their own window code while the
+// editor closes, Vst2Editor::~Vst2Editor, 5 reports from one user): the editor window's teardown runs inside the plugin
+// guard (as onEditorFault's does). When the plugin faults there, the window object is left behind and LYNX goes on;
+// the session notes it as an editor crash (so a later unclean end offers the plugin a separate process) and
+// plugin-crashes.log lists it. The EditorHost keeps the plugin alive, so its name is read before.
+void destroyHost (const juce::AudioPluginInstance* key)
+{
+    auto& open = windows();
+    const auto it = open.find (const_cast<juce::AudioPluginInstance*> (key));
+    if (it == open.end())
+        return;
+    const auto name = it->first->getPluginDescription().name;
+    auto* raw = it->second.release();
+    open.erase (it);
+    if (const auto code = crashguard::run ([raw] { delete raw; }); code != 0)
+    {
+        crashguard::note ((juce::String (crashreport::editorCrashStepPrefix) + name + " (" + crashguard::describe (code)
+                           + " while its window closed): left behind")
+                              .toStdString());
+        PluginHost::settingsFolder().getChildFile ("plugin-crashes.log")
+            .appendText (juce::Time::getCurrentTime().toISO8601 (true) + "  " + name + "  editor close: " + crashguard::describe (code) + " 0x"
+                         + juce::String::toHexString ((juce::int64) code) + "\n");
+    }
+}
+
 void closeHostOf (const juce::AudioPluginInstance* plugin)
 {
     // close after leaving this callback (the window deletes itself)
-    juce::MessageManager::callAsync ([plugin] { windows().erase (const_cast<juce::AudioPluginInstance*> (plugin)); });
+    juce::MessageManager::callAsync ([plugin] { destroyHost (plugin); });
 }
 
 // Round 190ao, "Pin on top": pinned plugin windows stay above LYNX's other secondary windows. Like them they are owned by
@@ -2382,7 +2407,7 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, boo
     auto keep = it->second->keepAlive();
     const auto title = it->second->hostTitle();
     const auto context = it->second->getContext();
-    open.erase (it);
+    destroyHost (&plugin); // (round 190rp: inside the plugin guard)
     if (store && context.engine != nullptr && context.find)
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
@@ -2410,8 +2435,12 @@ public:
             juce::MessageManager::callAsync ([this] {
                 reaping = false;
                 auto& all = windows();
-                for (auto it = all.begin(); it != all.end();)
-                    it = it->second->orphaned() ? all.erase (it) : std::next (it);
+                std::vector<juce::AudioPluginInstance*> gone; // (round 190rp: each teardown inside the plugin guard)
+                for (const auto& [key, window] : all)
+                    if (window->orphaned())
+                        gone.push_back (key);
+                for (auto* key : gone)
+                    destroyHost (key);
                 if (all.empty())
                     stopTimer();
             });
@@ -2760,7 +2789,11 @@ void setPinnedOnTop (juce::AudioPluginInstance& plugin, bool pinned)
 
 void closeAll()
 {
-    windows().clear();
+    std::vector<juce::AudioPluginInstance*> keys; // (round 190rp: each window's teardown inside the plugin guard)
+    for (const auto& [key, window] : windows())
+        keys.push_back (key);
+    for (auto* key : keys)
+        destroyHost (key);
     reaper().stopTimer();
 }
 
@@ -2788,7 +2821,7 @@ bool isOpen (const juce::AudioPluginInstance& plugin)
 
 void close (const juce::AudioPluginInstance& plugin)
 {
-    windows().erase (const_cast<juce::AudioPluginInstance*> (&plugin));
+    destroyHost (&plugin); // (round 190rp: inside the plugin guard)
 }
 
 namespace

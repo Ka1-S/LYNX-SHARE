@@ -7,6 +7,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <csignal>
 #include <cstdlib>
 #include <cerrno>
 #include <cstring>
@@ -1768,6 +1769,12 @@ std::string endSignalStep (int sig)
 
 void hardenSignals() noexcept
 {
+#if defined(_WIN32)
+    // round 190rp: abort() ended the process with exit code 3 and nothing written; now it raises an exception the crash
+    // handler (the top-level filter) gets, with this thread's stack
+    ::signal (SIGABRT, [] (int) { RaiseException (abortExceptionCode, EXCEPTION_NONCONTINUABLE, 0, nullptr); });
+    _set_abort_behavior (0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
 #if ! defined(_WIN32)
     try
     {
@@ -2873,6 +2880,40 @@ void armCrashWatchdog (void* exceptionPointers) noexcept
 #endif
 }
 
+const char* abortMessage() noexcept
+{
+#if defined(__GLIBC__)
+    // glibc keeps the text of its fatal message for core files (struct abort_msg_s { unsigned int size; char msg[]; })
+    struct AbortMessage
+    {
+        unsigned int size;
+        char msg[1];
+    };
+    static void* const symbol = dlsym (RTLD_DEFAULT, "__abort_msg");
+    if (symbol == nullptr)
+        return "";
+    const auto* m = *static_cast<AbortMessage* const*> (symbol);
+    return m != nullptr ? m->msg : "";
+#else
+    return "";
+#endif
+}
+
+namespace
+{
+// the allocator's own words in glibc's abort message (malloc.c's malloc_printerr texts)
+bool allocatorMessage (const char* m) noexcept
+{
+    if (m == nullptr || m[0] == 0)
+        return false;
+    for (const char* word : { "malloc", "free(", "free ", "realloc", "memalign", "corrupted", "chunk", "tcache", "unsorted", "top size", "invalid pointer",
+                              "invalid size", "double free", "arena" })
+        if (std::strstr (m, word) != nullptr)
+            return true;
+    return false;
+}
+} // namespace
+
 bool heapCorruptionCrash (void* exceptionPointers) noexcept
 {
 #if defined(_WIN32)
@@ -2881,9 +2922,15 @@ bool heapCorruptionCrash (void* exceptionPointers) noexcept
 #elif defined(LYNX_EXECINFO)
     if ((int) reinterpret_cast<std::intptr_t> (exceptionPointers) != SIGABRT)
         return false;
+   #if defined(__APPLE__)
     void* frames[64];
     const auto n = backtrace (frames, 64);
     return libraryAbort (frames, n);
+   #else
+    // round 190rp: only the allocator's own abort; glibc's other fatal aborts ("exception not rethrown" after a thread was
+    // killed) and every abort without a message get the emergency save (until then they all skipped it)
+    return allocatorMessage (abortMessage());
+   #endif
 #else
     (void) exceptionPointers;
     return false;
@@ -2933,7 +2980,15 @@ void writeHeapCrashFile (void* exceptionPointers) noexcept
     h = putNumber (h, (unsigned long long) reinterpret_cast<std::uintptr_t> (exceptionPointers));
     *h = 0;
     writeAll (fd, head);
-    writeAll (fd, ", abort). The emergency save was skipped: the heap is broken.\n--- frames\n");
+    writeAll (fd, ", abort). The emergency save was skipped: the heap is broken.\n");
+    if (const char* m = abortMessage(); m != nullptr && m[0] != 0)
+    {
+        writeAll (fd, "C library: ");
+        writeAll (fd, m);
+        if (m[std::strlen (m) - 1] != '\n')
+            writeAll (fd, "\n");
+    }
+    writeAll (fd, "--- frames\n");
  #if defined(LYNX_EXECINFO)
     void* frames[64];
     const auto n = backtrace (frames, 64);
@@ -2970,6 +3025,39 @@ void heapCorruptionForTest() noexcept
     RaiseException (0xC0000374u, EXCEPTION_NONCONTINUABLE, 0, nullptr); // (Windows: the code its heap raises)
 #endif
     std::abort(); // (not reached when the C library noticed)
+}
+
+void abortForTest (int kind) noexcept
+{
+#if defined(__GLIBC__)
+    if (kind == 2)
+    {
+        // a thread blocked in a cancellation point, cancelled; its catch-all swallows the forced unwind: glibc aborts
+        pthread_t t {};
+        pthread_create (&t, nullptr, [] (void*) -> void* {
+            try
+            {
+                for (;;)
+                    ::pause();
+            }
+            catch (...) // NOLINT (on purpose: what JUCE's threadEntryPoint does)
+            {
+            }
+            return nullptr;
+        }, nullptr);
+        ::usleep (100000);
+        pthread_cancel (t);
+        pthread_join (t, nullptr);
+    }
+#endif
+    if (kind == 1)
+    {
+        struct Unhandled
+        {
+        };
+        [] () noexcept (false) { throw Unhandled {}; }(); // (the process has no handler for it: std::terminate)
+    }
+    std::abort();
 }
 
 void setHangInCrashHandlerForTest() noexcept { hangForTest = true; }

@@ -111,6 +111,8 @@
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
+#include "engine/RecoveryTest.h" // round 190rp
+#include "engine/DeviceGuard.h" // round 190rp
 #include "engine/ProjectDowngrade.h"
 #include "engine/RemoteNotes.h" // (round 190pm: --selftest repeats190pm)
 #include "core/NoteConditions.h" // (round 190pm)
@@ -536,8 +538,13 @@ void onCrash (void* exceptionPointers)
     const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
     // JUCE's backtrace (named frames only), then every frame of the faulting thread as module+offset (round 157a: a
     // release LYNX.exe has no symbols, so its own frames were missing from the file)
-    folder.getChildFile ("crash " + stamp + ".txt").replaceWithText (juce::SystemStats::getStackBacktrace() + "\n--- frames (module+offset)\n"
-                                                                    + juce::String::fromUTF8 (lynx::crashguard::exceptionBacktrace (exceptionPointers).c_str()));
+    // (round 190rp: an abort that is not a heap corruption names what the C library said and gets the emergency save)
+    const auto libraryMessage = juce::String::fromUTF8 (lynx::crashguard::abortMessage()).trim();
+    const auto crashFile = folder.getChildFile ("crash " + stamp + ".txt");
+    crashFile.replaceWithText (juce::SystemStats::getStackBacktrace() + "\n--- frames (module+offset)\n"
+                               + juce::String::fromUTF8 (lynx::crashguard::exceptionBacktrace (exceptionPointers).c_str())
+                               + (libraryMessage.isNotEmpty() ? "\n--- C library: " + libraryMessage + " (not a heap corruption: the emergency save is attempted)\n"
+                                                              : juce::String()));
     lynx::crashguard::note (("crashed: backtrace in autosave\\crash " + stamp + ".txt").toStdString());
     if (lynx::crashguard::hangInCrashHandlerForTest()) // (--faulttest hang: a handler that never returns; the watchdog ends it)
         for (;;)
@@ -546,7 +553,8 @@ void onCrash (void* exceptionPointers)
     if (crashEngine != nullptr)
     {
         juce::String error;
-        lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
+        const auto saved = lynx::ProjectFile::save (crashEngine->getSong(), folder.getChildFile ("recovered " + stamp + lynx::ProjectFile::extension), error);
+        crashFile.appendText ("--- emergency save: " + (saved ? "recovered " + stamp + lynx::ProjectFile::extension : "failed (" + error + ")") + "\n");
     }
 }
 // Round 190rf (Linux): the X server went away (crashguard::watchDisplayConnection): the project in memory is saved as a
@@ -629,6 +637,22 @@ UncleanCause uncleanCause()
         }
     }
     return cause;
+}
+
+// Round 190rp (crash reports since 0.1.31.2, G1): the device the newest unclean session was opening when it ended (its
+// last steps, after the hang watch's own lines, are AudioEngine::openingDeviceStep without "audio device opened"): the
+// driver hung or crashed in its open. "" when the session got past it.
+juce::String uncleanDeviceOpen()
+{
+    for (int i = uncleanSteps.size(); --i >= 0;)
+    {
+        const auto& step = uncleanSteps[i];
+        if (step.startsWith ("UI not responding") || step.startsWith ("UI responding again") || step.startsWith ("crashed: "))
+            continue;
+        return step.startsWith (lynx::AudioEngine::openingDeviceStep) ? step.fromFirstOccurrenceOf (lynx::AudioEngine::openingDeviceStep, false, false).trim()
+                                                                     : juce::String();
+    }
+    return {};
 }
 
 juce::String collectUncleanSessions()
@@ -900,6 +924,30 @@ public:
             // rollup step 12: heap = the C library's heap-corruption abort (no recovered project may be written: an
             // engine is set for the emergency save on purpose); hang = a crash handler that never returns (the watchdog
             // must end the process: LYNX_CRASH_WATCHDOG_S makes the test short)
+            // round 190rp: recovery = the project <folder>/before.lynx in an engine, then a crash: the crash handler's
+            // emergency save is what the recovery round trip (engine/RecoveryTest.cpp) opens and compares
+            // round 190rp: abort / terminate / unwind = aborts that are not a heap corruption (the emergency save runs:
+            // an engine with <folder>/before.lynx, if any, is set for it)
+            if (args[i + 1] == "abort" || args[i + 1] == "terminate" || args[i + 1] == "unwind")
+            {
+                static lynx::AudioEngine* engine = new lynx::AudioEngine (false);
+                juce::String error;
+                if (auto song = lynx::ProjectFile::load (crashFolderForTest.getChildFile ("before.lynx"), error))
+                    engine->setSong (std::move (*song));
+                crashEngine = engine;
+                if (! sanitizerOwnsSignals())
+                    lynx::crashguard::hardenSignals(); // (Windows: abort() reaches the crash handler through it)
+                lynx::crashguard::abortForTest (args[i + 1] == "terminate" ? 1 : args[i + 1] == "unwind" ? 2 : 0);
+            }
+            if (args[i + 1] == "recovery")
+            {
+                static lynx::AudioEngine* engine = new lynx::AudioEngine (false);
+                juce::String error;
+                if (auto song = lynx::ProjectFile::load (crashFolderForTest.getChildFile ("before.lynx"), error))
+                    engine->setSong (std::move (*song));
+                crashEngine = engine;
+                lynx::crashguard::faultForTest (false);
+            }
             if (args[i + 1] == "heap" || args[i + 1] == "hang")
             {
                 static lynx::AudioEngine* engine = new lynx::AudioEngine (false);
@@ -926,6 +974,12 @@ public:
                 lynx::crashguard::exitNow (4);
             }
             lynx::crashguard::faultForTest (args[i + 1] == "unwalkable");
+        }
+        // round 190rp: LYNX --recoverychild autosave|save|take <folder> (engine/RecoveryTest.cpp): writes until killed
+        if (const auto args = juce::StringArray::fromTokens (commandLine, true); args.contains ("--recoverychild"))
+        {
+            lynx::crashguard::quietCrashReports();
+            lynx::runRecoveryChild (args);
         }
         if (! sanitizerOwnsSignals())
             lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
@@ -2279,6 +2333,17 @@ public:
             const auto i = args.indexOf ("--community190ritest");
             const auto result = community190riCheck (log, args[i + 2].unquoted());
             juce::File (args[i + 1].unquoted()).replaceWithText (log + "community190ri=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
+        if (args.contains ("--recoverytest"))
+        {
+            // LYNX --recoverytest report.txt (round 190rp, 0.1.32 Q4 stability; also in --selftest): src/Stab190rpCheck.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto result = stab190rpCheck (log);
+            juce::File (args[args.indexOf ("--recoverytest") + 1].unquoted()).replaceWithText (log + "stab190rp=" + result + "\n");
             setApplicationReturnValue (result == "OK" ? 0 : 1);
             quit();
             return;
@@ -5007,6 +5072,10 @@ public:
 
         // session breadcrumb: a fail-fast (no crash handler runs) still leaves the last steps behind (round 111)
         uncleanLastStep = collectUncleanSessions();
+        // round 190rp: the saved audio device hung (or crashed) the last start: not this time (see AudioEngine::skipSavedDevice)
+        if (uncleanLastStep.isNotEmpty())
+            if (uncleanDevice = uncleanDeviceOpen(); uncleanDevice.isNotEmpty())
+                lynx::AudioEngine::skipSavedDevice = true;
         sessionsFolder().createDirectory();
         lynx::crashguard::beginSession (
             sessionsFolder().getChildFile ("session-" + juce::String (lynx::crashguard::processId()) + ".txt").getFullPathName().toStdString(),
@@ -5408,6 +5477,11 @@ public:
     {
         bindExportDoneSound(); // (round 190qr, #280)
         mainWindow = std::make_unique<MainWindow> ("LYNX SHARE", *engine); // the brand; getApplicationName() stays "LYNX" (an id: instance lock, X11 WM_CLASS, ALSA client)
+        // round 190rp (decision O-2): the recovery box (MainComponent::checkPreviousSession, 2.5 s after the session
+        // starts) names the plugin whose window was open when the last session ended and opens the backup without
+        // third-party plugins by default
+        if (uncleanLastStep.isNotEmpty())
+            mainWindow->getContent().setRecoveryPlugin (uncleanCause().editorPlugin);
         lynx::setMainWindowForOwnership (mainWindow.get());
         lynx::crashguard::watchDisplayConnection (onDisplayLost); // (round 190rf, Linux: the display is open now)
         lynx::applyRenderingChoice (*mainWindow); // (GPU rendering off: GDI; round 157a)
@@ -5439,6 +5513,8 @@ public:
     // Settings › General › "Crash reports" says (round 159), ask whether to send a report, send it unasked, or not
     void showUncleanNotice()
     {
+        if (uncleanDevice.isNotEmpty())
+            lynx::platform::testModeLog ("saved audio device skipped: the last session ended while it opened (" + uncleanDevice + ")");
         if (lynx::platform::testMode()) // LYNX_TEST_MODE: no prompt, no report sent (written to test-mode.log)
         {
             if (uncleanLastStep.isNotEmpty())
@@ -5454,6 +5530,11 @@ public:
                                  "LYNX SHARE's autosave folder; details in crash-history.log.",
                                  { uncleanLastStep });
         uncleanLastStep.clear();
+        if (uncleanDevice.isNotEmpty()) // (round 190rp)
+            message << "\n\n"
+                    << lynx::tr ("It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. "
+                                 "Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example).",
+                                 { uncleanDevice.fromFirstOccurrenceOf (": ", false, false) });
         const auto cause = uncleanCause();
         // round 157a: a plugin's editor was opening — it crashed (often in the graphics driver, inside the plugin's own
         // OpenGL window): offer to keep that plugin in its own process, where a crash takes only the plugin down
@@ -10437,6 +10518,9 @@ private:
         // round 190rv (0.1.32 open bug issues): #317 the native editors' header LED, #319 the pin keeps the window (src/Bugs190rvCheck.inc)
         juce::String bugs190rvLog;
         const auto bugs190rvResult = bugs190rvCheck (bugs190rvLog);
+        // round 190rp (0.1.32 Q4, stability): src/Stab190rpCheck.inc
+        juce::String stab190rpLog;
+        const auto stab190rpResult = stab190rpCheck (stab190rpLog);
 
         // round 190qh (research190qa R5, Mixer QoL): FL's rule for a switched-off slot through the app's own publish
         // (D2-MX9, REA 190qc: its latency leaves the plan at once, a muted insert keeps it), the theme's own meter
@@ -11858,7 +11942,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && stab190rpResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -11990,6 +12074,7 @@ private:
                << "perf190rn=" << perf190rnResult << "\n"
                << "qa190rb=" << qa190rbResult << "\n"
                << "bugs190rv=" << bugs190rvResult << (bugs190rvResult == "OK" ? juce::String() : " | " + bugs190rvLog.replace ("\n", "; ")) << "\n"
+               << "stab190rp=" << stab190rpResult << (stab190rpResult == "OK" ? juce::String() : " | " + stab190rpLog.replace ("\n", "; ")) << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
                << "hotfixplaces190qp=" << hotfixPlacesResult << "\n"
@@ -22131,6 +22216,7 @@ private:
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "Bugs190rvCheck.inc" // round 190rv: 0.1.32 open bug issues (#317 header LED, #319 pin)
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
+#include "Stab190rpCheck.inc" // round 190rp: 0.1.32 Q4 stability (recovery box, device lost, recovery round trip, sample 0)
 #include "Iox190rmCheck.inc" // round 190rm: the 0.1.32 import / export sweep (--convert190rm)
 #include "Issues190rtShot.inc" // round 190rt: issues #309 / #310 / #311 (--issues190rtshot, --issues190rttest)
 #include "DetailsShot190mr.inc" // round 190mr
@@ -29701,6 +29787,181 @@ private:
             flush();
             return false;
         }
+        // round 190rp (coordinator: Thief's frozen mix doesn't null against live, -2.8 dB): "perchannel" = each target
+        // alone (the others muted), live and frozen, nulled; the lag where the frozen one matches best and the residual
+        // there say whether it is a time offset (latency) or a different sound
+        if (mode == "perchannel")
+        {
+            const auto solo = [] (lynx::Song s, int keep) {
+                for (int k = 0; k < (int) s.channels.size(); ++k)
+                    s.channels[(std::size_t) k].muted = k != keep;
+                return s;
+            };
+            for (const auto c : targets)
+            {
+                offline.setSong (before);
+                offline.dispatchPendingMessages();
+                const auto liveSong = solo (offline.getSong(), c);
+                const auto liveC = renderMix ("solo-live", &liveSong);
+                const auto error = lynx::freezeChannelNow (offline, c);
+                offline.dispatchPendingMessages();
+                const auto frozenSong = solo (offline.getSong(), c);
+                const auto frozenC = renderMix ("solo-frozen", &frozenSong);
+                float peak = 0.0f;
+                const auto direct = residual (liveC, frozenC, peak);
+                // the lag (frozen behind live, samples) with the smallest difference over the loudest 2 s
+                const auto n = juce::jmin (liveC.audio.getNumSamples(), frozenC.audio.getNumSamples());
+                int loudAt = 0;
+                float loud = 0.0f;
+                for (int i = 0; i < n; i += 256)
+                    if (const auto v = std::abs (liveC.audio.getSample (0, i)); v > loud)
+                    {
+                        loud = v;
+                        loudAt = i;
+                    }
+                const auto from = juce::jmax (0, loudAt - 48000), to = juce::jmin (n - 8192, loudAt + 48000);
+                int bestLag = 0;
+                double best = -1.0;
+                for (int lag = -4096; lag <= 4096; ++lag)
+                {
+                    double sum = 0.0;
+                    for (int i = from; i < to; i += 4)
+                    {
+                        const auto j = i + lag;
+                        if (j < 0 || j >= frozenC.audio.getNumSamples())
+                            continue;
+                        const auto d = (double) frozenC.audio.getSample (0, j) - (double) liveC.audio.getSample (0, i);
+                        sum += d * d;
+                    }
+                    if (best < 0.0 || sum < best)
+                    {
+                        best = sum;
+                        bestLag = lag;
+                    }
+                }
+                double energy = 0.0;
+                for (int i = from; i < to; i += 4)
+                    energy += (double) liveC.audio.getSample (0, i) * liveC.audio.getSample (0, i);
+                const auto atLag = energy > 0.0 ? 10.0 * std::log10 (juce::jmax (best, 1.0e-30) / energy) : -200.0;
+                // where they part: the first sample 60 dB under the peak apart, and the largest difference (seconds, bars)
+                int firstApart = -1, worstAt = 0;
+                float worst = 0.0f;
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < n; ++i)
+                        if (const auto d = std::abs (liveC.audio.getSample (ch, i) - frozenC.audio.getSample (ch, i)); d > 0.0f)
+                        {
+                            if (d > peak * 1.0e-3f && (firstApart < 0 || i < firstApart))
+                                firstApart = i;
+                            if (d > worst)
+                            {
+                                worst = d;
+                                worstAt = i;
+                            }
+                        }
+                const auto rate = offline.getTransport().sampleRate.load();
+                const auto bars = [&before, rate] (int sample) {
+                    const auto beats = sample / rate * before.bpm / 60.0;
+                    return juce::String (beats / juce::jmax (1, before.beatsPerBar) + 1.0, 2);
+                };
+                report << "    apart from " << (firstApart < 0 ? juce::String ("nowhere") : juce::String (firstApart / rate, 3) + " s (bar " + bars (firstApart) + ")")
+                       << ", largest difference at " << juce::String (worstAt / rate, 3) << " s (bar " << bars (worstAt) << "): live "
+                       << juce::String (liveC.audio.getSample (0, worstAt), 4) << ", frozen " << juce::String (frozenC.audio.getSample (0, worstAt), 4) << "\n";
+                if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_FREEZETEST_KEEP", {}); juce::File::isAbsolutePath (keep))
+                {
+                    const juce::File dir (keep);
+                    dir.createDirectory();
+                    for (const auto* m : { &liveC, &frozenC })
+                    {
+                        const auto out = dir.getChildFile ("ch" + juce::String (c + 1) + (m == &liveC ? "-live.wav" : "-frozen.wav"));
+                        out.deleteFile();
+                        juce::WavAudioFormat wav;
+                        if (std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (out.createOutputStream().release(), rate, 2, 32, {}, 0)); w != nullptr)
+                            w->writeFromAudioSampleBuffer (m->audio, 0, m->audio.getNumSamples());
+                    }
+                }
+                report << "channel " << (c + 1) << " '" << juce::String::fromUTF8 (before.channels[(std::size_t) c].name.c_str()) << "' instrument "
+                       << (int) before.channels[(std::size_t) c].instrument << (error.isEmpty() ? juce::String() : " (freeze: " + error + ")")
+                       << ": null " << juce::String (direct, 1) << " dB (peak " << juce::String (peak, 3) << "), best lag " << bestLag
+                       << " samples, residual there " << juce::String (atLag, 1) << " dB of its energy, lengths " << liveC.audio.getNumSamples() << " / "
+                       << frozenC.audio.getNumSamples() << "\n";
+                // the same with the channel's volume and pan neutral on both sides (the freeze renders its stem so and
+                // applies them after): a null here and none above = the level / pan reach the instrument itself
+                if (direct >= -90.0)
+                {
+                    const auto neutral = [&solo, c] (lynx::Song s) {
+                        auto& ch = s.channels[(std::size_t) c];
+                        ch.volume = 1.0f;
+                        ch.pan = 0.0f;
+                        ch.misc.levels.volume = 1.0f;
+                        ch.misc.levels.pan = 0.0f;
+                        return solo (std::move (s), c);
+                    };
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto liveNSong = neutral (offline.getSong());
+                    const auto liveN = renderMix ("solo-live-neutral", &liveNSong);
+                    lynx::freezeChannelNow (offline, c);
+                    offline.dispatchPendingMessages();
+                    const auto frozenNSong = neutral (offline.getSong());
+                    const auto frozenN = renderMix ("solo-frozen-neutral", &frozenNSong);
+                    float peakN = 0.0f;
+                    const auto nullN = residual (liveN, frozenN, peakN);
+                    report << "    volume " << before.channels[(std::size_t) c].volume << ", pan " << before.channels[(std::size_t) c].pan
+                           << "; with both neutral: null " << juce::String (nullN, 1) << " dB\n";
+                    // and live against itself (a second live render from the same start): what does not null there is
+                    // the instrument's own randomness (by design), not the freeze
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto againSong = solo (offline.getSong(), c);
+                    const auto again = renderMix ("solo-live-again", &againSong);
+                    float peakA = 0.0f;
+                    const auto nullA = residual (liveC, again, peakA);
+                    report << "    live against live: null " << juce::String (nullA, 1) << " dB\n";
+                    // and live with the other channels taken out as the freeze's render takes them out (freeze::lighten):
+                    // a null here = what differs comes from the others being there (their events splitting the blocks)
+                    auto lightSong = solo (before, c);
+                    lynx::freeze::lighten (lightSong, c, before.channels[(std::size_t) c].mixerTrack); // (its own insert kept: it plays through it)
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto light = renderMix ("solo-live-lightened", &lightSong);
+                    float peakL = 0.0f;
+                    report << "    live with the others taken out against live: null " << juce::String (residual (liveC, light, peakL), 1)
+                           << " dB, against frozen: " << juce::String (residual (light, frozenC, peakL), 1) << " dB\n";
+                    // and live in the chunks a stem's render uses (neutralise: Song::automationChunks on when automation plays)
+                    auto chunked = solo (before, c);
+                    chunked.automationChunks = true;
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto inChunks = renderMix ("solo-live-chunked", &chunked);
+                    report << "    automationChunks " << (before.automationChunks ? "on" : "off") << "; live in automation chunks against frozen: null "
+                           << juce::String (residual (inChunks, frozenC, peakL), 1) << " dB, against live: " << juce::String (residual (liveC, inChunks, peakL), 1) << " dB\n";
+                    // and both raw, straight to the Master with every insert's effects off (no latency anywhere in the
+                    // render): a null here = the difference comes from the insert's path (its delay compensation moves
+                    // where the blocks fall, and the instrument rounds per block)
+                    const auto raw = [c] (lynx::Song s) {
+                        s.channels[(std::size_t) c].mixerTrack = 0;
+                        lynx::freeze::lighten (s, c, -1);
+                        return s;
+                    };
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                    const auto rawLiveSong = raw (solo (before, c));
+                    const auto rawLive = renderMix ("solo-live-raw", &rawLiveSong);
+                    lynx::freezeChannelNow (offline, c);
+                    offline.dispatchPendingMessages();
+                    const auto rawFrozenSong = raw (solo (offline.getSong(), c));
+                    const auto rawFrozen = renderMix ("solo-frozen-raw", &rawFrozenSong);
+                    report << "    both raw to the Master, no insert effects: null " << juce::String (residual (rawLive, rawFrozen, peakL), 1) << " dB (insert "
+                           << before.channels[(std::size_t) c].mixerTrack << ", " << (int) before.mixer[(std::size_t) juce::jlimit (0, (int) before.mixer.size() - 1, before.channels[(std::size_t) c].mixerTrack)].effects.size() << " effects)\n";
+                }
+                report << "    levels in the stems: " << (offline.getSong().channels[(std::size_t) c].freeze.levels ? "yes" : "no") << "\n";
+                check (direct < -90.0, "channel " + juce::String (c + 1) + " frozen alone nulls against it live (" + juce::String (direct, 1) + " dB)");
+                flush();
+            }
+            flush();
+            return failures == 0;
+        }
+
         const auto first = targets.front();
         offline.setSelectedChannel (first);
         ui.selectTabForSnapshot (0);
@@ -42255,6 +42516,7 @@ private:
     juce::File fileToOpen;
     bool startupFileHandled = false;
     bool startWithoutPlugins = false; // --no-plugins project.lynx (round 190ap)
+    juce::String uncleanDevice; // round 190rp: "<type>: <name>" of the device the last session hung opening (uncleanDeviceOpen)
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };

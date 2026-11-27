@@ -1,4 +1,6 @@
 #include "engine/AudioEngine.h"
+#include "platform/CrashGuard.h" // round 190rp: session steps around the device open
+#include "engine/DeviceGuard.h" // round 190rp: bounded device opens
 #include "engine/SafeWrite.h"
 #include <cstring> // (round 190nw: the module import's sample files)
 #include "core/AutomationModes.h" // round 190pa (P21)
@@ -650,7 +652,7 @@ void AudioEngine::openAudioDevice()
     deviceManager.getAvailableDeviceTypes(); // the standard types first (round 190hd: its own trace line)
     mark ("  engine: standard device types (the prewarmed ASIO device handed over)");
     if (auto lynxAsio = makeBuiltInLynxAsioType())
-        deviceManager.addAudioDeviceType (std::move (lynxAsio));
+        deviceManager.addAudioDeviceType (deviceguard::wrap (std::move (lynxAsio))); // (round 190rp: bounded opens)
     // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
     if (auto pipeWire = makePipeWireDeviceType())
     {
@@ -660,7 +662,8 @@ void AudioEngine::openAudioDevice()
     mark ("  engine: device types");
 
     // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
-    const auto saved = juce::XmlDocument::parse (audioDeviceFile());
+    // (round 190rp: not after a session that hung or ended inside this open: skipSavedDevice)
+    const auto saved = skipSavedDevice ? std::unique_ptr<juce::XmlElement>() : juce::XmlDocument::parse (audioDeviceFile());
     // (round 190go) the MIDI ports the saved setup names open with the MIDI devices (openMidiDevices: LYNX's MIDI
     // settings decide which inputs are open anyway), not on the audio device's way: JUCE opened them here (~0.1-0.2 s)
     if (saved != nullptr)
@@ -671,6 +674,10 @@ void AudioEngine::openAudioDevice()
         saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
     }
     auto fresh = saved == nullptr;
+    const auto hungBefore = deviceguard::hungCount();
+    if (saved != nullptr) // (round 190rp: a hang or a crash in the driver's open leaves this as the session's last step)
+        crashguard::note (std::string (openingDeviceStep) + saved->getStringAttribute ("deviceType").toStdString() + ": "
+                          + saved->getStringAttribute ("audioOutputDeviceName").toStdString());
     auto failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
     // (round 190hd) a device made ahead without JUCE's start / stop at init that then failed: once more the usual way
     if (failed && saved != nullptr && asioPrewarmQuickInit())
@@ -685,9 +692,23 @@ void AudioEngine::openAudioDevice()
         choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
         chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
     }
+    if (saved != nullptr)
+        crashguard::note ("audio device opened");
+    // round 190rp (crash group G1): the saved device's driver did not answer within the time limit (DeviceGuard.h): the
+    // default device opened instead (above); the window says which driver hung, with "Try again" and "Choose another"
+    if (deviceguard::hungCount() != hungBefore)
+    {
+        hungDeviceSetup = saved != nullptr ? saved->toString() : juce::String();
+        juce::MessageManager::callAsync ([this, hung = deviceguard::lastHung()] {
+            if (onAudioDeviceHung)
+                onAudioDeviceHung (hung);
+        });
+    }
     mark ("  engine: device opened");
     deviceManager.addAudioCallback (this);
     deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
+    if (skipSavedDevice) // (the device that hung is not tried again at the next start: the default one is the setup now)
+        saveAudioDeviceState();
     prefetcher = std::make_unique<StreamPrefetcher> (transport);
     prefetcher->update (song, samples);
     // a project set while the device was not open yet (round 190go: the start-up song, built with the window): its
@@ -699,6 +720,8 @@ void AudioEngine::openAudioDevice()
 
 void AudioEngine::prewarmAudioDevice()
 {
+    if (skipSavedDevice) // (round 190rp: the saved device hung the last session's start)
+        return;
     prewarmAsioDevice (audioDeviceFile());
 }
 
@@ -6607,6 +6630,12 @@ void AudioEngine::timerCallback()
         enableAllMidiInputs();
     }
 
+    if (++deviceWatchTicks >= 15) // (twice a second)
+    {
+        deviceWatchTicks = 0;
+        watchAudioDevice();
+    }
+
     updateRealtimeStats();
     // round 190gn (A1): the racks' pitch-shifter stocks back to their reserve (a voice took one: a live keyboard on a
     // keep-pitch channel); nothing to do, and no allocation, when none was taken
@@ -6662,6 +6691,95 @@ void AudioEngine::timerCallback()
                 }
         ++latencyRepublishes;
         publishSong();
+    }
+}
+
+juce::String AudioEngine::retryHungAudioDevice()
+{
+    const auto xml = juce::XmlDocument::parse (hungDeviceSetup);
+    if (xml == nullptr)
+        return "no device to try again";
+    const auto type = xml->getStringAttribute ("deviceType");
+    const auto name = xml->getStringAttribute ("audioOutputDeviceName").isNotEmpty() ? xml->getStringAttribute ("audioOutputDeviceName")
+                                                                                     : xml->getStringAttribute ("audioInputDeviceName");
+    deviceguard::allowAgain (type, name);
+    const auto hungBefore = deviceguard::hungCount();
+    auto error = deviceManager.initialise (0, 2, xml.get(), false);
+    if (deviceguard::hungCount() != hungBefore || error.isNotEmpty())
+    {
+        deviceManager.initialise (0, 2, nullptr, true); // (the default device again)
+        if (error.isEmpty())
+            error = deviceguard::hungError (name);
+        return error;
+    }
+    saveAudioDeviceState();
+    return {};
+}
+
+// Round 190rp (0.1.32 Q4, decision O-4 (a)): the device in use went away or came back (core/DeviceLoss.h). FL shows
+// nothing here; LYNX stops the recording it can no longer feed (the take up to that moment is kept), says so, and opens
+// the device again when it is back, so a cable pulled out by mistake doesn't leave the session on the laptop speakers.
+void AudioEngine::watchAudioDevice()
+{
+    auto* device = deviceManager.getCurrentAudioDevice();
+    const deviceloss::Device now { device != nullptr ? device->getTypeName().toStdString() : std::string(),
+                                   device != nullptr ? device->getName().toStdString() : std::string() };
+    auto listed = [this] (const deviceloss::Device& d) {
+        for (auto* type : deviceManager.getAvailableDeviceTypes())
+            if (type->getTypeName().toStdString() == d.type)
+            {
+                const auto name = juce::String::fromUTF8 (d.name.c_str());
+                return type->getDeviceNames (false).contains (name) || type->getDeviceNames (true).contains (name);
+            }
+        return false;
+    };
+    switch (deviceWatch.update (now, listed))
+    {
+        case deviceloss::Event::none:
+            if (! now.empty() && deviceWatch.lost().empty())
+                runningDeviceSetup = deviceManager.getAudioDeviceSetup(); // (what to reopen it with if it goes)
+            return;
+        case deviceloss::Event::lost:
+        {
+            lostDeviceSetup = runningDeviceSetup;
+            deviceReopenTries = 0;
+            deviceReopenMs = juce::Time::getMillisecondCounter();
+            const auto name = juce::String::fromUTF8 (deviceWatch.lost().name.c_str());
+            const auto recordingStopped = transport.recording.load();
+            if (recordingStopped)
+            {
+                setRecording (false); // (the takes close with what reached them: kept, as the record button keeps them)
+                stop();
+            }
+            if (onAudioDeviceLost)
+                onAudioDeviceLost (name, recordingStopped);
+            return;
+        }
+        case deviceloss::Event::reopen:
+        {
+            const auto ms = juce::Time::getMillisecondCounter();
+            if (ms - deviceReopenMs < 2000) // (listed again: give the driver a moment, then one try every 2 s)
+                return;
+            deviceReopenMs = ms;
+            const auto wanted = deviceWatch.lost();
+            const auto name = juce::String::fromUTF8 (wanted.name.c_str());
+            if (deviceManager.getCurrentAudioDeviceType().toStdString() != wanted.type)
+                deviceManager.setCurrentAudioDeviceType (juce::String::fromUTF8 (wanted.type.c_str()), true);
+            const auto error = deviceManager.setAudioDeviceSetup (lostDeviceSetup, true);
+            auto* opened = deviceManager.getCurrentAudioDevice();
+            const deviceloss::Device after { opened != nullptr ? opened->getTypeName().toStdString() : std::string(),
+                                             opened != nullptr ? opened->getName().toStdString() : std::string() };
+            if (error.isEmpty() && after == wanted)
+            {
+                deviceWatch.reopened (after);
+                runningDeviceSetup = deviceManager.getAudioDeviceSetup();
+                if (onAudioDeviceBack)
+                    onAudioDeviceBack (name);
+            }
+            else if (++deviceReopenTries >= 10)
+                deviceWatch.reopened (after); // (listed but it won't open: given up after 20 s; Settings › Audio)
+            return;
+        }
     }
 }
 

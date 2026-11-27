@@ -152,6 +152,7 @@
 #include "ui/ActionSearch.h" // round 190nq (#228)
 #include "ui/HowTo.h" // round 190qx
 #include "ui/Notices.h" // round 190qx
+#include "engine/DeviceGuard.h" // round 190rp
 #include "ui/TrackerComponent.h"
 #include "core/ExtrasDefaults.h" // round 190qk: which extras are on by default, the user-set list
 #include "core/LynxExtras.h" // round 190on (P2: the command palette lists the extras)
@@ -1196,6 +1197,66 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             lines.add (tr ("MIDI device disconnected: {0}", { removed.joinIntoString (", ") }));
         ui::postNotice ({ lines.joinIntoString ("  ·  "), {} }, 5000);
     };
+    // round 190rp (0.1.32 Q4, decision O-4 (a)): the audio device in use went away / came back (AudioEngine::watchAudioDevice).
+    // FL shows nothing; LYNX says so, as a notice that stays (a recording that stopped must not go unnoticed)
+    engine.onAudioDeviceLost = [] (const juce::String& device, bool recordingStopped) {
+        platform::testModeLog ("audio device lost: " + device + (recordingStopped ? " (recording stopped)" : ""));
+        ui::Notice n;
+        n.kind = ui::Notice::Kind::problem;
+        n.id = "audio.deviceLost";
+        n.text = tr ("The audio device {0} stopped", { device });
+        n.detail = recordingStopped ? tr ("Recording stopped and the take is kept. LYNX SHARE opens {0} again when it is back.", { device })
+                                    : tr ("LYNX SHARE opens {0} again when it is back.", { device });
+        n.holdMs = recordingStopped ? 10 * 60 * 1000 : 0;
+        ui::notify (std::move (n));
+    };
+    // round 190rp (crash group G1, engine/DeviceGuard.h): the saved device's driver did not answer within the time limit
+    engine.onAudioDeviceHung = [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::String& hung) {
+        if (safe == nullptr)
+            return;
+        platform::testModeLog ("audio device hung: " + hung);
+        auto& self = *safe;
+        auto* now = self.engine.getDeviceManager().getCurrentAudioDevice();
+        const auto device = hung.fromFirstOccurrenceOf (": ", false, false);
+        const auto instead = now != nullptr ? now->getName() : tr ("no audio device");
+        auto* w = new juce::AlertWindow (tr ("The audio driver did not answer"),
+                                         tr ("LYNX SHARE waited {0} s for {1} to open and uses {2} for now. The driver may be busy in another "
+                                             "program or need a restart.",
+                                             { juce::String (deviceguard::timeoutMs() / 1000), device, instead }),
+                                         juce::MessageBoxIconType::WarningIcon);
+        w->addButton (tr ("Try again"), 1);
+        w->addButton (tr ("Choose another..."), 2);
+        w->addButton (tr ("OK"), 0, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, device] (int result) {
+                                if (safe == nullptr)
+                                    return;
+                                if (result == 2)
+                                    safe->showAudioSettings();
+                                if (result != 1)
+                                    return;
+                                if (const auto error = safe->engine.retryHungAudioDevice(); error.isNotEmpty())
+                                {
+                                    auto* d = safe->engine.getDeviceManager().getCurrentAudioDevice();
+                                    platform::testModeLog ("audio device still hung: " + error);
+                                    ui::Notice n;
+                                    n.kind = ui::Notice::Kind::problem;
+                                    n.id = "audio.deviceHung";
+                                    n.text = tr ("{0} still did not answer. LYNX SHARE uses {1} for now.", { device, d != nullptr ? d->getName() : tr ("no audio device") });
+                                    ui::notify (std::move (n));
+                                }
+                                else
+                                    platform::testModeLog ("audio device opened on the second try: " + device);
+                            }),
+                            true);
+    };
+    engine.onAudioDeviceBack = [] (const juce::String& device) {
+        platform::testModeLog ("audio device back: " + device);
+        ui::Notice n;
+        n.kind = ui::Notice::Kind::done;
+        n.id = "audio.deviceLost"; // (replaces the notice of its loss)
+        n.text = tr ("{0} is back: LYNX SHARE uses it again", { device });
+        ui::notify (std::move (n));
+    };
     if (startStyle.style != layoutstyle::Style::pattern)
         setLayoutStyle (startStyle.style, false); // (the saved workspace layout is already this style's)
     updateGamepad(); // (round 184a, S16: only when the option is on)
@@ -1270,6 +1331,9 @@ MainComponent::~MainComponent()
     workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     engine.onMidiDevicesChanged = nullptr;
+    engine.onAudioDeviceLost = nullptr;
+    engine.onAudioDeviceBack = nullptr;
+    engine.onAudioDeviceHung = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     liveui::setRemoteSession (nullptr, nullptr);
@@ -1278,7 +1342,7 @@ MainComponent::~MainComponent()
     setSecondaryWindowKeyHandler (nullptr);
     setLinkedWindowFocusHandler (nullptr);
     cancelProjectLoad(); // an open in progress uses the engine from its thread
-    if (sessionLock != nullptr) // a clean exit: no "LYNX did not close properly" next time
+    if (sessionMarker != juce::File()) // a clean exit: no "LYNX did not close properly" next time
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
     openMixerInsertHandler() = nullptr;
@@ -9876,23 +9940,34 @@ void MainComponent::startSession()
 {
     // Like FL's backup on crash: a marker exists while LYNX runs; finding one at start means the last session
     // ended without closing (crash, power loss), so the newest backup written during it is offered.
-    sessionLock = std::make_unique<juce::InterProcessLock> ("LYNX-ui-session");
-    if (! sessionLock->enter (0))
+    // round 190rp: one marker per running LYNX (session-running-<pid>.txt), not one per machine held by whichever window
+    // came first: a session whose marker is left while its process is gone ended without closing, even when other LYNX
+    // windows run (safety::newestEndedSession). The markers of ended sessions are removed once read.
+    const auto folder = lynx::platform::settingsFile ("session-running.txt").getParentDirectory();
+    folder.createDirectory();
+    std::vector<safety::SessionMarker> ended;
+    for (const auto& f : folder.findChildFiles (juce::File::findFiles, false, "session-running*.txt"))
     {
-        sessionLock.reset(); // another LYNX window is running: it owns the marker
-        return;
+        safety::SessionMarker m;
+        if (! safety::parseSessionMarker (f.loadFileAsString().toStdString(), m))
+            continue;
+        if (! m.legacy && crashguard::processRunning (m.pid, m.processStart))
+            continue; // (another LYNX that runs now: its marker is its own)
+        ended.push_back (m);
+        f.deleteFile();
     }
-    sessionMarker = lynx::platform::settingsFile ("session-running.txt");
-    if (sessionMarker.existsAsFile())
+    if (const auto previous = safety::newestEndedSession (ended, {}); previous >= 0)
     {
-        const auto previousStart = juce::Time (sessionMarker.loadFileAsString().trim().getLargeIntValue());
+        const auto previousStart = juce::Time (previous);
         juce::Timer::callAfterDelay (2500, [safe = juce::Component::SafePointer<MainComponent> (this), previousStart] {
             if (safe != nullptr)
                 safe->checkPreviousSession (previousStart);
         });
     }
-    sessionMarker.getParentDirectory().createDirectory();
-    safewrite::replaceWithText (sessionMarker, juce::String (juce::Time::getCurrentTime().toMilliseconds()));
+    sessionMarker = folder.getChildFile ("session-running-" + juce::String (crashguard::processId()) + ".txt");
+    safewrite::replaceWithText (sessionMarker, juce::String::fromUTF8 (safety::sessionMarkerText (juce::Time::getCurrentTime().toMilliseconds(),
+                                                                                                    crashguard::processId(), crashguard::processStartTime())
+                                                                          .c_str()));
     // takes that were recording when LYNX stopped (crash, power loss, closed while recording): after the backup offer
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
         if (safe != nullptr)
@@ -9959,25 +10034,55 @@ void MainComponent::checkPreviousSession (juce::Time sessionStart)
         return; // nothing was saved in that session
     const auto backup = folder.getChildFile (juce::String::fromUTF8 (name.c_str()) + ProjectFile::extension);
 
-    auto* w = new juce::AlertWindow (tr ("LYNX SHARE did not close properly"),
-                                     tr ("The last session ended unexpectedly. Open the newest backup it saved?\n{0}  ({1})",
-                                         { backup.getFileName(), backup.getLastModificationTime().formatted ("%Y-%m-%d %H:%M") }),
-                                     juce::MessageBoxIconType::WarningIcon);
-    w->addButton (tr ("Open backup"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    // round 190rp (0.1.32 Q4, decision O-2 (a)): "Open backup without third-party plugins" is always offered, and is the
+    // default when the session ended while a plugin's window was open (Main.cpp's uncleanCause): a backup that holds
+    // the plugin that crashed it would crash again as it opens. The plugins stay in the project, switched off with their
+    // settings kept (the title and the "Third-party plugins" window say so); its "Switch all on" turns them back on.
+    juce::StringArray buttons;
+    const auto message = recoveryBoxForTest (backup, buttons);
+    const auto pluginNamed = recoveryPlugin.isNotEmpty();
+    platform::testModeLog ("recovery box: " + backup.getFileName() + (pluginNamed ? " (plugin " + recoveryPlugin + ")" : juce::String()));
+    auto* w = new juce::AlertWindow (tr ("LYNX SHARE did not close properly"), message, juce::MessageBoxIconType::WarningIcon);
+    if (pluginNamed)
+    {
+        w->addButton (tr ("Open backup without third-party plugins"), 3, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Open backup"), 1);
+    }
+    else
+    {
+        w->addButton (tr ("Open backup"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Open backup without third-party plugins"), 3);
+    }
     w->addButton (tr ("Open backup folder"), 2);
     w->addButton (tr ("Ignore"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<MainComponent> (this), backup, folder] (int result) {
                             if (safe == nullptr)
                                 return;
-                            if (result == 1)
-                                safe->confirmDiscard ([safe, backup] {
+                            if (result == 1 || result == 3)
+                                safe->confirmDiscard ([safe, backup, withoutPlugins = result == 3] {
                                     if (safe != nullptr)
-                                        safe->openLynxProject (backup);
+                                        safe->openLynxProject (backup, withoutPlugins);
                                 });
                             else if (result == 2)
                                 folder.startAsProcess();
                         }),
                         true);
+}
+
+juce::String MainComponent::recoveryBoxForTest (const juce::File& backup, juce::StringArray& buttons) const
+{
+    const auto when = backup.getLastModificationTime().formatted ("%Y-%m-%d %H:%M");
+    buttons.clear();
+    if (recoveryPlugin.isNotEmpty())
+    {
+        buttons.addArray ({ tr ("Open backup without third-party plugins"), tr ("Open backup"), tr ("Open backup folder"), tr ("Ignore") });
+        return tr ("The last session ended unexpectedly while the window of {0} was open. Open the newest backup it saved without "
+                   "third-party plugins? They stay in the project, switched off with their settings kept; \"Switch all on\" in the "
+                   "Third-party plugins window turns them back on.\n{1}  ({2})",
+                   { recoveryPlugin, backup.getFileName(), when });
+    }
+    buttons.addArray ({ tr ("Open backup"), tr ("Open backup without third-party plugins"), tr ("Open backup folder"), tr ("Ignore") });
+    return tr ("The last session ended unexpectedly. Open the newest backup it saved?\n{0}  ({1})", { backup.getFileName(), when });
 }
 
 void MainComponent::newProject (bool askAlways)

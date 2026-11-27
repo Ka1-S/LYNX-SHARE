@@ -42,6 +42,7 @@
 #include "core/RtStats.h"
 #include "core/OverloadGuard.h"
 #include "core/Dropouts.h"
+#include "core/DeviceLoss.h"
 #include "core/ScoreLog.h"
 #include "core/FlpImport.h"
 #include "core/History.h"
@@ -99,6 +100,14 @@ public:
     // driver itself on JUCE's ASIO thread, cmake/LynxPatchJuce.cmake fix 29); openAudioDevice() then takes it. Making
     // and opening it took ~0.8 s of the start's critical path. Elsewhere, or for another device type: nothing.
     static void prewarmAudioDevice();
+    // Round 190rp (crash reports since 0.1.31.2, group G1: one Windows machine hung at every start inside its ASIO
+    // driver's open, 6 starts in a row): openAudioDevice notes "opening the audio device <type>: <name>" in the session
+    // file before the saved device opens and "audio device opened" after. When the last session ended inside that open
+    // (Main.cpp reads its steps), this start skips the saved device (no prewarm either), opens the default one, saves
+    // that as the setup and the start-up notice says why. Set before prewarmAudioDevice / openAudioDevice.
+    static inline bool skipSavedDevice = false;
+    // the session step written before the saved device opens (Main.cpp looks for it)
+    static constexpr const char* openingDeviceStep = "opening the audio device ";
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
@@ -912,6 +921,26 @@ public:
     // the names plugged in and out (the hint bar). UI thread.
     int getMidiDeviceListVersion() const noexcept { return midiDeviceListVersion; }
     std::function<void (const juce::StringArray& added, const juce::StringArray& removed)> onMidiDevicesChanged;
+    // Round 190rp (0.1.32 Q4, owner decision O-4 (a)): the audio device in use went away (unplugged, its driver or
+    // PipeWire node removed). A recording stops (the take is kept, as the record button would) and so does playback
+    // with it; onAudioDeviceLost gets the device's name and whether a recording was stopped (the notice). When the
+    // device is listed again and nothing else was chosen meanwhile it is opened again with its settings, and
+    // onAudioDeviceBack gets its name. Checked twice a second from the engine's timer. UI thread.
+    std::function<void (const juce::String& device, bool recordingStopped)> onAudioDeviceLost;
+    std::function<void (const juce::String& device)> onAudioDeviceBack;
+    // Round 190rp (crash group G1, engine/DeviceGuard.h): the saved device's driver did not answer within the time limit
+    // at start ("<type>: <name>"); the default device is open instead. retryHungAudioDevice: one more bounded attempt
+    // with the saved setup ("" = it opened; else why not, and the default device is open again). Message thread.
+    std::function<void (const juce::String& device)> onAudioDeviceHung;
+    juce::String retryHungAudioDevice();
+    // --selftest "device_lost" (engine/DeviceChangeTest.cpp): the stand-in device in use unplugged while recording,
+    // while playing, and while stopped, then plugged in again; and a device chosen while the lost one is away.
+    // "OK (...)" or "ERROR ..."
+    static juce::String deviceLostSelfTest();
+    // --selftest "stab190rp" / --recoverytest (round 190rp, FIX-LIST item 8 = TN2-1, engine/SampleZeroTest.cpp): a burst at
+    // tick 0 through every effect kind with latency, a linear-phase EQ, a send and side-by-side inserts starts at sample
+    // 0 of the export, and the delay compensation's total after play from stop and after a relocate. "OK (...)" / "ERROR ..."
+    static juce::String sampleZeroSelfTest (const std::function<void (const juce::String&)>& log = {});
     // --selftest "midi_hotplug" / --midihotplugtest: stand-in device lists in place of the system's (empty = the
     // system's), then "OK (...)" or "ERROR ..." (engine/MidiHotplugTest.cpp)
     static std::function<juce::Array<juce::MidiDeviceInfo> (bool inputs)>& midiDeviceListOverride();
@@ -1706,6 +1735,13 @@ private:
     bool midiPortsKnown = false;                     // lastMidiPorts was filled once (no hint for the start-up list)
     int midiDeviceListVersion = 0;
     int midiCheckTicks = 0;
+    // round 190rp: the audio device in use going away and coming back (watchAudioDevice, from the timer)
+    void watchAudioDevice();
+    deviceloss::Watch deviceWatch;
+    juce::AudioDeviceManager::AudioDeviceSetup runningDeviceSetup, lostDeviceSetup;
+    juce::String hungDeviceSetup; // (round 190rp: the saved setup whose open hung, for retryHungAudioDevice)
+    int deviceWatchTicks = 0, deviceReopenTries = 0;
+    juce::uint32 deviceReopenMs = 0;
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     std::uint32_t midiProjectLinked = 0, midiGlobalLinked = 0; // (message thread, round 190ld)
     std::atomic<float> listenGain { 1.0f };

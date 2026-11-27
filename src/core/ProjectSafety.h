@@ -48,7 +48,29 @@ std::string newestBackup (const std::vector<BackupFile>& files, const std::strin
 // The file to offer after LYNX did not close properly: the newest file written since the session started
 // (`sessionStart`, same unit as the times), not an "overwritten" copy (that is older than the saved project).
 // "" when nothing was written in that session.
+// Round 190rp: a save's temporary file is never the candidate ("<name>_temp<hex>", juce::TemporaryFile's name, left
+// half-written when LYNX was killed or the machine went down while an autosave or the emergency save was writing it).
 std::string crashRecoveryCandidate (const std::vector<BackupFile>& files, std::int64_t sessionStart);
+// Round 190rp: the session markers ("LYNX did not close properly"). Each running LYNX writes its own,
+// "session-running-<pid>.txt" (sessionMarkerText); a marker whose process is gone is a session that ended without
+// closing, whatever other LYNX windows run meanwhile (the marker used to be one per machine, kept by whichever window
+// started first: a crash of another window then left nothing, and its next start offered no backup). "session-running.txt"
+// (one number: the start) is an older LYNX's marker, read as before.
+struct SessionMarker
+{
+    std::int64_t startMs = 0;
+    std::uint32_t pid = 0;
+    std::uint64_t processStart = 0;
+    bool legacy = false;
+};
+std::string sessionMarkerText (std::int64_t startMs, std::uint32_t pid, std::uint64_t processStart);
+bool parseSessionMarker (const std::string& text, SessionMarker& out);
+// the newest start among the markers whose process is not running (`running` (pid, processStart)); legacy markers count
+// as ended. -1 when none ended.
+std::int64_t newestEndedSession (const std::vector<SessionMarker>& markers, const std::function<bool (std::uint32_t, std::uint64_t)>& running);
+
+// True for juce::TemporaryFile's name of a file being saved: "<name>_temp" + 1-8 hex digits (no extension).
+bool isTemporarySaveName (const std::string& name);
 
 // --- names ----------------------------------------------------------------------------------------------------------
 // `stem` if `taken` says it is free, else stem + "_2", "_3"... (FL's rule for backup and collected file names).

@@ -48,13 +48,14 @@ struct ChannelRender
 };
 // withInsert (round 190ff, track freeze): the channel with its volume and pan, through its insert's effects (that insert
 // at unity, its EQ, pan and sends left out — they apply live), instead of the channel's raw output.
-ChannelRender channelPatternRender (const Song& song, int channel, bool withInsert = false);
+// keepLevels (round 190rp, FreezeState::levels): the channel's raw output with its volume / pan and what drives them.
+ChannelRender channelPatternRender (const Song& song, int channel, bool withInsert = false, bool keepLevels = false);
 // A channel whose plugin follows song-level automation (of its parameters), or a song with tempo automation, gets a
 // timeline stem instead (the pattern stems would not follow).
 bool needsTimeline (const Song& song, int channel);
 // The whole song with only `channel` heard, before its insert (volume / pan / insert left out); withInsert: through its
 // insert's effects, as channelPatternRender.
-Song channelTimelineRender (const Song& song, int channel, bool withInsert = false);
+Song channelTimelineRender (const Song& song, int channel, bool withInsert = false, bool keepLevels = false);
 // The whole song with only insert `track`'s output heard, after its effects, before its fader / pan / EQ.
 Song insertTimelineRender (const Song& song, int track);
 
@@ -87,7 +88,11 @@ namespace lynx::freeze
 const char* whyNot (const Song& song, int channel) noexcept;
 // The channel with that uid plays `stems` from now on (its instrument is unloaded at the next publish). insert > 0: a
 // track freeze (round 190ff), the stems hold that insert's effects too.
+// A channel freeze (insert 0) of an instrument levelsShapeSound names holds the channel's volume / pan (FreezeState::levels).
 void apply (Song& song, std::uint64_t channelUid, std::vector<StandIn> stems, std::string source, int insert = 0);
+// Round 190rp: the instrument takes the channel's volume / pan inside and not as a plain gain (Harmless, Harmor: their
+// level and pan modulators add to FL's channel level), so its channel freeze renders them into the stems.
+bool levelsShapeSound (const ChannelDef& c) noexcept;
 // The channel plays its instrument again (the files are the caller's to delete).
 void clear (Song& song, int channel);
 bool any (const Song& song) noexcept;
