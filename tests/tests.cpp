@@ -14792,6 +14792,66 @@ TEST (fl_plugin_db_nfo_parsing)
     CHECK (lynx::pluginFormatFromPath ("a\\b.CLAP") == lynx::ForeignPlugin::Format::clap);
 }
 
+// round 190sb: FL's plugin database kept between starts (FlPluginDbCache): what goes in comes back field for field,
+// a file whose size or time changed is not found, and a damaged or cut cache file is an empty cache
+TEST (fl_plugin_db_cache_round_trip)
+{
+    lynx::FlPluginDbEntry a;
+    a.name = "Odd\tname\\with\nbreaks";
+    a.vendor = "Vendor";
+    a.path = "C:\\VST3\\Odd.vst3";
+    a.source = "C:\\FL\\Installed\\Generators\\VST3\\Odd.fst";
+    a.format = lynx::ForeignPlugin::Format::vst3;
+    a.role = 2;
+    for (int i = 0; i < 16; ++i)
+        a.classId[(std::size_t) i] = (std::uint8_t) (0xF0 + i);
+    a.hasClassId = true;
+    lynx::FlPluginDbEntry b;
+    b.name = "Clapper";
+    b.path = "E:\\CLAP\\Clapper.clap";
+    b.format = lynx::ForeignPlugin::Format::clap;
+    b.role = 1;
+    b.clapId = "org.clapper";
+    b.vst2Id = 0xFFFFFFFFu;
+    const auto same = [] (const lynx::FlPluginDbEntry& x, const lynx::FlPluginDbEntry& y) {
+        return x.name == y.name && x.vendor == y.vendor && x.path == y.path && x.source == y.source && x.format == y.format && x.role == y.role
+            && x.classId == y.classId && x.hasClassId == y.hasClassId && x.clapId == y.clapId && x.vst2Id == y.vst2Id;
+    };
+
+    lynx::FlPluginDbCache cache;
+    const lynx::FlPluginDbFileStamp one { "C:\\FL\\Installed\\Generators\\VST3\\Odd.fst", 1234, 1700000000123 };
+    const lynx::FlPluginDbFileStamp two { "C:\\FL\\Installed\\Effects\\CLAP\\Clapper.nfo", 77, -5 };
+    const lynx::FlPluginDbFileStamp none { "C:\\FL\\Installed\\Effects\\broken.fst", 3, 9 };
+    cache.put (one, { a });
+    cache.put (two, { b, a });
+    cache.put (none, {});
+    const auto text = cache.serialise();
+    const auto back = lynx::FlPluginDbCache::parse (text);
+    CHECK (back.size() == 3);
+    const auto* got = back.find (one);
+    CHECK (got != nullptr && got->size() == 1 && same ((*got)[0], a));
+    got = back.find (two);
+    CHECK (got != nullptr && got->size() == 2 && same ((*got)[0], b) && same ((*got)[1], a));
+    got = back.find (none);
+    CHECK (got != nullptr && got->empty());
+    CHECK (back.serialise() == text);
+
+    // a changed size or time, or another file: not in the cache
+    CHECK (back.find ({ one.path, one.size + 1, one.modified }) == nullptr);
+    CHECK (back.find ({ one.path, one.size, one.modified + 1 }) == nullptr);
+    CHECK (back.find ({ "C:\\other.nfo", 1, 1 }) == nullptr);
+
+    // damaged: another header, a cut file, a bad field: nothing is used
+    CHECK (lynx::FlPluginDbCache::parse ("").size() == 0);
+    CHECK (lynx::FlPluginDbCache::parse ("LYNX FL plugin database cache 0\nend\n").size() == 0);
+    CHECK (lynx::FlPluginDbCache::parse (text.substr (0, text.size() - 4)).size() == 0);
+    CHECK (lynx::FlPluginDbCache::parse (text.substr (0, text.size() / 2)).size() == 0);
+    auto bad = text;
+    bad.replace (bad.find ("\t2\t"), 3, "\tx\t");
+    CHECK (lynx::FlPluginDbCache::parse (bad).size() == 0);
+    CHECK (lynx::FlPluginDbCache::parse (text + "F\textra\n").size() == 0);
+}
+
 TEST (fl_plugin_db_fst_parsing_and_matching)
 {
     std::vector<std::uint8_t> cid;

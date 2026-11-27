@@ -116,11 +116,16 @@ FlStudioInstall findFlStudio()
     return fl;
 }
 
-FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files)
+FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files, const juce::File& cache)
 {
     FlPluginDb db;
     int count = 0;
     const auto folder = fl.pluginDatabase();
+    const auto cached = cache != juce::File() && cache.existsAsFile() && cache.getSize() < 64 * 1024 * 1024
+                            ? FlPluginDbCache::parse (cache.loadFileAsString().toStdString())
+                            : FlPluginDbCache();
+    FlPluginDbCache next;
+    auto changed = false;
 
     if (folder.isDirectory())
     {
@@ -132,26 +137,55 @@ FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files)
                 if (file.getFileName().equalsIgnoreCase ("VerifiedIDs.nfo") || entry.getFileSize() > 8 * 1024 * 1024)
                     continue;
                 ++count;
-                if (file.hasFileExtension ("fst"))
-                {
-                    juce::MemoryBlock data;
-                    FlPluginDbEntry e;
-                    e.source = file.getFullPathName().toStdString();
-                    const auto path = e.source;
-                    const auto under = [&path] (const char* folder) { // either separator (Windows path or a Wine prefix on Linux)
-                        return path.find (std::string ("\\") + folder + "\\") != std::string::npos || path.find (std::string ("/") + folder + "/") != std::string::npos;
-                    };
-                    e.role = under ("Generators") ? 2 : under ("Effects") ? 1 : 0;
-                    if (file.loadFileAsData (data)
-                        && parseFlPluginFst ({ static_cast<const std::uint8_t*> (data.getData()), data.getSize() }, e))
-                        db.add (e);
-                }
+                // (round 190sb) the listing's size and time: a file that did not change is not opened again
+                const FlPluginDbFileStamp stamp { file.getFullPathName().toStdString(), entry.getFileSize(), entry.getModificationTime().toMilliseconds() };
+                std::vector<FlPluginDbEntry> found;
+                auto keep = cache != juce::File();
+                if (const auto* kept = cached.find (stamp))
+                    found = *kept;
                 else
                 {
-                    for (const auto& e : parseFlPluginNfo (file.loadFileAsString().toStdString(), file.getFullPathName().toStdString()))
-                        db.add (e);
+                    // (a file that could not be read, an online-only OneDrive file without a connection: read again
+                    // next time, not kept as "no entries")
+                    auto read = false;
+                    if (file.hasFileExtension ("fst"))
+                    {
+                        juce::MemoryBlock data;
+                        FlPluginDbEntry e;
+                        e.source = stamp.path;
+                        const auto& path = e.source;
+                        const auto under = [&path] (const char* sub) { // either separator (Windows path or a Wine prefix on Linux)
+                            return path.find (std::string ("\\") + sub + "\\") != std::string::npos || path.find (std::string ("/") + sub + "/") != std::string::npos;
+                        };
+                        e.role = under ("Generators") ? 2 : under ("Effects") ? 1 : 0;
+                        const auto loaded = file.loadFileAsData (data);
+                        read = loaded && data.getSize() == (std::size_t) stamp.size;
+                        if (loaded && parseFlPluginFst ({ static_cast<const std::uint8_t*> (data.getData()), data.getSize() }, e))
+                            found.push_back (std::move (e));
+                    }
+                    else
+                    {
+                        juce::MemoryBlock data; // (as File::loadFileAsString: the same text decoding, "" when it can't be read)
+                        read = file.loadFileAsData (data) && data.getSize() == (std::size_t) stamp.size;
+                        found = parseFlPluginNfo (juce::String::createStringFromData (data.getData(), (int) data.getSize()).toStdString(), stamp.path);
+                    }
+                    keep = keep && read;
+                    changed = changed || keep;
                 }
+                for (const auto& e : found)
+                    db.add (e);
+                if (keep)
+                    next.put (stamp, std::move (found));
             }
+    }
+
+    // (a file gone from the database changes the cache too)
+    if (cache != juce::File() && (changed || next.size() != cached.size()))
+    {
+        const auto text = next.serialise();
+        const auto temp = cache.getSiblingFile (cache.getFileName() + ".tmp");
+        if (temp.replaceWithData (text.data(), text.size()))
+            temp.moveFileTo (cache);
     }
 
     if (files != nullptr)

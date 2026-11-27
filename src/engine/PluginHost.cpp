@@ -2565,7 +2565,8 @@ const FlPluginDb& PluginHost::flPluginDatabase()
     const std::scoped_lock lock (flDbLock);
     if (! flDbLoaded)
     {
-        flDb = readFlPluginDatabase (findFlStudio(), &flDbFiles);
+        // (round 190sb) kept between starts in the settings folder: only the database files that changed are read
+        flDb = readFlPluginDatabase (findFlStudio(), &flDbFiles, persistent ? settingsFolder().getChildFile ("fl-plugin-database-cache.txt") : juce::File());
         flDbLoaded = true;
     }
     return flDb;
