@@ -116,7 +116,7 @@
             f = frame (L, "zoom-after", 0, 24.0 * bar + 3.0 / f.ppt);
             check (L + ": after a zoom in the playhead is at a third again", third (f));
             playlist.setViewForSnapshot (40.0, (int) (f.scroll / bar), 0);
-            f = frame (L, "zoom-out", 0, 24.0 * bar + 6.0 / f.ppt);
+            f = frame (L, "zoom-out", 0, 24.0 * bar + 9.0 / f.ppt); // (the playhead moves: the Follow step runs on a moving frame)
             check (L + ": after a zoom out too", third (f));
             playlist.setViewForSnapshot (80.0, (int) (f.scroll / bar), 0);
 
