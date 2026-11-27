@@ -34,6 +34,7 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- The Simple layout: a sound dragged onto the timeline becomes a track there, as in BandLab.
 - **Faster with FL Studio's data and big projects:** F8, the Add menu, layout switches and opening a project no longer walk
   FL Studio's plugin database folders to know which FL engines LYNX has (F8 took 30.8 s with FL's data on a slow drive, now
   19 ms; a layout switch 15-39 s, now under 0.5 s); an edit while a 1,728-bar song plays no longer pauses for 1.6 s (65 ms):
@@ -92,6 +93,11 @@ The short version of each release. The full notes, with measurements, known issu
   (Ctrl+Z undid the project). A sidechain link now counts when LYNX refuses a Mixer route that would make a loop. Missing files
   lists a plugin that is not installed once. A Settings number box keeps its value on text with no number ("abc" in Tempo set
   10 BPM).
+- **Export to Ableton Live no longer crashes Live** when the project has a sampled drum kit (Live 12.4 crashed on a drum pad's
+  Simpler). Live no longer drops clips that LYNX wrote out of order; muted takes and muted automation lanes stay muted, and
+  returns used only for sends stay returns.
+- DAWproject export writes a sample other apps can't read as lossless FLAC only when its audio is exactly 16- or 24-bit;
+  copying samples for an export is faster and checked as it goes.
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
   save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
   third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
