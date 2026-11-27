@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![La ventana Gestionar atajos: una lista con búsqueda de acciones con las teclas de cada una](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Cada tecla abre el cuadro de diálogo de una herramienta de notas en el Piano Ro
 | `Del` | Elimina los inserts seleccionados. LYNX SHARE pregunta antes |
 | `Ctrl+E` | Abre el editor de audio |
 | `Shift+E` | Abre el editor de audio y graba |
+| `Ctrl+Shift+S` | Guarda el estado del insert seleccionado como... (un estado de pista del Mixer; fuera del Mixer es Guardar como) |
 | `Alt+R` | Renderiza los inserts armados a archivos WAV |
 | `Shift+Alt+R` | Renderiza los inserts seleccionados a archivos WAV |
 

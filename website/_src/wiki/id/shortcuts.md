@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![Jendela Kelola pintasan: daftar aksi yang bisa dicari beserta tombol masing-masing](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Setiap tombol membuka dialog satu alat not di Piano Roll.
 | `Del` | Menghapus insert terpilih. LYNX SHARE bertanya dulu |
 | `Ctrl+E` | Buka editor audio |
 | `Shift+E` | Buka editor audio dan rekam |
+| `Ctrl+Shift+S` | Simpan status insert terpilih sebagai... (status trek Mixer; di luar Mixer ini Simpan sebagai) |
 | `Alt+R` | Render insert yang diaktifkan ke file wave |
 | `Shift+Alt+R` | Render insert terpilih ke file wave |
 

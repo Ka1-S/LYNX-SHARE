@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![A janela Manage shortcuts: uma lista pesquisável de ações com as teclas de cada uma](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Cada tecla abre a caixa de diálogo de uma ferramenta de notas no Piano Roll.
 | `Del` | Excluir os inserts selecionados. O LYNX SHARE pergunta antes |
 | `Ctrl+E` | Abre o editor de áudio |
 | `Shift+E` | Abre o editor de áudio e grava |
+| `Ctrl+Shift+S` | Salva o estado do insert selecionado como... (um estado de faixa do Mixer; fora do Mixer é Salvar como) |
 | `Alt+R` | Renderiza os inserts armados em arquivos wave |
 | `Shift+Alt+R` | Renderiza os inserts selecionados em arquivos wave |
 

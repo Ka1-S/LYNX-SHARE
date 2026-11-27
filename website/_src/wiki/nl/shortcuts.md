@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![Het venster Sneltoetsen beheren: een doorzoekbare lijst van acties met de toetsen van elke actie](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Elke toets opent het dialoogvenster van één nootgereedschap in de Piano Roll.
 | `Del` | De geselecteerde inserts verwijderen. LYNX SHARE vraagt eerst om bevestiging |
 | `Ctrl+E` | De audio-editor openen |
 | `Shift+E` | De audio-editor openen en opnemen |
+| `Ctrl+Shift+S` | De toestand van de geselecteerde insert opslaan als... (een mixertrack-toestand; buiten de Mixer is het Opslaan als) |
 | `Alt+R` | De gearmde inserts renderen naar wave-bestanden |
 | `Shift+Alt+R` | De geselecteerde inserts renderen naar wave-bestanden |
 

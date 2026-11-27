@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![Okno Zarządzaj skrótami: przeszukiwalna lista akcji z klawiszami każdej z nich](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Każdy klawisz otwiera okno jednego narzędzia nut w Piano Roll.
 | `Del` | Usuń zaznaczone inserty. LYNX SHARE najpierw pyta |
 | `Ctrl+E` | Otwiera edytor audio |
 | `Shift+E` | Otwiera edytor audio i nagrywa |
+| `Ctrl+Shift+S` | Zapisuje stan zaznaczonego insertu jako... (stan ścieżki Mixera; poza Mixerem to Zapisz jako) |
 | `Alt+R` | Renderuje uzbrojone inserty do plików WAV |
 | `Shift+Alt+R` | Renderuje zaznaczone inserty do plików WAV |
 

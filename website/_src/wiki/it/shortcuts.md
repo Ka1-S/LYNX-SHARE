@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![La finestra Gestisci scorciatoie: un elenco di azioni con ricerca e i tasti di ciascuna](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Ogni tasto apre la finestra di uno strumento per le note nel Piano Roll.
 | `Del` | Elimina gli insert selezionati. LYNX SHARE chiede prima conferma |
 | `Ctrl+E` | Apre l'editor audio |
 | `Shift+E` | Apre l'editor audio e registra |
+| `Ctrl+Shift+S` | Salva lo stato dell'insert selezionato come... (uno stato di traccia del Mixer; fuori dal Mixer è Salva come) |
 | `Alt+R` | Renderizza gli insert armati in file wave |
 | `Shift+Alt+R` | Renderizza gli insert selezionati in file wave |
 

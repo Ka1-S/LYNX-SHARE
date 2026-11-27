@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![「管理快速鍵」視窗：可搜尋的動作清單，以及每個動作的按鍵](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ source: 9aa368f62c
 | `Del` | 刪除所選的插入軌。LYNX SHARE 會先詢問 |
 | `Ctrl+E` | 開啟音訊編輯器 |
 | `Shift+E` | 開啟音訊編輯器並錄製 |
+| `Ctrl+Shift+S` | 將所選插入軌的狀態儲存為……（混音器軌道的狀態；在混音器之外是儲存為） |
 | `Alt+R` | 把已預備的插入軌渲染為 wave 檔案 |
 | `Shift+Alt+R` | 把所選插入軌渲染為 wave 檔案 |
 

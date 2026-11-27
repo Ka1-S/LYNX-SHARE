@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![Kısayolları yönet penceresi: her eylemin tuşlarıyla aranabilir bir liste](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Her tuş Piano Roll'da bir nota aracının iletişim kutusunu açar.
 | `Del` | Seçili insert'leri sil. LYNX SHARE önce sorar |
 | `Ctrl+E` | Ses editörünü aç |
 | `Shift+E` | Ses editörünü aç ve kaydet |
+| `Ctrl+Shift+S` | Seçili insert'in durumunu farklı kaydet... (bir mikser kanalı durumu; mikser dışında Farklı kaydet) |
 | `Alt+R` | Kayda hazır insert'leri wave dosyalarına render et |
 | `Shift+Alt+R` | Seçili insert'leri wave dosyalarına render et |
 

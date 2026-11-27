@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![단축키 관리 창: 검색할 수 있는 동작 목록과 각 동작의 키](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ source: 9aa368f62c
 | `Del` | 선택한 인서트 삭제. LYNX SHARE가 먼저 확인을 묻습니다 |
 | `Ctrl+E` | 오디오 에디터 열기 |
 | `Shift+E` | 오디오 에디터를 열고 녹음 |
+| `Ctrl+Shift+S` | 선택한 인서트의 상태를 저장... (믹서 트랙 상태. 믹서 밖에서는 다른 이름으로 저장) |
 | `Alt+R` | 녹음 대기 중인 인서트를 wave 파일로 렌더링 |
 | `Shift+Alt+R` | 선택한 인서트를 wave 파일로 렌더링 |
 

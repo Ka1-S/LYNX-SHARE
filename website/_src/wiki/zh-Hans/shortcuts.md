@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![管理快捷键窗口：可搜索的动作列表及每个动作的按键](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ source: 9aa368f62c
 | `Del` | 删除所选的插入轨。LYNX SHARE 会先询问 |
 | `Ctrl+E` | 打开音频编辑器 |
 | `Shift+E` | 打开音频编辑器并录音 |
+| `Ctrl+Shift+S` | 将所选插入轨的状态另存为……（混音器轨道的状态；在混音器之外是另存为） |
 | `Alt+R` | 把已预备的插入轨渲染为 WAV 文件 |
 | `Shift+Alt+R` | 把所选插入轨渲染为 WAV 文件 |
 

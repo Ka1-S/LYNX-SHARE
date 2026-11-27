@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![La fenêtre Gérer les raccourcis : une liste d'actions avec recherche et les touches de chacune](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Chaque touche ouvre la boîte de dialogue d'un outil de notes du Piano Roll.
 | `Del` | Supprimer les inserts sélectionnés. LYNX SHARE demande d'abord confirmation |
 | `Ctrl+E` | Ouvre l'éditeur audio |
 | `Shift+E` | Ouvre l'éditeur audio et enregistre |
+| `Ctrl+Shift+S` | Enregistre l'état de l'insert sélectionné sous... (un état de piste du Mixer ; hors du Mixer, c'est Enregistrer sous) |
 | `Alt+R` | Rend les inserts armés en fichiers wave |
 | `Shift+Alt+R` | Rend les inserts sélectionnés en fichiers wave |
 

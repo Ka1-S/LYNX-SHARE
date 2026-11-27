@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: b72fd5c175
 ---
 ![Das Fenster Tastenkürzel verwalten: eine durchsuchbare Liste von Aktionen mit ihren Tasten](/assets/img/wiki/shortcuts.webp)
 
@@ -245,6 +245,7 @@ Jede Taste öffnet im Piano Roll den Dialog eines Notenwerkzeugs.
 | `Del` | Die gewählten Inserts löschen. LYNX SHARE fragt vorher nach |
 | `Ctrl+E` | Den Audio-Editor öffnen |
 | `Shift+E` | Den Audio-Editor öffnen und aufnehmen |
+| `Ctrl+Shift+S` | Den Zustand des gewählten Inserts speichern unter... (ein Mixerspur-Zustand; außerhalb des Mixers ist es Speichern unter) |
 | `Alt+R` | Die scharfgeschalteten Inserts in Wave-Dateien rendern |
 | `Shift+Alt+R` | Die gewählten Inserts in Wave-Dateien rendern |
 
