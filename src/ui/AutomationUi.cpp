@@ -997,7 +997,7 @@ void typeAutomationPointValue (AudioEngine& engine, int automation, int point, b
     window->enterModalState (true, juce::ModalCallbackFunction::create ([&engine, automation, point, tempo, lfoAmplitude, window] (int result) {
                                  if (result != 1)
                                      return;
-                                 const auto v = typedAutomationValue (window->getTextEditorContents ("value"), tempo);
+                                 const auto v = typedAutomationValue (window->getTextEditorContents ("value").toStdString(), tempo);
                                  if (! v) // (no number typed: nothing changes, as the knobs' own "Type in value..." does)
                                      return;
                                  engine.editSong ([automation, point, lfoAmplitude, v = *v] (Song& s) {

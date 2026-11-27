@@ -5,24 +5,34 @@
 // point's 0..1 value, clamped. Nothing when no number was typed ("abc" used to set the point to 0 %, a tempo to its
 // lowest): the dialog then leaves the point as it was, as the knobs' own "Type in value..." does.
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <optional>
-
-#include <juce_core/juce_core.h>
+#include <string>
 
 #include "core/Song.h"
 
 namespace lynx
 {
-inline std::optional<float> typedAutomationValue (const juce::String& typed, bool tempo)
+inline std::optional<float> typedAutomationValue (const std::string& typed, bool tempo)
 {
-    const auto t = typed.trim().replaceCharacter (',', '.');
-    const auto digits = t.initialSectionContainingOnly ("+-0123456789.");
-    if (digits.isEmpty() || digits.containsOnly ("+-."))
+    std::string digits;
+    auto i = typed.find_first_not_of (" \t\r\n");
+    for (; i != std::string::npos && i < typed.size(); ++i)
+    {
+        const auto c = typed[i];
+        if ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.' || c == ',')
+            digits += c == ',' ? '.' : c;
+        else
+            break;
+    }
+    if (digits.find_first_of ("0123456789") == std::string::npos)
         return std::nullopt;
-    const auto number = digits.getDoubleValue();
+    const auto number = std::strtod (digits.c_str(), nullptr);
     if (! std::isfinite (number))
         return std::nullopt;
-    return juce::jlimit (0.0f, 1.0f, tempo ? valueFromTempo (number) : (float) number / 100.0f);
+    const auto v = tempo ? valueFromTempo (number) : (float) number / 100.0f;
+    return std::clamp (v, 0.0f, 1.0f);
 }
 } // namespace lynx
