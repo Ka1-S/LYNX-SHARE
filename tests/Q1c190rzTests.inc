@@ -6,6 +6,7 @@
 #include "core/MixerOps.h"
 #include "core/RackFilter.h"
 #include "core/RackOps.h"
+#include "core/TypedNumber.h"
 
 // FL 2026 (checked live, round 190rz): Ctrl+L "Route to free mixer track" skips an empty insert the user named (Insert 2
 // "Bar", Insert 6 "Foo" were passed over, Insert 7 taken and named "808 Clap"), and a channel that is the only one on
@@ -113,3 +114,16 @@ TEST (q1c190rz_missing_files_lists_a_plugin_once)
     CHECK (! listsFailure (list, "Other: plugin not installed or not scanned"));
     CHECK (! listsFailure (list, "LYNX Test Missing:")); // (no reason after the name: not the host's form)
 }
+
+// Settings › Project › Tempo (and the page's other number boxes): "abc" typed set the tempo to 10 BPM (JUCE read it as
+// 0, clamped to the lowest); now text with no number keeps the value, and "98.5 BPM" / "120,5" read as numbers.
+TEST (q1c190rz_settings_number_box_reads_typed_text)
+{
+    using namespace lynx;
+    CHECK (! typedNumber ("abc").has_value() && ! typedNumber ("").has_value() && ! typedNumber (" BPM").has_value());
+    CHECK (typedNumber ("98.5 BPM").value_or (0) == 98.5);
+    CHECK (typedNumber ("120,5").value_or (0) == 120.5);
+    CHECK (typedNumber (" -12 cents").value_or (0) == -12.0);
+    CHECK (typedNumber ("140").value_or (0) == 140.0);
+}
+

@@ -1,6 +1,7 @@
 #include "ui/SettingsDialog.h"
 #include "engine/SafeWrite.h"
 #include "ui/PlaylistComponent.h"
+#include "core/TypedNumber.h"
 #include "core/Comping.h"
 #include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
@@ -56,6 +57,11 @@ public:
             s.setRange (lo, hi, step);
             s.setTextValueSuffix (suffix);
             s.setDoubleClickReturnValue (true, def);
+            // round 190rz (Q1 part C): text with no number keeps the value ("abc" in Tempo set 10 BPM); "98.5 BPM", "120,5"
+            s.valueFromTextFunction = [&s] (const juce::String& text) {
+                const auto n = typedNumber (text.toStdString());
+                return n ? *n : s.getValue();
+            };
             s.setColour (juce::Slider::trackColourId, theme::colour::bg4); // a quiet bar: the number is what matters here
             s.setColour (juce::Slider::textBoxOutlineColourId, theme::colour::borderStrong);
             add (s);
