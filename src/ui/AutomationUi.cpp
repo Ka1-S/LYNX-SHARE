@@ -2,6 +2,7 @@
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
+#include "core/TypedValue.h"
 #include "ui/HowTo.h" // round 190qx
 #include "ui/DemoMode.h" // round 190pl
 #include "ui/RemoteControl.h"
@@ -577,7 +578,11 @@ private:
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
-    void typeValue (int point) { typeAutomationPointValue (engine, automation, point); }
+    void typeValue (int point)
+    {
+        const auto* a = current();
+        typeAutomationPointValue (engine, automation, point, a != nullptr && a->lfo.on);
+    }
 
     juce::PopupMenu curveMenu()
     {
@@ -972,26 +977,36 @@ void addAutomationModeItems (juce::PopupMenu& menu, int current, bool enabled, s
     }
 }
 
-void typeAutomationPointValue (AudioEngine& engine, int automation, int point)
+void typeAutomationPointValue (AudioEngine& engine, int automation, int point, bool lfoAmplitude)
 {
     const auto& song = engine.getSong();
-    if (automation < 0 || automation >= (int) song.automations.size() || point < 0 || point >= (int) song.automations[(std::size_t) automation].points.size())
+    if (automation < 0 || automation >= (int) song.automations.size())
         return;
     const auto& a = song.automations[(std::size_t) automation];
-    const auto tempo = a.target.kind == AutomationTargetKind::tempo;
-    const auto value = a.points[(std::size_t) point].value;
+    // round 190rx: in the editor's LFO mode the point is one of the LFO's amplitude points (FL's LFO tab edits those);
+    // the dialog used to show, and write, the clip point with the same number
+    const auto& points = lfoAmplitude ? a.lfo.amp : a.points;
+    if (point < 0 || point >= (int) points.size())
+        return;
+    const auto tempo = ! lfoAmplitude && a.target.kind == AutomationTargetKind::tempo;
+    const auto value = points[(std::size_t) point].value;
     auto* window = new juce::AlertWindow (tr ("Point value"), tempo ? tr ("BPM") : tr ("Percent (0 to 100)"), juce::MessageBoxIconType::NoIcon);
     window->addTextEditor ("value", tempo ? juce::String (tempoFromValue (value), 2) : juce::String (value * 100.0f, 1));
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([&engine, automation, point, tempo, window] (int result) {
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([&engine, automation, point, tempo, lfoAmplitude, window] (int result) {
                                  if (result != 1)
                                      return;
-                                 const auto typed = window->getTextEditorContents ("value").retainCharacters ("0123456789.,-").replaceCharacter (',', '.').getDoubleValue();
-                                 const auto v = juce::jlimit (0.0f, 1.0f, tempo ? valueFromTempo (typed) : (float) typed / 100.0f);
-                                 engine.editSong ([automation, point, v] (Song& s) {
-                                     if (automation < (int) s.automations.size() && point < (int) s.automations[(std::size_t) automation].points.size())
-                                         s.automations[(std::size_t) automation].points[(std::size_t) point].value = v;
+                                 const auto v = typedAutomationValue (window->getTextEditorContents ("value"), tempo);
+                                 if (! v) // (no number typed: nothing changes, as the knobs' own "Type in value..." does)
+                                     return;
+                                 engine.editSong ([automation, point, lfoAmplitude, v = *v] (Song& s) {
+                                     if (automation >= (int) s.automations.size())
+                                         return;
+                                     auto& x = s.automations[(std::size_t) automation];
+                                     auto& pts = lfoAmplitude ? x.lfo.amp : x.points;
+                                     if (point < (int) pts.size())
+                                         pts[(std::size_t) point].value = v;
                                  });
                              }),
                              true);
