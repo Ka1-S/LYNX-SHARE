@@ -443,7 +443,7 @@ inline Group groupOf (Item i) noexcept
     if (i <= Item::songPosition) return Group::transport;
     if (i <= Item::masterPitch) return Group::master;
     if (i <= Item::midiLight) return Group::record;
-    if (i <= Item::pattern) return Group::snap;
+    if (i <= Item::patternMenu) return Group::snap;
     if (i <= Item::pluginPicker) return Group::windows;
     if (i <= Item::audioEditor) return Group::file;
     switch (i)
