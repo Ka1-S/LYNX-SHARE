@@ -1419,7 +1419,91 @@ struct Exporter
             }
     }
 
-    Node audioClip (const Clip& clip, int id)
+    // Round 190sa (Q6, Live's Patience in Live 12.4): a clip on a muted Playlist track doesn't play in LYNX (nor in FL);
+    // Live has no muted lane of a track, so it goes in as a deactivated clip (Live's Disabled: shown, silent). Before,
+    // Patience's take lanes (imported as muted rows under their track) played over the main lane in Live.
+    bool onMutedRow (const Clip& clip) const noexcept
+    {
+        return song.isTrackMuted (clip.track); // (as Song's automation playback asks)
+    }
+
+    // Round 190sa (Q6, LYNX's .als opened in Live 12.4.16): Live keeps a track's arrangement clips in time order, one at a
+    // time. On load it deletes every clip written after a later-starting one ("Repair Track: Delete clip because of wrong
+    // clip order") and cuts a clip where the next one starts ("Resize end of clip ... partly overlapped"); its log is the
+    // only place that says so. LYNX wrote a track's clips in Playlist order, so Live's Patience came back without main-lane
+    // clips (Coffee Lead 128-160, Mello 128-192, Rose Bass 160-224...). Now the clips go in time order (Live's Ids are
+    // only labels); a deactivated clip (muted, or on a muted Playlist track: Live 12's take lanes, imported as muted rows
+    // under their track) that would overlap another clip is left out instead of cutting a playing one, and what Live
+    // still cuts or drops (clips of one channel playing at once from several Playlist rows) is listed.
+    void tidyArrangement (Node& events, const std::string& trackName)
+    {
+        if (events.kids.size() < 2)
+            return;
+        const auto valueOf = [] (const Node& c, std::string_view what) {
+            for (const auto& k : c.kids)
+                if (k.name == what)
+                    return k.get ("Value");
+            return std::string();
+        };
+        const auto numberOf = [&valueOf] (const Node& c, std::string_view what) {
+            double x = 0.0;
+            std::istringstream in (valueOf (c, what)); // (num()'s text, read in the classic locale)
+            in.imbue (std::locale::classic());
+            in >> x;
+            return x;
+        };
+        const auto disabled = [&valueOf] (const Node& c) { return valueOf (c, "Disabled") == "true"; };
+        std::stable_sort (events.kids.begin(), events.kids.end(), [&numberOf] (const Node& a, const Node& b) {
+            return numberOf (a, "CurrentStart") < numberOf (b, "CurrentStart");
+        });
+        constexpr double eps = 1.0e-9;
+        // the playing clips' spans, then the deactivated clips that fit around them (in time order, none overlapping)
+        std::vector<std::pair<double, double>> playing;
+        for (auto& c : events.kids)
+            if (! disabled (c))
+                playing.emplace_back (numberOf (c, "CurrentStart"), numberOf (c, "CurrentEnd"));
+        const auto overlaps = [eps] (const std::vector<std::pair<double, double>>& spans, double a, double b) {
+            return std::any_of (spans.begin(), spans.end(), [=] (const auto& s) { return a < s.second - eps && s.first < b - eps; });
+        };
+        std::vector<Node> kept;
+        std::vector<std::pair<double, double>> taken = playing;
+        int leftOut = 0;
+        for (auto& c : events.kids)
+        {
+            const auto a = numberOf (c, "CurrentStart"), b = numberOf (c, "CurrentEnd");
+            if (disabled (c))
+            {
+                if (overlaps (taken, a, b))
+                {
+                    ++leftOut;
+                    continue;
+                }
+                taken.emplace_back (a, b);
+            }
+            kept.push_back (std::move (c));
+        }
+        events.kids = std::move (kept);
+        if (leftOut > 0)
+            note ("Muted clips that overlap other clips on one Live track left out (Live plays one clip at a time per track; they "
+                  "don't play): " + std::to_string (leftOut) + " on " + trackName);
+        int cut = 0, dropped = 0;
+        for (std::size_t i = 1; i < events.kids.size(); ++i)
+        {
+            const auto prevStart = numberOf (events.kids[i - 1], "CurrentStart"), prevEnd = numberOf (events.kids[i - 1], "CurrentEnd");
+            const auto start = numberOf (events.kids[i], "CurrentStart");
+            if (std::abs (start - prevStart) <= eps)
+                ++dropped;
+            else if (start < prevEnd - eps)
+                ++cut;
+        }
+        if (cut > 0)
+            note ("Clips that overlap on one Live track: Live cuts each where the next starts (" + std::to_string (cut) + " on " + trackName + ")");
+        if (dropped > 0)
+            note ("Clips that start together on one Live track: Live keeps one of them (" + std::to_string (dropped) + " left out by Live on "
+                  + trackName + ")");
+    }
+
+    Node audioClip (const Clip& clip, int id, bool muted)
     {
         Node c = sk["AudioClip"];
         const auto& ch = song.channels[(std::size_t) clip.channel];
@@ -1428,7 +1512,7 @@ struct Exporter
         c.value ("CurrentStart", num (beats (clip.start)));
         c.value ("CurrentEnd", num (beats (clip.end())));
         c.value ("Name", ch.name);
-        c.value ("Disabled", boolean (clip.muted));
+        c.value ("Disabled", boolean (muted));
         const auto mode = warpModeOf (ch.sampler);
         c.value ("IsWarped", "true");
         c.value ("WarpMode", num (mode));
@@ -1807,7 +1891,14 @@ struct Exporter
             else if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
                 audioClips.push_back (&c);
             else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
-                automationClips.push_back (&c);
+            {
+                // (round 190sa) Live's envelopes have no mute: an automation clip that doesn't play (muted, or on a muted
+                // Playlist track) is left out, and said
+                if (c.muted || onMutedRow (c))
+                    note ("Automation clip not exported (muted, or on a muted Playlist track: it doesn't play): " + song.automations[(std::size_t) c.automation].name);
+                else
+                    automationClips.push_back (&c);
+            }
             else if (c.kind != ClipKind::pattern && c.kind != ClipKind::audio && c.kind != ClipKind::automation)
                 note ("Playlist clips of this kind are not exported (video, pattern blocks...)");
         }
@@ -1915,6 +2006,11 @@ struct Exporter
                     mx.sends[k].level > 0.0f && ! (to > 0 && to < (int) song.mixer.size() && song.mixer[(std::size_t) to].liveReturn))
                     return -1;
             const auto target = mx.sends.front().target;
+            // (round 190sa: a track Live sends to its returns only, "No Output", has no route: its first send, to a
+            // return at -inf, made that return a group of it; a2-sends: the Reverb return came back as a group of s1 / s2,
+            // and s1's send automation was dropped)
+            if (mx.sends.front().level <= 0.0f || (target > 0 && target < (int) song.mixer.size() && song.mixer[(std::size_t) target].liveReturn))
+                return -1;
             return target > 0 && target < (int) song.mixer.size() && target != m && perInsert.count (target) == 0 ? target : -1;
         };
 
@@ -2117,7 +2213,7 @@ struct Exporter
                         });
                         if (has)
                         {
-                            events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted, clipId++));
+                            events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted || onMutedRow (*c), clipId++));
                             setClipGroove (events->kids.back(), c->groove); // (round 190fm)
                         }
                     }
@@ -2142,17 +2238,21 @@ struct Exporter
                 if (auto* events = n.at ("DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events"))
                     for (const auto* c : audioClips)
                         if (c->track == t.row)
-                            events->add (audioClip (*c, clipId++));
+                            events->add (audioClip (*c, clipId++, c->muted || onMutedRow (*c)));
                 for (const auto* c : gridAudioClips)
                     if (c->track == t.row)
                     {
                         const auto& slot = grid->slots[(std::size_t) c->gridSlot];
-                        Node clip = audioClip (*c, clipId++);
+                        Node clip = audioClip (*c, clipId++, c->muted); // (a grid clip: its track is the grid's)
                         const auto from = beats (c->offset) + (double) c->offsetFraction / ppq;
                         sessionSettings (clip, slot, from, from + beats (c->length));
                         putSessionClip (n, slot.scene, std::move (clip));
                     }
             }
+            // round 190sa: the track's arrangement clips in Live's order (see tidyArrangement)
+            for (const char* path : { "DeviceChain/MainSequencer/ClipTimeable/ArrangerAutomation/Events", "DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events" })
+                if (auto* events = n.at (path))
+                    tidyArrangement (*events, t.name);
             // an empty slot without its stop button: the Playlist track's (an instrument track's channel, or the row
             // of the channel's first grid clip)
             if (session && (t.kind == LiveTrack::Kind::midi || t.kind == LiveTrack::Kind::audio))
