@@ -2459,6 +2459,13 @@ void ChannelRackComponent::cloneSelected()
 void ChannelRackComponent::deleteSelected()
 {
     // round 190ow: the selected automation clip rows go too (FL deletes the selected channels, automation clips included)
+    // round 190rw (Q1): automation rows and channels together are one undo step (they were two)
+    const AudioEngine::UndoGesture deleteStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DeleteEnds
+    {
+        AudioEngine& e;
+        ~DeleteEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } deleteEnds { engine };
     const auto onlyAutomations = autoOnly;
     deleteSelectedAutomations();
     if (onlyAutomations)
@@ -3235,6 +3242,17 @@ void ChannelRackComponent::showEuclideanFill (int channel)
 void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
 {
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
+    // round 190rw: the press's own edits are done when it returns: from then on a song change is someone else's
+    dragAbandoned = false;
+    const struct ArmWatch
+    {
+        ChannelRackComponent& r;
+        ~ArmWatch()
+        {
+            r.dragWatch.arm (r.engine);
+            r.dragRowsPrint = r.rowsPrint();
+        }
+    } armWatch { *this };
     int row = 0;
     const auto area = areaAt (e.x, e.y, row);
     const auto& song = engine.getSong();
@@ -3544,8 +3562,80 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
     }
 }
 
+// round 190rw (Q1, ui/DragSongWatch.h) ------------------------------------------------------------------------------
+std::uint64_t ChannelRackComponent::rowsPrint() const
+{
+    const auto& song = engine.getSong();
+    std::uint64_t h = 1469598103934665603ull;
+    const auto mix = [&h] (std::uint64_t v) {
+        h ^= v;
+        h *= 1099511628211ull;
+    };
+    mix ((std::uint64_t) (std::int64_t) song.currentPattern);
+    mix (song.channels.size());
+    for (const auto& c : song.channels)
+        mix (c.uid);
+    mix (song.automations.size());
+    for (const auto& a : song.automations)
+        mix (a.uid);
+    return h;
+}
+
+void ChannelRackComponent::endDragState()
+{
+    previews.releaseAll();
+    if (nameDragged || autoNameDragged)
+        setMouseCursor (juce::MouseCursor::NormalCursor);
+    autoNameDown = -1;
+    autoNameDragged = false;
+    autoPaintRow = -1;
+    nameDownRow = -1;
+    nameDragged = false;
+    loopDragRow = -1;
+    selectDownRow = -1;
+    selectDragBase.clear();
+    ui::hideValueTip();
+    paintMode = PaintMode::none;
+    laneDownStep = -1;
+    laneScaleBase = -1.0f;
+    laneScaleFrom.clear();
+    knobDrag = Area::none;
+    drag.end();
+    repaint();
+}
+
+bool ChannelRackComponent::dragSurvivesSwap()
+{
+    if (! dragWatch.foreign (engine))
+        return true;
+    if (rowsPrint() != dragRowsPrint) // other channels / automation rows / pattern under the held rows
+    {
+        endDragState();
+        dragWatch.disarm();
+        dragAbandoned = true;
+        return false;
+    }
+    dragWatch.mark (engine);
+    return true;
+}
+
 void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    // round 190rw: the song changed under the drag (not by it): go on only with the same rows
+    if (dragAbandoned || ! dragSurvivesSwap())
+        return;
+    const struct MarkWatch
+    {
+        ChannelRackComponent& r;
+        ~MarkWatch()
+        {
+            if (! r.dragAbandoned && r.dragWatch.foreign (r.engine))
+            {
+                r.dragWatch.mark (r.engine);
+                r.dragRowsPrint = r.rowsPrint();
+            }
+        }
+    } markWatch { *this };
     if (loopDragRow >= 0)
     {
         const auto steps = juce::jlimit (1, numSteps(), loopDragStart + juce::roundToInt ((loopDragY - e.position.y) / 6.0f));
@@ -3668,6 +3758,14 @@ void ChannelRackComponent::mouseUp (const juce::MouseEvent& e)
 {
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     previews.releaseAll(); // the audition (Ctrl+click) and the steps' previews stop with the button
+    // round 190rw: a drag the song changed under (see mouseDrag) ends here with no write
+    if (dragAbandoned || ! dragSurvivesSwap())
+    {
+        dragAbandoned = false;
+        dragWatch.disarm();
+        return;
+    }
+    dragWatch.disarm();
 
     if (nameDownRow >= 0 && ! nameDragged && e.mouseWasClicked())
         toggleEditor (nameDownRow, nameDownAlt);
@@ -4853,6 +4951,13 @@ void ChannelRackComponent::importMidiOnChannel (int channel, const juce::File& f
 
 void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    // round 190rw (Q1): several files dropped at once are one undo step, not one per file
+    const AudioEngine::UndoGesture dropStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DropEnds
+    {
+        AudioEngine& e;
+        ~DropEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } dropEnds { engine };
     if (fileDropRow != noDrop) // (the drag's mark goes with the drop, even if no exit arrives)
     {
         fileDropRow = noDrop;

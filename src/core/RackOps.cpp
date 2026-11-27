@@ -467,7 +467,10 @@ int mergeIdenticalPatterns (Song& song)
 
 int patternSteps (const Song& song, const Pattern& pattern) noexcept
 {
-    return std::clamp ((int) (pattern.effectiveLength (song.meter()) / ticksPerStep), 16, 512);
+    // round 190rw (Q1): the steps the rack shows (issue #279: one bar of the time signature for an empty pattern, 3/4: 12,
+    // 7/8: 14), so Fill each N / Rotate / Euclidean fill work on them; at least 16 wrote steps past a 3/4 bar and made the
+    // pattern two bars long
+    return std::clamp ((int) (pattern.effectiveLength (song.meter()) / ticksPerStep), 1, 512);
 }
 
 bool showsNotePreview (const Pattern& pattern, int channel) noexcept

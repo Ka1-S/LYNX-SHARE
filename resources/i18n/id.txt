@@ -13156,3 +13156,4 @@ countries: id
 "Choose another..." = "Pilih yang lain..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} masih tidak menjawab. LYNX SHARE untuk sementara memakai {1}."
 "no audio device" = "tidak ada perangkat audio"
+"Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu" = "Clip: [LMB] seret memindahkan  [Shift][LMB] menyalin  [2xLMB] membuka  [RMB] menu"

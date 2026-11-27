@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/DragSongWatch.h"
 #include <array>
 #include <functional>
 #include <map>
@@ -1146,6 +1147,16 @@ private:
     int dragClip = -1;
     std::vector<int> dragIndices;
     std::vector<Clip> dragOriginals;
+    // round 190rw (Q1, ui/DragSongWatch.h): the song replaced under a held drag (undo, an Online Session guest, Remote
+    // Control, a plugin load...): the drag goes on only while its clips are still there (found again by uid), else it ends
+    // with no write
+    ui::DragSongWatch dragWatch;
+    std::vector<std::uint64_t> dragUids; // uids of dragIndices, then dragClip's and crossPair's (0 = none)
+    bool dragAbandoned = false;
+    void noteDragIds();
+    bool keepDragAfterSongSwap();
+    void abandonDrag();
+    bool dragSurvivesSwap(); // checks a foreign change: true = go on, false = the drag was abandoned
     std::vector<int> selection, selectionBefore;
     juce::Rectangle<int> rubberBand;
     std::int64_t loopAnchor = 0;

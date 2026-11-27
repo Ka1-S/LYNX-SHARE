@@ -4923,7 +4923,9 @@ bool PlaylistComponent::dragOutToClipGrid (const juce::MouseEvent& e)
         g.setColour (theme::colour::accent.withAlpha (0.85f));
         g.fillRoundedRectangle (image.getBounds().toFloat().reduced (1.0f), 3.0f);
     }
-    container->startDragging (playlistClipDragDescription (dragClip), this, juce::ScaledImage (image), false);
+    container->startDragging (playlistClipDragDescription (dragClip, dragClip >= 0 && dragClip < (int) engine.getSong().playlist.size()
+                                                                         ? engine.getSong().playlist[(std::size_t) dragClip].uid : 0),
+                              this, juce::ScaledImage (image), false);
     drag = Drag::none;
     repaint();
     return true;
@@ -6406,6 +6408,17 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     if (touchInput.mouseDown (e)) // round 190pm (P23): a finger in Touch mode is held back until it means something
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
+    // round 190rw: the press's own edits are done when it returns: from then on a song change is someone else's
+    dragAbandoned = false;
+    const struct ArmWatch
+    {
+        PlaylistComponent& p;
+        ~ArmWatch()
+        {
+            p.dragWatch.arm (p.engine);
+            p.noteDragIds();
+        }
+    } armWatch { *this };
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     downMods = e.mods;
     startedOnEmpty = erasedSomething = holdExpired = false;
@@ -7085,8 +7098,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         // on the clip menu icon (top left): the clip menu; anywhere else on a clip: delete, as in FL
-        // (press and hold on empty space: Knife)
-        if (hit >= 0 && clipMenuButton (hit).contains (e.getPosition()))
+        // (press and hold on empty space: Knife). Round 190rw (Q1): in the Clip-launch layout (Live 12: a right-click on
+        // an Arrangement clip opens its context menu) and the Simple layout (BandLab: a region's context menu) the whole
+        // clip opens its menu (Delete is in it); FL's right-click delete stays in the Pattern layout
+        if (hit >= 0 && (clipMenuButton (hit).contains (e.getPosition()) || layoutstyle::current() != layoutstyle::Style::pattern))
         {
             showClipMenu (hit);
             return;
@@ -7556,10 +7571,127 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     drag = Drag::move;
 }
 
+// round 190rw (Q1, ui/DragSongWatch.h) ------------------------------------------------------------------------------
+void PlaylistComponent::noteDragIds()
+{
+    const auto& playlist = engine.getSong().playlist;
+    const auto uidAt = [&playlist] (int i) { return i >= 0 && i < (int) playlist.size() ? playlist[(std::size_t) i].uid : std::uint64_t {}; };
+    dragUids.clear();
+    for (const auto i : dragIndices)
+        dragUids.push_back (uidAt (i));
+    dragUids.push_back (uidAt (dragClip));
+    dragUids.push_back (uidAt (crossPair));
+}
+
+bool PlaylistComponent::keepDragAfterSongSwap()
+{
+    switch (drag)
+    {
+        // nothing of the song held: the view, a box, the song position
+        case Drag::none: case Drag::seek: case Drag::select: case Drag::zoomRange: case Drag::listen: case Drag::pan:
+        case Drag::trackZoom: case Drag::heightZoom: case Drag::timeZoom: case Drag::headerWidth: case Drag::preview:
+        case Drag::perfLaunch: case Drag::headerSelect:
+            return true;
+        // clips held by index: found again by uid (the indices follow a re-sorted playlist)
+        case Drag::move: case Drag::resize: case Drag::trimLeft: case Drag::slip: case Drag::fadeIn: case Drag::fadeOut:
+        case Drag::fadeTension: case Drag::clipGain: case Drag::paint: case Drag::erase: case Drag::muting: case Drag::knife:
+            break;
+        // tracks, markers, points, lanes, ranges held by index: ended
+        default:
+            return false;
+    }
+    if (dragUids.size() != dragIndices.size() + 2)
+        return false;
+    const auto& playlist = engine.getSong().playlist;
+    const auto find = [&playlist] (std::uint64_t uid) {
+        if (uid == 0)
+            return -1;
+        for (std::size_t i = 0; i < playlist.size(); ++i)
+            if (playlist[i].uid == uid)
+                return (int) i;
+        return -2; // gone
+    };
+    std::vector<int> indices;
+    for (std::size_t j = 0; j < dragIndices.size(); ++j)
+    {
+        const auto i = find (dragUids[j]);
+        if (i < 0)
+            return false; // a dragged clip was deleted (or had no id)
+        indices.push_back (i);
+    }
+    const auto clip = find (dragUids[dragIndices.size()]), pair = find (dragUids[dragIndices.size() + 1]);
+    if ((dragClip >= 0 && clip < 0) || (crossPair >= 0 && pair < 0))
+        return false;
+    dragIndices = std::move (indices);
+    if (dragClip >= 0)
+        dragClip = clip;
+    if (crossPair >= 0)
+        crossPair = pair;
+    std::vector<int> kept; // the selection: what is still there (it is drawn and copied by index)
+    for (const auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            kept.push_back (i);
+    if (kept.size() != selection.size())
+        setSelection (kept);
+    return true;
+}
+
+void PlaylistComponent::abandonDrag()
+{
+    drag = Drag::none;
+    dragIndices.clear();
+    dragOriginals.clear();
+    dragUids.clear();
+    dragClip = -1;
+    crossPair = -1;
+    dragCopies = false;
+    rubberBand = {};
+    edgeScroller.stop();
+    edgeDragEvent.reset();
+    dragWatch.disarm();
+    dragAbandoned = true;
+    const auto& playlist = engine.getSong().playlist;
+    std::vector<int> kept;
+    for (const auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            kept.push_back (i);
+    setSelection (kept);
+    repaint();
+}
+
+bool PlaylistComponent::dragSurvivesSwap()
+{
+    if (! dragWatch.foreign (engine))
+        return true;
+    if (keepDragAfterSongSwap())
+    {
+        dragWatch.mark (engine);
+        noteDragIds();
+        return true;
+    }
+    abandonDrag();
+    return false;
+}
+
 void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
     if (touchInput.mouseDrag (e)) // round 190pm (P23)
         return;
+    // round 190rw: the song changed under the drag (not by it): go on only with the same clips
+    if (dragAbandoned || ! dragSurvivesSwap())
+        return;
+    const struct MarkWatch
+    {
+        PlaylistComponent& p;
+        ~MarkWatch()
+        {
+            if (! p.dragAbandoned)
+            {
+                p.dragWatch.mark (p.engine);
+                p.noteDragIds();
+            }
+        }
+    } markWatch { *this };
     if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
         return;
     // round 190qe (D2-PL1): past the arrangement's edge the view runs (feelFrame); the moved or resized clip and the brush
@@ -8513,6 +8645,14 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     if (touchInput.mouseUp (e)) // round 190pm (P23)
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    // round 190rw: a drag the song changed under (see mouseDrag) ends here with no write
+    if (dragAbandoned || ! dragSurvivesSwap())
+    {
+        dragAbandoned = false;
+        dragWatch.disarm();
+        return;
+    }
+    dragWatch.disarm();
     // round 190qe: the release ends the edge scroll; a click that replaced or cleared the selection leaves the old one
     // for "Restore selection" (D2-PL9), once the release is done
     edgeScroller.stop();
@@ -8891,8 +9031,12 @@ void PlaylistComponent::cutWithKnife (juce::Point<int> from, juce::Point<int> to
     if (from.getDistanceFrom (to) < 3)
     {
         bool edge = false;
+        // (round 190rw: only inside the clip, as the line cut below: a click whose snap lands on the clip's edge cut a
+        // 1-tick sliver off it, or a 0-length piece off a 1-tick clip)
         if (const auto hit = clipAt (from.x, from.y, edge); hit >= 0)
-            cuts.push_back ({ hit, snap (xToTick (from.x) + round, snapOn) });
+            if (const auto tick = snap (xToTick (from.x) + round, snapOn);
+                tick > playlist[(std::size_t) hit].start && tick < playlist[(std::size_t) hit].end())
+                cuts.push_back ({ hit, tick });
     }
     else
     {
@@ -14984,6 +15128,10 @@ void PlaylistComponent::deleteSelection()
 
 void PlaylistComponent::copySelection()
 {
+    // round 190rw (Q1): FL 2026 keeps its clipboard when Ctrl+C finds nothing selected (checked live: Ctrl+C, Ctrl+D,
+    // Ctrl+C, Ctrl+V pastes the first copy); LYNX's key emptied it
+    if (selection.empty())
+        return;
     clipboard.clear();
     ++clipboardStamp;
     rangeClipboardNewest() = false; // (round 190pa: Ctrl+V pastes clips again)
@@ -16041,6 +16189,13 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 
 void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    // round 190rw (Q1): several files dropped at once are one undo step, not one per file
+    const AudioEngine::UndoGesture dropStarts (engine, AudioEngine::UndoGesture::begin);
+    const struct DropEnds
+    {
+        AudioEngine& e;
+        ~DropEnds() { const AudioEngine::UndoGesture ends (e, AudioEngine::UndoGesture::end); }
+    } dropEnds { engine };
     setDropLaneHot (false);
     clearDropGhost();
     // round 190iu (issue #191.2, ui/WorkflowExtras.h): MIDI files become pattern clips where they are dropped (on a header:
@@ -17542,6 +17697,8 @@ void PlaylistComponent::itemDropped (const SourceDetails& details)
     // a clip dragged out of the clip grid (round 190bv): a copy of it where it is dropped, one pass long
     if (int gridTrack = 0, gridScene = 0; clipGridDrag (details.description, gridTrack, gridScene))
     {
+        if (! clipGridDragHolds (engine.getSong(), details.description)) // (round 190rw: the song changed under the drag)
+            return;
         const auto start = juce::jmax<std::int64_t> (0, snap (xToTick (details.localPosition.x), true));
         const auto track = juce::jmax (0, yToTrack (details.localPosition.y));
         engine.editSong ([=] (Song& s) { session::toPlaylist (s, gridTrack, gridScene, track, start); });

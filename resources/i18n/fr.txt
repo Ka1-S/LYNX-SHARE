@@ -13156,3 +13156,4 @@ countries: fr be ch ca lu
 "Choose another..." = "En choisir un autre..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} ne répond toujours pas. LYNX SHARE utilise {1} pour le moment."
 "no audio device" = "aucun périphérique audio"
+"Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu" = "Clip : [LMB] glisser déplace  [Maj][LMB] copie  [2xLMB] ouvre  [RMB] menu"

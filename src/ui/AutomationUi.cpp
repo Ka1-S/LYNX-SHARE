@@ -2,6 +2,7 @@
 #include "core/FlCurve.h"
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
+#include "ui/DragSongWatch.h"
 #include "ui/AutomationUi.h"
 #include "ui/HowTo.h" // round 190qx
 #include "ui/DemoMode.h" // round 190pl
@@ -366,6 +367,12 @@ public:
         if (a == nullptr || ! plotArea().contains (e.getPosition()))
             return;
 
+        // round 190rw: the press's own edits are done when it returns: from then on a song change is someone else's
+        const struct ArmWatch
+        {
+            AutomationEditor& ed;
+            ~ArmWatch() { ed.noteHeldPoints (true); }
+        } armWatch { *this };
         const auto hit = pointAt (e.position);
 
         downMods = e.mods;
@@ -463,8 +470,44 @@ public:
         automationPointMemory() = { p.mode < flcurve::modeCount ? (int) p.mode : 0, p.tension };
     }
 
+    // round 190rw (Q1, ui/DragSongWatch.h): the song replaced under a held point / tension drag (undo, an Online Session
+    // guest, Remote Control...): it goes on only on the same clip with the same points, else it ends with no write
+    void noteHeldPoints (bool arm)
+    {
+        if (arm)
+            dragWatch.arm (engine);
+        else
+            dragWatch.mark (engine);
+        const auto* a = current();
+        heldUid = a != nullptr ? a->uid : 0;
+        heldCount = a != nullptr ? editedPoints (*a).size() : 0;
+    }
+
+    bool heldPointsGone()
+    {
+        if (! dragWatch.foreign (engine))
+            return false;
+        const auto* a = current();
+        if (a != nullptr && a->uid == heldUid && editedPoints (*a).size() == heldCount)
+        {
+            noteHeldPoints (false);
+            return false;
+        }
+        dragPoint = tensionPoint = -1;
+        dragWatch.disarm();
+        repaint();
+        return true;
+    }
+
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (heldPointsGone())
+            return;
+        const struct MarkWatch
+        {
+            AutomationEditor& ed;
+            ~MarkWatch() { ed.noteHeldPoints (false); }
+        } markWatch { *this };
         const auto* a = current();
 
         if (a == nullptr)
@@ -888,6 +931,9 @@ private:
     double pixelsPerTick = 120.0 / (4 * ppq);
     double scroll = 0.0;
     int dragPoint = -1, hoverPoint = -1, tensionPoint = -1, hoverHandle = -1;
+    ui::DragSongWatch dragWatch; // (round 190rw)
+    std::uint64_t heldUid = 0;
+    std::size_t heldCount = 0;
     bool panning = false;
     double panStart = 0.0;
     float tensionStart = 0.0f, tensionSign = 1.0f;

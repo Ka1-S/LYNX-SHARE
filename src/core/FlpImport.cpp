@@ -1170,6 +1170,16 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         return inData.empty() ? path : inData;
     };
 
+    // round 190rw: a plugin sample of FL's own data (a path relative to FL's Data folder, or one under its factory data):
+    // not the user's file, so a missing one is not listed in Missing files
+    auto flDataSample = [&options] (const std::string& flPath) {
+        if (flPath.empty() || flPath[0] == '\\' || flPath.rfind ("%FLStudioFactoryData%", 0) == 0)
+            return true;
+        const auto& root = options.roots.factoryData;
+        const auto resolved = resolveFlPath (flPath, options.roots);
+        return ! root.empty() && resolved.size() > root.size() && resolved.compare (0, root.size(), root) == 0;
+    };
+
     // round 190fn: the FL Studio Mobile Racks' own inserts (LYNX channel → the rack's level, pan and effects)
     std::vector<std::pair<int, MixerTrack>> flmRackInserts;
     // round 190jv: the FL Studio Mobile Racks with several instruments (a Layer, its instruments right after it as LYNX
@@ -1774,6 +1784,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))
                         def.samplePath = path;
+                    else if (! flDataSample (c.samplePath)) // round 190rw: the user's own sample, looked for and listed
+                        def.samplePath = locateSample (c.samplePath);
                 }
                 adoptedFromPlugin = true;
             }
@@ -1794,6 +1806,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                         path += ".wav";
                     if (! path.empty() && options.fileExists (path))
                         def.samplePath = path;
+                    else if (! flDataSample (c.samplePath)) // round 190rw: the user's own sample, looked for and listed
+                        def.samplePath = locateSample (c.samplePath);
                 }
                 adoptedFromPlugin = true;
             }
@@ -2047,6 +2061,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     if (vs->path.find ('%') != std::string::npos)
                         if (const auto resolved = resolveFlPath (vs->path, options.roots); ! resolved.empty())
                             vs->path = resolved;
+                    // round 190rw: a video that isn't on this PC is listed in Missing files (and found again there)
+                    if (options.fileExists && ! vs->path.empty())
+                        if (const auto located = locateSample (vs->path); ! located.empty())
+                            vs->path = located;
                     def.instrument = InstrumentKind::videoplayer;
                     def.pluginState = video::write (*vs);
                     adoptedFromPlugin = true;
@@ -2087,7 +2105,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 sf::FlPlayerState fl;
                 if (sf::parseFlPlayerState (c.pluginState, fl))
                 {
-                    const auto resolved = resolveFlPath (fl.path, options.roots);
+                    // round 190rw (Discord, sidthenugget): the font is looked for like a sample (re-rooted from another
+                    // PC's folders, next to the project, or where the Missing files window placed it), and a font that
+                    // isn't on this PC is listed there (it was only named in the editor: "could not be loaded")
+                    const auto located = options.fileExists && ! fl.path.empty() ? locateSample (fl.path) : std::string();
+                    const auto resolved = located.empty() ? resolveFlPath (fl.path, options.roots) : located;
                     const auto info = resolved.empty() ? sf::FontInfo {} : sf::scanFontFile (resolved);
                     const auto name0 = def.name;
                     def.instrument = InstrumentKind::soundfont;

@@ -18154,3 +18154,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue310AutoTargetsTests.inc" // round 190rt: issue #310, FL automation clips keep their targets on import
 #include "Issue311ChannelControlsTests.inc" // round 190rt: issue #311, every channel settings control changes the sound
 #include "Q5fix190rsTests.inc" // round 190rs (0.1.32 Q5 fixes): selection kept by content over undo (G-31), routing hints (G-01), Ctrl+N (D-4)
+#include "Q1a190rwTests.inc" // round 190rw (0.1.32 stage Q1 part A: Playlist, Piano roll, Channel rack): the defects it found and fixed

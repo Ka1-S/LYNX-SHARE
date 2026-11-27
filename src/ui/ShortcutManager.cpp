@@ -1,4 +1,6 @@
 #include "ui/ShortcutManager.h"
+
+#include <cstring>
 #include "engine/SafeWrite.h"
 
 #include "core/SearchQuery.h"
@@ -48,6 +50,17 @@ keys::Chord chordFromKeyPress (const juce::KeyPress& key)
 
     if (const auto letter = keys::letterOfKeyCode (code))
         c.key = letter;
+
+    // round 190rw (Q1): on Linux (X11 hands JUCE the shifted character) Shift+1 arrived as '!', so every Shift+digit key
+    // (the Playlist's and the Piano roll's Shift+1...5, Shift+0, Shift+6 zooms) and Shift+/ did nothing there. With Shift
+    // held, the US layout's shifted symbols are their keys again (Windows already sends the key itself)
+    if (mods.isShiftDown())
+    {
+        static constexpr const char* shifted = ")!@#$%^&*(?_+{}|:\"<>~";
+        static constexpr const char* plain = "0123456789/-=[]\\;',.`";
+        if (const auto* at = std::strchr (shifted, c.key); c.key > 0 && c.key < 0x7f && at != nullptr)
+            c.key = plain[at - shifted];
+    }
 
     return c;
 }

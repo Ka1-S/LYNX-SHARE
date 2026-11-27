@@ -2863,6 +2863,14 @@ public:
             return;
         }
 
+        // --q1a190rwtest <report.txt> (round 190rw: the song replaced under a held drag; also in --selftest): src/Q1a190rwCheck.inc
+        if (args.contains ("--q1a190rwtest"))
+        {
+            setApplicationReturnValue (runQ1a190rwTest (juce::File (args[args.indexOf ("--q1a190rwtest") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --undogesture190jv <report.txt> (round 190jv, queue item 73: one undo step per drag): src/UndoGesture190jv.inc
         if (args.contains ("--undogesture190jv"))
         {
@@ -10498,6 +10506,13 @@ private:
         // round 190ri (0.1.32 community batch): track renders, transpose, scale box, Alt+C, clone names, unique samples
         juce::String community190riLog;
         const auto community190riResult = community190riCheck (community190riLog);
+        // round 190rw (0.1.32 Q1 part A): the song replaced under a held drag in every editor (src/Q1a190rwCheck.inc)
+        juce::String q1a190rwResult;
+        {
+            const auto q1aReport = juce::File::createTempFile ("q1a190rw.txt");
+            q1a190rwResult = runQ1a190rwTest (q1aReport) ? "OK" : "FAILED | " + q1aReport.loadFileAsString().replace ("\n", "; ");
+            q1aReport.deleteFile();
+        }
         juce::String backlog190rcLog;
         const auto backlog190rcResult = backlog190rcCheck (backlog190rcLog);
         // round 190rm (0.1.32 import / export sweep): MIDI tempo map / chunks / meter, FLM losses, DAWproject samples (src/Iox190rmCheck.inc)
@@ -11942,7 +11957,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && stab190rpResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && q1a190rwResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && stab190rpResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -12069,6 +12084,7 @@ private:
                << "issues190qr=" << issues190qrResult << "\n"
                << "backlog190rc=" << backlog190rcResult << "\n"
                << "community190ri=" << community190riResult << "\n"
+               << "q1a190rw=" << q1a190rwResult << "\n"
                << "iox190rm=" << iox190rmResult << "\n"
                << "issues190rt=" << issues190rtResult << "\n" << issues190rtLog
                << "perf190rn=" << perf190rnResult << "\n"
@@ -41703,6 +41719,7 @@ private:
 #include "BrowserShot190iz.inc" // round 190iz
 #include "LynxModelShot190ni.inc" // round 190ni
 #include "UndoGesture190jv.inc" // round 190jv
+#include "Q1a190rwCheck.inc" // round 190rw (0.1.32 Q1 part A)
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd
 #include "ModalShot190mc.inc" // round 190mc

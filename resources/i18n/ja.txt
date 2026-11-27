@@ -13156,3 +13156,4 @@ countries: jp
 "Choose another..." = "別のものを選ぶ..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} はまだ応答しません。LYNX SHARE は当面 {1} を使用します。"
 "no audio device" = "オーディオデバイスなし"
+"Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu" = "クリップ: [LMB] ドラッグで移動  [Shift][LMB] コピー  [2xLMB] 開く  [RMB] メニュー"

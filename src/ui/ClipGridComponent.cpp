@@ -620,6 +620,8 @@ public:
         {
             dragTrack = hit.track; // (a drag from the clip's name moves it, with Ctrl copies it)
             dragScene = hit.scene;
+            const auto held = session::copyOf (engine.getSong(), dragTrack, dragScene);
+            dragUid = held ? held->clip.uid : 0; // (round 190rw: the clip the press took)
         }
     }
 
@@ -627,6 +629,13 @@ public:
     {
         if (fieldScene >= 0)
         {
+            // (round 190rw: the song replaced under the drag with fewer scenes: the drag ends with no write)
+            const auto* grid = gridOf();
+            if (grid == nullptr || fieldScene >= (int) grid->scenes.size())
+            {
+                fieldScene = -1;
+                return;
+            }
             dragSceneField (e);
             return;
         }
@@ -661,8 +670,17 @@ public:
         if (container == nullptr || container->isDragAndDropActive())
             return;
         const juce::Rectangle<int> cell (columnX (dragTrack), rowY (dragScene), columnWidth, rowHeight);
-        container->startDragging (juce::String (gridDragDescription) + "|" + juce::String (dragTrack) + "|" + juce::String (dragScene), this,
-                                  juce::ScaledImage (createComponentSnapshot (cell)), false);
+        // (round 190rw: with the clip's uid, so a drop after the song was replaced meanwhile moves nothing else; and only
+        // the clip the press took: the song may have changed since)
+        const auto held = session::copyOf (engine.getSong(), dragTrack, dragScene);
+        if (! held || held->clip.uid != dragUid)
+        {
+            dragTrack = dragScene = -1;
+            return;
+        }
+        container->startDragging (juce::String (gridDragDescription) + "|" + juce::String (dragTrack) + "|" + juce::String (dragScene)
+                                      + "|" + juce::String::toHexString ((juce::int64) (held ? held->clip.uid : 0)),
+                                  this, juce::ScaledImage (createComponentSnapshot (cell)), false);
     }
 
     // --- drops: a clip of the grid, a pattern or a file from the Browser, files from outside (round 190bv) ---
@@ -740,11 +758,15 @@ public:
         int fromTrack = 0, fromScene = 0;
         if (clipGridDrag (details.description, fromTrack, fromScene))
         {
+            if (! clipGridDragHolds (engine.getSong(), details.description)) // (round 190rw: the song changed under the drag)
+                return;
             const auto copy = juce::ModifierKeys::currentModifiers.isCommandDown();
             engine.editSong ([=] (Song& s) { session::moveClip (s, fromTrack, fromScene, hit.track, hit.scene, copy); });
         }
         else if (int index = 0; playlistClipDrag (details.description, index))
         {
+            if (! playlistClipDragHolds (engine.getSong(), details.description)) // (round 190rw)
+                return;
             // round 190ef: a Playlist clip dragged onto a slot: a copy of it there (the Playlist keeps it)
             engine.editSong ([=] (Song& s) { session::fromPlaylist (s, (std::size_t) index, hit.track, hit.scene, false); });
         }
@@ -1350,6 +1372,7 @@ public:
     int selectedTrack = 0, selectedScene = 0;
     int pressedTrack = -1, pressedScene = -1;
     int dragTrack = -1, dragScene = -1; // the clip a drag would take
+    std::uint64_t dragUid = 0;          // (round 190rw) its uid at the press
     int dropTrack = -1, dropScene = -1; // the slot a drag is over
     int deviceDropTrack = -1;           // round 190dr: the track a dragged device is over
     // round 190ef: a scene (its cell clicked) or a column's title is the selection Duplicate / Rename act on
@@ -4054,11 +4077,24 @@ bool clipGridDrag (const juce::var& description, int& track, int& scene)
     if (! text.startsWith (juce::String (gridDragDescription) + "|"))
         return false;
     const auto parts = juce::StringArray::fromTokens (text, "|", {});
-    if (parts.size() != 3)
+    if (parts.size() != 3 && parts.size() != 4) // (round 190rw: a 4th part, the clip's uid)
         return false;
     track = parts[1].getIntValue();
     scene = parts[2].getIntValue();
     return track >= 0 && scene >= 0;
+}
+
+bool clipGridDragHolds (const Song& song, const juce::var& description)
+{
+    int track = 0, scene = 0;
+    if (! clipGridDrag (description, track, scene))
+        return false;
+    const auto parts = juce::StringArray::fromTokens (description.toString(), "|", {});
+    const auto uid = parts.size() == 4 ? (std::uint64_t) parts[3].getHexValue64() : 0;
+    if (uid == 0)
+        return true;
+    const auto now = session::copyOf (song, track, scene);
+    return now && now->clip.uid == uid;
 }
 
 std::vector<int> clipGridSelectedTracks (juce::Component& grid)
@@ -4279,9 +4315,21 @@ bool isClipGrid (const juce::Component* component)
     return false;
 }
 
-juce::String playlistClipDragDescription (int index)
+juce::String playlistClipDragDescription (int index, std::uint64_t uid)
 {
-    return juce::String (playlistDragDescription) + "|" + juce::String (index);
+    return juce::String (playlistDragDescription) + "|" + juce::String (index) + (uid != 0 ? "|" + juce::String::toHexString ((juce::int64) uid) : juce::String());
+}
+
+bool playlistClipDragHolds (const Song& song, const juce::var& description)
+{
+    int index = 0;
+    if (! playlistClipDrag (description, index))
+        return false;
+    const auto parts = juce::StringArray::fromTokens (description.toString(), "|", {});
+    const auto uid = parts.size() >= 3 ? (std::uint64_t) parts[2].getHexValue64() : 0;
+    if (index >= (int) song.playlist.size())
+        return false;
+    return uid == 0 || song.playlist[(std::size_t) index].uid == uid;
 }
 
 bool playlistClipDrag (const juce::var& description, int& index)

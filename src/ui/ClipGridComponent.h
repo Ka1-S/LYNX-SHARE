@@ -9,6 +9,7 @@
 namespace lynx
 {
 class AudioEngine;
+struct Song;
 enum class RemoteAction : std::uint8_t;
 class SessionMixerComponent;
 
@@ -33,6 +34,10 @@ void addClipGridMixerViewItems (juce::Component& grid, juce::PopupMenu& menu);
 juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 // A clip dragged out of a slot (the Playlist takes it as a clip of its own): true and its slot when `description` is one.
 bool clipGridDrag (const juce::var& description, int& track, int& scene);
+// Round 190rw (Q1): the slot still holds the clip that was dragged out of it (its uid is in the description); false
+// when the song was replaced meanwhile (undo, an Online Session guest, Remote Control...) and another clip, or none, is
+// there now. A description without a uid holds.
+bool clipGridDragHolds (const Song& song, const juce::var& description);
 // The grid's selected track and scene ({ 0, 0 } before any click).
 std::pair<int, int> clipGridSelection (juce::Component& grid);
 // Hotfix 0.1.31.1 (Live: one selected track for the Session and the Arrangement): the track chosen in the Arrangement
@@ -103,6 +108,8 @@ int captureClipGridScene (juce::Component& grid, int scene, const std::vector<in
 // Is `component` the clip grid or inside it? (the Playlist starts a clip's drag out over it)
 bool isClipGrid (const juce::Component* component);
 // A Playlist clip dragged out of the Playlist (index into the current playlist): its drag description, and back.
-juce::String playlistClipDragDescription (int index);
+juce::String playlistClipDragDescription (int index, std::uint64_t uid = 0);
 bool playlistClipDrag (const juce::var& description, int& index);
+// Round 190rw (Q1): the Playlist clip at the description's index is still the one dragged (by uid; true without one)
+bool playlistClipDragHolds (const Song& song, const juce::var& description);
 } // namespace lynx

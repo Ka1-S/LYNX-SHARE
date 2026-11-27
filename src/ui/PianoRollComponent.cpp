@@ -3021,6 +3021,17 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     if (touchInput.mouseDown (e)) // round 190pm (P23): a finger in Touch mode is held back until it means something
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
+    // round 190rw: the press's own edits are done when it returns: from then on a song change is someone else's
+    dragAbandoned = false;
+    const struct ArmWatch
+    {
+        PianoRollComponent& p;
+        ~ArmWatch()
+        {
+            p.dragWatch.arm (p.engine);
+            p.dragNotesPrint = p.notesPrint();
+        }
+    } armWatch { *this };
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     // round 190qe: a zoom glide lands; the press is kept in the song (a selection box's corner while the view runs); the
     // selection before the press is what "Restore selection" brings back if this click replaces it
@@ -3643,10 +3654,84 @@ void PianoRollComponent::holdFired (int serial)
     }
 }
 
+// round 190rw (Q1, ui/DragSongWatch.h) ------------------------------------------------------------------------------
+std::uint64_t PianoRollComponent::notesPrint() const
+{
+    const auto& song = engine.getSong();
+    std::uint64_t h = 1469598103934665603ull;
+    const auto mix = [&h] (std::uint64_t v) {
+        h ^= v;
+        h *= 1099511628211ull;
+    };
+    mix ((std::uint64_t) (std::int64_t) song.currentPattern);
+    mix ((std::uint64_t) (std::int64_t) engine.getSelectedChannel());
+    const auto& notes = currentPattern (song).notes;
+    mix (notes.size());
+    for (const auto& n : notes)
+    {
+        mix ((std::uint64_t) n.start);
+        mix ((std::uint64_t) n.length);
+        mix ((std::uint64_t) (std::int64_t) n.channel << 8 ^ (std::uint64_t) (std::int64_t) n.key);
+    }
+    return h;
+}
+
+bool PianoRollComponent::dragSurvivesSwap()
+{
+    if (! dragWatch.foreign (engine))
+        return true;
+    switch (drag)
+    {
+        // nothing of the song held: the view, a box, the song position, the keyboard's preview
+        case Drag::none: case Drag::keyboard: case Drag::select: case Drag::zoomRange: case Drag::listen: case Drag::pan:
+        case Drag::keyZoom: case Drag::timeZoom: case Drag::keySelect: case Drag::rulerSelect: case Drag::seek:
+        case Drag::eventPaneBar: case Drag::eventPaneAlternate:
+            break;
+        default:
+            if (notesPrint() != dragNotesPrint) // other notes (or another pattern / channel) under the held indices
+            {
+                drag = Drag::none;
+                dragNote = -1;
+                dragIndices.clear();
+                dragOriginals.clear();
+                edgeScroller.stop();
+                edgeDragEvent.reset();
+                dragWatch.disarm();
+                dragAbandoned = true;
+                const auto count = (int) currentPattern (engine.getSong()).notes.size();
+                std::vector<int> kept;
+                for (const auto i : selection)
+                    if (i >= 0 && i < count)
+                        kept.push_back (i);
+                setSelection (kept);
+                repaint();
+                return false;
+            }
+    }
+    dragWatch.mark (engine);
+    dragNotesPrint = notesPrint();
+    return true;
+}
+
 void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
 {
     if (touchInput.mouseDrag (e)) // round 190pm (P23)
         return;
+    // round 190rw: the song changed under the drag (not by it): go on only with the same notes
+    if (dragAbandoned || ! dragSurvivesSwap())
+        return;
+    const struct MarkWatch
+    {
+        PianoRollComponent& p;
+        ~MarkWatch()
+        {
+            if (! p.dragAbandoned && p.dragWatch.foreign (p.engine))
+            {
+                p.dragWatch.mark (p.engine);
+                p.dragNotesPrint = p.notesPrint();
+            }
+        }
+    } markWatch { *this };
     if (boundaryDrag >= 0) // round 190on (P10): two stacked lanes' heights
     {
         std::vector<float> weights;
@@ -4214,6 +4299,14 @@ void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
     if (touchInput.mouseUp (e)) // round 190pm (P23)
         return;
     const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
+    // round 190rw: a drag the song changed under (see mouseDrag) ends here with no write
+    if (dragAbandoned || ! dragSurvivesSwap())
+    {
+        dragAbandoned = false;
+        dragWatch.disarm();
+        return;
+    }
+    dragWatch.disarm();
     // round 190qe: the release ends the edge scroll; a click that replaced or cleared the selection leaves the old one
     // for "Restore selection" (D2-PL9)
     edgeScroller.stop();
@@ -6777,7 +6870,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && ! shift && letter == 'C') // (Ctrl+Shift+C: pattern.clone)
+    if (cmd && ! shift && ! alt && letter == 'C') // (Ctrl+Shift+C: pattern.clone; round 190rw: Ctrl+Alt+C is the global Consolidate)
     {
         copySelection();
         return true;
@@ -6785,7 +6878,11 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 
     if (cmd && letter == 'X')
     {
+        // round 190rw (Q1): with nothing selected FL 2026 cuts all of the channel's notes (checked live); LYNX copied them
+        // all and deleted none
+        const auto doomed = selectionOrAll();
         copySelection();
+        setSelection (doomed);
         deleteSelection();
         return true;
     }
@@ -6804,7 +6901,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 
     // quick note operations: one undo step each, on the selection (or all notes). The quantize ones are key map
     // actions (pianoRoll.quickQuantize / quantizeStarts / quantizeHalf) so they can be reassigned.
-    if (cmd && letter == 'U')
+    if (cmd && ! shift && ! alt && letter == 'U') // (round 190rw: Ctrl+Shift+U is the key map's pianoRoll.liveQuantizeSettings)
     {
         runOperation ([grid] (Pattern& p, const std::vector<int>& t) { return noteedit::chop (p, t, grid); });
         return true;
@@ -6816,7 +6913,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
-    if (cmd && letter == 'L')
+    if (cmd && ! alt && letter == 'L') // (round 190rw: Ctrl+Alt+L is the global view.detailToggle, the Clip-launch detail view)
     {
         runOperation ([] (Pattern& p, const std::vector<int>& t) { noteedit::legato (p, t); return t; });
         return true;

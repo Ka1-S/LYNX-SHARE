@@ -13156,3 +13156,4 @@ countries: ru by kz
 "Choose another..." = "Выбрать другое..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} по-прежнему не отвечает. LYNX SHARE пока использует {1}."
 "no audio device" = "нет аудиоустройства"
+"Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu" = "Клип: [LMB] перетаскивание двигает  [Shift][LMB] копирует  [2xLMB] открывает  [RMB] меню"

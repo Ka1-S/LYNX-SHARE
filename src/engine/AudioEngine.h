@@ -1105,6 +1105,13 @@ public:
     bool canRedo() const noexcept { return sessionHistory ? ! sessionRedo.empty() : ! redoStack.empty(); }
     void undo();
     void redo();
+    // round 190rw (Q1): an editor's mouse gesture is held down (a clip, a note, a step being dragged). Undo, redo and the
+    // history jumps wait for its release: they replaced the song under the drag, whose indices then wrote past the end
+    // of the playlist ("double free or corruption", a crash in 0.1.31.2 too)
+    bool isEditGestureHeld() const noexcept
+    {
+        return gestureOpen && gestureRealMouse && juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown();
+    }
 
     // Online Sessions P2 (round 169b): a live session's copy of the song changed by someone else's edit — like setSong,
     // but the history stays, the project stays modified and nothing becomes an undo step.

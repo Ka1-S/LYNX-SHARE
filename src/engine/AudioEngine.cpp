@@ -4479,6 +4479,8 @@ void AudioEngine::historyStep (bool redo)
 
 void AudioEngine::undo()
 {
+    if (isEditGestureHeld()) // (round 190rw: never under a held drag)
+        return;
     remoteHistoryFailed = false;
     remoteHistoryUncertain = false;
     remoteHistoryError.clear();
@@ -4489,6 +4491,8 @@ void AudioEngine::undo()
 
 void AudioEngine::redo()
 {
+    if (isEditGestureHeld()) // (round 190rw: never under a held drag)
+        return;
     remoteHistoryFailed = false;
     remoteHistoryUncertain = false;
     remoteHistoryError.clear();
@@ -4526,6 +4530,8 @@ ChangeLabel AudioEngine::getHistoryLabel (int index) const
 
 void AudioEngine::jumpToHistory (int index)
 {
+    if (isEditGestureHeld()) // (round 190rw: never under a held drag)
+        return;
     index = juce::jlimit (0, getHistorySize() - 1, index);
 
     if (index == getHistoryPosition())

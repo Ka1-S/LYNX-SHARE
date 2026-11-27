@@ -1,6 +1,7 @@
 #include "ui/FlMods.h"
 #include "engine/SafeWrite.h"
 #include "ui/EventEditor.h"
+#include "ui/DragSongWatch.h"
 #include "core/MidiControls.h"
 
 #include <algorithm>
@@ -417,6 +418,7 @@ public:
         }
 
         beginGesture();
+        dragWatch.arm (engine); // (round 190rw: a song change from now on that isn't this stroke's ends it)
 
         if (lineButton.getToggleState() && ! e.mods.isRightButtonDown())
         {
@@ -431,6 +433,8 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (strokeLostItsSong())
+            return;
         // round 190qe (D2-PL1): a stroke, a line or a selection past the plot's left or right edge scrolls it (FL's event
         // editor window, measured in round 190qc: the same law as the Playlist's); the point stays at the edge meanwhile
         if (e.mods.isAnyMouseButtonDown() && (lastDraw || lineFrom || (selectButton.getToggleState() && selectionAnchor >= 0)))
@@ -475,6 +479,10 @@ public:
             repaint();
             return;
         }
+
+        if (strokeLostItsSong())
+            return;
+        dragWatch.disarm();
 
         if (lineFrom)
         {
@@ -698,7 +706,24 @@ private:
     {
         const auto t = target;
         engine.editSong ([&] (Song& s) { fn (eventedit::laneFor (currentPattern (s), t)); }, false);
+        dragWatch.mark (engine);
         repaint();
+    }
+
+    // round 190rw (Q1, ui/DragSongWatch.h): the song was replaced under a held stroke (undo, an Online Session guest,
+    // Remote Control...): the stroke ends with no write (its commit would have put the gesture's old events back over it)
+    bool strokeLostItsSong()
+    {
+        if (! dragWatch.foreign (engine))
+            return false;
+        gestureStart.reset();
+        lastDraw.reset();
+        lineFrom.reset();
+        edgeScroller.stop();
+        edgeDragEvent.reset();
+        dragWatch.disarm();
+        repaint();
+        return true;
     }
 
     // replaces the live lane by `fn` applied to the gesture's starting state
@@ -714,6 +739,7 @@ private:
             p.events = start;
             fn (eventedit::laneFor (p, t));
         }, false);
+        dragWatch.mark (engine);
         repaint();
     }
 
@@ -1116,6 +1142,7 @@ private:
     std::optional<std::pair<std::int64_t, float>> lineFrom, lastDraw;
     juce::Point<int> lineTo;
     std::optional<std::vector<PatternEvents>> gestureStart;
+    ui::DragSongWatch dragWatch; // (round 190rw)
     std::uint32_t seed = 1;
     // round 190qe: the edge scroll of a stroke (at the display's rate while it runs, nothing otherwise)
     edgescroll::Scroller edgeScroller;

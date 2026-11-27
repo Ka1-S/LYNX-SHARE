@@ -13156,3 +13156,4 @@ countries: tw hk mo
 "Choose another..." = "選擇其他..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} 仍然沒有回應。LYNX SHARE 暫時使用 {1}。"
 "no audio device" = "無音訊裝置"
+"Clip: [LMB] drag moves  [Shift][LMB] copies  [2xLMB] opens  [RMB] menu" = "片段：[LMB] 拖曳移動  [Shift][LMB] 複製  [2xLMB] 開啟  [RMB] 選單"
