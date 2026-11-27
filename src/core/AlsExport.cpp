@@ -684,6 +684,23 @@ struct Exporter
         Node partSkeleton = sk["MultiSamplePart"];
         if (out.name.empty() || partSkeleton.name.empty() || (ch.samplePath.empty() && ch.zones.empty()))
             return false;
+        // round 190sa (Q6): Live 12.4.16 crashed (EXCEPTION_ACCESS_VIOLATION) opening any set with LYNX's pad Simpler:
+        // the skeleton's lists are empty, and with them the Simpler's three slots Live always fills (its default
+        // Simpler.adv: the pitch envelope, the filter, the LFO). They are in the skeleton now (tools/als_skeleton_add.py);
+        // (a Live 11 set takes Live 12's: the Live 11 skeleton has none; Live 12 opens it). Without them no Simpler: the
+        // pad stays empty, listed, rather than a set Live can't open
+        for (const auto& [slot, kind] : { std::pair<const char*, const char*> { "Pitch/Envelope/Slot/Value", "SimplerPitchEnvelope" },
+                                          { "Filter/Slot/Value", "SimplerFilter" }, { "Lfo/Slot/Value", "SimplerLfo" } })
+            if (auto* v = out.at (slot); v != nullptr && v->kids.empty())
+            {
+                Node filled = sk[kind].name.empty() ? skeletons (AlsVersion::live12)[kind] : sk[kind];
+                if (filled.name.empty())
+                {
+                    note ("Drum rack pad: Simpler not exported (this Live version's set has no Simpler skeleton): " + ch.name);
+                    return false;
+                }
+                v->add (std::move (filled));
+            }
         const auto& s = ch.sampler;
         out.value ("On/Manual", "true");
         out.value ("UserName", "");
@@ -728,6 +745,22 @@ struct Exporter
             const auto end = known ? std::max (start + 1.0, std::floor ((double) to * frames) - 1.0) : 0.0;
             part.value ("SampleStart", num (start));
             part.value ("SampleEnd", num (end));
+            // round 190sa (Q6): Live 12.4.16 crashed (EXCEPTION_ACCESS_VIOLATION) loading a pad Simpler whose sample part
+            // had no time signature: Live always writes one (4/4 at 0, as in its own sets' pads and in an AudioClip)
+            if (auto* sigs = part.at ("SampleWarpProperties/TimeSignature/TimeSignatures"); sigs != nullptr && sigs->kids.empty())
+            {
+                Node sig;
+                sig.name = "RemoteableTimeSignature";
+                sig.set ("Id", "0");
+                for (const auto& [member, v] : { std::pair<const char*, const char*> { "Numerator", "4" }, { "Denominator", "4" }, { "Time", "0" } })
+                {
+                    Node m;
+                    m.name = member;
+                    m.set ("Value", v);
+                    sig.add (std::move (m));
+                }
+                sigs->add (std::move (sig));
+            }
             for (const auto* loop : { "SustainLoop", "ReleaseLoop" })
             {
                 part.value (std::string (loop) + "/Start", num (start));
