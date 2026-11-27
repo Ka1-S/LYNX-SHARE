@@ -1166,6 +1166,16 @@ int routeSelectedTo (Song& song, const std::vector<int>& selected, int to, Route
     return routed;
 }
 
+std::vector<std::pair<int, int>> loopingRoutes (const Song& song, const std::vector<int>& from, const std::vector<int>& to)
+{
+    std::vector<std::pair<int, int>> out;
+    for (const auto f : from)
+        for (const auto t : to)
+            if (isInsert (song, f) && t > 0 && t < (int) song.mixer.size() && f != t && ! song.routes (f, t) && ! song.canRoute (f, t))
+                out.emplace_back (f, t);
+    return out;
+}
+
 int switchSelectedRoute (Song& song, const std::vector<int>& selected, int to, bool on)
 {
     int changed = 0;

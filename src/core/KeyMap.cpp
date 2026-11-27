@@ -549,6 +549,10 @@ std::vector<Action> makeActions()
         { "mixer.changeIcon", TR_NOOP ("Change the selected mixer track's icon"), Context::mixer, { chord (f3) } },
         { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
         { "mixer.audioEditorRecord", TR_NOOP ("Open the audio editor and record"), Context::mixer, { chord ('E', shift) } },
+        // round 190rx: FL 2026 gives Ctrl+Shift+S to the mixer track menu's File › "Save mixer track state as..." while the
+        // Mixer has the keys (checked live: its .fst Save as in Mixer presets, named after the track); elsewhere it stays
+        // Save as
+        { "mixer.saveTrackState", TR_NOOP ("Save the selected mixer track's state as..."), Context::mixer, { chord ('S', ctrl | shift) } },
         { "mixer.soloSelected", TR_NOOP ("Solo the selected mixer track(s)"), Context::mixer, { chord ('S') } },
         { "mixer.altSoloSelected", TR_NOOP ("Alt solo the selected mixer track(s) (with the tracks that feed them)"), Context::mixer, { chord ('S', alt) } },
         { "mixer.renderArmed", TR_NOOP ("Disk recording: render the armed tracks to wave file(s)"), Context::mixer, { chord ('R', alt) } },

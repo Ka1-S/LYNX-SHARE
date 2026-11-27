@@ -963,6 +963,8 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
             why = tr ("The host removed you from the live session.");
         else if (e.code == 401)
             why = tr ("The invite code is wrong.");
+        else if (e.code == 404 && running) // (round 190rx: before the plain 404, which said "or the code is wrong" to someone already in)
+            why = tr ("The live session is over: the relay no longer has it.");
         else if (e.code == 404)
             why = tr ("There is no such session: it has ended, or the code is wrong.");
         else if (e.code == 409)
@@ -973,8 +975,6 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
             why = host ? tr ("The relay closed the session.") : tr ("The host ended the live session.");
         else if (e.code == 4001)
             why = tr ("The LYNX SHARE relay closed this live session: it reached the relay's traffic limit or stayed open too long.");
-        else if (e.code == 404 && running)
-            why = tr ("The live session is over: the relay no longer has it.");
         else
             why = tr ("The connection to the session was lost.");
         const bool keep = ! host && ! keepFull;

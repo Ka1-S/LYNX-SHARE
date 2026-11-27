@@ -2256,6 +2256,17 @@ void AudioEngine::updateAudioRecording()
     // (round 190bv: a slot of the clip grid recording audio runs the armed inserts' takes too)
     const auto wantTake = audioArmed && recordOptions.recordAudio && (transport.recording.load() || slotAudioWanted);
     const auto open = takeCount > 0;
+    // round 190rx: the device came back at another sample rate during the takes (audioDeviceAboutToStart ended them)
+    if (open && std::abs (transport.sampleRate.load() - takeSampleRate) > 0.5)
+    {
+        const auto takeRate = takeSampleRate;
+        finishAudioTake(); // (kept, as the record button keeps them)
+        notify (InputIssue::failed, 0,
+                tr ("the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)",
+                    { juce::String (juce::roundToInt (takeRate)), juce::String (juce::roundToInt (transport.sampleRate.load())) }));
+        setRecording (false); // (the record button and the note / automation recording follow; no take is open any more)
+        return;
+    }
 
     // the files are ready before Play: the very first block gets recorded
     if (wantTake && ! open && recordingError.isEmpty())
@@ -8617,6 +8628,16 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
         overloadGuard.configure (spec.toRawUTF8());
     overloadGuard.restart();
     rt::resetForNewDevice();
+    // round 190rx (0.1.32 Q1): the device starts again at another sample rate (Settings › Audio's rate, a driver panel)
+    // while audio takes are being written: the recording ends here, before a frame at the new rate reaches a file made
+    // at the old one (the rest of the take played sped up / slowed down: 440 Hz became 479 Hz after 48 -> 44.1 kHz);
+    // updateAudioRecording closes the takes and says why
+    if (takeCount > 0 && std::abs (device->getCurrentSampleRate() - takeSampleRate) > 0.5)
+    {
+        transport.recording.store (false);
+        liveInput.recording.store (false);
+        slotAudioCapture.store (false);
+    }
     transport.sampleRate.store (device->getCurrentSampleRate());
     meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
