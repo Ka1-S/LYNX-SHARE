@@ -152,9 +152,23 @@ inline bool copyFile (const juce::File& source, const juce::File& target, juce::
         error = reasonOf (in.getStatus());
         return false;
     }
+    // (round 190sa, Q6: JUCE's writeFromInputStream copies 8 KB at a time: the .als export's 572 MB of samples took 17-19 s
+    // on Windows. 4 MB blocks go straight to the file, past the stream's 16 KB buffer.)
     return writeWith (target, [&in] (juce::OutputStream& out) {
         const auto total = in.getTotalLength();
-        return out.writeFromInputStream (in, -1) == total;
+        constexpr int block = 4 << 20;
+        juce::HeapBlock<char> buffer ((size_t) block);
+        juce::int64 copied = 0;
+        for (;;)
+        {
+            const auto n = in.read (buffer.get(), block);
+            if (n <= 0)
+                break;
+            if (! out.write (buffer.get(), (size_t) n))
+                return false;
+            copied += n;
+        }
+        return copied == total;
     }, error);
 }
 

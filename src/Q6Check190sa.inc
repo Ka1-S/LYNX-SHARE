@@ -16,6 +16,13 @@
         using namespace lynx;
         namespace st = simpletracks;
         juce::String result = "OK";
+        // (the layout style is global: a check that leaves it on Simple made --selftest's later feel190qe run the Simple
+        // layout's edge-scroll law in its Pattern layout; restored whatever happens)
+        struct KeepStyle
+        {
+            layoutstyle::Style was = layoutstyle::current();
+            ~KeepStyle() { layoutstyle::setCurrent (was); }
+        } keepStyle;
         const auto check = [&] (const juce::String& what, bool ok, const juce::String& detail = {}) {
             log << (ok ? "ok   " : "FAIL ") << what << (detail.isNotEmpty() ? "  [" + detail + "]" : juce::String()) << "\n";
             if (! ok && result == "OK")
@@ -118,6 +125,25 @@
                        source != nullptr && back != nullptr ? juce::String (source->frames()) + " / " + juce::String (back->frames()) + " frames" : juce::String ("not decoded"));
                 folder.deleteRecursively();
             }
+        }
+
+        // Q6: the checked sample copy (the .als export's "Copy them into the project folder") in 4 MB blocks: byte-exact
+        // across block edges, the size checked
+        {
+            const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getNonexistentChildFile ("lynx-q6190sa-copy", {}, false);
+            folder.createDirectory();
+            juce::MemoryBlock data ((size_t) (9 << 20) + 12345);
+            juce::Random rnd (190);
+            for (size_t i = 0; i < data.getSize(); ++i)
+                static_cast<char*> (data.getData())[i] = (char) rnd.nextInt (256);
+            const auto source = folder.getChildFile ("source.bin"), target = folder.getChildFile ("target.bin");
+            source.replaceWithData (data.getData(), data.getSize());
+            juce::String why;
+            const auto ok = safewrite::copyFile (source, target, why);
+            juce::MemoryBlock back;
+            target.loadFileAsData (back);
+            check ("checked copy: 9 MB + 12,345 bytes copied byte for byte", ok && back == data, why);
+            folder.deleteRecursively();
         }
 
         // Q6: the .als export of clips on a muted Playlist track (Live's Patience: its take lanes, imported as muted rows,
@@ -405,6 +431,8 @@
                 if (c.track == made && c.kind == ClipKind::pattern)
                     atStart = &c;
             check ("dropped on the headers: its clip at the start", atStart != nullptr && atStart->start == 0);
+            ui.setLayoutStyle (layoutstyle::Style::pattern); // (back, as a user leaving Simple: the global style with it)
+            check ("back in the Pattern layout", layoutstyle::current() == layoutstyle::Style::pattern);
         }
 
         // the Pattern layout: FL's (a plugin on the lanes does nothing; on the headers it goes to the track's channel)
