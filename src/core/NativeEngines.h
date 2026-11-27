@@ -10,6 +10,9 @@
 // start from LYNX's own defaults; the others say "requires FL Studio" in the menus when FL is not installed.
 
 #include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -59,6 +62,15 @@ struct FlAccess
     std::function<std::vector<std::uint8_t> (const std::string&)> readFile;
     std::function<std::vector<std::string> (const std::string& folder)> listPresets; // the preset files under a folder, sorted
     std::function<std::string (const std::vector<std::uint8_t>& wav, const std::string& name)> saveEmbedded; // (FL Keys' raw tables)
+    // Round 190ry (Q3 fluidity): set, available() answers each engine once and keeps the answer (the app's access, whose
+    // FL folders are fixed for the session: whether an engine can start from FL's files changes only with the install).
+    // Unset (the tests' accesses), every call looks again.
+    struct AvailabilityMemo
+    {
+        std::mutex lock;
+        std::map<std::pair<int, int>, bool> known; // (0 instrument / 1 effect, kind) -> available
+    };
+    std::shared_ptr<AvailabilityMemo> availability;
 };
 
 // A file of that installation by its path relative to %FLStudioFactoryData%; empty = not available
@@ -69,6 +81,8 @@ FlDataReader flDataReader (const FlAccess& fl);
 // read every version of their plugin's state); empty = FL not installed, or no preset for this plugin
 std::vector<std::string> presetCandidates (const std::string& presetFolder, bool generator, const FlAccess& fl);
 std::string defaultPresetPath (const std::string& presetFolder, bool generator, const FlAccess& fl);
+// whether presetCandidates would find any (round 190ry: no folder listing when a Default preset is there)
+bool hasPresetCandidate (const std::string& presetFolder, bool generator, const FlAccess& fl);
 
 // A channel of engine `kind` from one of its plugin's preset files (.fst, or Toxic's .tbio, GMS' .gmsynth, Morphine's
 // .mrp), named after the engine; nullopt when the file is not for this engine or LYNX can't read it (the preset arrows

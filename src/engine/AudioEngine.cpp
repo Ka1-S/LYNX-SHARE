@@ -200,6 +200,7 @@ const natives::FlAccess& flStudioAccess()
     static const natives::FlAccess cached = [] {
         natives::FlAccess access;
         access.roots = findFlStudioRoots();
+        access.availability = std::make_shared<natives::FlAccess::AvailabilityMemo>(); // (round 190ry: F8 / layout switches)
         access.fileExists = [] (const std::string& path) { return platform::localFile (path).existsAsFile(); };
         access.readFile = [] (const std::string& path) {
             juce::MemoryBlock data;
