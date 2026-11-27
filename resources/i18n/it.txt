@@ -12660,3 +12660,4 @@ countries: it ch sm
 "Move this rule down" = "Sposta questa regola in basso"
 "Typing keyboard settings" = "Impostazioni della tastiera del PC come pianoforte"
 "Continuous scrolling" = "Scorrimento continuo"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Segui: la Playlist scorre insieme alla testina di riproduzione mentre il brano è in esecuzione. Clic destro: Scorrimento continuo; disattivato, puoi esplorare liberamente"

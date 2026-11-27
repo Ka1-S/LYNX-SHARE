@@ -12660,3 +12660,4 @@ countries: pl
 "Move this rule down" = "Przesuń tę regułę w dół"
 "Typing keyboard settings" = "Ustawienia klawiatury jako pianina"
 "Continuous scrolling" = "Ciągłe przewijanie"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Śledź: Playlista przewija się wraz z głowicą odtwarzania podczas odtwarzania utworu. Prawy przycisk myszy: Ciągłe przewijanie; po wyłączeniu możesz swobodnie rozglądać się po widoku"
