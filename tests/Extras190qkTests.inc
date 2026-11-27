@@ -48,7 +48,9 @@ TEST (extras190qk_default_lists)
                             // round 190ro (EXTRAS-2.md OFF-1): 19 px off every FL Mixer fader and meter, +1.6 % a column
                             "mixer.peakValues", "mixer.correlation",
                             // round 190ro: +17.7 % / +24.5 % a Playlist frame with a track selected (0.1.33: a cached veil)
-                            "playlist.dimUnselectedTracks" })
+                            "playlist.dimUnselectedTracks",
+                            // round 190se (issue #323): FL 2026's double click on a sample only previews it
+                            "browser.doubleClickAdds" })
         CHECK (! extras::defaultOn (id) && ! extras::flExactOn (id));
     // FL-exact: FL's own two on, the stretched clips' loop (issue #25) off
     CHECK (extras::flExactOn ("general.escCloses") && extras::flExactOn ("general.startPage"));

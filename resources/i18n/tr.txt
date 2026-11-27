@@ -13156,3 +13156,8 @@ countries: tr
 "Choose another..." = "Başka birini seç..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} hâlâ yanıt vermiyor. LYNX SHARE şimdilik {1} kullanıyor."
 "no audio device" = "ses aygıtı yok"
+
+# round 190se (issues #323)
+"Double-click a sample in the Browser to add it to a new channel (LYNX)" = "Browser'da bir sample'a çift tıklayınca yeni bir kanala ekle (LYNX)"
+"A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "Browser'da bir ses dosyasına çift tıklamak onunla yeni bir Sampler kanalı oluşturur. Kapalı, FL Studio'daki gibi: çift tıklama sample'ı yalnızca önizler, Enter onu seçili kanala yükler ve sağ tık menüsündeki \"Yeni kanalda aç\" onu ekler. Clip-launch düzeninde her zaman açık, Live'daki gibi. Tek anahtarı burada."
+"Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "Sample: [LMB] önizle  Channel Rack'e veya Playlist'e sürükle  [Enter] seçili kanala  [RMB] Yeni kanalda aç  [Shift][Up] / [Shift][Down] dosyalar arasında gez"

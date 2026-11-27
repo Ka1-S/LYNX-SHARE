@@ -13156,3 +13156,8 @@ countries: pl
 "Choose another..." = "Wybierz inne..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} nadal nie odpowiada. LYNX SHARE na razie używa {1}."
 "no audio device" = "brak urządzenia audio"
+
+# round 190se (issues #323)
+"Double-click a sample in the Browser to add it to a new channel (LYNX)" = "Dwuklik na sample w Browser dodaje go do nowego kanału (LYNX)"
+"A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "Dwuklik na pliku audio w Browser tworzy z nim nowy kanał Sampler. Wyłączone, jak w FL Studio: dwuklik tylko odsłuchuje sample, Enter wczytuje go do zaznaczonego kanału, a \"Otwórz w nowym kanale\" z menu prawego przycisku go dodaje. Zawsze włączone w układzie Clip-launch, jak w Live. Jedyny przełącznik jest tutaj."
+"Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "Sample: [LMB] odsłuch  przeciągnij do Channel Rack lub Playlisty  [Enter] do zaznaczonego kanału  [RMB] Otwórz w nowym kanale  [Shift][Up] / [Shift][Down] przełączaj pliki"
