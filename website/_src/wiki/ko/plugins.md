@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: a6e85677ce
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 

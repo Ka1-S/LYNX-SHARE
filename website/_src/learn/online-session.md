@@ -37,7 +37,7 @@ When someone asks to join, click `Let them in`, or `Not now`.
 
 ![A drum track a guest added, on the host's screen](/assets/img/learn/online-session-5.webp)
 
-- Every change anyone makes reaches everyone. Each guest gets a colour and their own tracks and mixer inserts.
+- Every change anyone makes reaches everyone. Each guest gets a color and their own tracks and mixer inserts.
 - `File › Online session › Session chat...` opens the chat.
 - The host chooses `File › Online session › End live session` to end it. The project stays on the host's computer, and guests keep what the start window said: their own part or a full copy.
 

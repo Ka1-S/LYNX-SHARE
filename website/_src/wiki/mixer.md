@@ -11,7 +11,7 @@ A project can have up to 500 inserts. The Mixer has an add strip for a new one. 
 
 ## Put an effect on a channel
 
-1. In the [Channel rack](/wiki/channel-rack/), select the channel and press `Ctrl+L`. The channel goes to a free insert, which takes its name and colour.
+1. In the [Channel rack](/wiki/channel-rack/), select the channel and press `Ctrl+L`. The channel goes to a free insert, which takes its name and color.
 2. Press `F9` to show the Mixer and click that insert's strip.
 3. In the effects panel, click an empty slot and pick an effect.
 4. Click the slot's name to show or hide the effect's window.
@@ -32,12 +32,12 @@ To pair Playlist tracks with inserts, `Link Playlist tracks to mixer tracks` in 
 - Click a strip to select it.
 - `Ctrl`+click, or drag across strips, selects a range. `Ctrl+Shift`+click adds or removes one.
 - Drag a strip sideways, or press `Alt+Left` and `Alt+Right`, to move the selected inserts.
-- Right-click a strip for the insert menu. `F2` renames and colours the selected insert.
+- Right-click a strip for the insert menu. `F2` renames and colors the selected insert.
 - `Del`, or `Delete` in the insert menu, deletes the selected inserts. LYNX SHARE asks first. Tick `Remember my choice` to skip the question next time.
 
 Moving, inserting or deleting inserts keeps sends, sidechains and automation on their insert.
 
-The insert menu's `Mixer` section and `Options › Mixer` have two more commands. `Arrange inserts like the Playlist` moves the inserts linked to Playlist tracks to the front, in the Playlist's order. With `Keep links to deleted inserts, greyed (LYNX)` on, the sends that went into a deleted insert stay, greyed, so you can connect them again.
+The insert menu's `Mixer` section and `Options › Mixer` have two more commands. `Arrange inserts like the Playlist` moves the inserts linked to Playlist tracks to the front, in the Playlist's order. With `Keep links to deleted inserts, grayed (LYNX)` on, the sends that went into a deleted insert stay, grayed, so you can connect them again.
 
 ## Mute and solo
 
@@ -105,7 +105,7 @@ When you pick an external input for an insert that also records other audio, LYN
 | Link channels | `Ctrl+L` | Links the selected channels to the selected insert |
 | Link to consecutive inserts | `Ctrl+Shift+L` | Links the selected channels to inserts starting from the selected one |
 | Move inserts | `Alt+Left` / `Alt+Right` | Moves the selected inserts |
-| Rename and colour | `F2` | Renames and colours the selected insert |
+| Rename and color | `F2` | Renames and colors the selected insert |
 | Solo | `S` | Solos the selected inserts |
 | Solo with sources | `Alt+S` | Solos the selected inserts and the inserts that feed them |
 | Delete inserts | `Del` | Deletes the selected inserts, after a question |

@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Halaman ini menelusuri seluruh jalurnya sekali jalan: pattern drum, melodi, aransemen, mix, dan file hasil ekspor. Setiap bagian menaut ke halaman yang membahas jendelanya secara lengkap. Jika di titik mana pun kamu tidak mendengar apa-apa, lihat [Pengaturan audio](/wiki/audio-setup/).
 

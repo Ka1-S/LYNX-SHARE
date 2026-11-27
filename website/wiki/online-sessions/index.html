@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -97,10 +97,10 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="record-a-part-and-send-it-back">Record a part and send it back</h2>
 <p>The friend does this:</p>
 <ol><li>Open the <code>.lynxpack</code> with <code>File › Open...</code>. A summary shows who sent it and which mixer inserts and Playlist tracks are yours. Click <code>Open</code>.</li><li>Add your own channels, patterns and audio on your inserts and Playlist tracks. The host's material is left as it is.</li><li>Choose <code>File › Online session › Send my part back...</code> and send the new package to the host.</li></ol>
-<p>Each guest gets a colour, 20 mixer inserts and 16 Playlist tracks.</p>
+<p>Each guest gets a color, 20 mixer inserts and 16 Playlist tracks.</p>
 <h2 id="merge-a-part">Merge a part</h2>
 <p>The host does this:</p>
-<ol><li>Open the project that was sent.</li><li>Choose <code>File › Online session › Merge a part...</code> and pick the package your friend sent back.</li><li>The friend's channels, patterns, notes, clips and inserts are added in their colour. Nothing of yours is changed.</li></ol>
+<ol><li>Open the project that was sent.</li><li>Choose <code>File › Online session › Merge a part...</code> and pick the package your friend sent back.</li><li>The friend's channels, patterns, notes, clips and inserts are added in their color. Nothing of yours is changed.</li></ol>
 <p>Merging is one undo step. A newer part from the same friend replaces the earlier one.</p>
 <h2 id="start-or-join-a-live-session">Start or join a live session</h2>
 <figure><a class="shot" href="/assets/img/wiki/session-start.webp"><img src="/assets/img/wiki/session-start.webp" alt="Start live session" loading="lazy" width="474" height="294"></a></figure>
@@ -122,7 +122,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ol><li>Choose <code>File › Online session › Share plugins with guests...</code>.</li><li>Tick the plugins to share. <code>Search your plugins</code> narrows the list. Nothing is shared until you tick it.</li></ol>
 <p>A guest does this:</p>
 <ol><li>Open the plugin menu of one of your channels or effect slots. The shared plugins come first, under <code>On &lt;host&gt;'s computer</code>.</li><li>Choose one. Its window lists the plugin's parameters as sliders, with <code>Search parameters</code>.</li><li>Add notes and move the sliders. The window shows <code>Updating...</code> while the host's computer renders, then <code>Up to date</code>.</li></ol>
-<ul><li>The plugin stays on the host's computer and runs under the host's licence. LYNX SHARE never sends the plugin, its files, its presets or its licence.</li><li>The guest hears a render that follows the notes and values after a moment. It is not played live, and the guest does not get the plugin's own window.</li><li>While the host is away, the last render plays. Sharing stops when the session ends, and the last render stays.</li><li>A guest with the <code>Listen only (no edits)</code> role cannot use shared plugins.</li><li>Some plugin licences do not allow other people to operate the plugin, even remotely. Check each licence before you share.</li></ul>
+<ul><li>The plugin stays on the host's computer and runs under the host's license. LYNX SHARE never sends the plugin, its files, its presets or its license.</li><li>The guest hears a render that follows the notes and values after a moment. It is not played live, and the guest does not get the plugin's own window.</li><li>While the host is away, the last render plays. Sharing stops when the session ends, and the last render stays.</li><li>A guest with the <code>Listen only (no edits)</code> role cannot use shared plugins.</li><li>Some plugin licenses do not allow other people to operate the plugin, even remotely. Check each license before you share.</li></ul>
 <h2 id="what-goes-over-the-network">What goes over the network</h2>
 <p>Packages are files. Nothing is uploaded anywhere.</p>
 <p>A live session connects only while you are in one. Everything goes through the relay <code>relay.lynx-share.com</code>, end-to-end encrypted with a key that comes from the invite code. The relay passes the data on without being able to read it. It sees your IP address, when you were connected and how many bytes went through. The other people in the session see your name, your edits, the samples your part uses and whether you are playing or recording. They do not see your IP address. Details are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">privacy policy</a>.</p>
@@ -139,8 +139,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/wiki.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

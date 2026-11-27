@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -94,7 +94,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ol><li>Choose <code>Options › Plugin manager...</code>. It lists every plugin LYNX found, with its vendor, format and file.</li><li><code>Plugin folders...</code> shows where LYNX looks: the standard VST, VST3 and CLAP folders (also LV2 on Linux and AU on a Mac), plus any folder you add.</li></ol>
 <h2 id="scan-for-plugins">Scan for plugins</h2>
 <figure><a class="shot" href="/assets/img/learn/vst-plugins-2.webp"><img src="/assets/img/learn/vst-plugins-2.webp" alt="The plugins found" loading="lazy" width="1280" height="720"></a></figure>
-<ol><li>Click <code>Find new plugins</code>. Each file is checked in a separate process, so a plugin that crashes can't take LYNX down: it is listed under Failed.</li><li>Search by name, vendor or format; a star makes a plugin a favourite.</li></ol>
+<ol><li>Click <code>Find new plugins</code>. Each file is checked in a separate process, so a plugin that crashes can't take LYNX down: it is listed under Failed.</li><li>Search by name, vendor or format; a star makes a plugin a favorite.</li></ol>
 <h2 id="load-a-plugin">Load a plugin</h2>
 <figure><a class="shot" href="/assets/img/learn/vst-plugins-3.webp"><img src="/assets/img/learn/vst-plugins-3.webp" alt="A plugin's window on a Mixer track" loading="lazy" width="1280" height="720"></a></figure>
 <ol><li>In the Mixer, select a track and click an empty slot.</li><li>Choose <code>Plugin (VST/VST3/CLAP)</code>, then <code>More plugins...</code>, find the plugin by name and click <code>Add</code>.</li><li>The plugin opens in its own window. Press Play to hear it.</li></ol>
@@ -108,8 +108,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/learn.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/learn.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

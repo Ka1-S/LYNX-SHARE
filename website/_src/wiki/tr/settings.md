@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![Settings penceresinin General sayfası, üstte sayfa sekmeleri](/assets/img/wiki/settings-general.webp)
 

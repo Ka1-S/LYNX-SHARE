@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -145,7 +145,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div><dt>Windows</dt><dd data-i18n="dlp.reqWin">10 or 11, 64-bit</dd></div>
       <div><dt>macOS</dt><dd data-i18n="dlp.reqMac">11 or newer, Apple Silicon or Intel</dd></div>
       <div><dt>Linux</dt><dd data-i18n="dlp.reqLin">x86_64 or arm64, glibc 2.35 or newer</dd></div>
-      <div><dt data-i18n="fact.lic">Licence</dt><dd>AGPL-3.0</dd></div>
+      <div><dt data-i18n="fact.lic">License</dt><dd>AGPL-3.0</dd></div>
       <div><dt data-i18n="dlp.privT">Privacy</dt><dd data-i18n="dlp.priv">No telemetry and no account. Crash reports are sent only if you agree. <a href="/#signing">Details</a></dd></div>
     </dl>
   </div>
@@ -160,7 +160,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

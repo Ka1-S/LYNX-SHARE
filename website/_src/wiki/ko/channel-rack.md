@@ -1,5 +1,5 @@
 ---
-source: aad66b5125
+source: 0f5d8ab83e
 ---
 ![스텝 행이 있는 채널 랙](/assets/img/rack.webp)
 

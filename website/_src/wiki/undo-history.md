@@ -11,9 +11,9 @@ Every edit to the project is a step in the undo history: a note you add, a clip 
 
 1. Choose `Edit › Undo history...`, or press `Ctrl+Alt+H`.
 2. The list shows the steps with the newest at the bottom. The first row, `Start`, is the project as it was opened.
-3. Click a step. The project goes back to the state right after it, and the later steps turn grey.
-4. Click a grey step to go forward again.
-5. Make a new edit to continue from the step you chose. The grey steps are then gone.
+3. Click a step. The project goes back to the state right after it, and the later steps turn gray.
+4. Click a gray step to go forward again.
+5. Make a new edit to continue from the step you chose. The gray steps are then gone.
 
 ## The undo keys
 

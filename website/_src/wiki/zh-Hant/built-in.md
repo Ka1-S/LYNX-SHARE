@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![快速新增面板：樂器在左，效果器在右，每項都標有內建或內建 FL 引擎](/assets/img/wiki/quickadd.webp)
 

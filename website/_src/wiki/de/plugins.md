@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: a6e85677ce
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 

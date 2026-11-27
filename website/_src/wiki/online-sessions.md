@@ -25,7 +25,7 @@ The friend does this:
 2. Add your own channels, patterns and audio on your inserts and Playlist tracks. The host's material is left as it is.
 3. Choose `File › Online session › Send my part back...` and send the new package to the host.
 
-Each guest gets a colour, 20 mixer inserts and 16 Playlist tracks.
+Each guest gets a color, 20 mixer inserts and 16 Playlist tracks.
 
 ## Merge a part
 
@@ -33,7 +33,7 @@ The host does this:
 
 1. Open the project that was sent.
 2. Choose `File › Online session › Merge a part...` and pick the package your friend sent back.
-3. The friend's channels, patterns, notes, clips and inserts are added in their colour. Nothing of yours is changed.
+3. The friend's channels, patterns, notes, clips and inserts are added in their color. Nothing of yours is changed.
 
 Merging is one undo step. A newer part from the same friend replaces the earlier one.
 
@@ -95,11 +95,11 @@ A guest does this:
 2. Choose one. Its window lists the plugin's parameters as sliders, with `Search parameters`.
 3. Add notes and move the sliders. The window shows `Updating...` while the host's computer renders, then `Up to date`.
 
-- The plugin stays on the host's computer and runs under the host's licence. LYNX SHARE never sends the plugin, its files, its presets or its licence.
+- The plugin stays on the host's computer and runs under the host's license. LYNX SHARE never sends the plugin, its files, its presets or its license.
 - The guest hears a render that follows the notes and values after a moment. It is not played live, and the guest does not get the plugin's own window.
 - While the host is away, the last render plays. Sharing stops when the session ends, and the last render stays.
 - A guest with the `Listen only (no edits)` role cannot use shared plugins.
-- Some plugin licences do not allow other people to operate the plugin, even remotely. Check each licence before you share.
+- Some plugin licenses do not allow other people to operate the plugin, even remotely. Check each license before you share.
 
 ## What goes over the network
 

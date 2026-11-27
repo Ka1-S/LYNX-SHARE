@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![自动化编辑器，曲线在六个小节内上升](/assets/img/wiki/automation.webp)
 

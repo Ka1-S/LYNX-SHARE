@@ -54,7 +54,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 | `Session clips of Live sets` | Where the session clips of an imported Live set go: the clip grid, or the Playlist after the arrangement |
 | `Language`, `Interface font` | Applied at the next start |
 | `Interface size`, `Menu spacing` | Scale of the whole interface, and compact or comfortable menus |
-| `Waveforms` | Clean (the clip colour) or spectral colours, optionally with stereo channels apart |
+| `Waveforms` | Clean (the clip color) or spectral colors, optionally with stereo channels apart |
 | `Note names`, `Black notes` | English, Germanic or solfège names, with sharps or flats |
 | `Plugin style` | The look of the built-in plugin windows: automatic, or one style for every plugin |
 | `Animations`, `Animation rate` | Interface animations, and how often the playhead and meters move |
@@ -81,7 +81,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 | Setting | What it does |
 |---|---|
 | Theme box | Picks a preset. `Import...` and `Export...` read and write `.lynxtheme` files, `Save preset...` keeps the current theme, `Default` resets it |
-| `Accent color`, `Background`, `Workspace` | The three colours of a theme. The workspace colour can follow the background automatically |
+| `Accent color`, `Background`, `Workspace` | The three colors of a theme. The workspace color can follow the background automatically |
 | Workspace image | A PNG, JPEG or GIF behind the windows, with `Image fit`, `Image opacity` and `Darken image` |
 | Startup sound | Your own sound of 30 seconds or less, or LYNX SHARE's own |
 
@@ -103,7 +103,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 |---|---|
 | `Loudness meter beside the Master (LYNX)` | Short-term and integrated loudness (LUFS) and the true peak of the Master, with a Reset button |
 | `Show only used inserts` | Hides the Mixer inserts nothing uses |
-| `Keep links to deleted inserts, greyed (LYNX)` | Deleting an insert keeps the links that went into it, so they can be connected again |
+| `Keep links to deleted inserts, grayed (LYNX)` | Deleting an insert keeps the links that went into it, so they can be connected again |
 | `Mixer groups follow the Playlist (LYNX)` | The Mixer's groups mirror the Playlist's track groups |
 | `Automation lanes` | Automation can sit in lanes under a Playlist track |
 | `Ruler: song bars (LYNX)` | The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays |
@@ -128,7 +128,7 @@ The Settings window has eight pages: Audio, MIDI, General, Theme, Files, LYNX ex
 | `Comp crossfade` | The crossfade length used when comping takes, in milliseconds |
 | `Play truncated notes in clips` | A note that starts before a pattern clip plays from the clip's start |
 | `Fast declick for cut groups` | Faster ramping when cut groups cut notes |
-| `Panning law` | Circular (centre at 0 dB, +3 dB on the side panned to) or Triangular (the louder side keeps its level). For Mixer inserts and Sampler channels |
+| `Panning law` | Circular (center at 0 dB, +3 dB on the side panned to) or Triangular (the louder side keeps its level). For Mixer inserts and Sampler channels |
 
 ## Info
 

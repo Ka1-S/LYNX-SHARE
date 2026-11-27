@@ -62,7 +62,7 @@ Events belong to a pattern and play wherever that pattern plays. Right-click a c
 
 - `Draw` sets values as you drag, and a right-drag erases. `Line` draws a straight ramp. `Select` marks a time range for the tools at the bottom.
 - `Snap` goes from 1/2 step to 1 bar.
-- `Scale`, `Offset` and `Randomise` change the events of the selection, or of the whole pattern.
+- `Scale`, `Offset` and `Randomize` change the events of the selection, or of the whole pattern.
 - `LFO` writes a sine, triangle or square over 1 beat to 4 bars.
 - `Clear` removes the events.
 - `To automation...` turns the events into an automation clip and removes them from the pattern.

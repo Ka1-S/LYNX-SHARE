@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![Il layout a lancio di clip: una griglia di clip con le scene accanto alla Playlist](/assets/img/cliplaunch.webp)
 

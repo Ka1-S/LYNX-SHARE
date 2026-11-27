@@ -1,5 +1,5 @@
 ---
-source: cab9a0b0d1
+source: bfe483502a
 ---
 ![La Playlist avec des clips sur des pistes](/assets/img/playlist.webp)
 

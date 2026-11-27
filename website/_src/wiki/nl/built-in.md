@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Het Snel-toevoegpalet: instrumenten links, effecten rechts, elk gelabeld als ingebouwd of ingebouwde FL-engine](/assets/img/wiki/quickadd.webp)
 

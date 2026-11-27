@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Deze pagina loopt één keer het hele traject door: een drumpattern, een melodie, een arrangement, een mix en een geëxporteerd bestand. Elk onderdeel verwijst naar de pagina die het bijbehorende venster volledig behandelt. Hoor je op enig moment niets, zie dan [Audio instellen](/wiki/audio-setup/).
 

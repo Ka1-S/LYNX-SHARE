@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![La ventana del historial de deshacer: seis pasos de Start a Add notes, con Mute: Kick como el actual](/assets/img/wiki/history.webp)
 

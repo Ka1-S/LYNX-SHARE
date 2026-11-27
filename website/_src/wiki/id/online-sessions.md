@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Ada dua cara mengerjakan proyek bersama orang lain, dan keduanya ada di `File › Sesi online`. Paket adalah file yang kamu kirim ke teman, yang lalu mengirim sebuah bagian kembali. Tidak butuh jaringan, akun, atau server. Sesi live menghubungkan semua orang lewat internet melalui relay LYNX SHARE, dan setiap perubahan sampai ke semua orang. Hingga 4 orang ikut dalam satu proyek, termasuk kamu.
 

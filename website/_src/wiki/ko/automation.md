@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![여섯 마디에 걸쳐 올라가는 커브가 있는 오토메이션 에디터](/assets/img/wiki/automation.webp)
 

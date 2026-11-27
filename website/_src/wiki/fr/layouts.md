@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![La disposition par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 

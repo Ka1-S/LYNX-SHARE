@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![El editor de Automatización con una curva que sube a lo largo de seis compases](/assets/img/wiki/automation.webp)
 

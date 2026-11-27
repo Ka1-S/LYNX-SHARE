@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: a6e85677ce
 ---
 ![La parte bassa della Gestione plugin, con la nota che ogni file di plugin viene esaminato in un processo separato](/assets/img/wiki/plugin-manager-scan.webp)
 

@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![復原記錄視窗：從 Start 到 Add notes 共六個步驟，目前的是 Mute: Kick](/assets/img/wiki/history.webp)
 

@@ -5,7 +5,7 @@ status: full
 ---
 ## Is LYNX SHARE free?
 
-Yes. It is free software under the GNU Affero General Public License v3.0 (AGPL-3.0). You may use, study, modify and redistribute it. Anyone who distributes a modified version must publish its source code under the same licence.
+Yes. It is free software under the GNU Affero General Public License v3.0 (AGPL-3.0). You may use, study, modify and redistribute it. Anyone who distributes a modified version must publish its source code under the same license.
 
 ## Which systems does it run on?
 
@@ -13,7 +13,7 @@ Windows 10 and 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel) and Linu
 
 ## Is this FL Studio, or made by Image-Line?
 
-No. LYNX SHARE is an independent program. Its default layout works the way FL Studio does, next to a Clip-launch layout in the style of Ableton Live and a Simple layout in the style of BandLab and FL Studio Mobile. FL Studio's behaviour and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
+No. LYNX SHARE is an independent program. Its default layout works the way FL Studio does, next to a Clip-launch layout in the style of Ableton Live and a Simple layout in the style of BandLab and FL Studio Mobile. FL Studio's behavior and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
 
 ## Does it open my FL Studio projects, and what is lost?
 
@@ -47,7 +47,7 @@ The Windows executable is not code-signed yet, so SmartScreen may warn: click `M
 
 ## Does it send any data?
 
-There is no telemetry, analytics, account or licence check. By itself LYNX SHARE makes one connection: a few seconds after start-up it asks GitHub for the newest version number, which you can switch off on the first start or in `Settings › General › Updates`. Everything else goes online only when you ask for it: a crash report you agree to send, the stem model download, or a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) lists every address it contacts.
+There is no telemetry, analytics, account or license check. By itself LYNX SHARE makes one connection: a few seconds after start-up it asks GitHub for the newest version number, which you can switch off on the first start or in `Settings › General › Updates`. Everything else goes online only when you ask for it: a crash report you agree to send, the stem model download, or a live online session. The [privacy policy](https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md) lists every address it contacts.
 
 ## How do updates arrive?
 
@@ -67,11 +67,11 @@ LYNX SHARE has three ways of working in one program, and `View › Layout style`
 
 ## Will an update change how my projects sound?
 
-No, not on purpose. When one of LYNX SHARE's effects is refitted to sound closer to the plugin it is modelled on, the new behaviour is a switch (`Law: Classic | Measured`): new instances use it, and projects and presets saved earlier keep the old one. Only real fixes, such as a limiter that went over its ceiling, change a saved project, and the release notes list them.
+No, not on purpose. When one of LYNX SHARE's effects is refitted to sound closer to the plugin it is modeled on, the new behavior is a switch (`Law: Classic | Measured`): new instances use it, and projects and presets saved earlier keep the old one. Only real fixes, such as a limiter that went over its ceiling, change a saved project, and the release notes list them.
 
 ## Can I use FL Studio's own plugins in LYNX SHARE?
 
-Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs itself as a plugin too: `FL Studio VSTi` and `FL Studio VSTi (Multi)` (VST2) on Windows, and an Audio Unit on macOS. Put it on a channel in LYNX SHARE and FL Studio runs inside it, with its Channel rack, Patcher, Sytrus, Harmor and the other plugins your FL Studio licence covers. It needs FL Studio installed and your own licence. LYNX SHARE does not load FL Studio's plugin files directly, because they are made to run only inside FL Studio. If an older version of LYNX SHARE listed the FL Studio plugin as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
+Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs itself as a plugin too: `FL Studio VSTi` and `FL Studio VSTi (Multi)` (VST2) on Windows, and an Audio Unit on macOS. Put it on a channel in LYNX SHARE and FL Studio runs inside it, with its Channel rack, Patcher, Sytrus, Harmor and the other plugins your FL Studio license covers. It needs FL Studio installed and your own license. LYNX SHARE does not load FL Studio's plugin files directly, because they are made to run only inside FL Studio. If an older version of LYNX SHARE listed the FL Studio plugin as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
 
 ## Does it open GarageBand, BandLab, DAWproject or tracker files?
 
@@ -81,7 +81,7 @@ Tracker modules (`.mod`, `.xm`, `.s3m`, `.it`) open too: their instruments becom
 
 ## Does it work without an internet connection?
 
-Yes. LYNX SHARE starts and works fully offline, also in a sandbox without network access such as `firejail --net=none`, with nothing waiting for the network. The plugin scan never uses the internet: it reads the plugin files on your computer and looks only at files that are new or changed since the last scan. Third-party plugins are other programs and may try to connect by themselves, for example to check their licence. For sandboxes and packagers, the environment variable `LYNX_OFFLINE=1` or the `--offline` option turns off every connection of LYNX SHARE's own.
+Yes. LYNX SHARE starts and works fully offline, also in a sandbox without network access such as `firejail --net=none`, with nothing waiting for the network. The plugin scan never uses the internet: it reads the plugin files on your computer and looks only at files that are new or changed since the last scan. Third-party plugins are other programs and may try to connect by themselves, for example to check their license. For sandboxes and packagers, the environment variable `LYNX_OFFLINE=1` or the `--offline` option turns off every connection of LYNX SHARE's own.
 
 ## Can I use LYNX SHARE's own effects in another DAW?
 

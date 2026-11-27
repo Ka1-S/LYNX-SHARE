@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![Раскладка с запуском клипов: сетка клипов со сценами рядом с Playlist](/assets/img/cliplaunch.webp)
 

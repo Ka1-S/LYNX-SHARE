@@ -1,5 +1,5 @@
 ---
-source: aad66b5125
+source: 0f5d8ab83e
 ---
 ![带有步进行的通道机架](/assets/img/rack.webp)
 

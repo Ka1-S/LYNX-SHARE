@@ -1,5 +1,5 @@
 ---
-source: 141ffc1370
+source: 841575013e
 ---
 LYNX SHARE est une DAW gratuite et open source pour Windows, macOS et Linux, avec trois dispositions dans un seul programme. Par défaut, c'est la disposition Pattern : vous programmez des patterns dans le Channel Rack et le Piano Roll, les arrangez dans la Playlist et les mixez dans le Mixer. La disposition par lancement de clips lance des clips et des scènes depuis une grille, dans le style d'Ableton Live, et la disposition simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile. `Vue › Style de disposition` permet de passer de l'un à l'autre à tout moment. Elle ouvre les projets FL Studio (`.flp`), les sets Ableton Live (`.als`), les projets FL Studio Mobile (`.flm`), les fichiers DAWproject, les projets GarageBand et BandLab et les modules tracker, exporte `.flp`, `.als`, `.dawproject` et `.flm`, et enregistre dans son propre format `.lynx`.
 

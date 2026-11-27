@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -97,9 +97,9 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="what-changes-on-screen">What changes on screen</h2>
 <ul><li>The clip grid is shown beside the Playlist. Playlist tracks are the columns and scenes are the rows.</li><li>The Playlist's title bar gets a <code>Both</code>, <code>Grid</code>, <code>Song</code> switch. <code>Grid</code> shows only the grid, <code>Song</code> only the Playlist.</li><li>The first time, the Channel rack is hidden. <code>F6</code> or its toolbar button shows it.</li><li>The Playlist's automation lanes are switched on.</li><li>The window layout is stored per style, so each style comes back the way you left it.</li><li>Under the grid, the <code>Mixer</code> button shows or hides the Session mixer, as in Ableton Live: <code>In/Out</code> (<code>Audio From</code>, <code>Monitor</code>, <code>Audio To</code>), <code>Sends</code>, <code>Track Delay</code>, and each track's volume with its activator, solo, arm button and meter, plus the <code>Main</code> strip.</li><li><code>Grooves</code>, under the grid, shows the Groove Pool. <code>Commit groove</code> writes a groove into the notes of a MIDI clip.</li><li>The <code>MIDI</code> and <code>Key</code> buttons start MIDI Map Mode and Key Map Mode. See <a href="/wiki/midi-controllers/">MIDI controllers</a>.</li></ul>
 <h2 id="the-grid">The grid</h2>
-<p>A launched clip does not start at once. It waits for the next launch quantisation point, and its triangle blinks until then. The box at the bottom of the grid sets the global launch quantisation, which every clip set to <code>Global</code> uses. A stop waits in the same way.</p>
+<p>A launched clip does not start at once. It waits for the next launch quantization point, and its triangle blinks until then. The box at the bottom of the grid sets the global launch quantization, which every clip set to <code>Global</code> uses. A stop waits in the same way.</p>
 <p>Right-click a clip for its settings.</p>
-<div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Launch quantisation</code></td><td>When this clip starts: <code>Global</code>, <code>None</code>, <code>8 bars</code> down to <code>1/32</code></td></tr><tr><td><code>Launch mode</code></td><td><code>Trigger</code>, <code>Gate</code>, <code>Toggle</code> or <code>Repeat</code></td></tr><tr><td><code>Legato (keep the position)</code></td><td>The clip takes over the play position of the clip that played before on that track</td></tr><tr><td><code>Loop</code></td><td>On: the clip repeats. Off: it plays once, then the track stops</td></tr><tr><td><code>Follow action</code></td><td>What happens after the clip: two actions with a chance each, and the time after which they act</td></tr><tr><td><code>Delete</code></td><td>Empties the slot</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>Launch quantization</code></td><td>When this clip starts: <code>Global</code>, <code>None</code>, <code>8 bars</code> down to <code>1/32</code></td></tr><tr><td><code>Launch mode</code></td><td><code>Trigger</code>, <code>Gate</code>, <code>Toggle</code> or <code>Repeat</code></td></tr><tr><td><code>Legato (keep the position)</code></td><td>The clip takes over the play position of the clip that played before on that track</td></tr><tr><td><code>Loop</code></td><td>On: the clip repeats. Off: it plays once, then the track stops</td></tr><tr><td><code>Follow action</code></td><td>What happens after the clip: two actions with a chance each, and the time after which they act</td></tr><tr><td><code>Delete</code></td><td>Empties the slot</td></tr></tbody></table></div>
 <p>Right-click an empty slot for <code>Stop button (a scene stops this track here)</code>. Clicking the square at the left of an empty slot stops that track. Right-click a scene for <code>Insert scene</code>, <code>Add scene below</code>, <code>Delete scene</code>, <code>Rename scene...</code> and the scene's tempo.</p>
 <p>Clips can be cut, copied, pasted and duplicated (<code>Ctrl+D</code>) from their menu, and dragged between slots and to or from the Playlist. A pattern or a sample dragged from the Browser, or audio files dropped from outside, fill the slot they land on. A scene's menu also has <code>Duplicate</code> and <code>Capture and insert scene</code>, which puts the clips playing now into a new scene. <code>View › Scene tempo and time signature</code> shows a tempo and time signature for each scene.</p>
 <p>The slot menu also has two options for the whole grid: <code>Give tracks back to the Playlist when the transport stops</code> and <code>Follow actions on the whole grid</code>.</p>
@@ -125,8 +125,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/wiki.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

@@ -99,7 +99,7 @@ The report ends with `result=OK`. More options are on the [Command line](/wiki/c
 - Run only one `build-windows-zig.sh` at a time. Two Zig builds at once can hang. For parallel builds in separate worktrees, give each its own cache with `ZIG_GLOBAL_CACHE_DIR` and `ZIG_LOCAL_CACHE_DIR`.
 - Some engines read built-in sounds and tables from your own FL Studio installation. Nothing from FL Studio is in the repository.
 - Part of the documentation in `docs/` is still in Portuguese. It is being translated.
-- If you distribute a modified version, including as a network service, the licence requires you to publish its source under the same licence.
+- If you distribute a modified version, including as a network service, the license requires you to publish its source under the same license.
 
 ## Related
 

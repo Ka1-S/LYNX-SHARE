@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -97,9 +97,9 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="formats-per-system">Formats per system</h2>
 <div class="tablewrap"><table><thead><tr><th>System</th><th>Formats hosted</th></tr></thead><tbody><tr><td>Windows</td><td>VST3, CLAP, VST2, JSFX</td></tr><tr><td>macOS</td><td>VST3, CLAP, Audio Units, JSFX</td></tr><tr><td>Linux</td><td>VST3, CLAP, LV2, VST2, JSFX</td></tr></tbody></table></div>
 <p>VST2 is not hosted on macOS. On Linux, Windows plugins work through <a href="https://github.com/robbert-vdh/yabridge">yabridge</a> and Wine, which you install yourself: add the folder yabridge syncs to as a plugin folder.</p>
-<p>JSFX scripts, REAPER's effect and instrument format, run on every system: 31 free scripts (chokehold's, MIT licence) come with LYNX SHARE, in the Browser under <code>Plugin database › Effects › JSFX</code> and <code>Plugin database › Generators › JSFX</code> and in the plugin picker. Scripts in <code>Documents/LYNX/JSFX</code> and in REAPER's Effects folder are found too, and <code>Settings › Files › JSFX folders</code> adds more folders. LYNX SHARE shows a script's sliders in its own panel; a script that draws its own display shows its sliders only.</p>
+<p>JSFX scripts, REAPER's effect and instrument format, run on every system: 31 free scripts (chokehold's, MIT license) come with LYNX SHARE, in the Browser under <code>Plugin database › Effects › JSFX</code> and <code>Plugin database › Generators › JSFX</code> and in the plugin picker. Scripts in <code>Documents/LYNX/JSFX</code> and in REAPER's Effects folder are found too, and <code>Settings › Files › JSFX folders</code> adds more folders. LYNX SHARE shows a script's sliders in its own panel; a script that draws its own display shows its sliders only.</p>
 <h2 id="the-plugin-manager">The Plugin manager</h2>
-<div class="tablewrap"><table><thead><tr><th>Control</th><th>What it does</th></tr></thead><tbody><tr><td>Search box</td><td>Filters by name, vendor, format or file</td></tr><tr><td><code>All</code>, <code>Instruments</code>, <code>Effects</code>, <code>Favourites</code>, <code>Failed</code></td><td>Choose which plugins are listed</td></tr><tr><td>Star column</td><td>Marks a favourite</td></tr><tr><td><code>Bits</code> column</td><td>32, 64 or 32+64 (Windows)</td></tr><tr><td><code>Status</code> column</td><td><code>OK</code>, <code>File not found</code> or <code>Failed to load</code></td></tr><tr><td><code>Find new plugins</code></td><td>Scans for files that are not in the list yet</td></tr><tr><td><code>Rescan all...</code></td><td>Forgets the failed files and examines every file again</td></tr><tr><td><code>Plugin folders...</code></td><td>Edits the folders that are scanned</td></tr><tr><td><code>Add plugin file...</code></td><td>Adds one plugin file</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Control</th><th>What it does</th></tr></thead><tbody><tr><td>Search box</td><td>Filters by name, vendor, format or file</td></tr><tr><td><code>All</code>, <code>Instruments</code>, <code>Effects</code>, <code>Favorites</code>, <code>Failed</code></td><td>Choose which plugins are listed</td></tr><tr><td>Star column</td><td>Marks a favorite</td></tr><tr><td><code>Bits</code> column</td><td>32, 64 or 32+64 (Windows)</td></tr><tr><td><code>Status</code> column</td><td><code>OK</code>, <code>File not found</code> or <code>Failed to load</code></td></tr><tr><td><code>Find new plugins</code></td><td>Scans for files that are not in the list yet</td></tr><tr><td><code>Rescan all...</code></td><td>Forgets the failed files and examines every file again</td></tr><tr><td><code>Plugin folders...</code></td><td>Edits the folders that are scanned</td></tr><tr><td><code>Add plugin file...</code></td><td>Adds one plugin file</td></tr></tbody></table></div>
 <p>Each plugin file is examined in a separate process. A file that crashes or hangs for 30 seconds is marked as failed and skipped later. On Windows the failed files are listed with the reason in <code>%APPDATA%\LYNX\scan-failures.log</code>.</p>
 <p>The standard folders are scanned, plus the ones you add:</p>
 <ul><li>Windows: <code>Common Files\VST3</code>, <code>Common Files\CLAP</code>, <code>Common Files\VST2</code>, <code>VSTPlugins</code> and <code>Steinberg\VSTPlugins</code> under Program Files, and the folders FL Studio uses if it is installed.</li><li>macOS: <code>VST3</code>, <code>Components</code> and <code>CLAP</code> in <code>~/Library/Audio/Plug-Ins</code> and <code>/Library/Audio/Plug-Ins</code>.</li><li>Linux: <code>~/.vst3</code>, <code>~/.clap</code>, <code>~/.lv2</code>, <code>~/.vst</code> and the same folders under <code>/usr/lib</code> and <code>/usr/local/lib</code>.</li></ul>
@@ -124,7 +124,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="fl-studio-s-own-plugins">FL Studio's own plugins</h2>
 <p>FL Studio's native plugins, such as Sytrus, Harmor and Patcher, run only inside FL Studio. To use them in LYNX SHARE, use the plugin version of FL Studio that comes with it. On Windows it is installed as <code>FL Studio VSTi</code> and <code>FL Studio VSTi (Multi)</code> in <code>C:\Program Files\Common Files\VST2</code>. On macOS it is an Audio Unit.</p>
 <ol><li>Scan for plugins. Both appear as instruments with the vendor Image-Line. The first scan can take a while, because the whole of FL Studio starts inside the plugin.</li><li>Add <code>FL Studio VSTi</code> to a channel and open its window. Click the FL Studio logo to open FL Studio's own window, with its Channel rack, Mixer and browser.</li><li>In FL Studio's Channel rack, add an instrument. A new FL Studio plugin starts with one empty Sampler and makes no sound until you add one. Notes from LYNX SHARE play the channel selected in FL Studio's Channel rack.</li><li>FL Studio's own patterns play when LYNX SHARE plays, at LYNX SHARE's tempo.</li></ol>
-<p>What you build inside FL Studio is saved with the LYNX SHARE project. <code>FL Studio VSTi (Multi)</code> has 16 stereo outputs, which can play on separate inserts (see the section above). Your FL Studio licence decides which FL plugins work inside it. LYNX SHARE does not load FL Studio's plugin files by itself.</p>
+<p>What you build inside FL Studio is saved with the LYNX SHARE project. <code>FL Studio VSTi (Multi)</code> has 16 stereo outputs, which can play on separate inserts (see the section above). Your FL Studio license decides which FL plugins work inside it. LYNX SHARE does not load FL Studio's plugin files by itself.</p>
 <p>If the FL Studio plugin is listed as <code>Failed to load</code>, right-click it in <code>Options › Plugin manager...</code> and choose <code>Try again (scan this file now)</code>.</p>
 <h2 id="lynx-s-own-plugins-in-other-daws">LYNX's own plugins in other DAWs</h2>
 <p>LYNX SHARE's own effects and instruments, such as Facet EQ, Apex Limiter, LYNX Tune and LYNX Model, also come as plugins for other DAWs. They are a separate, optional download on the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases">releases page</a>: <code>LYNX-Plugins-&lt;version&gt;</code> for Windows, macOS and Linux.</p>
@@ -151,8 +151,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/wiki.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

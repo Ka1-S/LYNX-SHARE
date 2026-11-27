@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![La finestra Cronologia annullamenti: sei passi da Start a Add notes, con Mute: Kick come passo corrente](/assets/img/wiki/history.webp)
 

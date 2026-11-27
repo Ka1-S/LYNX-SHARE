@@ -81,7 +81,7 @@ AGPL-3.0, and is still an **alpha**.
 | 🎛️ **Three layouts, one program** | The Pattern layout by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. The first start asks where you are coming from and picks one; switch any time in *View › Layout style*. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, while FL's *Thief* demo plays LYNX SHARE 0.1.31 uses 34.4 % of one CPU core and 564 MB of memory (FL Studio 2026: 905 MB), and opens it in 4.3 s (FL Studio: 7.1 s) ([0.1.31 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31-alpha)). |
-| 🔒 **Free, private, clean-room** | No price, no account, no subscription, no telemetry, and nothing goes online before you say so. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
+| 🔒 **Free, private, clean-room** | No price, no account, no subscription, no telemetry, and nothing goes online before you say so. Every behavior was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
 
 ## Features
 
@@ -101,7 +101,7 @@ a channel can be frozen to audio, or deactivated so its instrument is unloaded u
 <img src="docs/img/piano-roll.png" alt="Piano Roll">
 
 **Piano Roll.** Snap, chords and scales, key markers that change the key along the song, a *Scale degree chord*
-stamp, note colours and groups, slide and porta notes, quantize, strum and arpeggiate tools, velocity, pan and pitch
+stamp, note colors and groups, slide and porta notes, quantize, strum and arpeggiate tools, velocity, pan and pitch
 lanes (optionally up to five stacked at once), ghost notes, and MIDI import and export.
 
 </td>
@@ -142,7 +142,7 @@ insert to any hardware output.
 </p>
 
 *View › Layout style › Clip-launch layout* adds an Ableton Live-style clip grid next to the arrangement: tracks are
-columns, scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a selected clip
+columns, scenes are rows. Clips have launch modes, quantization, legato, loop and follow actions, and a selected clip
 opens in a Clip View with Live 12's MIDI tools. Under the grid there is a Session mixer with return tracks, sends, a
 crossfader and Live's Solo / Cue (a Cue Out for your headphones). The Device View shows instrument, audio-effect and
 MIDI-effect racks with their chains inline, and a Macro Map mode assigns any device parameter to a macro. There is
@@ -197,7 +197,7 @@ have ([below](#inspired-by-the-classics)).
 </table>
 
 Every one of them is listed, with a picture of its editor, in the
-[catalogue of instruments and effects](https://lynx-share.com/instruments-and-effects/).
+[catalog of instruments and effects](https://lynx-share.com/instruments-and-effects/).
 
 ### Audio editing, chords and sound design
 
@@ -224,7 +224,7 @@ insert and edit every clip routed there.
 <img src="docs/img/chord-helper.png" alt="The Chord helper next to the Piano Roll: related keys and borrowed chords">
 
 **Chord helper.** *Tools › Chord helper* in the Piano Roll reads the selected chord and suggests related keys and
-borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it, and pin your favourites.
+borrowed chords, with how each one moves and feels; hear one on hover, click it to insert it, and pin your favorites.
 
 </td>
 <td width="50%" valign="top">
@@ -337,7 +337,7 @@ compensation.
   patterns, channels and mixer settings copy and paste between them.
 - **Safe by default:** undo on every edit with an undo history, autosave and project versions, *Save a copy for an
   older LYNX...*, and *Collect all and save*, which copies every sample the project uses next to it.
-- **Your look and language:** themes, automatic colours and icons by track name, and the interface in 15 languages.
+- **Your look and language:** themes, automatic colors and icons by track name, and the interface in 15 languages.
 
 ### Import and export
 
@@ -784,18 +784,18 @@ docs/         architecture, status, roadmap and notes on FL Studio's behaviour
 | [`docs/PLUGINS.md`](docs/PLUGINS.md) | the built-in plugins, what each one is compatible with, and its status |
 | [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | LYNX SHARE's own features, beyond the FL Studio workflow |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | project phases |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how the engine and the UI are organised |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how the engine and the UI are organized |
 | [`docs/CODE_SIGNING.md`](docs/CODE_SIGNING.md) | how releases are built and code-signed |
 | [`PRIVACY.md`](PRIVACY.md) | privacy policy: every network connection LYNX SHARE makes, and why |
 | [`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md) | a script for checking by ear and by hand what the automated tests don't cover |
-| [`docs/analise/`](docs/analise) | clean-room notes on FL Studio's and Live's behaviour and file formats |
+| [`docs/analise/`](docs/analise) | clean-room notes on FL Studio's and Live's behavior and file formats |
 
 Some of the older notes are still in Portuguese and are being translated.
 
 ## Credits and notice
 
 LYNX SHARE is an independent implementation. FL Studio, FL Studio Mobile and Ableton Live were studied only to
-understand their behaviour and file formats; no Image-Line or Ableton code was copied, and no protected content (such
+understand their behavior and file formats; no Image-Line or Ableton code was copied, and no protected content (such
 as FLEX packs) is ever opened.
 
 FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG;
@@ -805,7 +805,7 @@ them. VST is a registered trademark of Steinberg Media Technologies GmbH.
 Logo by **w3teal**.
 
 Built with [JUCE](https://juce.com), [CLAP](https://github.com/free-audio/clap), the [WavPack](https://www.wavpack.com)
-decoder, [ysfx](https://github.com/JoepVanlier/ysfx) with WDL's EEL2 (JSFX) and the Steinberg ASIO SDK; their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Thanks to everyone
+decoder, [ysfx](https://github.com/JoepVanlier/ysfx) with WDL's EEL2 (JSFX) and the Steinberg ASIO SDK; their licenses are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Thanks to everyone
 who reported bugs and sent pull requests.
 
 ## Code signing policy

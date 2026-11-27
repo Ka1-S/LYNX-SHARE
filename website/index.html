@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -130,7 +130,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div><dt data-i18n="fact.sys">Systems</dt><dd data-i18n="fact.sysV">Windows 10 / 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel), Linux x86_64 or arm64 with glibc 2.35 or newer</dd></div>
       <div><dt data-i18n="fact.ver">Version</dt><dd><span class="ver-line">v0.1.31.2-alpha</span> (<a href="/updates/" data-i18n="fact.verL">what changed</a>)</dd></div>
       <div><dt data-i18n="fact.price">Price</dt><dd data-i18n="fact.priceV">Free. No account, no subscription.</dd></div>
-      <div><dt data-i18n="fact.lic">Licence</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
+      <div><dt data-i18n="fact.lic">License</dt><dd data-i18n="fact.licV">AGPL-3.0, <a href="https://github.com/Ka1-S/LYNX-SHARE">source on GitHub</a></dd></div>
       <div><dt data-i18n="fact.opens">Opens</dt><dd data-i18n="fact.opensV">.lynx (its own format), .flp, .als (Live 11 and 12), .flm (partial), .dawproject, GarageBand .band (partial), BandLab .blx (partial), .mid, tracker modules .mod, .xm, .s3m, .it (partial), zipped projects .zip</dd></div>
       <div><dt data-i18n="fact.exports">Exports</dt><dd data-i18n="fact.exportsV">WAV, MP3, FLAC, OGG, AIFF, M4A, stems, MIDI, .flp, .als, .dawproject, .flm, zipped loop packages .zip</dd></div>
       <div><dt data-i18n="fact.plug">Plugins</dt><dd data-i18n="fact.plugV">VST3 and CLAP; Audio Units on macOS; LV2 on Linux; VST2 on Windows and Linux; JSFX everywhere</dd></div>
@@ -171,7 +171,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap split">
     <div class="prose">
       <h2 data-i18n="home.srcT">Source code</h2>
-      <p data-i18n="home.src1">LYNX SHARE is written in C++20 with JUCE 8. The code, the tests and the notes on every FL Studio behaviour it reproduces are in one public repository. FL Studio and Live were studied from the outside and the code was written from scratch: nothing from Image-Line or Ableton is in it.</p>
+      <p data-i18n="home.src1">LYNX SHARE is written in C++20 with JUCE 8. The code, the tests and the notes on every FL Studio behavior it reproduces are in one public repository. FL Studio and Live were studied from the outside and the code was written from scratch: nothing from Image-Line or Ableton is in it.</p>
       <p data-i18n="home.src2">Bug reports and pull requests are welcome. Several fixes in recent releases came from users.</p>
       <p><a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/issues" data-i18n="home.issues">Report a bug</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/ROADMAP.md">Roadmap</a> <a class="btn btn-ghost btn-sm" href="https://discord.gg/XHKkbtbkY">Discord</a></p>
       <h3 data-i18n="home.commT">Community</h3>
@@ -236,7 +236,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

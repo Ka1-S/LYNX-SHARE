@@ -39,7 +39,7 @@ What is different from Live:
 | Arrangement view | The Playlist |
 | Tracks | Playlist tracks, which are the columns of the clip grid |
 | Scenes | Scenes, the rows of the clip grid. A scene can set the tempo when launched |
-| Launch quantisation | `Global`, `None`, 8 bars down to 1 bar, or a note value from 1/2 to 1/32, per clip if you want |
+| Launch quantization | `Global`, `None`, 8 bars down to 1 bar, or a note value from 1/2 to 1/32, per clip if you want |
 | Launch modes | `Trigger`, `Gate`, `Toggle` and `Repeat` |
 | Follow actions | Action A and Action B with a chance for each |
 | Clip stop buttons | An empty slot can have a stop button |
@@ -53,7 +53,7 @@ What is different from Live:
 A slot holds a pattern clip or an audio clip.
 
 - A track plays one clip at a time. A launched clip replaces the one playing.
-- A launch waits for the next step of the launch quantisation.
+- A launch waits for the next step of the launch quantization.
 - `Legato` starts the new clip at the position the replaced clip had reached. `Loop` is per clip.
 - Scenes can be inserted, deleted and renamed.
 - A track that launched a clip stays silent in the Playlist until you press `Back to Playlist`. An option gives tracks back when the transport stops.
@@ -64,7 +64,7 @@ Follow actions run after a number of bars or passes of the clip. The actions are
 
 - MIDI, audio, group and return tracks, tempo, time signature, locators, the loop, mixer settings (volume, pan, mute, solo, sends) and their automation.
 - VST2 and VST3 plugins with their state, if the same plugin is installed. See [Third-party plugins](/wiki/plugins/).
-- Session clips and scenes, into the clip grid, with their launch mode, quantisation, legato, loop, follow actions and stop buttons. To place them on the Playlist instead, one section per scene, change `Session clips of Live sets` in `Options › General settings...`.
+- Session clips and scenes, into the clip grid, with their launch mode, quantization, legato, loop, follow actions and stop buttons. To place them on the Playlist instead, one section per scene, change `Session clips of Live sets` in `Options › General settings...`.
 - Warp markers.
 
 ## Export a .als

@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: e44862929e
 ---
 ![「管理快速鍵」視窗：可搜尋的動作清單，以及每個動作的按鍵](/assets/img/wiki/shortcuts.webp)
 

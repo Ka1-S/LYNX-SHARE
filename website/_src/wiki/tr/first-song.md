@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Bu sayfa tüm yolu bir kez baştan sona gösterir: bir davul pattern'i, bir melodi, bir aranjman, bir mix ve dışa aktarılmış bir dosya. Her bölüm, penceresini ayrıntısıyla anlatan sayfaya bağlanır. Herhangi bir noktada hiçbir şey duymuyorsanız [Ses ayarı](/wiki/audio-setup/) sayfasına bakın.
 

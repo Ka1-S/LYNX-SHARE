@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![Работа с запуском клипов: сетка клипов и сцен слева, «Пипетка» и Playlist справа](/assets/img/cliplaunch.webp)
 

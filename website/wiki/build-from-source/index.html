@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -122,7 +122,7 @@ cmake --build build</code></pre>
 <h2 id="the-source-tree">The source tree</h2>
 <div class="tablewrap"><table><thead><tr><th>Folder</th><th>What it holds</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>Model, sequencer, instruments, effects and <code>.flp</code> import. Plain C++, testable without JUCE</td></tr><tr><td><code>src/flp/</code></td><td>The <code>.flp</code> format reader</td></tr><tr><td><code>src/engine/</code></td><td>The audio engine: device, graph, samples, plugins, project files</td></tr><tr><td><code>src/ui/</code></td><td>The interface: Channel rack, Piano roll, Playlist, Mixer, windows</td></tr><tr><td><code>third_party/</code></td><td>CLAP and the WavPack decoder</td></tr><tr><td><code>tests/</code></td><td>The core tests</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>Architecture, status, roadmap and the behavioural analysis of FL Studio</td></tr></tbody></table></div>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li>JUCE 8 does not officially support MinGW. The Zig build script works around the differences. The fixes are in <code>cmake/mingw/</code> and <code>src/platform/MingwFixes.cpp</code>.</li><li>Run only one <code>build-windows-zig.sh</code> at a time. Two Zig builds at once can hang. For parallel builds in separate worktrees, give each its own cache with <code>ZIG_GLOBAL_CACHE_DIR</code> and <code>ZIG_LOCAL_CACHE_DIR</code>.</li><li>Some engines read built-in sounds and tables from your own FL Studio installation. Nothing from FL Studio is in the repository.</li><li>Part of the documentation in <code>docs/</code> is still in Portuguese. It is being translated.</li><li>If you distribute a modified version, including as a network service, the licence requires you to publish its source under the same licence.</li></ul>
+<ul><li>JUCE 8 does not officially support MinGW. The Zig build script works around the differences. The fixes are in <code>cmake/mingw/</code> and <code>src/platform/MingwFixes.cpp</code>.</li><li>Run only one <code>build-windows-zig.sh</code> at a time. Two Zig builds at once can hang. For parallel builds in separate worktrees, give each its own cache with <code>ZIG_GLOBAL_CACHE_DIR</code> and <code>ZIG_LOCAL_CACHE_DIR</code>.</li><li>Some engines read built-in sounds and tables from your own FL Studio installation. Nothing from FL Studio is in the repository.</li><li>Part of the documentation in <code>docs/</code> is still in Portuguese. It is being translated.</li><li>If you distribute a modified version, including as a network service, the license requires you to publish its source under the same license.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">The full development environment (SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LYNX SHARE on Linux (LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">The repository and its README</a></li><li><a href="/wiki/command-line/">Command line</a></li><li><a href="/wiki/file-formats/">File formats</a></li></ul></div></div><nav class="wpn"><a href="/wiki/command-line/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.command-line.t">Command line</b></a><a href="/wiki/troubleshooting/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.troubleshooting.t">Troubleshooting</b></a></nav></article></div>
 </main>
@@ -134,8 +134,8 @@ cmake --build build</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/wiki.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

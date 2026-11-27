@@ -25,7 +25,7 @@ It is an alpha. Expect bugs, and save often.
 
 You do not need an audio interface. LYNX SHARE plays through the sound device your system already uses. You do not need FL Studio either. If it is installed on the same computer, LYNX SHARE finds its samples and uses the same plugin files for `.flp` projects.
 
-Third-party plugins are optional. LYNX SHARE has its own instruments and effects, listed in the [catalogue](/instruments-and-effects/).
+Third-party plugins are optional. LYNX SHARE has its own instruments and effects, listed in the [catalog](/instruments-and-effects/).
 
 ## Save your work
 

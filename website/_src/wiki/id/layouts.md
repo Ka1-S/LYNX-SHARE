@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![Alur kerja peluncuran klip: kisi clip dan scene di kiri, Picker dan Playlist di kanan](/assets/img/cliplaunch.webp)
 

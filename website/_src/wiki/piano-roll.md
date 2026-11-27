@@ -64,7 +64,7 @@ Click the ruler to set the position. `Ctrl`+drag, right-drag or double-click-dra
 | Scale | Highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale. Moved notes then move by scale steps, so a chord stays in the scale, and `Up` and `Down` move one scale step. |
 | Slide (`S`) | New notes are slide notes. The note that is sounding glides to them (808 glide). |
 | Ghost notes (`Alt+V`) | Shows the other channels' notes behind yours. |
-| Note colour | New notes get this colour. There are 16. |
+| Note color | New notes get this color. There are 16. |
 | Follow | The view scrolls with the playhead while the pattern plays. |
 | Lane box | Chooses what the bottom lane edits: Velocity, Pan, Fine pitch, Release, Mod X, Mod Y, Chance or Velocity range. |
 
@@ -80,7 +80,7 @@ The `Tools` menu of the Piano roll opens FL Studio's note tools as dialogs. They
 |---|---|---|
 | Limit | `Alt+K` | Moves notes by octaves into a key range, then clamps them. Under `Key / scale restriction` it keeps notes on a base key and one of FL Studio's chords or scales, with `Snap` set to `Above`, `Under` or `Alternate`. `Wrap to top / bottom` and `Transpose` set where notes outside the range go |
 | Flip | `Alt+Y` | `Flip horizontally` mirrors the notes in time. With `Preserve start times`, on at first, the start times are mirrored and the notes keep their lengths. `Flip vertically` mirrors the keys around the middle of their range |
-| Randomise | `Alt+R` | Random changes to velocity, pan, fine pitch, timing and length, and to Mod X, Mod Y and release |
+| Randomize | `Alt+R` | Random changes to velocity, pan, fine pitch, timing and length, and to Mod X, Mod Y and release |
 | Scale levels | `Alt+X` | Scales a note level from the start to the end of the selection, with `Offset`, `Center` (the value it scales around) and `Tension` |
 | LFO | `Alt+O` | Writes an LFO shape into a note level. Right-click a `Period` slider for a list from 1 step to 512 steps |
 
@@ -112,7 +112,7 @@ The `Scripts` column of the `Tools` menu lists piano roll scripts: LYNX SHARE's 
 | Export MIDI | `Ctrl+Shift+M` | Exports the pattern as a MIDI file |
 | Zoom | `PageUp` / `PageDown` | Zooms in or out |
 
-The note tools (Arpeggiate, Strum, Flip, Randomise, Quantize, Chop and others) open dialogs. Their keys are on the [Shortcuts](/wiki/shortcuts/) page.
+The note tools (Arpeggiate, Strum, Flip, Randomize, Quantize, Chop and others) open dialogs. Their keys are on the [Shortcuts](/wiki/shortcuts/) page.
 
 ## Good to know
 

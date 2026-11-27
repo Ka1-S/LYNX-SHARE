@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: e44862929e
 ---
 ![La fenêtre Gérer les raccourcis : une liste d'actions avec recherche et les touches de chacune](/assets/img/wiki/shortcuts.webp)
 

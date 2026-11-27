@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Ta strona przechodzi raz przez całą drogę: pattern perkusyjny, melodia, aranżacja, miks i wyeksportowany plik. Każda część odsyła do strony, która opisuje dane okno w całości. Jeśli w którymkolwiek momencie nic nie słychać, zajrzyj do [Ustawień audio](/wiki/audio-setup/).
 

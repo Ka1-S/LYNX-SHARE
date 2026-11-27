@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![Edytor automatyzacji z krzywą rosnącą przez sześć taktów](/assets/img/wiki/automation.webp)
 

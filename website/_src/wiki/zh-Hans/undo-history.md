@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![撤销历史窗口：从“起点”到“添加音符”共六步，当前一步是“静音：Kick”](/assets/img/wiki/history.webp)
 

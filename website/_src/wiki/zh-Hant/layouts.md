@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![片段啟動工作流程：左側是片段和場景的網格，右側是選擇面板和播放清單](/assets/img/cliplaunch.webp)
 

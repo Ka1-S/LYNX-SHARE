@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: e44862929e
 ---
 ![Okno Zarządzaj skrótami: przeszukiwalna lista akcji z klawiszami każdej z nich](/assets/img/wiki/shortcuts.webp)
 

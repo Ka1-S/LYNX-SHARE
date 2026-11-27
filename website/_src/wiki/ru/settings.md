@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![Страница «Общие» окна «Настройки» с вкладками страниц сверху](/assets/img/wiki/settings-general.webp)
 

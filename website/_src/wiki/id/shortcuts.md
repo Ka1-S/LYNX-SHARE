@@ -1,5 +1,5 @@
 ---
-source: 9aa368f62c
+source: e44862929e
 ---
 ![Jendela Kelola pintasan: daftar aksi yang bisa dicari beserta tombol masing-masing](/assets/img/wiki/shortcuts.webp)
 

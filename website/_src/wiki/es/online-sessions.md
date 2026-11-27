@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Hay dos formas de trabajar en un proyecto con otras personas, y las dos están en `Archivo › Sesión online`. Un paquete es un archivo que envías a un amigo, y él te devuelve una parte. No necesita red, cuenta ni servidor. Una sesión en vivo conecta a todos por internet a través del relay de LYNX SHARE, y cada cambio llega a todos. En un proyecto participan hasta 4 personas, tú incluido.
 

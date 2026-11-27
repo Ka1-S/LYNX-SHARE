@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="ef13bf2b";
+window.LYNX_LANG=lang;window.LYNX_V="1fba94f6";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=ef13bf2b">
+<link rel="stylesheet" href="/assets/site.css?v=1fba94f6">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -105,7 +105,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The rack always edits the current pattern. The rack's pattern selector shows its name: click the name for the list, or use the arrows. <code>Shift</code>+wheel over the rack's title also changes the pattern.</p>
 <p>The rack's pattern length box sets the length in bars (drag it or use the wheel). Double-click it for an automatic length taken from the notes.</p>
 <p>The swing knob in the main toolbar applies to all channels. <code>Swing mix</code> in the channel menu sets how much one channel follows it.</p>
-<div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Next pattern</td><td><code>Numpad +</code></td><td>Makes the next pattern the current one</td></tr><tr><td>Previous pattern</td><td><code>Numpad -</code></td><td>Makes the previous pattern the current one</td></tr><tr><td>Next empty pattern</td><td><code>F4</code></td><td>Goes to the next empty pattern and asks for a name</td></tr><tr><td>Rename and colour</td><td><code>F2</code></td><td>Renames and colours the current pattern</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Command</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Next pattern</td><td><code>Numpad +</code></td><td>Makes the next pattern the current one</td></tr><tr><td>Previous pattern</td><td><code>Numpad -</code></td><td>Makes the previous pattern the current one</td></tr><tr><td>Next empty pattern</td><td><code>F4</code></td><td>Goes to the next empty pattern and asks for a name</td></tr><tr><td>Rename and color</td><td><code>F2</code></td><td>Renames and colors the current pattern</td></tr></tbody></table></div>
 <h2 id="playing-notes-from-the-pc-keyboard">Playing notes from the PC keyboard</h2>
 <p><code>Ctrl+T</code> turns the typing keyboard into a piano: <code>Z</code> to <code>M</code> and <code>Q</code> to <code>P</code> play the selected channels. While it is on, the single-letter shortcuts of the editors are paused.</p>
 <h2 id="keys">Keys</h2>
@@ -114,7 +114,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="freeze-a-channel">Freeze a channel</h2>
 <p>Freezing renders a channel to audio and plays that audio in its place. The instrument is unloaded, a third-party plugin too, so it uses no CPU and no memory.</p>
 <ol><li>Right-click the channel and choose <code>Freeze</code>. With several channels selected the item reads <code>Freeze selected channels</code>.</li><li>The row gets a snowflake tag. The channel's volume, pan and the effects of its insert still work as before.</li><li>To change the notes or the instrument again, right-click the channel and choose <code>Unfreeze</code>. The instrument comes back with the settings it had.</li></ol>
-<p>A frozen channel cannot be edited: its steps are locked and its instrument window does not open. If the notes, the tempo or the arrangement change after the freeze, the tag changes colour and the audio made before keeps playing until you choose <code>Re-freeze</code>. If the rendered audio files are missing, the instrument plays instead.</p>
+<p>A frozen channel cannot be edited: its steps are locked and its instrument window does not open. If the notes, the tempo or the arrangement change after the freeze, the tag changes color and the audio made before keeps playing until you choose <code>Re-freeze</code>. If the rendered audio files are missing, the instrument plays instead.</p>
 <p>Freeze works on channels only. A Mixer insert cannot be frozen.</p>
 <h2 id="other-things-in-the-channel-menu">Other things in the channel menu</h2>
 <p><code>Piano Roll</code>, <code>Rename and color</code>, <code>Replace</code> (swap the instrument), <code>Clone</code>, <code>Delete</code>, <code>Arpeggiator</code>, <code>Loop point</code>, <code>Burn MIDI to</code>, <code>Sort channels</code>, <code>Select unused channels</code> and <code>Channel settings</code>.</p>
@@ -131,8 +131,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=ef13bf2b" defer></script>
-<script src="/assets/wiki.js?v=ef13bf2b" defer></script>
-<script src="/assets/motion.js?v=ef13bf2b" defer></script>
+<script src="/assets/site.js?v=1fba94f6" defer></script>
+<script src="/assets/wiki.js?v=1fba94f6" defer></script>
+<script src="/assets/motion.js?v=1fba94f6" defer></script>
 </body>
 </html>

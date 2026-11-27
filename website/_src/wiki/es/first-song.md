@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Esta página recorre una vez todo el camino: un patrón de batería, una melodía, un arreglo, una mezcla y un archivo exportado. Cada parte enlaza con la página que cubre su ventana al completo. Si en algún momento no oyes nada, consulta [Configuración de audio](/wiki/audio-setup/).
 

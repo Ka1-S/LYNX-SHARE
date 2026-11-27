@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![O layout de disparo de clipes: uma grade de clipes com cenas ao lado da Playlist](/assets/img/cliplaunch.webp)
 

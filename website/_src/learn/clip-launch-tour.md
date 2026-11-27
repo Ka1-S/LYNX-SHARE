@@ -15,7 +15,7 @@ summary: The Ableton Live way in LYNX SHARE: a grid of clips, scenes made from t
 ![Right-click a slot: Create scenes from sections](/assets/img/learn/clip-launch-tour-2.webp)
 
 1. Right-click a slot and choose `Create scenes from sections`.
-2. Each section becomes a scene, named and coloured after it, with every track's clip of that section.
+2. Each section becomes a scene, named and colored after it, with every track's clip of that section.
 
 ## Launch scenes and clips
 

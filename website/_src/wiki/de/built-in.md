@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Die Schnellauswahl: Instrumente links, Effekte rechts, jeweils als eingebaut oder als eingebaute FL-Engine gekennzeichnet](/assets/img/wiki/quickadd.webp)
 

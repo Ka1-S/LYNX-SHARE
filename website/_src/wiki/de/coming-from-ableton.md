@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![Das Clip-Start-Layout: ein Clip-Raster mit Szenen neben der Playlist](/assets/img/cliplaunch.webp)
 

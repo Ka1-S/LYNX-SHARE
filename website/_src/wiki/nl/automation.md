@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![De automatiseringseditor met een curve die over zes maten stijgt](/assets/img/wiki/automation.webp)
 

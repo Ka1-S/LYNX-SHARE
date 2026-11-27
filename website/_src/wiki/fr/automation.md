@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![L'éditeur d'automation avec une courbe qui monte sur six mesures](/assets/img/wiki/automation.webp)
 

@@ -7,7 +7,7 @@ status: full
 
 LYNX SHARE ships its own instruments and effects, so a project plays without any third-party plugin. There are three kinds: LYNX SHARE originals (a synth, a sampler, a SoundFont player, drums, EQs, compressors, limiters, reverbs, delays), engines written to play the settings of FL Studio's native plugins, and effects that stand in for well-known third-party plugins.
 
-Every one of them has its own page in the [catalogue](/instruments-and-effects/). `Help › Built-in plugins (online list)...` opens the list with the status of each engine.
+Every one of them has its own page in the [catalog](/instruments-and-effects/). `Help › Built-in plugins (online list)...` opens the list with the status of each engine.
 
 ## Add an instrument and an effect
 
@@ -87,7 +87,7 @@ The switch is `Substitute missing plugins with LYNX SHARE equivalents` in `Optio
 
 ## Related
 
-- [Instruments and effects catalogue](/instruments-and-effects/)
+- [Instruments and effects catalog](/instruments-and-effects/)
 - [Third-party plugins](/wiki/plugins/)
 - [Channel rack](/wiki/channel-rack/)
 - [Mixer](/wiki/mixer/)

@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![WAVを選んだエクスポートウィンドウ。左に範囲、テール、ファイル、右に形式、下にミックスのオプション](/assets/img/wiki/export.webp)
 

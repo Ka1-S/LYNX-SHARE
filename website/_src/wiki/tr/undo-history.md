@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![Geri alma geçmişi penceresi: Start'tan Add notes'a altı adım, geçerli adım olarak Mute: Kick](/assets/img/wiki/history.webp)
 

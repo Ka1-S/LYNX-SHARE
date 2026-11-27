@@ -101,7 +101,7 @@ These keys work in the Clip-launch layout only.
 | `F4` | Next empty pattern, and name it |
 | `Ctrl+F4` | Next empty pattern, without naming |
 | `Shift+F4` | First empty pattern, and name it |
-| `F2` | Rename and colour the pattern |
+| `F2` | Rename and color the pattern |
 | `Ctrl+Shift+C` | Clone the pattern |
 | `Ctrl+Shift+Ins` | Insert an empty pattern before the current one |
 | `Ctrl+Shift+Del` | Delete the pattern |
@@ -154,8 +154,8 @@ These keys work in the Clip-launch layout only.
 | `Alt+V` | Ghost notes on or off |
 | `Shift+I` | Invert the selection |
 | `Shift+G` / `Alt+G` | Group, ungroup the selected notes |
-| `Alt+C` | Colour the selected notes with the note colour |
-| `Shift+C` | Select the notes of the same colour |
+| `Alt+C` | Color the selected notes with the note color |
+| `Shift+C` | Select the notes of the same color |
 | `Shift+N` | Chord stamp: none (single notes) |
 | `Ctrl+Ins` / `Ctrl+Del` | Insert, delete space (the time selection) |
 | `Ctrl+M` | Import a MIDI file |
@@ -164,7 +164,7 @@ These keys work in the Clip-launch layout only.
 | `Shift+1` / `Shift+2` / `Shift+3` | Zoom to 1, 4, 16 bars |
 | `Shift+4` | Zoom to show everything |
 | `Shift+5` | Zoom to the selection |
-| `Shift+0` | Centre the view on the playhead |
+| `Shift+0` | Center the view on the playhead |
 
 ### Note tools
 
@@ -175,7 +175,7 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Alt+A` | Arpeggiate |
 | `Alt+S` | Strum |
 | `Alt+Y` | Flip |
-| `Alt+R` | Randomise |
+| `Alt+R` | Randomize |
 | `Alt+X` | Scale levels |
 | `Alt+K` | Limit to a range |
 | `Alt+Q` | Quantize |
@@ -231,14 +231,14 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Shift+1` / `Shift+2` / `Shift+3` | Zoom to 1, 4, 16 bars |
 | `Shift+4` | Zoom to show everything |
 | `Shift+5` | Zoom to the selection |
-| `Shift+0` | Centre the view on the playhead |
+| `Shift+0` | Center the view on the playhead |
 
 ## Mixer
 
 | Key | What it does |
 |---|---|
 | `Alt+Left` / `Alt+Right` | Move the selected inserts left, right |
-| `F2` | Rename and colour the selected insert |
+| `F2` | Rename and color the selected insert |
 | `S` | Solo the selected inserts |
 | `Alt+S` | Solo the selected inserts with the inserts that feed them |
 | `Ctrl+L` | Route selected channels to this track (the selected insert) |

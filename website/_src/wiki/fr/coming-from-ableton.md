@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![La disposition Clip-launch : une grille de clips avec des scènes à côté de la Playlist](/assets/img/cliplaunch.webp)
 

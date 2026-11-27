@@ -1,5 +1,5 @@
 ---
-source: aad66b5125
+source: 0f5d8ab83e
 ---
 ![Channel Rack со строками шагов](/assets/img/rack.webp)
 
