@@ -18,7 +18,9 @@
 // channels (InstrumentKind::audioClip, or in a group named "Audio clips"), "Unsorted" = the other channels that are in
 // no group (or in FL's "Unsorted" group). Groups named like these two are not listed again.
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "core/Song.h"
 
@@ -64,6 +66,23 @@ inline bool shows (const Song& song, int channel, int filter)
         return ! isAudioClipChannel (song, channel) && (name == nullptr || *name == "Unsorted");
     }
     return song.channels[(std::size_t) channel].group == filter;
+}
+
+// Round 190rz (FL 2026, checked live): a selection under a group filter keeps only the channels the filter shows. The
+// primary channel moves to the first shown one when it is hidden; when none is shown the selection stays as it was.
+inline void keepShown (const Song& song, int filter, std::vector<int>& rows, int& primary)
+{
+    if (filter == all)
+        return;
+    std::vector<int> shown;
+    for (const auto r : rows)
+        if (shows (song, r, filter))
+            shown.push_back (r);
+    if (shown.empty())
+        return;
+    if (! shows (song, primary, filter) || std::find (shown.begin(), shown.end(), primary) == shown.end())
+        primary = *std::min_element (shown.begin(), shown.end());
+    rows = std::move (shown);
 }
 
 // The name FL 2026 shows for a group (its loader's renames: "Audio clips" → "Audio", "Automation clips" → "Automation")
