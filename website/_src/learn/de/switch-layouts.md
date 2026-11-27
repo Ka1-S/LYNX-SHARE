@@ -1,5 +1,5 @@
 ---
-source: 53b620ca2d
+source: d1745d3bfa
 ---
 ## Wähle, woher du kommst
 
@@ -10,7 +10,7 @@ source: 53b620ca2d
    - `BandLab, FL Studio Mobile oder GarageBand`: das Einfache Layout, ein Fenster mit Spuren, Loops und schneller Aufnahme.
    - `FL Studio`: das Pattern-Layout mit Channel Rack, Piano Roll, Playlist und Mixer.
    - `Ableton Live oder Bitwig`: das Clip-Start-Layout mit einem Raster aus Clips und Szenen.
-   - `Logic, Cubase, Reaper, Pro Tools oder Studio One`: das Einfache Layout mit dem Mixer griffbereit, eine Spur pro Instrument auf einer Zeitleiste.
+   - `Logic, Cubase, REAPER, Pro Tools oder Studio One`: das Einfache Layout mit dem Mixer griffbereit, eine Spur pro Instrument auf einer Zeitleiste.
    - `Ich bin neu im Musikmachen`: das Einfache Layout und eine kurze Tour zum ersten Song.
 3. Klicke auf eine Antwort. Hier wählen wir BandLab: Das Einfache Layout öffnet sich mit einem Starter-Beat auf einer Drums-Spur.
 

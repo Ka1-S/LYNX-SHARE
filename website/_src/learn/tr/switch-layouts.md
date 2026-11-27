@@ -1,5 +1,5 @@
 ---
-source: 53b620ca2d
+source: d1745d3bfa
 ---
 ## Nereden geldiğinizi seçin
 
@@ -10,7 +10,7 @@ source: 53b620ca2d
    - `BandLab, FL Studio Mobile veya GarageBand`: Basit yerleşim; izlerin, loop'ların ve hızlı kaydın olduğu tek bir pencere.
    - `FL Studio`: Channel Rack, Piano Roll, Playlist ve Mixer'ın olduğu Pattern yerleşimi.
    - `Ableton Live veya Bitwig`: klip ve sahne ızgarasının olduğu Klip başlatma yerleşimi.
-   - `Logic, Cubase, Reaper, Pro Tools veya Studio One`: Mixer'ın el altında olduğu Basit yerleşim; zaman çizelgesinde her enstrüman için bir iz.
+   - `Logic, Cubase, REAPER, Pro Tools veya Studio One`: Mixer'ın el altında olduğu Basit yerleşim; zaman çizelgesinde her enstrüman için bir iz.
    - `Müzik yapmaya yeniyim`: Basit yerleşim ve kısa bir ilk şarkı turu.
 3. Birine tıklayın. Burada BandLab'i seçiyoruz: Basit yerleşim açılır ve bir Drums izinde başlangıç beat'i hazır gelir.
 

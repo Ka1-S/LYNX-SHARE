@@ -12024,7 +12024,7 @@ countries: id
 "BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile, atau GarageBand"
 "FL Studio" = "FL Studio"
 "Ableton Live or Bitwig" = "Ableton Live atau Bitwig"
-"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools, atau Studio One"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, REAPER, Pro Tools, atau Studio One"
 "I'm new to making music" = "Saya baru membuat musik"
 "A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Aplikasi seluler atau sederhana. Tata letak sederhana: trek, loop, drum machine, dan rekaman cepat."
 "Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Tata letak Pattern: Channel Rack, Piano roll, Playlist, dan Mixer, dengan pintasan FL. Proyek .flp Anda bisa dibuka."

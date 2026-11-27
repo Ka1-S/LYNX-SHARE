@@ -704,7 +704,7 @@ COMING = [   # the "Coming from..." cards of the Learn hub: wiki page, string ke
     ("coming-from-bandlab", "lr.from.mobile", "BandLab, FL Studio Mobile or GarageBand"),
     ("coming-from-fl-studio", "lr.from.fl", "FL Studio"),
     ("coming-from-ableton", "lr.from.live", "Ableton Live or Bitwig"),
-    ("coming-from-other-daws", "lr.from.other", "Logic, Cubase or Reaper"),
+    ("coming-from-other-daws", "lr.from.other", "Logic, Cubase or REAPER"),
 ]
 
 

@@ -12024,7 +12024,7 @@ countries: tw hk mo
 "BandLab, FL Studio Mobile or GarageBand" = "BandLab、FL Studio Mobile 或 GarageBand"
 "FL Studio" = "FL Studio"
 "Ableton Live or Bitwig" = "Ableton Live 或 Bitwig"
-"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic、Cubase、Reaper、Pro Tools 或 Studio One"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic、Cubase、REAPER、Pro Tools 或 Studio One"
 "I'm new to making music" = "我剛開始做音樂"
 "A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "行動版或簡單的應用程式。簡易版面：音軌、循環素材、鼓機和快速錄音。"
 "Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "樣式版面：通道機架、鋼琴捲簾、播放清單和混音器，沿用 FL 的快速鍵。可開啟你的 .flp 專案。"

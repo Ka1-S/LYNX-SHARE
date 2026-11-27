@@ -1,5 +1,5 @@
 ---
-source: 53b620ca2d
+source: d1745d3bfa
 ---
 ## Kies waar je vandaan komt
 
@@ -10,7 +10,7 @@ source: 53b620ca2d
    - `BandLab, FL Studio Mobile of GarageBand`: de Eenvoudige lay-out, één venster met tracks, loops en snel opnemen.
    - `FL Studio`: de Pattern-lay-out, met Channel Rack, Piano Roll, Playlist en Mixer.
    - `Ableton Live of Bitwig`: de Clipstart-lay-out, met een raster van clips en scènes.
-   - `Logic, Cubase, Reaper, Pro Tools of Studio One`: de Eenvoudige lay-out met de Mixer bij de hand, één track per instrument op een tijdlijn.
+   - `Logic, Cubase, REAPER, Pro Tools of Studio One`: de Eenvoudige lay-out met de Mixer bij de hand, één track per instrument op een tijdlijn.
    - `Ik ben nieuw met muziek maken`: de Eenvoudige lay-out en een korte rondleiding voor je eerste song.
 3. Klik op een antwoord. Hier kiezen we BandLab: de Eenvoudige lay-out opent met een startbeat op een Drums-track.
 

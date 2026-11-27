@@ -1,5 +1,5 @@
 ---
-source: 53b620ca2d
+source: d1745d3bfa
 ---
 ## 选择你从哪里转过来
 
@@ -10,7 +10,7 @@ source: 53b620ca2d
    - `BandLab、FL Studio Mobile 或 GarageBand`：简易布局，一个窗口里有音轨、循环素材和快速录音。
    - `FL Studio`：模式布局，包含 Channel rack、Piano roll、播放列表和混音器。
    - `Ableton Live 或 Bitwig`：片段启动布局，有片段和场景组成的网格。
-   - `Logic、Cubase、Reaper、Pro Tools 或 Studio One`：简易布局，混音台随手可用，每种乐器一条音轨排在时间线上。
+   - `Logic、Cubase、REAPER、Pro Tools 或 Studio One`：简易布局，混音台随手可用，每种乐器一条音轨排在时间线上。
    - `我刚开始做音乐`：简易布局和一段简短的首支歌曲导览。
 3. 点击其中一个。这里我们选 BandLab：简易布局打开，鼓音轨上放着一段起始节拍。
 

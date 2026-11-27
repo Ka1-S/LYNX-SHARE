@@ -12024,7 +12024,7 @@ countries: pl
 "BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile lub GarageBand"
 "FL Studio" = "FL Studio"
 "Ableton Live or Bitwig" = "Ableton Live lub Bitwig"
-"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools lub Studio One"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, REAPER, Pro Tools lub Studio One"
 "I'm new to making music" = "Dopiero zaczynam tworzyć muzykę"
 "A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "Aplikacja mobilna lub prosta. Prosty układ: ścieżki, pętle, automat perkusyjny i szybkie nagrywanie."
 "Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "Układ Pattern: Channel Rack, Piano roll, Playlist i Mixer, ze skrótami FL. Twoje projekty .flp się otwierają."

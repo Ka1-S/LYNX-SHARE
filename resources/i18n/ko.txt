@@ -12024,7 +12024,7 @@ countries: kr
 "BandLab, FL Studio Mobile or GarageBand" = "BandLab, FL Studio Mobile 또는 GarageBand"
 "FL Studio" = "FL Studio"
 "Ableton Live or Bitwig" = "Ableton Live 또는 Bitwig"
-"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, Reaper, Pro Tools 또는 Studio One"
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, REAPER, Pro Tools 또는 Studio One"
 "I'm new to making music" = "음악 만들기가 처음이에요"
 "A mobile or simple app. Simple layout: tracks, loops, a drum machine and quick recording." = "모바일 또는 간단한 앱. 간단한 레이아웃: 트랙, 루프, 드럼 머신, 빠른 녹음."
 "Pattern layout: Channel Rack, Piano roll, Playlist and Mixer, with FL's shortcuts. Your .flp projects open." = "패턴 레이아웃: 채널 랙, 피아노 롤, 플레이리스트, 믹서, FL 단축키 지원. .flp 프로젝트를 열 수 있습니다."

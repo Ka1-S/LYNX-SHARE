@@ -281,3 +281,4 @@ countries:
 "Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins" = "Tip: Smart disable is off on {0} of {1} effects. Try Tools › Macros › Switch smart disable for all plugins"
 "No target yet: drag the grip onto a knob, use Assign, or right-click a knob > Modulate with" = "No target yet: drag the grip onto a knob, use Assign, or right-click a knob › Modulate with"
 "It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example)." = "It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options › Audio settings when its driver works (after an update or a restart, for example)."
+"Logic, Cubase, Reaper, Pro Tools or Studio One" = "Logic, Cubase, REAPER, Pro Tools or Studio One"

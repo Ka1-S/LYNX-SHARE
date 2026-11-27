@@ -289,5 +289,6 @@ inline constexpr const char* englishDisplay =
     "\042Tip: Smart disable is off on {0} of {1} effects. Try Tools > Macros > Switch smart disable for all plugins\042 = \042Tip: Smart disable is off on {0} of {1} effects. Try Tools \342\200\272 Macros \342\200\272 Switch smart disable for all plugins\042\n"
     "\042No target yet: drag the grip onto a knob, use Assign, or right-click a knob > Modulate with\042 = \042No target yet: drag the grip onto a knob, use Assign, or right-click a knob \342\200\272 Modulate with\042\n"
     "\042It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options > Audio settings when its driver works (after an update or a restart, for example).\042 = \042It stopped while the audio device {0} was opening, so LYNX SHARE started with the default device this time. Choose {0} again in Options \342\200\272 Audio settings when its driver works (after an update or a restart, for example).\042\n"
+    "\042Logic, Cubase, Reaper, Pro Tools or Studio One\042 = \042Logic, Cubase, REAPER, Pro Tools or Studio One\042\n"
     "";
 } // namespace lynx::i18n::data
