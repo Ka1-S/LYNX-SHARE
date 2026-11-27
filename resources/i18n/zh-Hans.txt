@@ -13156,3 +13156,4 @@ countries: cn sg
 "Choose another..." = "选择其他..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} 仍然没有响应。LYNX SHARE 暂时使用 {1}。"
 "no audio device" = "无音频设备"
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[双击] 添加为新的乐器轨，或拖到时间线上"

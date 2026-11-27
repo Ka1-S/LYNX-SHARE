@@ -1328,6 +1328,17 @@ void SimpleWorkflow::dropFiles (const juce::StringArray& files, std::int64_t tic
     addFiles (list, tick);
 }
 
+bool SimpleWorkflow::dropSound (ChannelDef channel, const juce::String& name, std::int64_t tick)
+{
+    simpletracks::Request q;
+    q.kind = channel.instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
+    q.name = name.trim().isNotEmpty() ? name.trim().toStdString() : trackNameFor (q.kind);
+    q.channel = std::move (channel);
+    q.emptyBars = 4; // (the chooser's: a pattern to write into, round 190ds)
+    q.start = juce::jmax<std::int64_t> (0, tick);
+    return add (std::move (q));
+}
+
 void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_t start)
 {
     juce::StringArray failed;

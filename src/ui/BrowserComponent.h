@@ -269,6 +269,12 @@ public:
                                  std::function<std::optional<EffectSlot>()> effect, const juce::String& label, const juce::Image& image,
                                  juce::Component* containerOwner = nullptr);
     static bool isAudioFile (const juce::File& file);
+    // (round 190sa, tests) the plugin a drag carries, as a drag from the Plugin database sets it
+    static void setDraggedPluginForCheck (std::function<std::optional<ChannelDef>()> generator, std::function<std::optional<EffectSlot>()> effect);
+    // The hint of a generator row (an instrument or one of LYNX's sounds) in the Plugin database / the Loops panel: in the
+    // Simple layout a sound becomes a new instrument track, dropped on the timeline (round 190sa: it named the Channel
+    // Rack, which the Simple layout doesn't show)
+    static juce::String generatorRowHint (bool simpleLayout);
 
     void resized() override;
 

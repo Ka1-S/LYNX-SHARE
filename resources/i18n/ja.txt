@@ -13156,3 +13156,4 @@ countries: jp
 "Choose another..." = "別のものを選ぶ..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} はまだ応答しません。LYNX SHARE は当面 {1} を使用します。"
 "no audio device" = "オーディオデバイスなし"
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[ダブルクリック] 新規インストゥルメントトラックとして追加、またはタイムラインへドラッグ"

@@ -13156,3 +13156,4 @@ countries: de at ch li lu
 "Choose another..." = "Anderes wählen..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} antwortet weiterhin nicht. LYNX SHARE verwendet vorerst {1}."
 "no audio device" = "kein Audiogerät"
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[Doppelklick] als neue Instrumentenspur hinzufügen oder auf die Zeitleiste ziehen"

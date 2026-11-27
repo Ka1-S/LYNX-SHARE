@@ -13156,3 +13156,4 @@ countries: tr
 "Choose another..." = "Başka birini seç..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} hâlâ yanıt vermiyor. LYNX SHARE şimdilik {1} kullanıyor."
 "no audio device" = "ses aygıtı yok"
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[çift tık] yeni enstrüman parçası olarak ekle veya zaman çizelgesine sürükle"
