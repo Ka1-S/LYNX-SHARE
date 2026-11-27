@@ -34,6 +34,9 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- The Clip-launch and Simple layouts open a clip's menu on right-click, as Live and BandLab (the Pattern layout keeps FL
+  Studio's right-click delete). The Mixer's slot menu asks before Delete..., and Ctrl+Shift+S in the Mixer saves the selected
+  insert's state, as FL Studio 2026.
 - Pattern layout: **Ctrl+N** is FL Studio's *Save new version* (Ctrl+Alt+S still works) and *File › New* has no key, as in FL;
   the Clip-launch and Simple layouts keep Ctrl+N for a new project, and a key you set yourself stays as you set it.
 - Dragging the tempo hides the pointer and is not stopped by the screen's edge, as in FL Studio (#283).
@@ -66,6 +69,18 @@ The short version of each release. The full notes, with measurements, known issu
   LYNX writes for you now goes through one checked writer (projects, exports, settings, and the samples, takes and state
   files it saves: Slicer, Newtone, ADR, Auto Sampler, stems, recordings, Gross Beat's .fnv): if anything fails, the old file
   is left as it was and LYNX says why ("Not saved: the disk is full. Your project file was not changed.").
+- **Undo while dragging no longer crashes LYNX** ("double free or corruption", 0.1.31.2 too): undo, redo and history jumps
+  wait until a held drag is released (in FL Studio the drag wins as well).
+- Missing files lists an .flp's SoundFont, a Video Player video, 3x Osc / Granulizer user samples and a saved project's videos,
+  and Locate / Search reload them.
+- Undo: dropping several files is one step, as is Alt+Del of rack channels with their automation; channel move / clone /
+  delete get their own names. The rack's Fill / Rotate / Euclidean follow 3/4 and 7/8 patterns. On Linux, Shift+digit shortcuts
+  (the zooms, Shift+/) work. FL Studio's keys: Ctrl+C with nothing selected keeps the clipboard in the Playlist, Ctrl+X with
+  nothing selected cuts the channel's notes in the Piano roll.
+- A Mixer route that would make a loop says why instead of doing nothing; Type in value... in an automation clip's LFO mode
+  edits the LFO's amplitude; a sample-rate change during a recording ends it and keeps the take (the rest was written at the
+  wrong speed); Esc ends Link to MIDI controller; an online session that is over says so. File dialogs on Windows and macOS are
+  always the system's own.
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
   save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
   third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
