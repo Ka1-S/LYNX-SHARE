@@ -147,6 +147,15 @@
             const auto back = ProjectFile::fromJson (json, error);
             check ("saved under \"levelsFreeze\" and read back", json.contains ("\"levelsFreeze\"") && back.has_value() && back->channels[0].freeze.levels
                                                                     && back->channels[0].freeze.on());
+            // (rollup 0.1.32 step 6) Save a copy for 0.1.31: the key goes as it is. 0.1.31 reads only "freeze" / "trackFreeze"
+            // (its ProjectFile.cpp), so it sees no freeze and plays the Harmless channel live, with its own volume and pan
+            const auto copy = olderlynx::forRelease (song, "0.1.31");
+            const auto copied = juce::JSON::parse (copy.json);
+            const auto& c0 = copied["channels"][0];
+            check ("Save a copy for 0.1.31: \"levelsFreeze\" as it is, no \"freeze\", the instrument, volume and pan kept (0.1.31 plays it live)",
+                   copy.ok && c0.hasProperty ("levelsFreeze") && ! c0.hasProperty ("freeze") && ! c0.hasProperty ("trackFreeze")
+                       && c0["instrument"].toString() == juce::JSON::parse (json)["channels"][0]["instrument"].toString()
+                       && std::abs ((double) c0["volume"] - 0.55) < 1.0e-3 && std::abs ((double) c0["pan"] + 0.35) < 1.0e-3);
         }
 
         // ---- crash group G1: a device whose driver never returns from its open (engine/DeviceGuard.h, the test type):
