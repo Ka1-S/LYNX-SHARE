@@ -13165,3 +13165,4 @@ countries: id
 "The selected plugin is about to be deleted." = "Plugin yang dipilih akan dihapus."
 "Delete plugin" = "Hapus plugin"
 "Save the selected mixer track's state as..." = "Simpan status trek mixer yang dipilih sebagai..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[klik ganda] tambahkan sebagai trek instrumen baru, atau seret ke timeline"

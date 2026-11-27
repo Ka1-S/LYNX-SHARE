@@ -102,6 +102,9 @@ public:
     bool add (simpletracks::Request request);
     // Files dropped on the timeline below the tracks (slice S4): one new track each (MIDI: one per MIDI track), from `tick`.
     void dropFiles (const juce::StringArray& files, std::int64_t tick);
+    // round 190sa (BandLab): a sound dropped on the timeline: a new instrument track named `name` (else the kind's
+    // default name), its four-bar clip at `tick`, as the New track chooser's instrument; false when refused (said why)
+    bool dropSound (ChannelDef channel, const juce::String& name, std::int64_t tick);
 
     // The Finish dock (slice S8, ui/FinishDock.h): the Master looks, on the right of the Playlist
     void showFinish();

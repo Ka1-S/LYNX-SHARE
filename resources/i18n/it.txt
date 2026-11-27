@@ -13165,3 +13165,4 @@ countries: it ch sm
 "The selected plugin is about to be deleted." = "Il plugin selezionato sta per essere eliminato."
 "Delete plugin" = "Elimina plugin"
 "Save the selected mixer track's state as..." = "Salva lo stato della traccia del mixer selezionata come..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[doppio clic] aggiungilo come nuova traccia strumento, o trascinalo sulla timeline"

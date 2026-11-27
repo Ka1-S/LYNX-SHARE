@@ -296,6 +296,7 @@ public:
     // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
+    void simpleSoundDropped (const SourceDetails& details); // (round 190sa)
     void applyGeneratorDrop (ChannelDef generator, std::vector<int> tracks, bool shift);
     // Issue #177: entries dragged out of the Picker panel (patterns, audio clips, automation clips), placed as FL does
     // (core/PickerDrop.h): entry k on the track under the mouse + k at the snapped mouse time; Shift: one after the other
@@ -519,6 +520,9 @@ public:
     void chooseArrangementTrack (int track); // (also the tests' way in)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
+    // round 190sa (BandLab): a sound (an instrument from the Loops panel / the Browser) dropped on the Simple timeline:
+    // a new instrument track named `name`, its first clip at `tick`
+    std::function<void (ChannelDef channel, const juce::String& name, std::int64_t tick)> onSimpleSoundDropped;
     // round 190jc (design190ia SG-2): the round "+" under the Simple tracks (the New-track chooser, as "+ Add track")
     std::function<void()> onSimpleAddTrack;
     juce::Rectangle<int> simpleAddButtonForSnapshot() const { return simpleAddButton(); }

@@ -13165,3 +13165,4 @@ countries: es mx ar co cl pe ve
 "The selected plugin is about to be deleted." = "El plugin seleccionado está a punto de eliminarse."
 "Delete plugin" = "Eliminar plugin"
 "Save the selected mixer track's state as..." = "Guardar el estado de la pista del mezclador seleccionada como..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[doble clic] añadirlo como pista de instrumento nueva, o arrastrarlo a la línea de tiempo"

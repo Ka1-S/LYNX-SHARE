@@ -349,6 +349,11 @@ TEST (drumrack190ec_als_drum_rack_round_trip)
             std::printf ("  loader rule: %s\n", why.c_str());
         CHECK (out.xml.find ("<DrumGroupDevice") != std::string::npos && out.xml.find ("<DrumBranch ") != std::string::npos
                && out.xml.find ("<ReturnBranch ") != std::string::npos && out.xml.find ("<OriginalSimpler") != std::string::npos);
+        // round 190sa: Live 12.4.16 crashed opening a pad Simpler whose pitch envelope / filter / LFO slots were empty
+        for (const auto* filled : { "<SimplerPitchEnvelope", "<SimplerFilter", "<SimplerLfo" })
+            CHECK (out.xml.find (filled) != std::string::npos);
+        // and every sample part with its time signature (Live has one in each)
+        CHECK (out.xml.find ("<TimeSignatures />") == std::string::npos);
         // the pad routed into return 1 by this track's and device's Ids [DATA form]
         CHECK (out.xml.find ("/DeviceIn.0.R1,ChainIn\" />") != std::string::npos);
         const auto back = importAls (out.bytes, drumOptions (nullptr));

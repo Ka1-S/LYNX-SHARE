@@ -5265,6 +5265,10 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->dropFiles (files, tick);
         };
+        playlist.onSimpleSoundDropped = [this] (ChannelDef channel, const juce::String& name, std::int64_t tick) { // (round 190sa)
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+                simpleWorkflow->dropSound (std::move (channel), name, tick);
+        };
         // round 190jc (design190ia SG-2): the round "+" under the Simple tracks opens the New-track chooser
         playlist.onSimpleAddTrack = [this] {
             if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)

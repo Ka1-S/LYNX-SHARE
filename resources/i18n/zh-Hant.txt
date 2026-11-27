@@ -13165,3 +13165,4 @@ countries: tw hk mo
 "The selected plugin is about to be deleted." = "所選外掛即將被刪除。"
 "Delete plugin" = "刪除外掛"
 "Save the selected mixer track's state as..." = "將所選混音器軌道的狀態另存為..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[雙擊] 新增為新的樂器軌，或拖到時間軸上"

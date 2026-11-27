@@ -10682,7 +10682,9 @@ void PlaylistComponent::fileDragExit (const juce::StringArray&)
 void PlaylistComponent::itemDragMove (const SourceDetails& details)
 {
     updateDropGhost (details); // (round 190im)
-    setDropLaneHot (simpleHeaders && dropLaneArea().contains (details.localPosition));
+    // (round 190sa: a sound goes on a new track wherever it is dropped on the timeline: the lane lights for it)
+    setDropLaneHot (simpleHeaders && (dropLaneArea().contains (details.localPosition)
+                                      || (BrowserComponent::isGeneratorDrag (details) && gridArea().contains (details.localPosition))));
 }
 
 void PlaylistComponent::itemDragExit (const SourceDetails&)
@@ -17146,7 +17148,23 @@ bool PlaylistComponent::isInterestedInDragSource (const SourceDetails& details)
     std::vector<int> pickerEntries;
     return BrowserComponent::isBrowserDrag (details) || BrowserComponent::draggedPattern (details) >= 0
            || clipGridDrag (details.description, gridTrack, gridScene) || pickerDrag (details.description, pickerKind, pickerEntries)
-           || (! simpleHeaders && (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))); // (issue #152.6)
+           || (! simpleHeaders && (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))) // (issue #152.6)
+           || (simpleHeaders && onSimpleSoundDropped && BrowserComponent::isGeneratorDrag (details)); // (round 190sa: BandLab)
+}
+
+// Round 190sa (Q1 G-S1, BandLab: a loop dropped on the timeline becomes a track with its region where it was dropped): a
+// sound dropped anywhere on the Simple timeline is a new instrument track, as its double-click makes, with its first
+// (empty, four-bar) clip at the bar it was dropped on; on the track headers, at the song's start. Effects stay refused.
+void PlaylistComponent::simpleSoundDropped (const SourceDetails& details)
+{
+    const auto p = details.localPosition;
+    if (p.y < tracksTop() || p.y >= gridArea().getBottom() || p.x >= gridArea().getRight() || ! onSimpleSoundDropped)
+        return;
+    auto generator = BrowserComponent::draggedGenerator (details);
+    if (! generator)
+        return;
+    const auto tick = p.x >= headerWidth ? juce::jmax<std::int64_t> (0, snap (xToTick (p.x), true)) : (std::int64_t) 0;
+    onSimpleSoundDropped (std::move (*generator), details.description.toString().fromFirstOccurrenceOf ("|", false, false), tick);
 }
 
 void PlaylistComponent::pluginDropped (const SourceDetails& details)
@@ -17447,6 +17465,12 @@ void PlaylistComponent::updateDropGhost (const SourceDetails& details)
             add (ClipKind::audio, -1, track, snapped, dropGhostAudioTicks (file));
             name = file.getFileNameWithoutExtension();
         }
+        else if (simpleHeaders && BrowserComponent::isGeneratorDrag (details)) // (round 190sa: a sound makes a new track)
+        {
+            name = text.fromFirstOccurrenceOf ("|", false, false);
+            if (const auto lane = dropLaneTrack(); lane >= 0 && p.x >= headerWidth)
+                add (ClipKind::pattern, -1, lane, snapped, 4 * song.barTicks()); // (on the new track's row, where it goes)
+        }
     }
     finishDropGhost (std::move (ghost), p, name);
 }
@@ -17687,6 +17711,11 @@ void PlaylistComponent::itemDropped (const SourceDetails& details)
     if (std::vector<int> entries; pickerDrag (details.description, pickerKind, entries))
     {
         dropFromPicker (pickerKind, entries, details.localPosition, juce::ModifierKeys::currentModifiers.isShiftDown());
+        return;
+    }
+    if (simpleHeaders && BrowserComponent::isGeneratorDrag (details)) // (round 190sa)
+    {
+        simpleSoundDropped (details);
         return;
     }
     if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))

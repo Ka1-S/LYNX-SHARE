@@ -961,7 +961,8 @@ public:
     }
 
     // Round 190ke (owner decision D2): one item of LYNX's own content, a plugin-like row (double-click / Enter: add it;
-    // drag a sound onto the Channel Rack) whose key the collections and the tags store; nullptr for an unknown key
+    // drag a sound onto the Channel Rack, in the Simple layout onto the timeline) whose key the collections and the tags
+    // store; nullptr for an unknown key
     static std::unique_ptr<Node> makeFactoryItem (BrowserComponent& browser, const std::string& key)
     {
         const auto* item = factorycontent::find (key);
@@ -2291,7 +2292,7 @@ public:
                     return h;
                 }
                 h.text = n.label + " (" + n.detail + ")  "
-                         + (n.generator ? tr ("[double-click] add it as a new channel, or drag it onto the Channel Rack")
+                         + (n.generator ? generatorRowHint (layoutstyle::current() == layoutstyle::Style::simple)
                                         : tr ("[double-click] add it to the selected insert, or drag it onto a mixer insert or an effect slot"));
                 h.hasMenu = true;
                 return h;
@@ -7122,6 +7123,18 @@ bool BrowserComponent::startPluginDrag (juce::Component& source, std::function<s
     container->startDragging (juce::String (isGenerator ? generatorDragDescription : effectDragDescription) + "|" + label, &source,
                               juce::ScaledImage (image), true);
     return true;
+}
+
+void BrowserComponent::setDraggedPluginForCheck (std::function<std::optional<ChannelDef>()> generator, std::function<std::optional<EffectSlot>()> effect)
+{
+    draggedPlugin() = { std::move (generator), std::move (effect) };
+}
+
+juce::String BrowserComponent::generatorRowHint (bool simpleLayout)
+{
+    // (round 190sa: the Simple layout has no Channel Rack on screen: a sound goes on a new track there, as in BandLab)
+    return simpleLayout ? tr ("[double-click] add it as a new instrument track, or drag it onto the timeline")
+                        : tr ("[double-click] add it as a new channel, or drag it onto the Channel Rack");
 }
 
 bool BrowserComponent::isGeneratorDrag (const juce::DragAndDropTarget::SourceDetails& details)

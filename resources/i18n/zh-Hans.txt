@@ -13165,3 +13165,4 @@ countries: cn sg
 "The selected plugin is about to be deleted." = "所选插件即将被删除。"
 "Delete plugin" = "删除插件"
 "Save the selected mixer track's state as..." = "将所选混音器轨道的状态另存为..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[双击] 添加为新的乐器轨，或拖到时间线上"

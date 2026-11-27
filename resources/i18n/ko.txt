@@ -13165,3 +13165,4 @@ countries: kr
 "The selected plugin is about to be deleted." = "선택한 플러그인이 삭제됩니다."
 "Delete plugin" = "플러그인 삭제"
 "Save the selected mixer track's state as..." = "선택한 믹서 트랙 상태를 다른 이름으로 저장..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[더블 클릭] 새 악기 트랙으로 추가 또는 타임라인으로 드래그"

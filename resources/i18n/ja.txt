@@ -13165,3 +13165,4 @@ countries: jp
 "The selected plugin is about to be deleted." = "選択したプラグインを削除します。"
 "Delete plugin" = "プラグインを削除"
 "Save the selected mixer track's state as..." = "選択したミキサートラックの状態に名前を付けて保存..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[ダブルクリック] 新規インストゥルメントトラックとして追加、またはタイムラインへドラッグ"

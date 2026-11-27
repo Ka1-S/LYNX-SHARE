@@ -13165,3 +13165,4 @@ countries: ru by kz
 "The selected plugin is about to be deleted." = "Выбранный плагин будет удалён."
 "Delete plugin" = "Удалить плагин"
 "Save the selected mixer track's state as..." = "Сохранить состояние выбранной дорожки микшера как..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[двойной клик] добавить новой дорожкой инструмента или перетащить на шкалу времени"

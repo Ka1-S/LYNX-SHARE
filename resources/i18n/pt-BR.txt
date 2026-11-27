@@ -13318,3 +13318,4 @@ countries: br
 "The selected plugin is about to be deleted." = "O plugin selecionado será excluído."
 "Delete plugin" = "Excluir plugin"
 "Save the selected mixer track's state as..." = "Salvar o estado da trilha do mixer selecionada como..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[clique duplo] adiciona como nova faixa de instrumento, ou arraste para a linha do tempo"

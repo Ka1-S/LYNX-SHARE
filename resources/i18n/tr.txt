@@ -13165,3 +13165,4 @@ countries: tr
 "The selected plugin is about to be deleted." = "Seçili eklenti silinmek üzere."
 "Delete plugin" = "Eklentiyi sil"
 "Save the selected mixer track's state as..." = "Seçili mikser kanalının durumunu farklı kaydet..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[çift tık] yeni enstrüman parçası olarak ekle veya zaman çizelgesine sürükle"

@@ -13165,3 +13165,4 @@ countries: pl
 "The selected plugin is about to be deleted." = "Wybrana wtyczka zostanie usunięta."
 "Delete plugin" = "Usuń wtyczkę"
 "Save the selected mixer track's state as..." = "Zapisz stan zaznaczonej ścieżki miksera jako..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[dwuklik] dodaj jako nową ścieżkę instrumentu lub przeciągnij na oś czasu"

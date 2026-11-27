@@ -13165,3 +13165,4 @@ countries: nl be
 "The selected plugin is about to be deleted." = "De geselecteerde plug-in wordt zo verwijderd."
 "Delete plugin" = "Plug-in verwijderen"
 "Save the selected mixer track's state as..." = "Status van het geselecteerde mixerkanaal opslaan als..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[dubbelklik] toevoegen als nieuw instrumentspoor, of naar de tijdlijn slepen"

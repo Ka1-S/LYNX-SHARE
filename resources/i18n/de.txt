@@ -13165,3 +13165,4 @@ countries: de at ch li lu
 "The selected plugin is about to be deleted." = "Das ausgewählte Plugin wird gleich gelöscht."
 "Delete plugin" = "Plugin löschen"
 "Save the selected mixer track's state as..." = "Zustand der ausgewählten Mixerspur speichern unter..."
+"[double-click] add it as a new instrument track, or drag it onto the timeline" = "[Doppelklick] als neue Instrumentenspur hinzufügen oder auf die Zeitleiste ziehen"
