@@ -12809,7 +12809,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                 manageNote.setBorderSize ({});
                 manage.setButtonText (tr ("Manage shortcuts..."));
                 manage.setFont (theme::font (theme::type::body, true), false, juce::Justification::centredLeft);
-                manage.setColour (juce::HyperlinkButton::textColourId, theme::colour::accent);
+                // (round 190sc: the theme's link colour, as every other link, not the accent)
                 manage.setTooltip (tr ("Change, add or reset the keys of every action"));
                 manage.onClick = std::move (onManage);
                 addAndMakeVisible (manageNote);
