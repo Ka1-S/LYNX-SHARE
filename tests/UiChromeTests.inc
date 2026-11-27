@@ -2,6 +2,7 @@
 // Included at the end of tests.cpp.
 
 #include "core/HintMarkup.h"
+#include "core/ModifierMap.h" // (round 190sc: the Mac key names over plain())
 #include "core/History.h"
 #include "core/SongStats.h"
 
@@ -24,6 +25,28 @@ TEST (ui_hint_markup_parses_mouse_and_key_tokens)
     CHECK (parse ("").empty());
     CHECK (plain ("[Ctrl][LMB] adds") == "Ctrl+click adds");
     CHECK (plain ("[RMB] menu", { "a", "b", "c", "d", "e" }) == "c menu");
+    // round 190sc (RC sweep): one "+" per join in every modifier combination the hint bar uses, both ways the tables
+    // write them, and no dangling "+" after a lone key
+    CHECK (plain ("[Alt]+[LMB] reset") == "Alt+click reset");
+    CHECK (plain ("[Ctrl]+[LMB] adds") == "Ctrl+click adds");
+    CHECK (plain ("[Shift]+[LMB] adds") == "Shift+click adds");
+    CHECK (plain ("[Alt][LMB] reset") == "Alt+click reset");
+    CHECK (plain ("[Shift][LMB] adds") == "Shift+click adds");
+    CHECK (plain ("[Ctrl][Shift][LMB] copies") == "Ctrl+Shift+click copies");
+    CHECK (plain ("[Ctrl]+[Shift]+[LMB] copies") == "Ctrl+Shift+click copies");
+    CHECK (plain ("[Ctrl]+[Shift] T") == "Ctrl+Shift T");
+    CHECK (plain ("[Ctrl][Wheel] zoom  [Alt][RMB] menu") == "Ctrl+wheel zoom  Alt+right-click menu");
+    CHECK (plain ("[Alt]+[Up] up") == "Alt+Up up");
+    CHECK (plain ("[Ctrl] fine  [Space] play") == "Ctrl fine  Space play");
+    CHECK (plain ("[Ctrl][R]") == "Ctrl+R");
+    {
+        using lynx::modmap::keyNames;
+        using lynx::modmap::Os;
+        CHECK (keyNames (plain ("[Ctrl]+[LMB] adds"), Os::mac) == "\xe2\x8c\x98+click adds");          // Cmd
+        CHECK (keyNames (plain ("[Alt][LMB] reset"), Os::mac) == "\xe2\x8c\xa5+click reset");          // Opt
+        CHECK (keyNames (plain ("[Ctrl][Shift][LMB]"), Os::mac) == "\xe2\x8c\x98+Shift+click");
+        CHECK (keyNames (plain ("[Alt]+[LMB]"), Os::windows) == "Alt+click");
+    }
 }
 
 TEST (ui_default_layout_sizes)
