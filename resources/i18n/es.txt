@@ -12661,4 +12661,3 @@ countries: es mx ar co cl pe ve
 "Typing keyboard settings" = "Configuración del teclado de escritura a piano"
 "Continuous scrolling" = "Desplazamiento continuo"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Seguir: la lista de reproducción se desplaza con el cabezal de reproducción mientras suena la canción. Clic derecho: Desplazamiento continuo; desactivado, puedes desplazarte libremente"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Seguir: la Playlist se desplaza junto con el cursor de reproducción mientras suena la canción. Clic derecho: Desplazamiento continuo; desactivado, puedes explorar libremente"

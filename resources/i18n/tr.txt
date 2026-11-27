@@ -12661,4 +12661,3 @@ countries: tr
 "Typing keyboard settings" = "Klavyeden piyano ayarları"
 "Continuous scrolling" = "Sürekli kaydırma"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Takip et: Şarkı çalarken oynatma listesi oynatma imleciyle birlikte kayar. Sağ tık: Sürekli kaydırma; kapalıyken etrafa özgürce göz atabilirsiniz"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Takip: Şarkı çalarken Playlist çalma işaretçisiyle birlikte kaydırılır. Sağ tık: Sürekli kaydırma; kapalıyken serbestçe gezinebilirsiniz"

@@ -12661,4 +12661,3 @@ countries: id
 "Typing keyboard settings" = "Pengaturan keyboard ketik ke piano"
 "Continuous scrolling" = "Gulir berkelanjutan"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Ikuti: Playlist bergulir mengikuti playhead saat lagu diputar. Klik kanan: Gulir berkelanjutan; nonaktif, Anda dapat melihat-lihat dengan bebas"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Ikuti: Playlist menggulir bersama kepala pemutaran saat lagu diputar. Klik kanan: Pengguliran berkelanjutan; jika dimatikan, Anda dapat melihat dengan bebas"

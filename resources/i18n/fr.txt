@@ -12661,4 +12661,3 @@ countries: fr be ch ca lu
 "Typing keyboard settings" = "Réglages du clavier de saisie vers piano"
 "Continuous scrolling" = "Défilement continu"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Suivre : la liste de lecture défile avec la tête de lecture pendant la lecture du morceau. Clic droit : Défilement continu ; désactivé, vous pouvez naviguer librement"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Suivre : la Playlist défile avec la tête de lecture pendant la lecture du morceau. Clic droit : Défilement continu ; désactivé, vous pouvez naviguer librement"

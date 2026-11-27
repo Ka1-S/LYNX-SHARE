@@ -12661,4 +12661,3 @@ countries: nl be
 "Typing keyboard settings" = "Instellingen van het typtoetsenbord als piano"
 "Continuous scrolling" = "Continu scrollen"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Volgen: de Playlist scrolt mee met de afspeelkop terwijl het nummer speelt. Rechtsklik: Continu scrollen; uitgeschakeld kun je vrij rondkijken"
-"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Volgen: de Playlist scrollt samen met de afspeelkop terwijl het nummer wordt afgespeeld. Klik met de rechtermuisknop: Doorlopend scrollen; uitgeschakeld kun je vrij rondkijken"
