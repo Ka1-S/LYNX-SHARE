@@ -4117,7 +4117,7 @@ void MainComponent::saveUiSettings()
                                       + "\nsimpleLargeControls=" + juce::String (ui::simplelook::largeControls() ? 1 : 0)
                                       + "\nsimpleProjectName=" + juce::String (ui::simplelook::projectNameShown() ? 1 : 0) // (round 190oo, O-4)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
-                                      + "\nplaylistContinuousScroll=" + juce::String (EditorGlobals::get().isContinuousScroll() ? 1 : 0);
+                                      + "\nplaylistContinuousScroll=" + juce::String (EditorGlobals::get().isContinuousScroll() ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
                                       + "\nfollowAudioEditor=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor) ? 1 : 0)
