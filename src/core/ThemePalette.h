@@ -65,6 +65,12 @@ struct ButtonLook
 
     bool operator== (const ButtonLook&) const = default;
 };
+// The fill under text on the accent (a primary / "on" text button). Owner 2026-11-27 (round 190sc): with LYNX's red it is
+// #DD3336, 4.56:1 with white (the 4.5 floor alone gave #DD3639, 4.51:1); another accent is deepened to the same ratio. The
+// flat kinds (icons on the accent) keep the brand red.
+constexpr std::uint32_t defaultAccentTextFill = 0xffdd3336;
+constexpr double accentTextContrastFloor = 4.56;
+std::uint32_t accentTextFill (const Palette& palette);
 // `hover` 0..1 (IconButton fades it over 120 ms); `on`: toggled on (or a primary button).
 ButtonLook buttonLook (const Palette& palette, ButtonKind kind, bool on, double hover, bool down, bool enabled);
 
