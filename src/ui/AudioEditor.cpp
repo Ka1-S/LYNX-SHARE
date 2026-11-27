@@ -53,6 +53,7 @@
 #include "ui/Icons.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
+#include "core/KeyMap.h"
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
 
@@ -2177,7 +2178,11 @@ public:
         const auto ctrl = k.getModifiers().isCtrlDown() || k.getModifiers().isCommandDown();
         const auto shift = k.getModifiers().isShiftDown();
         const auto c = juce::CharacterFunctions::toLowerCase (k.getTextCharacter());
-        const auto code = k.getKeyCode();
+        // round 190rz: X11 hands JUCE a Ctrl+letter as the lower-case key ('z') with a control character as its text
+        // (0x1A), so on Linux none of the Ctrl+letter keys below matched: Ctrl+Z went on to the main window and undid the
+        // PROJECT's last step (it removed the channel being edited), Ctrl+A / C / X / V / S did the main window's. The
+        // letter is read upper-case, as the key map reads it (Windows already sends it so).
+        const auto code = keys::letterOfKeyCode (k.getKeyCode()) != 0 ? keys::letterOfKeyCode (k.getKeyCode()) : k.getKeyCode();
 
         if (warpMode && warpSelected > 0 && (code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey))
         {
