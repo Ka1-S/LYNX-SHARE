@@ -78,8 +78,23 @@ def app_dict(lid):
     en = ROOT / "resources/i18n/en/display.txt"
     for m in re.finditer(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)"', en.read_text(encoding="utf-8") if en.exists() and out else "", re.M):
         if un(m.group(1)) in out:
+            # round 190sc: an English label that is also a key of its own ("Randomize" shown for "Randomise", and a
+            # "Randomize" key elsewhere) names two controls; a page's label may stand for either, so either translation counts
+            if un(m.group(2)) in out and out[un(m.group(2))] != out[un(m.group(1))]:
+                ALIASES.setdefault(lid, {})[out[un(m.group(1))]] = out[un(m.group(2))]
             out.setdefault(un(m.group(2)), out[un(m.group(1))])
     return out
+
+
+ALIASES = {}        # language id -> {translation of a display-table key: translation of the key its English text also is}
+
+
+def same_labels(lid, ecode, tcode):
+    """The labels of a translated body match the English page's (round 190sc: through ALIASES)."""
+    if ecode == tcode:
+        return True
+    alias = ALIASES.get(lid, {})
+    return [sum((Counter({alias.get(k, k): v}) for k, v in c.items()), Counter()) for c in tcode] == ecode
 
 
 HEADS = 0           # app_dict key of the index label() builds: head of a label -> the labels that start with it
@@ -243,7 +258,7 @@ def check_bodies(b, langs, errors, warnings):
             elif ec != tc:
                 n = next(i for i, (x, y) in enumerate(zip(ec, tc)) if x != y)
                 errors.append(f"{lid}: wiki body '{name}': links, pictures or emphasis differ from English near \"{plain(en)[n][:50]}\"")
-            elif ecode != tcode:
+            elif not same_labels(lid, ecode, tcode):
                 n = next(i for i, (x, y) in enumerate(zip(ecode, tcode)) if x != y)
                 warnings.append(f"{lid}: wiki body '{name}': labels differ from the app's: {sorted((tcode[n] - ecode[n]).keys())[:3]}")
             same = [x for x, y in zip(plain(en), plain(tr)) if x == y and english_prose(x)]
