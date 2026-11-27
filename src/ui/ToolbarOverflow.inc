@@ -333,9 +333,8 @@ void MainComponent::addOverflowItem (juce::PopupMenu& menu, Item item)
             addIconSubMenu (menu, Icon::pattern, name + ": " + patternBox.getText(), std::move (patterns));
             return;
         }
-        case Item::patternMenu: // round 190sc: the "…" beside the pattern box (its menu; the whole panel's entry has it already)
-            if (std::find (overflowList.begin(), overflowList.end(), Item::pattern) == overflowList.end())
-                addIconSubMenu (menu, Icon::pattern, name, makePatternMenu());
+        case Item::patternMenu: // round 190sc: the "…" beside the pattern box, its own entry like every item of the overflow
+            addIconSubMenu (menu, Icon::pattern, name, makePatternMenu());
             return;
         case Item::playlist:
         case Item::channelRack:
