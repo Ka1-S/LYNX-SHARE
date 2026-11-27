@@ -67,17 +67,31 @@ jobs:
     name: macOS (${{ matrix.arch }})
     needs: version
     runs-on: macos-15
-    timeout-minutes: 300
+    # (rollup 0.1.32: a cold arm64 build took 4.5-5 h and was cancelled at the old 300; GitHub's own limit is 360)
+    timeout-minutes: 350
     strategy:
       matrix:
         arch: [arm64, x86_64]
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1500M
+      CCACHE_COMPILERCHECK: content
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ needs.version.outputs.ref }}
 
       - name: Build dependencies
-        run: brew list ninja > /dev/null 2>&1 || brew install ninja
+        run: |
+          brew list ninja > /dev/null 2>&1 || brew install ninja
+          brew list ccache > /dev/null 2>&1 || brew install ccache
+
+      # (rollup 0.1.32, as Tests' App job: ccache between runs, per architecture; main saves it, other branches start from main's)
+      - uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-macapp-${{ matrix.arch }}-${{ needs.version.outputs.ref }}
+          restore-keys: ccache-macapp-${{ matrix.arch }}-
 
       - name: JUCE (checksum verified)
         run: |
@@ -87,12 +101,21 @@ jobs:
 
       - name: Build (${{ matrix.arch }})
         run: |
+          ccache --zero-stats > /dev/null
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
-            -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+            -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target LYNX -- -k 0
+          ccache --show-stats || true
           lipo -info build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX
           # (a tar keeps the bundle's symbolic links and modes through the artifact)
           tar -C build/LYNX_artefacts/Release -cf "LYNX-app-${{ matrix.arch }}.tar" LYNX.app
+
+      - uses: actions/cache/save@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          path: .ccache
+          key: ccache-macapp-${{ matrix.arch }}-${{ needs.version.outputs.ref }}
 
       - uses: actions/upload-artifact@v7
         with:
