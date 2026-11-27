@@ -2524,6 +2524,14 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
+    // round 190rx: Esc ends "Link to MIDI controller (move a knob...)" when no controller moved (with none connected it
+    // waited for ever, the hint bar held on its message)
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && engine.isLearningMidi())
+    {
+        engine.learnMidiController ({}); // (an empty target: learning ends, nothing is linked)
+        return true;
+    }
+
     // 2. a key the user gave an action himself (Options › Shortcuts) wins over the panels' built-in keys
     // (issue #12: Metronome on 'C' did nothing while the Playlist, whose Knife is 'C', had the focus)
     if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
@@ -8878,8 +8886,23 @@ void MainComponent::timerCallback()
         juce::Component* hovered = nullptr;
         std::optional<juce::Point<float>> mouseAt; // (round 190qk: read once a tick, the hover value pill reuses it)
 
+        // round 190rx: whether a MIDI input was open when the learn started (looked up once, not on every tick)
+        static bool learnSeen = false, learnWithoutInput = false;
+        if (engine.isLearningMidi() != learnSeen)
+        {
+            learnSeen = engine.isLearningMidi();
+            learnWithoutInput = learnSeen && engine.getActiveMidiInputs().isEmpty();
+        }
         if (engine.isLearningMidi())
-            hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
+        {
+            // round 190rx: how to get out, and why nothing happens when no MIDI input is open
+            hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter... (Esc cancels)");
+            if (learnWithoutInput)
+            {
+                hint.text = tr ("No MIDI input is open.") + " " + hint.text;
+                hint.mark = ui::Hint::Mark::warning;
+            }
+        }
         else if (engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
         {
             hint.text = idleHint();
