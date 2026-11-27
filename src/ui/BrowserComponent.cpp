@@ -92,6 +92,7 @@
 #include "ui/WorkflowExtras.h" // round 190iu (issue #191.6)
 #include "ui/LoopInfo.h" // round 190kx
 #include "core/MidiPreview.h"   // round 190qi
+#include "core/BrowserDoubleClick.h" // round 190se (issue #323)
 #include "engine/MidiFileIo.h" // round 190qi
 
 namespace lynx
@@ -191,8 +192,12 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
     if (folder)
         return (expanded ? tr ("Folder: [LMB] close") : tr ("Folder: [LMB] open")) + "  " + tr ("[RMB] menu (collapse all, show in the file manager)");
     if (isAudio (f))
-        return tr ("Sample: [LMB] preview  [2xLMB] new channel  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  "
-                   "[Shift][Up] / [Shift][Down] swap through the files");
+        // (issue #323, round 190se: FL's double click only previews; a new channel from it is a LYNX extra, always in Clip-launch)
+        return browserclick::addsOnDoubleClickNow() || f.hasFileExtension ("speech")
+                   ? tr ("Sample: [LMB] preview  [2xLMB] new channel  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  "
+                         "[Shift][Up] / [Shift][Down] swap through the files")
+                   : tr ("Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new "
+                         "channel  [Shift][Up] / [Shift][Down] swap through the files");
     if (f.hasFileExtension ("mid;midi"))
         // (issue #287, round 190rc: where else a MIDI file goes, as FL takes it, and the Playlist's LYNX extra)
         return mididrop::playlistTakes (layoutstyle::current() == layoutstyle::Style::clipLaunch)
@@ -2204,6 +2209,11 @@ public:
         }
         if (n.kind != Kind::item)
         {
+            // issue #323 (round 190se): FL 2026's double click on a sample previews it (each click did) and adds nothing;
+            // a new channel from it is the LYNX extra "browser.doubleClickAdds" (core/BrowserDoubleClick.h), always in the
+            // Clip-launch layout as Live's double click loads the sample into the selected track
+            if (isAudio (n.file) && ! n.file.hasFileExtension ("speech") && ! browserclick::addsOnDoubleClickNow())
+                return;
             browser.openFile (n.file);
             return;
         }

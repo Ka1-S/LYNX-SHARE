@@ -13166,3 +13166,8 @@ countries: nl be
 "Delete plugin" = "Plug-in verwijderen"
 "Save the selected mixer track's state as..." = "Status van het geselecteerde mixerkanaal opslaan als..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[dubbelklik] toevoegen als nieuw instrumentspoor, of naar de tijdlijn slepen"
+
+# round 190se (issues #323)
+"Double-click a sample in the Browser to add it to a new channel (LYNX)" = "Dubbelklik op een sample in de Browser om het aan een nieuw kanaal toe te voegen (LYNX)"
+"A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "Een dubbelklik op een audiobestand in de Browser maakt er een nieuw Sampler-kanaal mee. Uit, zoals in FL Studio: een dubbelklik beluistert de sample alleen voor, Enter laadt hem in het geselecteerde kanaal en \"Openen in een nieuw kanaal\" in het rechtsklikmenu voegt hem toe. Altijd aan in de Clip-launch-layout, zoals in Live. De enige schakelaar ervoor is hier."
+"Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "Sample: [LMB] voorbeluisteren  slepen naar de Channel Rack of de Playlist  [Enter] in het geselecteerde kanaal  [RMB] Openen in een nieuw kanaal  [Shift][Omhoog] / [Shift][Omlaag] door de bestanden bladeren"

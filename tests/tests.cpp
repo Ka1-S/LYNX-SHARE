@@ -18218,3 +18218,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Q1c190rzTests.inc" // round 190rz (0.1.32 Q1 part C): the rows parts A and B left not exercised
 #include "Q1b190rxTests.inc" // round 190rx (0.1.32 Q1 part B): the defects the feature audit found and fixed
 #include "Q3190ryTests.inc" // round 190ry (0.1.32 stage Q3, fluidity): native engines offered without listing FL's folders; the big UI project
+#include "Issues190seTests.inc" // round 190se: #324 a looped time selection past the song's end plays its clips once, #323 the Browser's double click

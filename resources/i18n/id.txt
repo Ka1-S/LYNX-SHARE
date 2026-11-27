@@ -13166,3 +13166,8 @@ countries: id
 "Delete plugin" = "Hapus plugin"
 "Save the selected mixer track's state as..." = "Simpan status trek mixer yang dipilih sebagai..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[klik ganda] tambahkan sebagai trek instrumen baru, atau seret ke timeline"
+
+# round 190se (issues #323)
+"Double-click a sample in the Browser to add it to a new channel (LYNX)" = "Klik ganda sample di Browser untuk menambahkannya ke channel baru (LYNX)"
+"A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "Klik ganda pada file audio di Browser membuat channel Sampler baru dengannya. Mati, seperti di FL Studio: klik ganda hanya mempratinjau sample, Enter memuatnya ke channel terpilih, dan \"Buka di channel baru\" di menu klik kanan menambahkannya. Selalu aktif di layout Clip-launch, seperti di Live. Satu-satunya sakelarnya ada di sini."
+"Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "Sample: [LMB] pratinjau  seret ke Channel Rack atau Playlist  [Enter] ke channel terpilih  [RMB] Buka di channel baru  [Shift][Up] / [Shift][Down] ganti antar file"

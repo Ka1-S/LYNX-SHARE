@@ -495,10 +495,16 @@ void ScheduledNotes::moveChannels (const std::vector<int>& from) noexcept
     heldCount = kept;
 }
 
+std::int64_t scheduleIndexLength (const Song& song) noexcept
+{
+    const auto length = song.songLength();
+    return song.loopPlays() ? std::max (length, song.loopEnd) : length;
+}
+
 ScheduleIndex makeScheduleIndex (const Song& song)
 {
     ScheduleIndex index;
-    index.songLength = song.songLength();
+    index.songLength = scheduleIndexLength (song); // (issue #324: a looped selection past the song's end does not wrap)
     index.maxShift = maxChannelShift (song.channels);
     index.maxNoteLength.reserve (song.patterns.size());
     index.patternLength.reserve (song.patterns.size());
@@ -1037,7 +1043,7 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
         return;
 
     const auto endTick = startTick + numSamples * tps;
-    auto loop = index != nullptr ? index->songLength : song.songLength();
+    auto loop = index != nullptr ? index->songLength : scheduleIndexLength (song);
     if (! wrap) // a "loop" longer than anything played: nothing starts over
         loop = std::max<std::int64_t> (loop, (std::int64_t) std::ceil (endTick) + 1) * 2;
 
@@ -1070,7 +1076,7 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         return;
 
     const auto endTick = startTick + numSamples * tps;
-    auto loop = index != nullptr ? index->songLength : song.songLength();
+    auto loop = index != nullptr ? index->songLength : scheduleIndexLength (song);
     if (! wrap)
         loop = std::max<std::int64_t> (loop, (std::int64_t) std::ceil (endTick) + 1) * 2;
     const auto loopStart = std::fmod (startTick, (double) loop);

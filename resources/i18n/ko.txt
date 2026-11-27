@@ -13166,3 +13166,8 @@ countries: kr
 "Delete plugin" = "플러그인 삭제"
 "Save the selected mixer track's state as..." = "선택한 믹서 트랙 상태를 다른 이름으로 저장..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[더블 클릭] 새 악기 트랙으로 추가 또는 타임라인으로 드래그"
+
+# round 190se (issues #323)
+"Double-click a sample in the Browser to add it to a new channel (LYNX)" = "브라우저에서 샘플을 더블클릭하면 새 채널에 추가 (LYNX)"
+"A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "브라우저에서 오디오 파일을 더블클릭하면 그 파일로 새 Sampler 채널을 만듭니다. 끔(FL Studio와 같음): 더블클릭은 샘플을 미리 듣기만 하고, Enter는 선택한 채널에 불러오며, 오른쪽 클릭 메뉴의 \"새 채널에서 열기\"로 추가합니다. Clip-launch 레이아웃에서는 Live처럼 항상 켜져 있습니다. 전환은 여기에서만 할 수 있습니다."
+"Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "샘플: [LMB] 미리 듣기  채널 랙이나 플레이리스트로 드래그  [Enter] 선택한 채널에 넣기  [RMB] 새 채널에서 열기  [Shift][Up] / [Shift][Down] 파일 차례로 바꾸기"

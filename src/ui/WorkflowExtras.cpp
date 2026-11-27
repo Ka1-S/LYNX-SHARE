@@ -33,6 +33,7 @@
 #include "core/PluginPicks.h" // round 190qi (rollup 0.1.32 step 3: the extras' switches)
 #include "core/MidiPreview.h"
 #include "core/BrowserTags.h"
+#include "core/BrowserDoubleClick.h" // round 190se (issue #323)
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/HintBar.h"
@@ -187,6 +188,8 @@ bool readUiOption (const juce::String& key, bool on)
         midipreview::enabled() = on;
     else if (key == "browserTabCompletes")
         browsertags::tabCompletes() = on;
+    else if (key == "browserDoubleClickAdds") // issue #323 (round 190se, LYNX extra)
+        browserclick::doubleClickAdds() = on;
     else
         return false;
     return true;
@@ -232,7 +235,8 @@ juce::String uiOptionsText()
            + "\nsimpleDropStrip=" + juce::String (simpletracks::dropStripAlways ? 1 : 0) // (round 190qu)
            // (round 190qi's lists; rollup 0.1.32 step 3)
            + "\npluginRecent=" + juce::String (pluginpicks::recentShown() ? 1 : 0) + "\npluginOneRow=" + juce::String (pluginpicks::oneRowPerPlugin() ? 1 : 0)
-           + "\nbrowserMidiPreview=" + juce::String (midipreview::enabled() ? 1 : 0) + "\nbrowserTabCompletes=" + juce::String (browsertags::tabCompletes() ? 1 : 0);
+           + "\nbrowserMidiPreview=" + juce::String (midipreview::enabled() ? 1 : 0) + "\nbrowserTabCompletes=" + juce::String (browsertags::tabCompletes() ? 1 : 0)
+           + "\nbrowserDoubleClickAdds=" + juce::String (browserclick::doubleClickAdds() ? 1 : 0); // (round 190se, issue #323)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -303,6 +307,8 @@ std::optional<bool> extraOn (std::string_view id)
         return midipreview::enabled();
     if (id == "browser.tabCompletes")
         return browsertags::tabCompletes();
+    if (id == "browser.doubleClickAdds") // round 190se (issue #323)
+        return browserclick::doubleClickAdds();
     return std::nullopt;
 }
 
@@ -378,6 +384,8 @@ bool setExtra (std::string_view id, bool on)
         midipreview::enabled() = on;
     else if (id == "browser.tabCompletes")
         browsertags::tabCompletes() = on;
+    else if (id == "browser.doubleClickAdds") // round 190se (issue #323)
+        browserclick::doubleClickAdds() = on;
     else
         return false;
     if (onChanged)

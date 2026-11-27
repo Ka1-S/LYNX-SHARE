@@ -266,6 +266,11 @@ inline constexpr Item items[] = {
     { "browser.tabCompletes", TR_NOOP ("Browser"), TR_NOOP ("Tab completes the Browser's search"),
       TR_NOOP ("While you type in the Browser's search, the rest of a tag (#word) or a folder name shows greyed after the text, and Tab takes it. Off: nothing is completed. Its only switch is here."),
       "ui-options.txt:browserTabCompletes" },
+    // issue #323 (round 190se; FL 2026 checked live 11-27): FL's double click on a sample only previews it; LYNX's new channel
+    // from it is an extra, off in the Pattern and Simple layouts, always on in Clip-launch (Live loads it into the track)
+    { "browser.doubleClickAdds", TR_NOOP ("Browser"), TR_NOOP ("Double-click a sample in the Browser to add it to a new channel (LYNX)"),
+      TR_NOOP ("A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here."),
+      "ui-options.txt:browserDoubleClickAdds" },
     { "midi.gamepad", TR_NOOP ("Controllers"), TR_NOOP ("Use a game controller"),
       TR_NOOP ("A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page."),
       "midi-settings.txt:gamepad" },
