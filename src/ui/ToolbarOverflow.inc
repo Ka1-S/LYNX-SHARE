@@ -231,6 +231,7 @@ juce::Component* MainComponent::toolbarItemComponent (Item item)
         case Item::midiLight: return &midiLight;
         case Item::snap: return &gridBox;
         case Item::pattern: return &patternBox;
+        case Item::patternMenu: return &patternMenuButton;
         case Item::playlist: return &panelButtons[(std::size_t) Panel::playlist];
         case Item::channelRack: return &panelButtons[(std::size_t) Panel::channelRack];
         case Item::pianoRoll: return &panelButtons[(std::size_t) Panel::pianoRoll];
@@ -332,6 +333,10 @@ void MainComponent::addOverflowItem (juce::PopupMenu& menu, Item item)
             addIconSubMenu (menu, Icon::pattern, name + ": " + patternBox.getText(), std::move (patterns));
             return;
         }
+        case Item::patternMenu: // round 190sc: the "…" beside the pattern box (its menu; the whole panel's entry has it already)
+            if (std::find (overflowList.begin(), overflowList.end(), Item::pattern) == overflowList.end())
+                addIconSubMenu (menu, Icon::pattern, name, makePatternMenu());
+            return;
         case Item::playlist:
         case Item::channelRack:
         case Item::pianoRoll:

@@ -430,7 +430,7 @@ enum class Item
     patternSong, play, stop, record, tempo, tapTempo, time, songPosition,                                 // transport
     masterVolume, masterPitch,                                                                             // master
     metronome, waitInput, countIn, blend, typingPiano, loopRecord, stepEdit, punch, recordMenu, midiLight, // record
-    snap, pattern,                                                                                         // snap (+ its buttons)
+    snap, pattern, patternMenu,                                                                            // snap (+ its buttons; patternMenu: the "…" beside the box, round 190sc)
     playlist, channelRack, pianoRoll, mixer, browser, pluginPicker,                                        // windows
     newFile, open, save, exportFile, undo, redo, audioEditor,                                              // file
     meters, output, chord, multilink, key, link,
@@ -463,7 +463,7 @@ inline const char* itemId (Item i)
     static constexpr std::array<const char*, itemCount> ids {
         "patternSong", "play", "stop", "record", "tempo", "tapTempo", "time", "songPosition", "masterVolume", "masterPitch",
         "metronome", "waitInput", "countIn", "blend", "typingPiano", "loopRecord", "stepEdit", "punch", "recordMenu", "midiLight",
-        "snap", "pattern", "playlist", "channelRack", "pianoRoll", "mixer", "browser", "pluginPicker",
+        "snap", "pattern", "patternMenu", "playlist", "channelRack", "pianoRoll", "mixer", "browser", "pluginPicker",
         "newFile", "open", "save", "export", "undo", "redo", "audioEditor", "meters", "output", "chord", "multilink", "key", "link"
     };
     return ids[(std::size_t) i];
@@ -478,7 +478,7 @@ inline const char* itemName (Item i)
         TR_NOOP ("Time"), TR_NOOP ("Song position"), TR_NOOP ("Master volume"), TR_NOOP ("Master pitch"),
         TR_NOOP ("Metronome"), TR_NOOP ("Wait for input"), TR_NOOP ("Count-in"), TR_NOOP ("Blend recorded notes"), TR_NOOP ("Typing keyboard to piano"),
         TR_NOOP ("Loop record"), TR_NOOP ("Step edit"), TR_NOOP ("Punch in / out"), TR_NOOP ("Recording options: what to record"), TR_NOOP ("MIDI input activity"),
-        TR_NOOP ("Snap"), TR_NOOP ("Patterns"), "Playlist", "Channel rack", "Piano roll", "Mixer", "Browser", TR_NOOP ("Plugin picker"),
+        TR_NOOP ("Snap"), TR_NOOP ("Patterns"), TR_NOOP ("Pattern options"), "Playlist", "Channel rack", "Piano roll", "Mixer", "Browser", TR_NOOP ("Plugin picker"),
         TR_NOOP ("New"), TR_NOOP ("Open..."), TR_NOOP ("Save"), TR_NOOP ("Export"), TR_NOOP ("Undo"), TR_NOOP ("Redo"), TR_NOOP ("Audio editor"),
         TR_NOOP ("CPU, memory and polyphony"), TR_NOOP ("Output monitor"), TR_NOOP ("Chord detection"), TR_NOOP ("Multilink to controllers"),
         TR_NOOP ("Project key"), TR_NOOP ("Ableton Link")

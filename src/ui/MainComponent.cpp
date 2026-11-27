@@ -1817,6 +1817,8 @@ void MainComponent::resized()
             inside.insert (inside.end(), { toolbarlayout::Item::typingPiano, toolbarlayout::Item::midiLight });
         if (! fileWide)
             inside.push_back (toolbarlayout::Item::audioEditor);
+        if (narrowSnap) // round 190sc (owner 11-27): the narrowest form gives the pattern box the "…" button's room
+            inside.push_back (toolbarlayout::Item::patternMenu);
         overflowList = toolbarlayout::overflowItems (toolbarLayout, visible, inside);
     };
     listOverflow();
@@ -2085,14 +2087,17 @@ void MainComponent::resized()
                 put (gridBox, first.reduced (0, 1));
                 auto second = juce::Rectangle<int> (panel.getX(), row2, panel.getWidth(), h);
                 patternLabelArea = second.removeFromLeft (labelWidth);
-                put (patternMenuButton, second.removeFromRight (h));
                 if (narrowSnap) // (the pattern box keeps room for a name)
                 {
+                    // round 190sc (owner 11-27): at 1280 px the box was 51 px ("Patter..."); the "…" goes to the overflow
+                    // (its menu is there, in the Patterns menu and on the box's right-click) and the box takes its room
+                    hide ({ &patternMenuButton });
                     put (newPatternButton, patternLabelArea.withWidth (h));
                     patternLabelArea = {};
                 }
                 else
                 {
+                    put (patternMenuButton, second.removeFromRight (h));
                     put (newPatternButton, second.removeFromRight (h));
                     second.removeFromRight (2);
                     // round 190oj: at 1920 px the box was 67 px and every new project showed "Patter..."; when it would
