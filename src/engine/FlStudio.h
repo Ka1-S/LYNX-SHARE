@@ -25,5 +25,7 @@ struct FlStudioInstall
 FlStudioInstall findFlStudio();
 
 // Reads FL's plugin database (.nfo and .fst files under Installed). `files` = how many files were read.
-FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files = nullptr);
+// `cache` (round 190sb): a file of LYNX's settings folder that keeps the files' entries between starts (see
+// core/FlPluginDb.h FlPluginDbCache): only the files whose size or time changed are opened; written when it changed.
+FlPluginDb readFlPluginDatabase (const FlStudioInstall& fl, int* files = nullptr, const juce::File& cache = {});
 } // namespace lynx

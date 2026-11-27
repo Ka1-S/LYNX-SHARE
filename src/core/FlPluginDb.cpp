@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <climits>
+#include <cstdint>
 #include <map>
 #include <sstream>
 
@@ -422,5 +424,175 @@ std::string locateFlSample (const std::string& flPath, const FlPathRoots& roots,
         if (fileExists (c))
             return c;
     return {};
+}
+// --- round 190sb: the database kept between starts ---------------------------------------------------------------
+
+namespace
+{
+constexpr std::string_view cacheHeader = "LYNX FL plugin database cache 1";
+
+// a field of a cache line: \ t n escaped, so a name with a tab or a line break stays one field
+void putField (std::string& out, const std::string& s)
+{
+    out += '\t';
+    for (const auto c : s)
+    {
+        if (c == '\\')
+            out += "\\\\";
+        else if (c == '\t')
+            out += "\\t";
+        else if (c == '\n')
+            out += "\\n";
+        else if (c == '\r')
+            out += "\\r";
+        else
+            out += c;
+    }
+}
+
+std::vector<std::string> splitFields (std::string_view line)
+{
+    std::vector<std::string> fields (1);
+    for (std::size_t i = 0; i < line.size(); ++i)
+    {
+        const auto c = line[i];
+        if (c == '\t')
+            fields.emplace_back();
+        else if (c == '\\' && i + 1 < line.size())
+        {
+            const auto n = line[++i];
+            fields.back() += n == 't' ? '\t' : n == 'n' ? '\n' : n == 'r' ? '\r' : n;
+        }
+        else
+            fields.back() += c;
+    }
+    return fields;
+}
+
+bool toInt64 (const std::string& s, std::int64_t& out)
+{
+    if (s.empty())
+        return false;
+    std::size_t i = s[0] == '-' ? 1 : 0;
+    if (i == s.size())
+        return false;
+    std::int64_t v = 0;
+    for (; i < s.size(); ++i)
+    {
+        if (s[i] < '0' || s[i] > '9' || v > (INT64_MAX - 9) / 10)
+            return false;
+        v = v * 10 + (s[i] - '0');
+    }
+    out = s[0] == '-' ? -v : v;
+    return true;
+}
+} // namespace
+
+const std::vector<FlPluginDbEntry>* FlPluginDbCache::find (const FlPluginDbFileStamp& stamp) const
+{
+    const auto it = files.find (stamp.path);
+    if (it == files.end() || it->second.size != stamp.size || it->second.modified != stamp.modified)
+        return nullptr;
+    return &it->second.entries;
+}
+
+void FlPluginDbCache::put (const FlPluginDbFileStamp& stamp, std::vector<FlPluginDbEntry> entries)
+{
+    files[stamp.path] = File { stamp.size, stamp.modified, std::move (entries) };
+}
+
+std::string FlPluginDbCache::serialise() const
+{
+    static const char* hex = "0123456789abcdef";
+    std::string out (cacheHeader);
+    out += '\n';
+    for (const auto& [path, file] : files)
+    {
+        out += 'F';
+        putField (out, path);
+        putField (out, std::to_string (file.size));
+        putField (out, std::to_string (file.modified));
+        putField (out, std::to_string (file.entries.size()));
+        out += '\n';
+        for (const auto& e : file.entries)
+        {
+            std::string id;
+            for (const auto b : e.classId)
+                id += hex[b >> 4], id += hex[b & 15];
+            out += 'E';
+            putField (out, e.name);
+            putField (out, e.vendor);
+            putField (out, e.path);
+            putField (out, e.source);
+            putField (out, std::to_string ((int) e.format));
+            putField (out, std::to_string (e.role));
+            putField (out, id);
+            putField (out, e.hasClassId ? "1" : "0");
+            putField (out, e.clapId);
+            putField (out, std::to_string (e.vst2Id));
+            out += '\n';
+        }
+    }
+    out += "end\n"; // (a file cut short is not a cache)
+    return out;
+}
+
+FlPluginDbCache FlPluginDbCache::parse (std::string_view text)
+{
+    FlPluginDbCache cache, none;
+    std::size_t pos = 0;
+    const auto nextLine = [&] (std::string_view& line) {
+        if (pos >= text.size())
+            return false;
+        const auto end = text.find ('\n', pos);
+        line = text.substr (pos, end == std::string_view::npos ? std::string_view::npos : end - pos);
+        pos = end == std::string_view::npos ? text.size() : end + 1;
+        return true;
+    };
+    const auto hexValue = [] (char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : -1; };
+    std::string_view line;
+    if (! nextLine (line) || line != cacheHeader)
+        return none;
+    while (nextLine (line))
+    {
+        if (line == "end")
+            return pos == text.size() ? cache : none;
+        const auto f = splitFields (line);
+        std::int64_t size = 0, modified = 0, count = 0;
+        if (f.size() != 5 || f[0] != "F" || ! toInt64 (f[2], size) || ! toInt64 (f[3], modified) || ! toInt64 (f[4], count) || count < 0 || count > 4096)
+            return none;
+        File file { size, modified, {} };
+        for (std::int64_t i = 0; i < count; ++i)
+        {
+            if (! nextLine (line))
+                return none;
+            const auto e = splitFields (line);
+            std::int64_t format = 0, role = 0, vst2 = 0;
+            if (e.size() != 11 || e[0] != "E" || ! toInt64 (e[5], format) || format < 0 || format > (int) ForeignPlugin::Format::other
+                || ! toInt64 (e[6], role) || ! toInt64 (e[10], vst2) || vst2 < 0 || vst2 > (std::int64_t) UINT32_MAX || e[7].size() != 32
+                || (e[8] != "0" && e[8] != "1"))
+                return none;
+            FlPluginDbEntry entry;
+            entry.name = e[1];
+            entry.vendor = e[2];
+            entry.path = e[3];
+            entry.source = e[4];
+            entry.format = (ForeignPlugin::Format) format;
+            entry.role = (int) role;
+            for (std::size_t b = 0; b < 16; ++b)
+            {
+                const auto hi = hexValue (e[7][2 * b]), lo = hexValue (e[7][2 * b + 1]);
+                if (hi < 0 || lo < 0)
+                    return none;
+                entry.classId[b] = (std::uint8_t) (hi * 16 + lo);
+            }
+            entry.hasClassId = e[8] == "1";
+            entry.clapId = e[9];
+            entry.vst2Id = (std::uint32_t) vst2;
+            file.entries.push_back (std::move (entry));
+        }
+        cache.files[f[1]] = std::move (file);
+    }
+    return none; // (no "end" line)
 }
 } // namespace lynx

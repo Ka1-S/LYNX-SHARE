@@ -9,9 +9,12 @@
 // lets LYNX map a project's plugins to the very files FL uses, without scanning. Formats: docs/FL_INTEGRATION.md.
 // Does not depend on JUCE so it can be tested in isolation.
 
+#include <cstdint>
 #include <functional>
+#include <map>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "core/FlpImport.h"
@@ -67,6 +70,38 @@ public:
 
 private:
     std::vector<FlPluginDbEntry> list;
+};
+
+// Round 190sb (the first 15 s after start-up): FL's database kept between starts. Reading it opened every .fst and
+// .nfo (2,193 files on the developer's PC, in a OneDrive folder: 0.6-0.7 s of CPU on a worker 3 s after every start).
+// The cache keeps each file's entries with the size and modification time its folder listing showed; a file whose
+// listing is unchanged is not opened again, any other is read as before. The database built from it is the same,
+// entry for entry, in the same order (readFlPluginDatabase replays the files in the listing's order).
+struct FlPluginDbFileStamp
+{
+    std::string path;
+    std::int64_t size = 0, modified = 0; // bytes, ms since 1970
+};
+
+class FlPluginDbCache
+{
+public:
+    // the entries kept for this file, or null when it is new or its size / time changed
+    const std::vector<FlPluginDbEntry>* find (const FlPluginDbFileStamp& stamp) const;
+    void put (const FlPluginDbFileStamp& stamp, std::vector<FlPluginDbEntry> entries);
+    std::size_t size() const noexcept { return files.size(); }
+
+    // the cache file's text, and back (text that is not a whole cache of this version: an empty cache)
+    std::string serialise() const;
+    static FlPluginDbCache parse (std::string_view text);
+
+private:
+    struct File
+    {
+        std::int64_t size = 0, modified = 0;
+        std::vector<FlPluginDbEntry> entries;
+    };
+    std::map<std::string, File> files;
 };
 
 // Whether `file` (a plugin binary found in a search folder) is likely the plugin a project needs: same file as the
