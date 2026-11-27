@@ -10,6 +10,10 @@
         juce::String error, report;
         auto ok = false;
         const juce::File input (inputPath), output (outputPath);
+        // round 190sa (Q6): how long each step takes (kainproctor's FL -> LYNX -> .als -> Bitwig case): "timing.openMs" /
+        // "timing.exportMs" in the report
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        auto tOpened = t0, tWritten = t0;
         {
             AudioEngine loader (false);
             if (input.hasFileExtension ("mid;midi"))
@@ -25,6 +29,7 @@
             else
                 ok = loader.importFlpFile (input, error);
 
+            tOpened = juce::Time::getMillisecondCounterHiRes();
             if (ok)
             {
                 const auto joined = [] (const std::map<std::string, int>& items) {
@@ -85,7 +90,9 @@
                 }
                 else if (output.hasFileExtension ("als"))
                 {
-                    const auto als = writeAlsProject (song, &loader.getPluginHost(), AlsVersion::live12, false, output.getParentDirectory(),
+                    // --alscollect (round 190sa): the samples copied into the set's folder, as the app's default
+                    const auto collect = args.contains ("--alscollect");
+                    const auto als = writeAlsProject (song, &loader.getPluginHost(), AlsVersion::live12, collect, output.getParentDirectory(),
                                                       output.getFileNameWithoutExtension(), notes, error);
                     ok = als != juce::File();
                     report << "als=" << als.getFullPathName() << "\n";
@@ -108,8 +115,11 @@
                 }
                 for (const auto& n : notes)
                     report << "export.note=" << n << "\n";
+                tWritten = juce::Time::getMillisecondCounterHiRes();
             }
         }
+        report << "timing.openMs=" << juce::String (tOpened - t0, 0) << "\ntiming.exportMs=" << juce::String (tWritten - tOpened, 0)
+               << "\ntiming.closeMs=" << juce::String (juce::Time::getMillisecondCounterHiRes() - juce::jmax (tOpened, tWritten), 0) << "\n";
         report << "result=" << (ok ? juce::String ("OK") : "ERROR " + error) << "\n";
         juce::File (outputPath + ".txt").replaceWithText (report);
         std::fprintf (stderr, "convert190rm %s", ("result=" + report.fromLastOccurrenceOf ("\nresult=", false, false)).toRawUTF8()); // (also when <out>.txt can't be written)
