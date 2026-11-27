@@ -40572,8 +40572,8 @@ private:
                 // the windows' own menus (title bars) and the toolbar's recording menu
                 juce::StringArray names;
                 std::vector<juce::PopupMenu> menus;
-                for (auto [panel, name] : { std::pair { lynx::workspace::Panel::playlist, "Playlist" }, { lynx::workspace::Panel::channelRack, "Channel Rack" },
-                                            { lynx::workspace::Panel::pianoRoll, "Piano Roll" }, { lynx::workspace::Panel::mixer, "Mixer" },
+                for (auto [panel, name] : { std::pair { lynx::workspace::Panel::playlist, "Playlist" }, { lynx::workspace::Panel::channelRack, "Channel rack" },
+                                            { lynx::workspace::Panel::pianoRoll, "Piano roll" }, { lynx::workspace::Panel::mixer, "Mixer" },
                                             { lynx::workspace::Panel::browser, "Browser" } })
                 {
                     names.add (name);

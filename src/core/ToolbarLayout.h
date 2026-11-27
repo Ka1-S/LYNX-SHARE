@@ -478,7 +478,7 @@ inline const char* itemName (Item i)
         TR_NOOP ("Time"), TR_NOOP ("Song position"), TR_NOOP ("Master volume"), TR_NOOP ("Master pitch"),
         TR_NOOP ("Metronome"), TR_NOOP ("Wait for input"), TR_NOOP ("Count-in"), TR_NOOP ("Blend recorded notes"), TR_NOOP ("Typing keyboard to piano"),
         TR_NOOP ("Loop record"), TR_NOOP ("Step edit"), TR_NOOP ("Punch in / out"), TR_NOOP ("Recording options: what to record"), TR_NOOP ("MIDI input activity"),
-        TR_NOOP ("Snap"), TR_NOOP ("Patterns"), "Playlist", "Channel Rack", "Piano Roll", "Mixer", "Browser", TR_NOOP ("Plugin picker"),
+        TR_NOOP ("Snap"), TR_NOOP ("Patterns"), "Playlist", "Channel rack", "Piano roll", "Mixer", "Browser", TR_NOOP ("Plugin picker"),
         TR_NOOP ("New"), TR_NOOP ("Open..."), TR_NOOP ("Save"), TR_NOOP ("Export"), TR_NOOP ("Undo"), TR_NOOP ("Redo"), TR_NOOP ("Audio editor"),
         TR_NOOP ("CPU, memory and polyphony"), TR_NOOP ("Output monitor"), TR_NOOP ("Chord detection"), TR_NOOP ("Multilink to controllers"),
         TR_NOOP ("Project key"), TR_NOOP ("Ableton Link")

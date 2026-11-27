@@ -224,8 +224,8 @@ juce::String panelName (Panel p)
     switch (p)
     {
         case Panel::playlist: return "Playlist";
-        case Panel::channelRack: return "Channel Rack";
-        case Panel::pianoRoll: return "Piano Roll";
+        case Panel::channelRack: return "Channel rack";
+        case Panel::pianoRoll: return "Piano roll";
         case Panel::mixer: return "Mixer";
         case Panel::browser: return "Browser";
     }
@@ -717,8 +717,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
     workspace.setContent (Panel::playlist, playlistArea, "Playlist", Icon::playlist);
-    workspace.setContent (Panel::channelRack, rackViewport, "Channel Rack", Icon::channelRack);
-    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll);
+    workspace.setContent (Panel::channelRack, rackViewport, "Channel rack", Icon::channelRack);
+    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano roll", Icon::pianoRoll);
     workspace.setContent (Panel::mixer, mixer, "Mixer", Icon::mixer);
     workspace.setContent (Panel::browser, browser, "Browser", Icon::browser);
     workspace.setTitleTooltip (Panel::channelRack, tr ("Shift+wheel here changes the pattern"));
@@ -5589,7 +5589,7 @@ void MainComponent::undockPianoRoll()
     pianoRollDockActive = false;
     pianoRoll.setDocked (false);
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
-    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
+    workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano roll", Icon::pianoRoll); // (its panel has it again)
 }
 
 // Round 190ce: links the Browser to `target` (showing the Browser), or ends the link when it is linked to it already.
@@ -12773,7 +12773,7 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
             { TR_NOOP ("Right-click a knob/fader"), TR_NOOP ("Type value, reset, automation, MIDI link") },
             { TR_NOOP ("Right-click Pattern / Song"), TR_NOOP ("Show the Channel Rack / Playlist") },
             { TR_NOOP ("Double-click Stop"), TR_NOOP ("All notes off") } } },
-        { "Piano Roll",
+        { "Piano roll",
           { { TR_NOOP ("Click"), TR_NOOP ("Create a note (or chord, via the selector)") },
             { TR_NOOP ("Drag"), TR_NOOP ("Move; the right edge changes the length") },
             { TR_NOOP ("Right-click"), TR_NOOP ("Delete") },
@@ -12805,8 +12805,8 @@ std::unique_ptr<juce::Component> MainComponent::makeHelpContent (const keys::Key
                 text << " (" << tr (b.context == keys::Context::browser       ? "Browser"
                                     : b.context == keys::Context::mixer       ? "Mixer"
                                     : b.context == keys::Context::playlist    ? "Playlist"
-                                    : b.context == keys::Context::pianoRoll   ? "Piano Roll"
-                                                                               : "Channel Rack")
+                                    : b.context == keys::Context::pianoRoll   ? "Piano roll"
+                                                                               : "Channel rack")
                      << ")";
             functionKeys.push_back ({ juce::String (keys::displayString (b.chord)), text });
         }

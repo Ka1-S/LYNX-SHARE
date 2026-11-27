@@ -1156,8 +1156,8 @@ juce::PopupMenu MainComponent::makeToolbarMoreMenu()
 
     // the windows and the file buttons
     juce::PopupMenu windows;
-    for (const auto& [name, action] : { std::pair<const char*, const char*> { "Playlist", "panel.playlist" }, { "Channel Rack", "panel.channelRack" },
-                                        { "Piano Roll", "panel.pianoRoll" }, { "Mixer", "panel.mixer" }, { "Browser", "panel.browser" } })
+    for (const auto& [name, action] : { std::pair<const char*, const char*> { "Playlist", "panel.playlist" }, { "Channel rack", "panel.channelRack" },
+                                        { "Piano roll", "panel.pianoRoll" }, { "Mixer", "panel.mixer" }, { "Browser", "panel.browser" } })
         windows.addItem (juce::String (name) + shortcutText (action), [this, action = std::string (action)] { runAction (action); });
     windows.addItem (tr ("Plugin picker") + shortcutText ("view.pluginPicker"), [this] { togglePluginPicker(); });
     menu.addSubMenu (tr (toolbarlayout::groupName (Group::windows)), windows);
