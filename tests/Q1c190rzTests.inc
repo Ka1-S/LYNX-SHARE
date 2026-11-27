@@ -2,6 +2,7 @@
 // the app (or by an FL 2026 check) and fixed.
 
 #include "core/Effects.h"
+#include "core/MissingFiles.h"
 #include "core/MixerOps.h"
 #include "core/RackFilter.h"
 #include "core/RackOps.h"
@@ -97,4 +98,18 @@ TEST (q1c190rz_sidechain_link_counts_for_route_loops)
     const auto order = song.mixerOrder();
     const auto at = [&order] (int t) { return std::find (order.begin(), order.end(), t) - order.begin(); };
     CHECK (at (1) < at (5) && at (5) < at (6) && at (6) < at (7));
+}
+
+// Help › Missing files... listed a plugin that is not installed twice: "LYNX Test Missing" (Bypassed: the slot keeps the
+// plugin's settings) and "LYNX Test Missing: plugin not installed or not scanned" (Silence: the plugin is installed but
+// did not load) — the host's load-failure line was compared with the name as a whole.
+TEST (q1c190rz_missing_files_lists_a_plugin_once)
+{
+    using namespace lynx;
+    std::vector<MissingPlugin> list { { "LYNX Test Missing", { "Clap" }, "Bypassed", {} } };
+    CHECK (listsFailure (list, "LYNX Test Missing: plugin not installed or not scanned"));
+    CHECK (listsFailure (list, "LYNX Test Missing"));
+    CHECK (! listsFailure (list, "LYNX Test Missing 2: the plugin could not start"));
+    CHECK (! listsFailure (list, "Other: plugin not installed or not scanned"));
+    CHECK (! listsFailure (list, "LYNX Test Missing:")); // (no reason after the name: not the host's form)
 }

@@ -32,6 +32,17 @@ struct MissingPlugin
     std::string replacementArg; // what "{0}" stands for (a LYNX substitute's effect name), not translated
 };
 
+// Round 190rz: whether the plugin host's load-failure line ("<name>: <why>", PluginHost::getLoadFailures) is about a
+// plugin `list` already names. A plugin that is not installed fails to load too ("<name>: plugin not installed or not
+// scanned"): the Missing files window listed it twice, the second time as "installed but did not load".
+inline bool listsFailure (const std::vector<MissingPlugin>& list, const std::string& line)
+{
+    for (const auto& p : list)
+        if (p.name == line || (line.size() > p.name.size() + 1 && line.compare (0, p.name.size(), p.name) == 0 && line.compare (p.name.size(), 2, ": ") == 0))
+            return true;
+    return false;
+}
+
 // The last component of a path saved on Windows or elsewhere ('\\' and '/' both separate).
 std::string pathFileName (const std::string& path);
 
