@@ -442,6 +442,10 @@ int routeSelectedTo (Song& song, const std::vector<int>& selected, int to, Route
 int switchSelectedRoute (Song& song, const std::vector<int>& selected, int to, bool on);
 // "This track to selected tracks": `from` is routed into every selected track but itself (0 = the Master).
 int routeToSelected (Song& song, int from, const std::vector<int>& selected, RouteKind kind);
+// Round 190rx: the routes from each of `from` into each of `to` that can't be made because the sound of the target
+// already reaches the source (a loop; Song::canRoute), as (from, to) pairs. Routes that exist, the source itself and
+// the Master as a target are never in it.
+std::vector<std::pair<int, int>> loopingRoutes (const Song& song, const std::vector<int>& from, const std::vector<int>& to);
 // "Create submix...": the selected inserts are routed only into `to`; `to` is renamed "<name> master" (when `name` is
 // not empty), the routed inserts take its colour and the unnamed ones (no name or "Insert n") the name; when they are
 // contiguous in one dock they become a group (separators; `to` joins when it is next to them). Returns how many

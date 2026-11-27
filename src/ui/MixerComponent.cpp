@@ -263,6 +263,43 @@ void drawTextStamped (juce::Graphics& g, juce::Rectangle<int> box, float corner,
     g.drawImageAt (it->second.image, box.getX() + it->second.at.x, box.getY() + it->second.at.y);
     g.setColour (ink); // (the colour the text leaves set)
 }
+
+// Round 190rx (0.1.32 Q1): a route the user asks for that would make a loop is said, not dropped in silence. The arrow
+// is not drawn under such a track for the selected one, but the selection's other tracks, the arrow's Ctrl / Shift
+// clicks and Track routing's items reach them; they changed nothing and left an empty "Edit" undo step. Returns how
+// many of the routes from `from` into `to` are refused, and how many could change at all (`asked`).
+struct LoopCheck
+{
+    int refused = 0, asked = 0;
+    bool nothingToDo() const noexcept { return refused > 0 && refused == asked; }
+};
+
+LoopCheck explainLoopingRoutes (const Song& song, const std::vector<int>& from, const std::vector<int>& to)
+{
+    LoopCheck check;
+    for (const auto f : from)
+        for (const auto t : to)
+            if (f > 0 && f < (int) song.mixer.size() && t > 0 && t < (int) song.mixer.size() && f != t && ! song.routes (f, t))
+                ++check.asked;
+    const auto loops = mixerops::loopingRoutes (song, from, to);
+    check.refused = (int) loops.size();
+    if (loops.empty())
+        return check;
+    const auto name = [&song] (int t) {
+        const auto own = juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str()).trim();
+        const auto insert = tr ("Insert {0}", { juce::String (t) });
+        return own.isEmpty() || own == insert ? insert : insert + " (" + own + ")";
+    };
+    ui::Notice notice;
+    notice.kind = ui::Notice::Kind::problem;
+    notice.id = "mixer.routeLoop";
+    notice.text = tr ("{0} can't be routed to {1}: that would make a loop", { name (loops.front().first), name (loops.front().second) });
+    notice.detail = tr ("The sound of {0} already reaches {1}.", { name (loops.front().second), name (loops.front().first) });
+    if (loops.size() > 1)
+        notice.detail += " " + tr ("{0} more route(s) would make a loop too.", { juce::String ((int) loops.size() - 1) });
+    ui::notify (notice);
+    return check;
+}
 } // namespace
 
 // The Mixer strips' picture (round 174e2): JUCE's buffered-to-image cache for the visible part of the strips (they are
@@ -2793,6 +2830,8 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             return;
         }
         const auto on = engine.getSong().routes (from, t);
+        if (! on && t > 0 && explainLoopingRoutes (engine.getSong(), sources, { t }).nothingToDo())
+            return;
         engine.editSong ([sources, t, on] (Song& s) { mixerops::switchSelectedRoute (s, sources, t, ! on); });
 
         if (! on && engine.getSong().routes (from, t)) // just enabled (at 0 dB): dragging adjusts the level, like the route knob
@@ -3356,6 +3395,8 @@ void MixerStrips::routeSelection (int t, mixerops::RouteKind kind)
 {
     using K = mixerops::RouteKind;
     int linked = 0;
+    if (t > 0 && explainLoopingRoutes (engine.getSong(), selection, { t }).nothingToDo())
+        return;
     engine.editSong ([sources = selection, t, kind, &linked] (Song& s) {
         mixerops::routeSelectedTo (s, sources, t, kind);
         if (t >= 0 && t < (int) s.mixer.size())
@@ -4482,8 +4523,16 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         juce::PopupMenu routing;
         routing.addSectionHeader (tr ("Selected tracks to this track"));
         using K = mixerops::RouteKind;
-        auto selToThis = [this, others, t] (K kind) { engine.editSong ([others, t, kind] (Song& s) { mixerops::routeSelectedTo (s, others, t, kind); }); };
-        auto thisToSel = [this, others, t] (K kind) { engine.editSong ([others, t, kind] (Song& s) { mixerops::routeToSelected (s, t, others, kind); }); };
+        auto selToThis = [this, others, t] (K kind) {
+            if (explainLoopingRoutes (engine.getSong(), others, { t }).nothingToDo())
+                return;
+            engine.editSong ([others, t, kind] (Song& s) { mixerops::routeSelectedTo (s, others, t, kind); });
+        };
+        auto thisToSel = [this, others, t] (K kind) {
+            if (explainLoopingRoutes (engine.getSong(), { t }, others).nothingToDo())
+                return;
+            engine.editSong ([others, t, kind] (Song& s) { mixerops::routeToSelected (s, t, others, kind); });
+        };
         routing.addItem (tr ("Route selected to this track"), any, false, [selToThis] { selToThis (K::route); });
         routing.addItem (tr ("Route selected to this track only"), any, false, [selToThis] { selToThis (K::routeOnly); });
         routing.addItem (tr ("Sidechain selected to this track"), any && t > 0, false, [selToThis] { selToThis (K::sidechain); });
