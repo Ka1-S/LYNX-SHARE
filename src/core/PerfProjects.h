@@ -507,6 +507,70 @@ inline Song automation()
     return song;
 }
 
+// round 190ry (Q3 fluidity): the big-project UI case — 120 synth channels on 120 tracks over 64 bars (1,920 pattern
+// clips), one pattern of 10,000 notes (channel 1, the Piano roll's case), 128 inserts (the first 40 with an EQ and a
+// compressor: 80 effect windows to open) and 24 automation clips of 64 bars with 513 points each. Not one of names():
+// the perf gate leaves it out; `--perfgen <folder> <report> q3big` writes it.
+inline Song q3big()
+{
+    Song song;
+    song.bpm = 130.0;
+    song.mixer = Song::defaultMixer (128);
+    for (int t = 1; t <= 40; ++t)
+    {
+        song.mixer[(std::size_t) t].effects.push_back (makeEffectSlot (t % 2 == 0 ? EffectKind::parametricEq : EffectKind::facetEq));
+        song.mixer[(std::size_t) t].effects.push_back (makeEffectSlot (EffectKind::compressor));
+    }
+    constexpr int channels = 120, bars = 64;
+    for (int c = 0; c < channels; ++c)
+    {
+        ChannelDef ch;
+        ch.name = "Synth " + std::to_string (c + 1);
+        ch.instrument = InstrumentKind::synth;
+        ch.synth = presetAt ((std::size_t) c);
+        ch.volume = 0.2f;
+        ch.mixerTrack = 1 + c;
+        song.channels.push_back (ch);
+        auto& p = song.patterns.emplace_back();
+        p.name = ch.name;
+        if (c == 0)
+        {
+            // 10,000 notes over 64 bars: a 39-note cluster on every beat (257 beats), moving through the keys
+            for (int n = 0; n < 10000; ++n)
+            {
+                const auto beat = n / 39;
+                const auto key = 36 + (n % 39) + (beat * 7) % 12;
+                p.notes.push_back (makeNote (c, (double) beat, 0.9, key, 0.5f + 0.4f * (float) ((n * 13) % 10) / 10.0f));
+            }
+        }
+        else
+            for (int e = 0; e < 16; ++e)
+                p.notes.push_back (makeNote (c, e * 1.0, 0.5, 40 + (c * 5 + e * 7) % 36, 0.7f));
+        for (int b = 0; b < bars; b += 4)
+        {
+            if (c == 0 && b > 0)
+                break; // (the long pattern: one clip of the whole song)
+            Clip clip;
+            clip.pattern = c;
+            clip.track = c;
+            clip.start = (std::int64_t) b * 4 * ppq;
+            clip.length = p.effectiveLength (song.meter());
+            song.playlist.push_back (clip);
+        }
+    }
+    for (int a = 0; a < 24; ++a)
+    {
+        AutomationTarget target;
+        const auto track = 1 + a;
+        target = a % 2 == 0 ? AutomationTarget { AutomationTargetKind::mixerVolume, track, 0, 0 }
+                            : AutomationTarget { AutomationTargetKind::mixerPan, track, 0, 0 };
+        const auto index = addAutomation (song, target, "Automation " + std::to_string (a + 1), wavePoints ((double) bars * 4.0, 0.5, 0.3f, 0.8f, a));
+        addAutomationClip (song, index, channels + a, 0, (std::int64_t) bars * 4 * ppq);
+    }
+    song.mode = PlayMode::song;
+    return song;
+}
+
 // a scenario by name (`folder` for the audio files' paths); nullopt-like empty song name check is up to the caller
 inline bool make (const std::string& name, Song& song, Samples& samples, const std::string& folder = {})
 {
@@ -520,6 +584,8 @@ inline bool make (const std::string& name, Song& song, Samples& samples, const s
         song = big200 (samples, folder.empty() ? "/big200" : folder);
     else if (name == "automation")
         song = automation();
+    else if (name == "q3big")
+        song = q3big();
     else
         return false;
     return true;
