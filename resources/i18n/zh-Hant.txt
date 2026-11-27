@@ -12659,3 +12659,5 @@ countries: tw hk mo
 "Move this rule up (the first matching rule wins)" = "上移此規則（第一個符合的規則生效）"
 "Move this rule down" = "下移此規則"
 "Typing keyboard settings" = "電腦鍵盤當鋼琴的設定"
+"Continuous scrolling" = "連續捲動"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "跟隨：歌曲播放時播放清單隨播放頭一起捲動。右鍵點擊：連續捲動；關閉時可自由瀏覽"

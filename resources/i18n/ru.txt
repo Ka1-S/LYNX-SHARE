@@ -12659,3 +12659,5 @@ countries: ru by kz
 "Move this rule up (the first matching rule wins)" = "Переместить правило выше (срабатывает первое подходящее правило)"
 "Move this rule down" = "Переместить правило ниже"
 "Typing keyboard settings" = "Настройки клавиатуры ПК как пианино"
+"Continuous scrolling" = "Непрерывная прокрутка"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Следовать: плейлист прокручивается вместе с курсором воспроизведения во время проигрывания песни. Правый клик: Непрерывная прокрутка; если выключено, можно свободно осматриваться"

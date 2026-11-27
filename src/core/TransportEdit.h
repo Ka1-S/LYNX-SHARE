@@ -128,6 +128,18 @@ inline double followViewStart (double viewStart, double viewTicks, double tick, 
     return viewStart;
 }
 
+// Follow, continuously: the playhead stays fixed at leadTicks from the view's left edge at all times, the view
+// scrolling smoothly to match — instead of jumping a page once the playhead leaves it (followViewStart above).
+// Rounded to whole pixels: PlaylistComponent::cacheShift() only takes its cheap shift-the-picture path on a whole-
+// pixel scroll (FW review: a fractional scroll every frame forced a full repaint, 74.6M instructions a frame).
+inline double followViewStartContinuous (double tick, double leadTicks, double pixelsPerTick)
+{
+    if (tick < 0.0)
+        return 0.0;
+    const auto raw = std::max (0.0, tick - leadTicks);
+    return pixelsPerTick > 0.0 ? std::round (raw * pixelsPerTick) / pixelsPerTick : raw; 
+}
+
 // Follow inside a loop of `loopTicks` (the Piano Roll in Pattern mode: the pattern's length; feedback 190bm: "it always
 // jumps when it reaches the end"). The playhead never passes the loop's end, so:
 //  - a view that already shows the loop's end doesn't page forward when the playhead nears its right edge (the right

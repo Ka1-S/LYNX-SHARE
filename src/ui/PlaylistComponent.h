@@ -795,6 +795,7 @@ private:
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
     void showRulerMenu (int x, int y = -1);               // markers, time signature and loop
+    void showFollowMenu();                                // right-click on Follow: "Continuous scrolling"
 public:
     // (round 190ol: the menu itself, also for the shots). Issue #281 (round 190qr): `y` is the press; on a marker's tag
     // (markerTagAt) the menu is that marker's, wherever on the tag, as FL's

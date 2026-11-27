@@ -12659,3 +12659,5 @@ countries: jp
 "Move this rule up (the first matching rule wins)" = "このルールを上へ移動（最初に一致したルールが優先）"
 "Move this rule down" = "このルールを下へ移動"
 "Typing keyboard settings" = "タイピングキーボードの設定"
+"Continuous scrolling" = "連続スクロール"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "フォロー：曲の再生中に再生ヘッドに合わせてプレイリストがスクロールします。右クリック：連続スクロール；オフにすると自由に周囲を見渡せます"
