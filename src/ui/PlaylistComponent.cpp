@@ -16536,6 +16536,16 @@ bool PlaylistComponent::playheadTrailOn() const
     return ui::motion::enabled() && engine.getTransport().playing.load (std::memory_order_relaxed) && playheadTick >= 0.0;
 }
 
+// The screen's pixels per component pixel (the window's DPI scale x the desktop scale x any transform): the scale the cached
+// picture is drawn at. (getApproximateScaleFactorForComponent alone leaves out the peer's DPI scale and divides the global
+// scale back out: 1 at Windows' 150 % and at LYNX_UIPERF_SCALE=150.)
+static double screenPixelScale (const juce::Component& c)
+{
+    const auto* peer = c.getPeer();
+    return (double) juce::Component::getApproximateScaleFactorForComponent (&c) * (double) juce::Desktop::getInstance().getGlobalScaleFactor()
+           * (peer != nullptr ? peer->getPlatformScaleFactor() : 1.0);
+}
+
 bool PlaylistComponent::liveFrame (double nowMs)
 {
     const auto feel = feelFrame (nowMs); // round 190qe: the edge scroll of a drag, the zoom glide
@@ -16598,7 +16608,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
         // has none here: the view stays put, as with the option off), and in whole steps of the screen's pixels (2 px at
         // 150 %), so the cached picture is shifted and only the uncovered strip is painted (repaintScrolled)
         const auto continuous = EditorGlobals::get().isContinuousScroll() && tick >= 0.0;
-        const auto quantum = continuous ? (double) edgescroll::wholeQuantum (juce::Component::getApproximateScaleFactorForComponent (this)) : 1.0;
+        const auto quantum = continuous ? (double) edgescroll::wholeQuantum (screenPixelScale (*this)) : 1.0;
         const auto newStart = continuous ? transportedit::followViewStartContinuous (tick, grid.getWidth() / 3.0 / pixelsPerTick, pixelsPerTick / quantum)
                                          : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                            20.0 / pixelsPerTick);
