@@ -34,6 +34,11 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- A double click on a sample in the Browser previews it, as in FL Studio 2026 (it added a channel); adding it is the new LYNX
+  extra *Double-click a sample in the Browser to add it to a new channel*, off by default. The Clip-launch layout always adds (#323).
+- Lighter when idle: the output display's oscilloscope and spectrum stop drawing once silence has settled their picture, and FL
+  Studio's plugin database is kept between starts (only changed files are read again): a later empty start uses about a
+  quarter of the CPU it did.
 - The Simple layout: a sound dragged onto the timeline becomes a track there, as in BandLab.
 - **Faster with FL Studio's data and big projects:** F8, the Add menu, layout switches and opening a project no longer walk
   FL Studio's plugin database folders to know which FL engines LYNX has (F8 took 30.8 s with FL's data on a slow drive, now
@@ -98,6 +103,7 @@ The short version of each release. The full notes, with measurements, known issu
   returns used only for sends stay returns.
 - DAWproject export writes a sample other apps can't read as lossless FLAC only when its audio is exactly 16- or 24-bit;
   copying samples for an export is faster and checked as it goes.
+- A looped time selection that runs past the song's end no longer plays the clips at the end again (#324).
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
   save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
   third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
