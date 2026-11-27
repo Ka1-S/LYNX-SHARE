@@ -13156,3 +13156,6 @@ countries: kr
 "Choose another..." = "다른 장치 선택..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0}이(가) 여전히 응답하지 않습니다. LYNX SHARE는 당분간 {1}을(를) 사용합니다."
 "no audio device" = "오디오 장치 없음"
+"Continuous scrolling" = "연속 스크롤"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "따라가기: 곡이 재생되는 동안 재생 헤드를 따라 플레이리스트가 스크롤됩니다. 우클릭: 연속 스크롤; 끄면 자유롭게 둘러볼 수 있습니다"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "팔로우: 노래가 재생되는 동안 플레이리스트가 재생 헤드와 함께 스크롤됩니다. 오른쪽 클릭: 연속 스크롤; 끄면 자유롭게 둘러볼 수 있습니다"

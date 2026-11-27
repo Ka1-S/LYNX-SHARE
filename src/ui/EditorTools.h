@@ -267,6 +267,15 @@ public:
         return v == FollowView::channelRack ? followRack : v == FollowView::audioEditor ? followAudioEditor : isFollowing (v == FollowView::pianoRoll);
     }
     void setFollowingView (FollowView v, bool on, bool save = true);
+    // Playlist only: the view scrolls smoothly, the playhead fixed near the left edge — instead of jumping a page
+    // once the playhead reaches the view's edge. FL's Follow right-click menu, "Continuous scrolling".
+    bool isContinuousScroll() const noexcept { return continuousScrollPlaylist; }
+    void setContinuousScroll (bool on)
+    {
+        continuousScrollPlaylist = on;
+        if (onOptionsChanged)
+            onOptionsChanged();
+    }
     // Round 190im (R15, owner decision L3; Live's manual 6.2 / 8.7: "Follow will pause if you make an edit or scroll the
     // view horizontally", it goes on with the next play / stop or a Follow click): a view's Follow pauses after a scroll
     // or an edit by hand. −1 = as the layout: on in the Clip-launch workflow, off in the others until FL's behaviour is
@@ -302,6 +311,7 @@ private:
     int gridOption = grid::screenOption, lastGridOption = grid::screenOption;
     std::int64_t defaultNoteLength = 0;
     bool followPlaylist = true, followPianoRoll = true, followRack = true, followAudioEditor = true;
+    bool continuousScrollPlaylist = false;
     followpause::State followState; // round 190im: the pauses [FollowView] (round 190kp: core/FollowPause.h)
 };
 

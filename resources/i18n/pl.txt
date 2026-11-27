@@ -13156,3 +13156,6 @@ countries: pl
 "Choose another..." = "Wybierz inne..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} nadal nie odpowiada. LYNX SHARE na razie używa {1}."
 "no audio device" = "brak urządzenia audio"
+"Continuous scrolling" = "Ciągłe przewijanie"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Śledź: Playlista przewija się wraz z głowicą odtwarzania podczas odtwarzania utworu. Prawy przycisk myszy: Ciągłe przewijanie; po wyłączeniu możesz swobodnie rozglądać się po widoku"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Śledzenie: Lista odtwarzania przewija się wraz z głowicą odtwarzania podczas odtwarzania utworu. Kliknięcie prawym przyciskiem: Ciągłe przewijanie; po wyłączeniu możesz swobodnie przeglądać"

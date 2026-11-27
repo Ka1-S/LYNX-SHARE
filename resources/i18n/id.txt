@@ -13156,3 +13156,6 @@ countries: id
 "Choose another..." = "Pilih yang lain..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} masih tidak menjawab. LYNX SHARE untuk sementara memakai {1}."
 "no audio device" = "tidak ada perangkat audio"
+"Continuous scrolling" = "Gulir berkelanjutan"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Ikuti: Playlist bergulir mengikuti playhead saat lagu diputar. Klik kanan: Gulir berkelanjutan; nonaktif, Anda dapat melihat-lihat dengan bebas"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Ikuti: Playlist menggulir bersama kepala pemutaran saat lagu diputar. Klik kanan: Pengguliran berkelanjutan; jika dimatikan, Anda dapat melihat dengan bebas"

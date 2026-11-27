@@ -4161,6 +4161,8 @@ void MainComponent::loadUiSettings()
             touchMadeLarge = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
+        else if (key == "playlistContinuousScroll")
+            EditorGlobals::get().setContinuousScroll (on);
         else if (key == "followChannelRack" || key == "followAudioEditor")
             EditorGlobals::get().setFollowingView (key == "followChannelRack" ? EditorGlobals::FollowView::channelRack
                                                                                : EditorGlobals::FollowView::audioEditor, on, false);
@@ -4492,6 +4494,7 @@ void MainComponent::saveUiSettings()
                                       + "\ntouchModeAsked=" + juce::String (ui::touchmode::asked() ? 1 : 0)
                                       + "\ntouchModeLarge=" + juce::String (touchMadeLarge ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
+                                      + "\nplaylistContinuousScroll=" + juce::String (EditorGlobals::get().isContinuousScroll() ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
                                       + "\nfollowAudioEditor=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor) ? 1 : 0)

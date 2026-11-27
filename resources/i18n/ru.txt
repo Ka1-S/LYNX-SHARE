@@ -13156,3 +13156,6 @@ countries: ru by kz
 "Choose another..." = "Выбрать другое..."
 "{0} still did not answer. LYNX SHARE uses {1} for now." = "{0} по-прежнему не отвечает. LYNX SHARE пока использует {1}."
 "no audio device" = "нет аудиоустройства"
+"Continuous scrolling" = "Непрерывная прокрутка"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Следовать: плейлист прокручивается вместе с курсором воспроизведения во время проигрывания песни. Правый клик: Непрерывная прокрутка; если выключено, можно свободно осматриваться"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Следование: плейлист прокручивается вместе с указателем воспроизведения во время проигрывания композиции. Правая кнопка мыши: Непрерывная прокрутка; при отключении можно свободно перемещаться"
