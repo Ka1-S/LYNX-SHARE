@@ -12795,3 +12795,4 @@ countries: br
 "Typing keyboard settings" = "Configurações do teclado do PC como piano"
 "Continuous scrolling" = "Rolagem contínua"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Seguir: a Playlist rola junto com o cursor de reprodução enquanto a música toca. Clique com o botão direito: Rolagem contínua; desativada, você pode navegar livremente"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Seguir: a Playlist rola junto com o cursor de reprodução enquanto a música toca. Clique com o botão direito: Rolagem contínua; desativada, você pode navegar livremente"

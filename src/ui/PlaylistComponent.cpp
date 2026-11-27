@@ -1269,7 +1269,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     followButton.setFlat (true);
     followButton.setClickingTogglesState (false);
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
-    followButton.setTooltip (tr ("Follow: the Playlist scrolls along with the playhead while the song play. Right-click: Continuous scrolling; off, you can look around freely"));
+    followButton.setTooltip (tr ("Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely"));
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("playlist.follow"); };
     followButton.onRightClick = [this] { showFollowMenu(); };

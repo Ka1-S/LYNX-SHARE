@@ -12661,3 +12661,4 @@ countries: de at ch li lu
 "Typing keyboard settings" = "Einstellungen: Tastatur als Klavier"
 "Continuous scrolling" = "Kontinuierliches Scrollen"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Folgen: Die Playlist scrollt mit dem Abspielkopf mit, während der Song läuft. Rechtsklick: Kontinuierliches Scrollen; deaktiviert, kannst du dich frei umsehen"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Folgen: Die Playlist scrollt zusammen mit dem Abspielmarker, solange das Lied läuft. Rechtsklick: Kontinuierliches Scrollen; ausgeschaltet kannst du frei navigieren"

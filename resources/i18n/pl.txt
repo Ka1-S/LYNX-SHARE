@@ -12661,3 +12661,4 @@ countries: pl
 "Typing keyboard settings" = "Ustawienia klawiatury jako pianina"
 "Continuous scrolling" = "Ciągłe przewijanie"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Śledź: Playlista przewija się wraz z głowicą odtwarzania podczas odtwarzania utworu. Prawy przycisk myszy: Ciągłe przewijanie; po wyłączeniu możesz swobodnie rozglądać się po widoku"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "Śledzenie: Lista odtwarzania przewija się wraz z głowicą odtwarzania podczas odtwarzania utworu. Kliknięcie prawym przyciskiem: Ciągłe przewijanie; po wyłączeniu możesz swobodnie przeglądać"

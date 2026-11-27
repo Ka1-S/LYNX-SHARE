@@ -12661,3 +12661,4 @@ countries: tw hk mo
 "Typing keyboard settings" = "電腦鍵盤當鋼琴的設定"
 "Continuous scrolling" = "連續捲動"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "跟隨：歌曲播放時播放清單隨播放頭一起捲動。右鍵點擊：連續捲動；關閉時可自由瀏覽"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "跟隨：播放歌曲時，播放清單會與播放游標一起捲動。按一下右鍵：連續捲動；關閉後，可自由瀏覽"

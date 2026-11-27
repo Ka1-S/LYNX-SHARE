@@ -12661,3 +12661,4 @@ countries: jp
 "Typing keyboard settings" = "タイピングキーボードの設定"
 "Continuous scrolling" = "連続スクロール"
 "Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "フォロー：曲の再生中に再生ヘッドに合わせてプレイリストがスクロールします。右クリック：連続スクロール；オフにすると自由に周囲を見渡せます"
+"Follow: the Playlist scrolls along with the playhead while the song plays. Right-click: Continuous scrolling; off, you can look around freely" = "フォロー：曲の再生中、再生ヘッドに合わせてプレイリストをスクロールします。右クリック：連続スクロール；オフの場合は自由に表示範囲を移動できます"
