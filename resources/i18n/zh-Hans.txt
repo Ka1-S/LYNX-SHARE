@@ -13108,3 +13108,8 @@ countries: cn sg
 "On by default." = "默认打开。"
 "Zoom keys: LYNX's anchor, and Shift+5 again goes back (LYNX)" = "缩放键：LYNX 的锚点，再按 Shift+5 返回 (LYNX)"
 "PgUp and PgDn zoom the Playlist and the Piano roll around the playhead while it plays on screen, else around the selected clips or notes, else around the view's centre, and the zoom-to-selection key (Shift+5) pressed again goes back to the view before. Off, as in FL Studio: the keys zoom around the mouse pointer (or keep the view's left edge when the pointer is elsewhere) and Shift+5 pressed again changes nothing. Always on in the Clip-launch and Simple layouts. Also in the Playlist ruler's right-click menu › Zoom." = "PgUp 和 PgDn 在播放头于屏幕上播放时围绕播放头缩放播放列表和钢琴卷帘，否则围绕所选片段或音符，再否则围绕视图中心；再次按下缩放到所选内容的键（Shift+5）会回到之前的视图。关闭时与 FL Studio 相同：按键围绕鼠标指针缩放（指针在别处时保持视图左边缘），再次按 Shift+5 不会改变任何东西。在 Clip-launch 和 Simple 布局中始终开启。也在播放列表标尺的右键菜单 › 缩放中。"
+"Move a knob/fader on the MIDI controller to link it to the parameter... (Esc cancels)" = "在MIDI控制器上转动一个旋钮/推子，将其关联到该参数...（按 Esc 取消）"
+"{0} can't be routed to {1}: that would make a loop" = "无法将 {0} 路由到 {1}：会形成回路"
+"The sound of {0} already reaches {1}." = "{0} 的声音已经进入 {1}。"
+"{0} more route(s) would make a loop too." = "另有 {0} 个路由也会形成回路。"
+"the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "采样率从 {0} Hz 变为 {1} Hz，因此录音在此处停止（此前录下的片段已保留）"
