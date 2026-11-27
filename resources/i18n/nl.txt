@@ -13113,3 +13113,6 @@ countries: nl be
 "The sound of {0} already reaches {1}." = "Het geluid van {0} komt al bij {1} aan."
 "{0} more route(s) would make a loop too." = "Nog {0} route(s) zou(den) ook een lus maken."
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "de samplefrequentie veranderde van {0} Hz naar {1} Hz, dus de opname stopte daar (de take tot dat punt blijft bewaard)"
+"The selected plugin is about to be deleted." = "De geselecteerde plug-in wordt zo verwijderd."
+"Delete plugin" = "Plug-in verwijderen"
+"Save the selected mixer track's state as..." = "Status van het geselecteerde mixerkanaal opslaan als..."

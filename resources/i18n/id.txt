@@ -13113,3 +13113,6 @@ countries: id
 "The sound of {0} already reaches {1}." = "Suara {0} sudah sampai ke {1}."
 "{0} more route(s) would make a loop too." = "{0} rute lain juga akan membuat loop."
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "sample rate berubah dari {0} Hz ke {1} Hz, jadi perekaman berhenti di situ (take sampai titik itu tetap disimpan)"
+"The selected plugin is about to be deleted." = "Plugin yang dipilih akan dihapus."
+"Delete plugin" = "Hapus plugin"
+"Save the selected mixer track's state as..." = "Simpan status trek mixer yang dipilih sebagai..."

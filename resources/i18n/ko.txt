@@ -13113,3 +13113,6 @@ countries: kr
 "The sound of {0} already reaches {1}." = "{0}의 소리가 이미 {1}에 도달합니다."
 "{0} more route(s) would make a loop too." = "{0}개의 라우팅도 루프가 생깁니다."
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "샘플레이트가 {0} Hz에서 {1} Hz로 바뀌어 녹음이 그 지점에서 멈췄습니다 (그 지점까지의 테이크는 유지됩니다)"
+"The selected plugin is about to be deleted." = "선택한 플러그인이 삭제됩니다."
+"Delete plugin" = "플러그인 삭제"
+"Save the selected mixer track's state as..." = "선택한 믹서 트랙 상태를 다른 이름으로 저장..."

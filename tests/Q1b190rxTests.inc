@@ -169,3 +169,35 @@ TEST (q1b190rx_sample_rate_change_ends_the_take)
     CHECK (finish != std::string::npos && stopRec != std::string::npos && finish < stopRec); // (no take open when setRecording re-enters)
     CHECK (update.find ("notify (InputIssue::failed, 0,") != std::string::npos);
 }
+
+// FL 2026 (checked live, round 190rx): the Mixer slot menu's "Delete..." asks "The selected plugin is about to be
+// deleted." (Ok / Cancel, Remember my choice); LYNX deleted at once. Del with the menu open is the same command.
+TEST (q1b190rx_slot_delete_asks_first)
+{
+    const auto ui = i18ntest::readFile ("src/ui/MixerComponent.cpp");
+    CHECK (ui.find ("menu.addItem (tr (\"Delete...\") + \"\\tDel\", [this, slot] { askDeleteSlot (slot); });") != std::string::npos);
+    CHECK (ui.find ("safe->askDeleteSlot (slot);") != std::string::npos);
+    const auto ask = q1b190rx::between (ui, "void EffectsPanel::askDeleteSlot (int slot)", "void EffectsPanel::deleteSlot (int slot)");
+    CHECK (ask.find ("tr (\"The selected plugin is about to be deleted.\")") != std::string::npos);
+    CHECK (ask.find ("messages::shown (\"DeletePlugin\")") != std::string::npos && ask.find ("messages::setShown (\"DeletePlugin\", false)") != std::string::npos);
+    const auto dialogs = i18ntest::readFile ("src/ui/Dialogs.cpp");
+    CHECK (dialogs.find ("{ \"DeletePlugin\", TR_NOOP (\"Delete plugin\"), TR_NOOP (\"File/Data\") }") != std::string::npos);
+}
+
+// FL 2026 (checked live): Ctrl+Shift+S with the Mixer focused saves the selected track's state (.fst Save as); LYNX
+// opened the project's Save as. The Mixer context now has it; elsewhere it stays Save as.
+TEST (q1b190rx_ctrl_shift_s_in_the_mixer)
+{
+    using namespace lynx;
+    bool mixer = false, global = false;
+    for (const auto& a : keys::actions())
+    {
+        if (a.id == std::string ("mixer.saveTrackState"))
+            mixer = a.context == keys::Context::mixer;
+        if (a.id == std::string ("file.saveAs"))
+            global = a.context == keys::Context::global;
+    }
+    CHECK (mixer && global);
+    const auto ui = i18ntest::readFile ("src/ui/MixerComponent.cpp");
+    CHECK (ui.find ("else if (id == \"mixer.saveTrackState\")") != std::string::npos);
+}

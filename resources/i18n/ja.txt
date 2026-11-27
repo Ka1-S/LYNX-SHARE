@@ -13113,3 +13113,6 @@ countries: jp
 "The sound of {0} already reaches {1}." = "{0} の音はすでに {1} に届いています。"
 "{0} more route(s) would make a loop too." = "ほかに {0} 件のルーティングもループになります。"
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "サンプルレートが {0} Hz から {1} Hz に変わったため、録音はそこで止まりました（その時点までのテイクは残ります）"
+"The selected plugin is about to be deleted." = "選択したプラグインを削除します。"
+"Delete plugin" = "プラグインを削除"
+"Save the selected mixer track's state as..." = "選択したミキサートラックの状態に名前を付けて保存..."

@@ -13113,3 +13113,6 @@ countries: tr
 "The sound of {0} already reaches {1}." = "{0} kanalının sesi zaten {1} kanalına ulaşıyor."
 "{0} more route(s) would make a loop too." = "{0} yönlendirme daha da döngü oluşturur."
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "örnekleme hızı {0} Hz'den {1} Hz'e değişti, bu yüzden kayıt orada durdu (o noktaya kadarki kayıt korunur)"
+"The selected plugin is about to be deleted." = "Seçili eklenti silinmek üzere."
+"Delete plugin" = "Eklentiyi sil"
+"Save the selected mixer track's state as..." = "Seçili mikser kanalının durumunu farklı kaydet..."

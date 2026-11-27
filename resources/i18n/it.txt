@@ -13113,3 +13113,6 @@ countries: it ch sm
 "The sound of {0} already reaches {1}." = "Il suono di {0} arriva già a {1}."
 "{0} more route(s) would make a loop too." = "Anche altri {0} instradamenti creerebbero un loop."
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "la frequenza di campionamento è passata da {0} Hz a {1} Hz, quindi la registrazione si è fermata lì (la ripresa fino a quel punto è conservata)"
+"The selected plugin is about to be deleted." = "Il plugin selezionato sta per essere eliminato."
+"Delete plugin" = "Elimina plugin"
+"Save the selected mixer track's state as..." = "Salva lo stato della traccia del mixer selezionata come..."

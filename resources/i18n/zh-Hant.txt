@@ -13113,3 +13113,6 @@ countries: tw hk mo
 "The sound of {0} already reaches {1}." = "{0} 的聲音已經進入 {1}。"
 "{0} more route(s) would make a loop too." = "另有 {0} 個路由也會形成迴路。"
 "the sample rate changed from {0} Hz to {1} Hz, so the recording stopped there (the take up to that point is kept)" = "取樣率從 {0} Hz 變為 {1} Hz，因此錄音在此處停止（此前錄下的片段已保留）"
+"The selected plugin is about to be deleted." = "所選外掛即將被刪除。"
+"Delete plugin" = "刪除外掛"
+"Save the selected mixer track's state as..." = "將所選混音器軌道的狀態另存為..."
