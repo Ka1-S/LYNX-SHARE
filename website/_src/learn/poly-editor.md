@@ -7,7 +7,7 @@ summary: The polyphonic editor finds every note of an audio clip, chords include
 ![The audio clip's menu: Edit notes (polyphonic)...](/assets/img/learn/poly-editor-1.webp)
 
 1. Right-click an audio clip in the Playlist and choose `Edit notes (polyphonic)...`.
-2. The first time, LYNX SHARE analyses the clip in the background, with a progress bar and `Cancel`. The notes are saved with the project, so it never analyses the same clip twice.
+2. The first time, LYNX SHARE analyzes the clip in the background, with a progress bar and `Cancel`. The notes are saved with the project, so it never analyzes the same clip twice.
 
 ## Move a note
 

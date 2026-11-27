@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 

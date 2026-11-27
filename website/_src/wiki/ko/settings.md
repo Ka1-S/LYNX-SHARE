@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![위쪽에 페이지 탭이 늘어선 설정 창의 일반 페이지](/assets/img/wiki/settings-general.webp)
 

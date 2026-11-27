@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![Het exportvenster met WAV gekozen: bereik, staart en bestanden links, formaat rechts, mixopties eronder](/assets/img/wiki/export.webp)
 

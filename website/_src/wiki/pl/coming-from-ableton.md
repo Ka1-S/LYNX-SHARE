@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 

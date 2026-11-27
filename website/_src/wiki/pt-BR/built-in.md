@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![A paleta de inserção rápida: instrumentos à esquerda, efeitos à direita, cada um marcado como embutido ou motor FL embutido](/assets/img/wiki/quickadd.webp)
 

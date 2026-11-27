@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![元に戻す履歴ウィンドウ。StartからAdd notesまでの6ステップがあり、Mute: Kickが現在のステップ](/assets/img/wiki/history.webp)
 

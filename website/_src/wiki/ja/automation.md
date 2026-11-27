@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![6小節かけて上昇するカーブを表示したオートメーションエディター](/assets/img/wiki/automation.webp)
 

@@ -1171,7 +1171,7 @@ std::string controlText (const State& s, int index, int raw)
     };
     const auto pan = [&] {
         if (raw == 0)
-            std::snprintf (text, sizeof (text), "Centred");
+            std::snprintf (text, sizeof (text), "Centered");
         else
             std::snprintf (text, sizeof (text), "%d%% %s", (int) std::lround (std::abs (raw) * 100.0 / 128.0), raw < 0 ? "left" : "right");
     };

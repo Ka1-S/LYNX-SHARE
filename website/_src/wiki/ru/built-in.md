@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Палитра быстрого добавления: инструменты слева, эффекты справа, у каждого пометка built-in или built-in FL engine](/assets/img/wiki/quickadd.webp)
 

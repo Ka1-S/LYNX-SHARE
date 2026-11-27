@@ -1,5 +1,5 @@
 ---
-source: b72fd5c175
+source: 6916fc82b3
 ---
 ![管理快捷键窗口：可搜索的动作列表及每个动作的按键](/assets/img/wiki/shortcuts.webp)
 

@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![Okno Historia cofania: sześć kroków od Start do Add notes, z Mute: Kick jako bieżącym](/assets/img/wiki/history.webp)
 

@@ -15,13 +15,23 @@
             checks.add ((ok ? "ok   " : "FAIL ") + what);
             allOk = allOk && ok;
         };
-        const auto both = [&prefix, &made] (juce::Component& c, juce::Rectangle<int> area, const juce::String& name) {
+        // round 190sc: LYNX_DESIGN_SCALES="1,1.25,1.5" picks the pixel scales (default 1 and 1.5; "@125" etc. after the
+        // name) and LYNX_DESIGN_SIZE="1536x864" the window's logical size (default 1920x1080: a 1080p screen at 125 %
+        // is 1536x864, at 150 % 1280x720)
+        std::vector<float> scales;
+        for (const auto& t : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_DESIGN_SCALES", "1,1.5"), ",", {}))
+            if (const auto v = t.trim().getFloatValue(); v >= 0.5f && v <= 4.0f)
+                scales.push_back (v);
+        if (scales.empty())
+            scales = { 1.0f, 1.5f };
+        const auto both = [&prefix, &made, &scales] (juce::Component& c, juce::Rectangle<int> area, const juce::String& name) {
             area = area.getIntersection (c.getLocalBounds());
             if (area.isEmpty())
                 return;
             checkTextFit (c, name);
-            savePng (c.createComponentSnapshot (area, true, 1.0f), prefix + "-" + name + ".png");
-            savePng (c.createComponentSnapshot (area, true, 1.5f), prefix + "-" + name + "@150.png");
+            for (const auto s : scales)
+                savePng (c.createComponentSnapshot (area, true, s),
+                         prefix + "-" + name + (s == 1.0f ? juce::String() : "@" + juce::String (juce::roundToInt (s * 100.0f))) + ".png");
             made.add (name);
         };
 
@@ -38,7 +48,11 @@
 
         AudioEngine offline (false);
         MainComponent ui (offline, false);
-        ui.setSize (1920, 1080);
+        {
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_DESIGN_SIZE", "1920x1080"), "x", {});
+            const auto w = size.size() == 2 ? size[0].getIntValue() : 0, h = size.size() == 2 ? size[1].getIntValue() : 0;
+            ui.setSize (w >= 800 && h >= 500 ? w : 1920, w >= 800 && h >= 500 ? h : 1080);
+        }
         ui.setVisible (true);
         const auto settle = [&offline] {
             for (int k = 0; k < 4; ++k)

@@ -1,5 +1,5 @@
 ---
-source: b72fd5c175
+source: 6916fc82b3
 ---
 ![La finestra Gestisci scorciatoie: un elenco di azioni con ricerca e i tasti di ciascuna](/assets/img/wiki/shortcuts.webp)
 

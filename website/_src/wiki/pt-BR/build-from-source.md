@@ -1,5 +1,5 @@
 ---
-source: edc71061e6
+source: 64e7f0c3eb
 ---
 O LYNX SHARE é escrito em C++20 com JUCE 8 e compilado com CMake. O código-fonte está em [github.com/Ka1-S/LYNX-SHARE](https://github.com/Ka1-S/LYNX-SHARE), sob a GNU Affero General Public License v3.0. Os arquivos das versões são compilados a partir do código com tag pelo GitHub Actions, então você só precisa desta página para alterar o código ou compilar por conta própria.
 

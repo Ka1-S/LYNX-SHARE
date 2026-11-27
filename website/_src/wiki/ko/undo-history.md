@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![실행 취소 기록 창: 시작부터 노트 추가까지 여섯 단계이며, 현재 단계는 Mute: Kick](/assets/img/wiki/history.webp)
 

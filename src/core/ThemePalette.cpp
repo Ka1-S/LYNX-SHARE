@@ -161,12 +161,20 @@ std::uint32_t withAlpha (std::uint32_t c, double alpha)
 }
 } // namespace
 
+std::uint32_t accentTextFill (const Palette& p)
+{
+    if ((p.accent | 0xff000000u) == defaultAccent && (p.onAccent | 0xff000000u) == 0xffffffffu)
+        return defaultAccentTextFill;
+    return withContrast (p.accent, p.onAccent, accentTextContrastFloor);
+}
+
 ButtonLook buttonLook (const Palette& p, ButtonKind kind, bool on, double hoverIn, bool down, bool enabled)
 {
     const auto hover = enabled ? std::clamp (hoverIn, 0.0, 1.0) : 0.0;
     const auto flat = kind != ButtonKind::secondary;
-    // text drawn on the accent keeps 4.5:1 (LYNX red with white text is 4.2:1: a hair deeper red where text sits on it)
-    const auto accentFill = flat ? p.accent : withContrast (p.accent, p.onAccent, textContrastFloor);
+    // text drawn on the accent keeps its contrast (LYNX red with white text is 4.2:1: a hair deeper red where text sits on
+    // it, accentTextFill); hover lights only the edge, pressed is accentPressed (5.8:1)
+    const auto accentFill = flat ? p.accent : accentTextFill (p);
     ButtonLook look {};
 
     if (! enabled)

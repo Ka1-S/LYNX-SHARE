@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: a6e85677ce
 ---
 ![Plugin yöneticisinin alt kısmı; her plugin dosyasının ayrı bir süreçte incelendiğini belirten notla](/assets/img/wiki/plugin-manager-scan.webp)
 

@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![WAV seçili dışa aktarma penceresi: solda aralık, kuyruk ve dosyalar, sağda format, altta miks seçenekleri](/assets/img/wiki/export.webp)
 

@@ -44,7 +44,7 @@ The letters work while the typing keyboard piano (`Ctrl+T`) is off.
 - Drag a clip's end to resize it. Dragging the start trims it while the content stays in place.
 - Right-click deletes a clip. `Ctrl`+drag selects.
 - Double-click a clip to open it.
-- The button at a clip's top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).
+- The button at a clip's top left opens the clip menu (make unique, rename and color, chop, and for audio: pitch, fit to tempo, reverse).
 - An audio clip's menu follows FL Studio's layout in two columns. The left column has the `Audio clip` section (`Preview`, `Muted`, `Rename and color...`, `Change color...`, `Random color`, `Change icon...`, `Select source channel`, `Channel settings`, `Make unique`, `Select all similar clips`, `Delete`, `Properties...`) and the `Region` section (`Select region`, `Chop`). The right column has `Sample` (`Make unique as sample`, `Edit sample`, `Extract stems from sample`, `Detect tempo`, `Fit to tempo`), `Automation` (`Automate › Panning` or `Volume`, `Crossfade with`) and `Fades` (`Reset fades`). LYNX SHARE's own items, such as `Split here`, `Reverse`, `Normalize` and `Convert to MIDI`, come last, below a line.
 - `Automate › Panning` or `Volume` makes an automation clip as long as the audio clip, on its track, for the channel's Levels adjustment pan or volume.
 - Hold `Alt` while dragging to ignore the snap.

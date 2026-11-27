@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![Окно истории отмен: шесть шагов от Start до Add notes, текущий шаг — Mute: Kick](/assets/img/wiki/history.webp)
 

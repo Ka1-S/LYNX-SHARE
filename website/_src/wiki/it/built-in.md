@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![La palette di aggiunta rapida: strumenti a sinistra, effetti a destra, ciascuno contrassegnato come integrato o motore FL integrato](/assets/img/wiki/quickadd.webp)
 

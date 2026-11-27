@@ -31,13 +31,13 @@ The Pattern layout, the default, works the way FL Studio does: the Channel rack,
 
 ## The grid
 
-A launched clip does not start at once. It waits for the next launch quantisation point, and its triangle blinks until then. The box at the bottom of the grid sets the global launch quantisation, which every clip set to `Global` uses. A stop waits in the same way.
+A launched clip does not start at once. It waits for the next launch quantization point, and its triangle blinks until then. The box at the bottom of the grid sets the global launch quantization, which every clip set to `Global` uses. A stop waits in the same way.
 
 Right-click a clip for its settings.
 
 | Setting | What it does |
 |---|---|
-| `Launch quantisation` | When this clip starts: `Global`, `None`, `8 bars` down to `1/32` |
+| `Launch quantization` | When this clip starts: `Global`, `None`, `8 bars` down to `1/32` |
 | `Launch mode` | `Trigger`, `Gate`, `Toggle` or `Repeat` |
 | `Legato (keep the position)` | The clip takes over the play position of the clip that played before on that track |
 | `Loop` | On: the clip repeats. Off: it plays once, then the track stops |

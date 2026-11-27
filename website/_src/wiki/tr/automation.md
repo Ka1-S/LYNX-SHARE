@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![Altı ölçü boyunca yükselen bir eğriyle Otomasyon düzenleyici](/assets/img/wiki/automation.webp)
 

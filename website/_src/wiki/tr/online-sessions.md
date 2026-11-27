@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Bir projede başkalarıyla çalışmanın iki yolu vardır ve ikisi de `Dosya › Çevrimiçi oturum` altındadır. Paket, bir arkadaşınıza gönderdiğiniz ve onun bir parti geri gönderdiği dosyadır. Ağ, hesap ya da sunucu gerektirmez. Canlı oturum ise herkesi internet üzerinden LYNX SHARE relay'i aracılığıyla bağlar ve her değişiklik herkese ulaşır. Bir projede siz dahil en fazla 4 kişi yer alır.
 

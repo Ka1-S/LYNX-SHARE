@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Hızlı ekleme paleti: solda enstrümanlar, sağda efektler; her biri dahili veya dahili FL motoru olarak etiketli](/assets/img/wiki/quickadd.webp)
 

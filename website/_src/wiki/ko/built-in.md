@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![빠른 추가 팔레트: 왼쪽에 악기, 오른쪽에 이펙트가 있고 각각 내장 또는 내장 FL 엔진 표시가 붙어 있다](/assets/img/wiki/quickadd.webp)
 

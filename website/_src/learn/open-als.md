@@ -1,6 +1,6 @@
 ---
 title: Open an Ableton Live set
-summary: Open a .als: tracks, clips, scenes, the arrangement and Live's colours come over, and you can export back to Live. The Clip-launch layout shows it as Live does.
+summary: Open a .als: tracks, clips, scenes, the arrangement and Live's colors come over, and you can export back to Live. The Clip-launch layout shows it as Live does.
 ---
 ## Open the .als
 
@@ -15,7 +15,7 @@ summary: Open a .als: tracks, clips, scenes, the arrangement and Live's colours 
 
 - MIDI, audio, group and return tracks, the tempo, the time signature, locators and the loop.
 - The arrangement, and session clips and scenes into the clip grid, with their launch settings.
-- The mixer: volume, pan, mute, solo, sends and their automation. Live's colours stay.
+- The mixer: volume, pan, mute, solo, sends and their automation. Live's colors stay.
 - VST2 and VST3 plugins with their state, when the same plugin is installed.
 
 ## Play and look at the devices

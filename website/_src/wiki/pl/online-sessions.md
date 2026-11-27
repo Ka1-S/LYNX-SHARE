@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Z innymi osobami można pracować nad projektem na dwa sposoby, oba w `Plik › Sesja online`. Paczka to plik, który wysyłasz znajomemu, a on odsyła partię z powrotem. Nie potrzebuje sieci, konta ani serwera. Sesja na żywo łączy wszystkich przez internet przez przekaźnik LYNX SHARE, a każda zmiana trafia do wszystkich. W jednym projekcie bierze udział do 4 osób, razem z tobą.
 

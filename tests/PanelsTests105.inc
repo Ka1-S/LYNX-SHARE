@@ -74,7 +74,7 @@ TEST (state_params_band_tables)
     const auto m2 = mbd->with (mstate, cell, 1 << 29);
     CHECK (mbdelay::parse (m2)->raw[(std::size_t) cell] == 1 << 29);
     CHECK (mbd->text (m2, cell, 1 << 29) == "50%");
-    CHECK (mbd->text (m2, 2 * 48 + 2 * 16, 1 << 29) == "Centred");
+    CHECK (mbd->text (m2, 2 * 48 + 2 * 16, 1 << 29) == "Centered");
     CHECK (mbd->get (mbd->with (mstate, 8 * 48 + 1, 2), 8 * 48 + 1).value_or (-1) == 2);
 
     // EQUO: (bank·31 + band)·3 + target, thousandths of FL's 0…2 cells

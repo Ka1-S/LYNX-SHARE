@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![A janela do histórico de desfazer: seis passos de Start a Add notes, com Mudo: Kick como o atual](/assets/img/wiki/history.webp)
 

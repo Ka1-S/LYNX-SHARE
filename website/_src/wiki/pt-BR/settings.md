@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![A página General da janela Configurações, com as abas de página ao longo do topo](/assets/img/wiki/settings-general.webp)
 

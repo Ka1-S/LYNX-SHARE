@@ -26,15 +26,15 @@ On first start, LYNX SHARE scans the plugin folders in the background while the 
 
 VST2 is not hosted on macOS. On Linux, Windows plugins work through [yabridge](https://github.com/robbert-vdh/yabridge) and Wine, which you install yourself: add the folder yabridge syncs to as a plugin folder.
 
-JSFX scripts, REAPER's effect and instrument format, run on every system: 31 free scripts (chokehold's, MIT licence) come with LYNX SHARE, in the Browser under `Plugin database › Effects › JSFX` and `Plugin database › Generators › JSFX` and in the plugin picker. Scripts in `Documents/LYNX/JSFX` and in REAPER's Effects folder are found too, and `Settings › Files › JSFX folders` adds more folders. LYNX SHARE shows a script's sliders in its own panel; a script that draws its own display shows its sliders only.
+JSFX scripts, REAPER's effect and instrument format, run on every system: 31 free scripts (chokehold's, MIT license) come with LYNX SHARE, in the Browser under `Plugin database › Effects › JSFX` and `Plugin database › Generators › JSFX` and in the plugin picker. Scripts in `Documents/LYNX/JSFX` and in REAPER's Effects folder are found too, and `Settings › Files › JSFX folders` adds more folders. LYNX SHARE shows a script's sliders in its own panel; a script that draws its own display shows its sliders only.
 
 ## The Plugin manager
 
 | Control | What it does |
 |---|---|
 | Search box | Filters by name, vendor, format or file |
-| `All`, `Instruments`, `Effects`, `Favourites`, `Failed` | Choose which plugins are listed |
-| Star column | Marks a favourite |
+| `All`, `Instruments`, `Effects`, `Favorites`, `Failed` | Choose which plugins are listed |
+| Star column | Marks a favorite |
 | `Bits` column | 32, 64 or 32+64 (Windows) |
 | `Status` column | `OK`, `File not found` or `Failed to load` |
 | `Find new plugins` | Scans for files that are not in the list yet |
@@ -103,7 +103,7 @@ FL Studio's native plugins, such as Sytrus, Harmor and Patcher, run only inside 
 3. In FL Studio's Channel rack, add an instrument. A new FL Studio plugin starts with one empty Sampler and makes no sound until you add one. Notes from LYNX SHARE play the channel selected in FL Studio's Channel rack.
 4. FL Studio's own patterns play when LYNX SHARE plays, at LYNX SHARE's tempo.
 
-What you build inside FL Studio is saved with the LYNX SHARE project. `FL Studio VSTi (Multi)` has 16 stereo outputs, which can play on separate inserts (see the section above). Your FL Studio licence decides which FL plugins work inside it. LYNX SHARE does not load FL Studio's plugin files by itself.
+What you build inside FL Studio is saved with the LYNX SHARE project. `FL Studio VSTi (Multi)` has 16 stereo outputs, which can play on separate inserts (see the section above). Your FL Studio license decides which FL plugins work inside it. LYNX SHARE does not load FL Studio's plugin files by itself.
 
 If the FL Studio plugin is listed as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
 

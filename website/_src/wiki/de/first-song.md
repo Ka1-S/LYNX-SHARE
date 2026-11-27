@@ -1,5 +1,5 @@
 ---
-source: 9bf58111cf
+source: 6b79d642bc
 ---
 Diese Seite geht einmal den ganzen Weg durch: ein Drum-Pattern, eine Melodie, ein Arrangement, ein Mix und eine exportierte Datei. Jeder Abschnitt verweist auf die Seite, die sein Fenster vollständig behandelt. Wenn du an irgendeiner Stelle nichts hörst, lies [Audio einrichten](/wiki/audio-setup/).
 

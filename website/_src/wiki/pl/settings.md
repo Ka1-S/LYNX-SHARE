@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![Strona Ogólne okna Ustawienia, z kartami stron na górze](/assets/img/wiki/settings-general.webp)
 

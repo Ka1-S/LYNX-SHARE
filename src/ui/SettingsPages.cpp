@@ -238,7 +238,7 @@ public:
         };
         // the translations added in 0.1.20: an invitation to improve them (GitHub issue form)
         translationLink.setFont (juce::FontOptions (13.0f), false, juce::Justification::centredLeft);
-        translationLink.setColour (juce::HyperlinkButton::textColourId, theme::colour::accent);
+        // (round 190sc: the theme's link colour, as every other link; the red accent read as an error and was 4.0:1 on the page)
         add (translationLink);
         updateTranslationLink();
 
@@ -989,7 +989,7 @@ private:
                                            "(fonts-noto-cjk or google-noto-sans-cjk-fonts), then restart LYNX SHARE.")
                                      : tr ("A new language is applied when LYNX SHARE restarts."),
                               juce::dontSendNotification);
-        languageNote.setColour (juce::Label::textColourId, noFont ? theme::colour::accent : theme::colour::textDisabled);
+        languageNote.setColour (juce::Label::textColourId, noFont ? theme::colour::warning : theme::colour::textDisabled); // (round 190sc: a missing item, not the accent)
         translationLink.setButtonText (tr ("New translation — suggestions welcome"));
         translationLink.setTooltip (tr ("Opens a GitHub issue to suggest a better translation"));
         translationLink.setURL (juce::URL ("https://github.com/Ka1-S/LYNX-SHARE/issues/new")

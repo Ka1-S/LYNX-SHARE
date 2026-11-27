@@ -11,7 +11,7 @@ summary: Pick a layout on the welcome card, then switch between Simple, Pattern 
    - `BandLab, FL Studio Mobile or GarageBand`: the Simple layout, one window with tracks, loops and quick recording.
    - `FL Studio`: the Pattern layout, with the Channel rack, Piano roll, Playlist and Mixer.
    - `Ableton Live or Bitwig`: the Clip-launch layout, with a grid of clips and scenes.
-   - `Logic, Cubase, Reaper, Pro Tools or Studio One`: the Simple layout with the Mixer at hand, one track per instrument on a timeline.
+   - `Logic, Cubase, REAPER, Pro Tools or Studio One`: the Simple layout with the Mixer at hand, one track per instrument on a timeline.
    - `I'm new to making music`: the Simple layout and a short first-song tour.
 3. Click one. Here we pick BandLab: the Simple layout opens with a starter beat on a Drums track.
 

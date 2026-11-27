@@ -1,5 +1,5 @@
 ---
-source: aad66b5125
+source: 0f5d8ab83e
 ---
 ![El Channel Rack con filas de pasos](/assets/img/rack.webp)
 

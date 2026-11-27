@@ -117,7 +117,7 @@ std::optional<Program> readInstrument (const std::string& path, const Access& ac
                            "in LYNX SHARE as audio files.";
             break;
         default:
-            report.error = "This is not a Kontakt instrument LYNX SHARE recognises.";
+            report.error = "This is not a Kontakt instrument LYNX SHARE recognizes.";
             break;
     }
     return std::nullopt;

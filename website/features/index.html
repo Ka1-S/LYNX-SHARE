@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="d42ac3a0";
+window.LYNX_LANG=lang;window.LYNX_V="00028658";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=d42ac3a0">
+<link rel="stylesheet" href="/assets/site.css?v=00028658">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -110,7 +110,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="frow narrow flip">
       <figure><a class="shot" href="/assets/img/rack.webp?v=0.1.31"><img src="/assets/img/rack.webp?v=0.1.31" srcset="/assets/img/rack.webp?v=0.1.31 1x, /assets/img/rack@2x.webp?v=0.1.31 2x" alt="Channel rack" loading="lazy" width="1074" height="420"></a></figure>
       <div><h3>Channel rack</h3>
-        <p data-i18n="fe.crP">A step sequencer with one row per instrument. Each channel has volume, pan, mute and solo, and each pattern its own name, colour and length.</p>
+        <p data-i18n="fe.crP">A step sequencer with one row per instrument. Each channel has volume, pan, mute and solo, and each pattern its own name, color and length.</p>
         <ul><li data-i18n="fe.crA">Swing, cut groups, an arpeggiator and layer channels</li><li data-i18n="fe.crB">The PC keyboard plays notes like a piano</li><li data-i18n="fe.crC">Freeze: a channel plays as audio and its instrument is unloaded</li><li data-i18n="fe.crD">Automation clips as rows of the rack, with steps that start them and range knobs, as in FL Studio</li><li data-i18n="fe.crE">Deactivate: a channel's instrument is unloaded until you need it again</li></ul>
       </div>
     </div>
@@ -118,8 +118,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="frow">
       <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.31"><img src="/assets/img/pianoroll.webp?v=0.1.31" srcset="/assets/img/pianoroll.webp?v=0.1.31 1x, /assets/img/pianoroll@2x.webp?v=0.1.31 2x" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
       <div><h3>Piano roll</h3>
-        <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colours, note groups, and slide and porta notes.</p>
-        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li><li data-i18n="fe.prE">Note chance, velocity range and Piano roll scripts</li><li data-i18n="fe.prF">Limit to a scale or chord, Scale levels, Flip and Randomize, as in FL Studio</li><li data-i18n="fe.prG">Key markers that change the key along the song, and a Scale degree chord stamp</li><li data-i18n="fe.prH">The Chord helper: related keys and borrowed chords for the selected chord, with favourites</li><li data-i18n="fe.prI">Up to five controller lanes stacked at once (a LYNX extra)</li></ul>
+        <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colors, note groups, and slide and porta notes.</p>
+        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li><li data-i18n="fe.prE">Note chance, velocity range and Piano roll scripts</li><li data-i18n="fe.prF">Limit to a scale or chord, Scale levels, Flip and Randomize, as in FL Studio</li><li data-i18n="fe.prG">Key markers that change the key along the song, and a Scale degree chord stamp</li><li data-i18n="fe.prH">The Chord helper: related keys and borrowed chords for the selected chord, with favorites</li><li data-i18n="fe.prI">Up to five controller lanes stacked at once (a LYNX extra)</li></ul>
       </div>
     </div>
 
@@ -144,7 +144,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="frow flip">
       <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/polyeditor.webp?v=0.1.31" aria-label="The polyphonic note editor: the top note of a recorded string chord moved up three semitones, then reset" data-i18n-aria="fe.peA"><source src="/assets/media/loops/polyeditor.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div><h3 data-i18n="fe.peT">Polyphonic note editor</h3>
-        <p data-i18n="fe.peP">Right-click an audio clip in the Playlist and choose Edit notes (polyphonic)... under LYNX extras: LYNX analyses the recording and shows each note of its chords on its own row. Drag a single note up or down to retune it (hold Alt for cents) or sideways to move it in time, while the rest of the chord stays as it was. This is a feature of LYNX's own, with no FL Studio counterpart.</p>
+        <p data-i18n="fe.peP">Right-click an audio clip in the Playlist and choose Edit notes (polyphonic)... under LYNX extras: LYNX analyzes the recording and shows each note of its chords on its own row. Drag a single note up or down to retune it (hold Alt for cents) or sideways to move it in time, while the rest of the chord stays as it was. This is a feature of LYNX's own, with no FL Studio counterpart.</p>
       </div>
     </div>
   </div>
@@ -186,7 +186,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <div class="frow">
       <figure class="loopfig"><video class="lp" muted loop playsinline preload="none" width="1280" height="720" poster="/assets/media/loops/cliplaunch.webp?v=0.1.31" aria-label="The Clip-launch layout: scenes launched one after another" data-i18n-aria="fe.clA2"><source src="/assets/media/loops/cliplaunch.mp4?v=0.1.31" type="video/mp4"></video></figure>
       <div>
-        <p data-i18n="fe.clP">The Clip-launch layout (View › Layout style) works in the style of Ableton Live: a grid of clips and scenes next to the Playlist, like Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
+        <p data-i18n="fe.clP">The Clip-launch layout (View › Layout style) works in the style of Ableton Live: a grid of clips and scenes next to the Playlist, like Live's Session view. Clips have launch modes, quantization, legato, loop and follow actions.</p>
         <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The FL Studio workflow stays the default and nothing changes in it.</p>
         <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs. Freeze Track and Bounce turn a track into audio, and Ableton Link keeps the tempo in sync with Live and other Link apps.</p>
         <p data-i18n="fe.clP4">In the Device View a rack shows its chains' devices inline, and Macro Map mode gives any device parameter to a macro. The Session mixer has Live's Solo / Cue, with a Cue Out for headphones.</p>
@@ -345,8 +345,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=d42ac3a0" defer></script>
-<script src="/assets/features.js?v=d42ac3a0" defer></script>
-<script src="/assets/motion.js?v=d42ac3a0" defer></script>
+<script src="/assets/site.js?v=00028658" defer></script>
+<script src="/assets/features.js?v=00028658" defer></script>
+<script src="/assets/motion.js?v=00028658" defer></script>
 </body>
 </html>

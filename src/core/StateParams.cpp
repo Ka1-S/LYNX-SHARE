@@ -44,7 +44,7 @@ std::string format (const char* f, double v)
 std::string panText (double v) // −1…1
 {
     if (std::abs (v) < 0.005)
-        return "Centred";
+        return "Centered";
     return format ("%.0f%%", std::abs (v) * 100.0) + (v < 0 ? " left" : " right");
 }
 

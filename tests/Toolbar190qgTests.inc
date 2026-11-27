@@ -24,6 +24,7 @@ TEST (toolbar190qg_every_item_belongs_to_one_group_in_toolbar_order)
     CHECK (groupOf (Item::typingPiano) == Group::record && groupOf (Item::midiLight) == Group::record);
     CHECK (groupOf (Item::audioEditor) == Group::file && groupOf (Item::pluginPicker) == Group::windows);
     CHECK (groupOf (Item::link) == Group::link && groupOf (Item::key) == Group::key && groupOf (Item::meters) == Group::meters);
+    CHECK (groupOf (Item::patternMenu) == Group::snap && groupOf (Item::playlist) == Group::windows); // (round 190sc)
     // ids are unique
     for (int a = 0; a < itemCount; ++a)
         for (int b = a + 1; b < itemCount; ++b)

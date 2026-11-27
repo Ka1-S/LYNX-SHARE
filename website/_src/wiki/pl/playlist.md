@@ -1,5 +1,5 @@
 ---
-source: cab9a0b0d1
+source: bfe483502a
 ---
 ![Playlist z klipami na ścieżkach](/assets/img/playlist.webp)
 

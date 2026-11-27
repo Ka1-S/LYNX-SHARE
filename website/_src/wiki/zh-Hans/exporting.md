@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![选择了 WAV 的导出窗口：左侧是范围、尾音和文件，右侧是格式，下方是混音选项](/assets/img/wiki/export.webp)
 

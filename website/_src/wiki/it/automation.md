@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![L'editor di automazione con una curva che sale in sei battute](/assets/img/wiki/automation.webp)
 

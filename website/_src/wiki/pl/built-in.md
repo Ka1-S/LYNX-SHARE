@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Paleta szybkiego dodawania: instrumenty po lewej, efekty po prawej, każdy z oznaczeniem wbudowany lub wbudowany silnik FL](/assets/img/wiki/quickadd.webp)
 

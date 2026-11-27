@@ -1,5 +1,5 @@
 ---
-source: b72fd5c175
+source: 6916fc82b3
 ---
 ![ショートカットを管理ウィンドウ: アクションの検索可能なリストと、それぞれのキー](/assets/img/wiki/shortcuts.webp)
 

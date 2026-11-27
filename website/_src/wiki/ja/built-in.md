@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![クイック追加パレット。左がインストゥルメント、右がエフェクトで、それぞれに内蔵または内蔵FLエンジンのタグが付いている](/assets/img/wiki/quickadd.webp)
 

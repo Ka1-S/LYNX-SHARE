@@ -99,7 +99,7 @@ The `.dawproject` holds tracks, folders, clips, notes, audio with its warp marke
 
 ## Good to know
 
-- `Dither` is greyed out for MP3, OGG, M4A and 32-bit WAV, and the tempo and marker options are greyed out for every format but WAV.
+- `Dither` is grayed out for MP3, OGG, M4A and 32-bit WAV, and the tempo and marker options are grayed out for every format but WAV.
 - With `Playlist selection` and no selection in the Playlist, the whole song is rendered. The window warns you.
 - If the Master insert is muted, the window warns that the file will be silent.
 - `Also write a video with this mix` appears only when the project has a video track, and it needs FFmpeg.

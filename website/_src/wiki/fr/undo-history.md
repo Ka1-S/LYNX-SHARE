@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![La fenêtre Historique des annulations : six étapes de Start à Add notes, avec Muet : Kick comme étape actuelle](/assets/img/wiki/history.webp)
 

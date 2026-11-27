@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![Halaman Umum di jendela Pengaturan, dengan tab halaman di bagian atas](/assets/img/wiki/settings-general.webp)
 

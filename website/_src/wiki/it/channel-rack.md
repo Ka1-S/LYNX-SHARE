@@ -1,5 +1,5 @@
 ---
-source: aad66b5125
+source: 0f5d8ab83e
 ---
 ![Il Channel Rack con le righe di step](/assets/img/rack.webp)
 

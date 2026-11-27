@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![La ventana de exportación con WAV seleccionado: rango, cola y archivos a la izquierda, formato a la derecha, opciones de mezcla debajo](/assets/img/wiki/export.webp)
 

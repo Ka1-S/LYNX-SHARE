@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![WAV가 선택된 내보내기 창: 왼쪽에 범위, 테일, 파일, 오른쪽에 형식, 아래쪽에 믹스 옵션](/assets/img/wiki/export.webp)
 

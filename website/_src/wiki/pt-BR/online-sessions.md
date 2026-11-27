@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Há duas formas de trabalhar em um projeto com outras pessoas, e as duas estão em `Arquivo › Sessão online`. Um pacote é um arquivo que você manda a um amigo, que devolve uma parte. Não precisa de rede, conta nem servidor. Uma sessão ao vivo conecta todo mundo pela internet por meio do relay do LYNX SHARE, e cada alteração chega a todos. Até 4 pessoas participam de um projeto, você incluído.
 

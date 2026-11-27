@@ -1,5 +1,5 @@
 ---
-source: 53b620ca2d
+source: d1745d3bfa
 ---
 ## 選擇你從哪裡轉過來
 
@@ -10,7 +10,7 @@ source: 53b620ca2d
    - `BandLab、FL Studio Mobile 或 GarageBand`：簡易版面，一個視窗裡有音軌、循環素材和快速錄音。
    - `FL Studio`：模式版面，包含 Channel rack、Piano roll、播放清單和混音器。
    - `Ableton Live 或 Bitwig`：片段啟動版面，有片段和場景組成的格狀介面。
-   - `Logic、Cubase、Reaper、Pro Tools 或 Studio One`：簡易版面，混音器隨手可用，每種樂器一條音軌排在時間軸上。
+   - `Logic、Cubase、REAPER、Pro Tools 或 Studio One`：簡易版面，混音器隨手可用，每種樂器一條音軌排在時間軸上。
    - `我剛開始做音樂`：簡易版面和一段簡短的首支歌曲導覽。
 3. 點擊其中一個。這裡我們選 BandLab：簡易版面開啟，鼓音軌上放著一段起始節拍。
 

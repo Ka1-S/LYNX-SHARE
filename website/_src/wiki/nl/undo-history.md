@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![Het venster Bewerkgeschiedenis: zes stappen van Start tot Add notes, met Mute: Kick als de huidige](/assets/img/wiki/history.webp)
 

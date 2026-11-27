@@ -65,6 +65,17 @@ TEST (g1menus190je_one_state_rule_for_every_button_kind)
     l = buttonLook (p, ButtonKind::secondary, true, 0.0, false, true);
     CHECK (contrastRatio (l.content, l.fill) >= textContrastFloor);
     CHECK (buttonLook (p, ButtonKind::secondary, true, 0.0, true, true).fill == p.accentPressed);
+    // round 190sc (owner 11-27): the text fill on LYNX's red is #DD3336 (4.56:1) at rest and under the mouse; pressed
+    // accentPressed keeps more; another accent reaches the same ratio; the flat kinds keep the brand red
+    CHECK (buttonLook (p, ButtonKind::secondary, true, 0.0, false, true).fill == defaultAccentTextFill);
+    CHECK (buttonLook (p, ButtonKind::secondary, true, 1.0, false, true).fill == defaultAccentTextFill);
+    CHECK (contrastRatio (p.onAccent, defaultAccentTextFill) >= accentTextContrastFloor);
+    CHECK (contrastRatio (p.onAccent, buttonLook (p, ButtonKind::secondary, true, 0.0, true, true).fill) >= accentTextContrastFloor);
+    CHECK (buttonLook (p, ButtonKind::flatToggle, true, 0.0, false, true).fill == p.accent);
+    {
+        const auto other = derivePalette (0xffff8c42, defaultBackground); // a light orange accent
+        CHECK (contrastRatio (other.onAccent, accentTextFill (other)) >= accentTextContrastFloor);
+    }
     // a flat icon that acts once: nothing at rest, a bg5 tile with an edge under the mouse
     l = buttonLook (p, ButtonKind::flatMomentary, false, 0.0, false, true);
     CHECK (alpha (l.fill) == 0 && alpha (l.edge) == 0);

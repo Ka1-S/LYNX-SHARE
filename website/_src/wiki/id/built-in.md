@@ -1,5 +1,5 @@
 ---
-source: 3fa93d4af9
+source: fa136baaa1
 ---
 ![Palet tambah cepat: instrumen di kiri, efek di kanan, masing-masing diberi label bawaan atau engine FL bawaan](/assets/img/wiki/quickadd.webp)
 

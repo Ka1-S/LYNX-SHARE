@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![La fenêtre d'export avec WAV sélectionné : étendue, queue et fichiers à gauche, format à droite, options de mixage en dessous](/assets/img/wiki/export.webp)
 

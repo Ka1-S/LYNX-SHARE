@@ -1,5 +1,5 @@
 ---
-source: 37920663db
+source: 81ddbe70f0
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 

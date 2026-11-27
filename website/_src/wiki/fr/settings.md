@@ -1,5 +1,5 @@
 ---
-source: 3574c0cb84
+source: b925236cdd
 ---
 ![La page Général de la fenêtre Réglages, avec les onglets de page en haut](/assets/img/wiki/settings-general.webp)
 

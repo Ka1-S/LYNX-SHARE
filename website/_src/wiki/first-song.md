@@ -12,7 +12,7 @@ This page walks once through the whole path: a drum pattern, a melody, an arrang
 3. Click some steps on the Kick row. Dragging draws several, and right-click erases.
 4. Press `Space`. The transport is in Pattern mode, so the pattern plays in a loop. Press `Space` again to stop.
 5. Give the Clap, Hat and Snare rows their own steps.
-6. Press `F2` to name and colour the pattern.
+6. Press `F2` to name and color the pattern.
 
 To add a sound that is not there, click the `+ add channel` box under the last row and pick an instrument from the menu. To use a sample of your own, open the [Browser](/wiki/browser/) with `Alt+F8`, click an audio file to hear it and double-click it to add it as a new channel.
 
@@ -37,7 +37,7 @@ To add a sound that is not there, click the `+ add channel` box under the last r
 ## Mix it and add an effect
 
 1. Press `F9` to show the [Mixer](/wiki/mixer/). A Mixer track is also called an insert. The five starting channels already play through inserts 1 to 5 (Playlist tracks only hold clips, so Playlist track 1 is not insert 1), and a channel added from the `+ add channel` menu plays into the Master (its route box reads `---`), as in FL Studio. The number in the channel's route box in the Channel rack says which one.
-2. To move channels to free inserts of their own, select them in the Channel rack and press `Ctrl+L`. Each insert takes the channel's name and colour.
+2. To move channels to free inserts of their own, select them in the Channel rack and press `Ctrl+L`. Each insert takes the channel's name and color.
 3. Drag an insert's fader to set its level.
 4. Click an insert to select it. The effects panel on the right shows its effect slots (ten rows, and the list scrolls).
 5. Click an empty slot and pick an effect. Click the slot's name to show or hide the effect's window. The slot's light bypasses the effect.

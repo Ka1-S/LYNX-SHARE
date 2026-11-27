@@ -1,5 +1,5 @@
 ---
-source: 141ffc1370
+source: 841575013e
 ---
 LYNX SHARE는 Windows, macOS, Linux에서 쓸 수 있는 무료 오픈 소스 DAW로, 한 프로그램에 세 가지 레이아웃이 있습니다. 기본은 FL Studio 레이아웃입니다. 채널 랙과 피아노 롤에서 패턴을 만들고, 플레이리스트에서 배치하고, 믹서에서 믹스합니다. 클립 실행 레이아웃은 Ableton Live 스타일로 그리드에서 클립과 씬을 실행하고, 간단한 레이아웃은 BandLab의 쉬운 단일 창 스타일과 FL Studio Mobile의 작업 방식을 섞었습니다. `보기 › 레이아웃 스타일`에서 언제든지 전환할 수 있습니다. FL Studio 프로젝트(`.flp`), Ableton Live 세트(`.als`), FL Studio Mobile 프로젝트(`.flm`), DAWproject 파일, GarageBand와 BandLab 프로젝트, 트래커 모듈을 열 수 있고, `.flp`, `.als`, `.dawproject`, `.flm`으로 내보내며, 자체 형식인 `.lynx`로 저장합니다.
 

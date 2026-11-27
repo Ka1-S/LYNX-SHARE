@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Il y a deux façons de travailler à plusieurs sur un projet, et les deux sont sous `Fichier › Session en ligne`. Un paquet est un fichier que vous envoyez à un ami, qui vous renvoie une partie. Il ne demande ni réseau, ni compte, ni serveur. Une session en direct relie tout le monde par internet via le relais LYNX SHARE, et chaque modification parvient à tous. Jusqu'à 4 personnes participent à un projet, vous compris.
 

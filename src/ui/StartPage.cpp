@@ -22,7 +22,7 @@ juce::String whenText (std::int64_t now, std::int64_t then)
         case Kind::seconds: return tr ("seconds ago");
         case Kind::minutes: return tr ("{0}m ago", { juce::String (a.minutes) });
         case Kind::hours: return tr ("{0}h {1}m ago", { juce::String (a.hours), juce::String (a.minutes) });
-        case Kind::days: return tr ("{0} days ago", { juce::String (a.days) });
+        case Kind::days: return a.days == 1 ? tr ("1 day ago") : tr ("{0} days ago", { juce::String (a.days) }); // (round 190sc: FL writes "1 days ago")
         case Kind::unknown: break;
     }
     return {};

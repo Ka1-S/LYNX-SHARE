@@ -1,5 +1,5 @@
 ---
-source: 7031553640
+source: e2ff3c3bd4
 ---
 ![Jendela Riwayat urungkan: enam langkah dari Start sampai Add notes, dengan Mute: Kick sebagai langkah saat ini](/assets/img/wiki/history.webp)
 

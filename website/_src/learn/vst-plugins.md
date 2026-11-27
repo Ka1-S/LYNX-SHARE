@@ -14,7 +14,7 @@ summary: The Plugin manager finds the VST, VST3 and CLAP plugins on your compute
 ![The plugins found](/assets/img/learn/vst-plugins-2.webp)
 
 1. Click `Find new plugins`. Each file is checked in a separate process, so a plugin that crashes can't take LYNX down: it is listed under Failed.
-2. Search by name, vendor or format; a star makes a plugin a favourite.
+2. Search by name, vendor or format; a star makes a plugin a favorite.
 
 ## Load a plugin
 

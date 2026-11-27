@@ -97,18 +97,23 @@ inline std::vector<Segment> parse (const std::string& text)
 }
 
 // The text without markup, for places that cannot draw glyphs (tooltips, logs): [LMB] -> "click",
-// [Ctrl] -> "Ctrl+"... `words` gives the words for LMB, 2xLMB, RMB, MMB and Wheel in that order.
+// [Ctrl][LMB] -> "Ctrl+click"... `words` gives the words for LMB, 2xLMB, RMB, MMB and Wheel in that order.
+// Round 190sc (RC sweep, the #296 bubble showed "Alt++click"): a key gets its "+" only when the next token follows it
+// directly ([Ctrl][LMB], [Ctrl][Shift][LMB]); a text that writes the "+" itself ([Alt]+[LMB]) keeps its one "+", and a key
+// before a word ("[Ctrl] fine") gets none.
 inline std::string plain (const std::string& text, const std::vector<std::string>& words = { "click", "double-click", "right-click", "middle-click", "wheel" })
 {
     std::string out;
     const char* mice[] = { "LMB", "2xLMB", "RMB", "MMB", "Wheel" };
 
-    for (const auto& s : parse (text))
+    const auto segments = parse (text);
+    for (std::size_t i = 0; i < segments.size(); ++i)
     {
+        const auto& s = segments[i];
         if (s.kind == Segment::Kind::text)
             out += s.value;
         else if (s.kind == Segment::Kind::key)
-            out += s.value + "+";
+            out += s.value + (i + 1 < segments.size() && segments[i + 1].kind != Segment::Kind::text ? "+" : "");
         else
             for (std::size_t m = 0; m < 5; ++m)
                 if (s.value == mice[m])

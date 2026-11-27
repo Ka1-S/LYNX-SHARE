@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Er zijn twee manieren om met anderen aan een project te werken, en beide staan onder `Bestand › Online sessie`. Een pakket is een bestand dat je naar een vriend stuurt, die een deel terugstuurt. Het heeft geen netwerk, account of server nodig. Een livesessie verbindt iedereen via internet door het LYNX SHARE-relay, en elke wijziging bereikt iedereen. Aan één project doen maximaal 4 mensen mee, jou meegerekend.
 

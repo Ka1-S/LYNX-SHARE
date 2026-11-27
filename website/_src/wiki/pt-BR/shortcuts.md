@@ -1,5 +1,5 @@
 ---
-source: b72fd5c175
+source: 6916fc82b3
 ---
 ![A janela Manage shortcuts: uma lista pesquisável de ações com as teclas de cada uma](/assets/img/wiki/shortcuts.webp)
 

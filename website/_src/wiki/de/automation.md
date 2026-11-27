@@ -1,5 +1,5 @@
 ---
-source: 1aea1764bf
+source: 47cb8b30d1
 ---
 ![Der Automationseditor mit einer Kurve, die über sechs Takte ansteigt](/assets/img/wiki/automation.webp)
 

@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 

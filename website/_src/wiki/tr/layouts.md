@@ -1,5 +1,5 @@
 ---
-source: 54ebedc064
+source: a9ef5dbc8f
 ---
 ![Klip başlatma iş akışı: solda klip ve sahne gridi, sağda Picker ve Playlist](/assets/img/cliplaunch.webp)
 

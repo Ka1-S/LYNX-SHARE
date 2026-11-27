@@ -1,5 +1,5 @@
 ---
-source: bf45e1d436
+source: 415534558a
 ---
 Es gibt zwei Wege, mit anderen an einem Projekt zu arbeiten, und beide stehen unter `Datei › Online-Session`. Ein Paket ist eine Datei, die du an einen Freund schickst, der einen Part zurückschickt. Es braucht kein Netzwerk, kein Konto und keinen Server. Eine Live-Session verbindet alle über das Internet mit dem LYNX-SHARE-Relay, und jede Änderung erreicht alle. Bis zu 4 Personen arbeiten an einem Projekt, du eingeschlossen.
 

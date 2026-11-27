@@ -1,5 +1,5 @@
 ---
-source: 56f7378df1
+source: 1e00c06b75
 ---
 ![Okno eksportu z wybranym WAV: zakres, ogon i pliki po lewej, format po prawej, opcje miksu poniżej](/assets/img/wiki/export.webp)
 

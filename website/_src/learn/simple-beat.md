@@ -24,7 +24,7 @@ The dock under the timeline shows the selected track. For a Drums track it opens
 
 ![The Drum Machine: one row per sound, one square per step](/assets/img/learn/simple-beat-3.webp)
 
-1. Click a grey square of the Drum Machine to add a hit there. Click a lit square to remove it.
+1. Click a gray square of the Drum Machine to add a hit there. Click a lit square to remove it.
 2. Each row is one sound of the kit: kick, snare, hats, clap and percussion.
 3. `Length` sets how many bars the pattern has, and `Swing` moves every second step later.
 

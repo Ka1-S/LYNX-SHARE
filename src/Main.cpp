@@ -29360,10 +29360,15 @@ private:
                 frame.setSize (panel->getWidth(), panel->getHeight());
                 frame.addAndMakeVisible (*panel);
                 panel->setTopLeftPosition (0, 0);
-                juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
+                // round 190sc: the text-fit list (-textfit.txt, as --snapshot's) and the shot scale (--shot-scale /
+                // --shot-suffix; scale 1 = the same pixels as before)
+                checkTextFit (frame, "settings-" + name);
+                const auto k = lynx::shot::scale();
+                juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) frame.getWidth() * k), juce::roundToInt ((float) frame.getHeight() * k), true);
                 {
                     juce::Graphics g (image);
                     g.fillAll (lynx::theme::panel);
+                    g.addTransform (juce::AffineTransform::scale (k));
                     frame.paintEntireComponent (g, false);
                 }
                 savePng (image, prefix + "-settings-" + name + ".png");
@@ -29396,6 +29401,7 @@ private:
                 lynx::themeui::apply (before, false);
             }
         }
+        juce::File (prefix + "-settings-textfit.txt").replaceWithText (textFitLog().joinIntoString ("\n") + "\n");
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
 
@@ -40950,8 +40956,8 @@ private:
                 // the windows' own menus (title bars) and the toolbar's recording menu
                 juce::StringArray names;
                 std::vector<juce::PopupMenu> menus;
-                for (auto [panel, name] : { std::pair { lynx::workspace::Panel::playlist, "Playlist" }, { lynx::workspace::Panel::channelRack, "Channel Rack" },
-                                            { lynx::workspace::Panel::pianoRoll, "Piano Roll" }, { lynx::workspace::Panel::mixer, "Mixer" },
+                for (auto [panel, name] : { std::pair { lynx::workspace::Panel::playlist, "Playlist" }, { lynx::workspace::Panel::channelRack, "Channel rack" },
+                                            { lynx::workspace::Panel::pianoRoll, "Piano roll" }, { lynx::workspace::Panel::mixer, "Mixer" },
                                             { lynx::workspace::Panel::browser, "Browser" } })
                 {
                     names.add (name);

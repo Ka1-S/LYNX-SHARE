@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: a6e85677ce
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
