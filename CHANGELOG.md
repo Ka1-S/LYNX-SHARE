@@ -34,6 +34,9 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- As FL Studio 2026: the Channel rack's Ctrl+L (Route to free mixer track) treats a named insert as taken and keeps a
+  channel that is alone on its insert there; with a group filter on, the rack's selection keeps only the channels it shows; the
+  Mixer slot menu's Browse presets, Save preset as..., Browse parameters and Help work where FL Studio's do.
 - The Clip-launch and Simple layouts open a clip's menu on right-click, as Live and BandLab (the Pattern layout keeps FL
   Studio's right-click delete). The Mixer's slot menu asks before Delete..., and Ctrl+Shift+S in the Mixer saves the selected
   insert's state, as FL Studio 2026.
@@ -81,6 +84,10 @@ The short version of each release. The full notes, with measurements, known issu
   edits the LFO's amplitude; a sample-rate change during a recording ends it and keeps the take (the rest was written at the
   wrong speed); Esc ends Link to MIDI controller; an online session that is over says so. File dialogs on Windows and macOS are
   always the system's own.
+- Linux: Ctrl+Z and the other Ctrl+letter keys in the audio editor (and in Newtone and the polyphonic editor) reach the editor
+  (Ctrl+Z undid the project). A sidechain link now counts when LYNX refuses a Mixer route that would make a loop. Missing files
+  lists a plugin that is not installed once. A Settings number box keeps its value on text with no number ("abc" in Tempo set
+  10 BPM).
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
   save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
   third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
