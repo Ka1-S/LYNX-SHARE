@@ -18546,6 +18546,7 @@ private:
                                              return;
                                          const auto b = pr.firstVisibleNoteForSnapshot (a.index, { pr.getWidth(), pr.getHeight() });
                                          const auto& n = (f / 8) % 2 == 0 || b.index < 0 ? a : b;
+                                         mouse (pr, n.bounds.getCentre(), ctrl); // (over the note first, as a real mouse)
                                          latency->arm (inWindow (pr, n.bounds));
                                          mouse (pr, n.bounds.getCentre(), ctrlLeft);
                                          mouse (pr, n.bounds.getCentre(), ctrl);
@@ -18571,8 +18572,9 @@ private:
                                          auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
                                          mouse (strips, strips.panAreaForSnapshot (1).getCentre(), {});
                                          juce::ModifierKeys::currentModifiers = {};
+                                         const auto pan = engine->getSong().mixer.size() > 1 ? engine->getSong().mixer[1].pan : 0.0f;
                                          engine->undo();
-                                         return latency->take ("the knob");
+                                         return latency->take ("the knob") + "    pan of insert 1 at the release " + juce::String (pan, 3) + "\n";
                                      } });
             // a button: insert 1's mute, clicked every 30 frames (no double-click), an even number of times
             run->steps.push_back ({ "q3 latency: mixer mute click", {},
@@ -18581,11 +18583,15 @@ private:
                                              return;
                                          auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
                                          const auto m = strips.muteAreaForSnapshot (1);
+                                         mouse (strips, m.getCentre(), {});
                                          latency->arm (inWindow (strips, m));
                                          mouse (strips, m.getCentre(), left);
                                          mouse (strips, m.getCentre(), {});
                                          juce::ModifierKeys::currentModifiers = {};
-                                     }, 240, [latency] { return latency->take ("the mute button"); } });
+                                     }, 240, [this, latency] {
+                                         return latency->take ("the mute button") + "    insert 1 muted at the end: "
+                                                + (engine->getSong().mixer.size() > 1 && engine->getSong().mixer[1].muted ? "yes" : "no") + "\n";
+                                     } });
             // a clip dragged sideways in the Playlist, 24 px a move (one every 6 frames), then dropped and undone
             auto clipPress = std::make_shared<juce::Point<int>>();
             run->steps.push_back ({ "q3 latency: playlist clip drag", [this, ui, mouse, left, clipPress] {
@@ -18616,7 +18622,9 @@ private:
                                          mouse (pl, *clipPress, {});
                                          juce::ModifierKeys::currentModifiers = {};
                                          engine->undo();
-                                         return latency->take ("the dragged clip") + "    (pressed at " + clipPress->toString() + ")\n";
+                                         const auto moved = engine->getPublishCount();
+                                         return latency->take ("the dragged clip") + "    (pressed at " + clipPress->toString() + ", song published "
+                                                + juce::String ((juce::int64) moved) + " times)\n";
                                      } });
             // keys typed in the Browser's search box (one every 6 frames), then taken back with Backspace
             auto typed = std::make_shared<int> (0);
@@ -18630,18 +18638,24 @@ private:
                                          if (f % 6 != 3 || *typed >= text.length())
                                              return;
                                          auto& browser = ui->getBrowserForSnapshot();
-                                         if (auto* peer = mainWindow->getPeer(); peer != nullptr && browser.isShowing())
+                                         std::function<juce::TextEditor* (juce::Component&)> findBox = [&findBox] (juce::Component& c) -> juce::TextEditor* {
+                                             for (auto* child : c.getChildren())
+                                                 if (auto* t = dynamic_cast<juce::TextEditor*> (child); t != nullptr && t->isShowing())
+                                                     return t;
+                                                 else if (auto* deeper = findBox (*child))
+                                                     return deeper;
+                                             return nullptr;
+                                         };
+                                         if (auto* box = browser.isShowing() ? findBox (browser) : nullptr)
                                          {
                                              latency->arm (inWindow (browser, browser.getLocalBounds()));
                                              const auto c = text[*typed];
-                                             peer->handleKeyPress (juce::KeyPress ((int) c, {}, c));
+                                             box->keyPressed (juce::KeyPress ((int) c, {}, c));
                                              ++*typed;
                                          }
                                      }, 96, [this, ui, latency, typed] {
                                          auto text = latency->take ("a key in the search box") + "    search box: \"" + ui->getBrowserForSnapshot().searchTextForSnapshot() + "\"\n";
-                                         if (auto* peer = mainWindow->getPeer())
-                                             for (int k = 0; k < *typed; ++k)
-                                                 peer->handleKeyPress (juce::KeyPress (juce::KeyPress::backspaceKey));
+                                         ui->getBrowserForSnapshot().setSearchForSnapshot ({});
                                          return text;
                                      } });
 
