@@ -8945,7 +8945,7 @@ void EffectsPanel::showSlotMenu (int slot)
     if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
         extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace"), replace);
-    menu.addItem (tr ("Delete...") + "\tDel", [this, slot] { deleteSlot (slot); });
+    menu.addItem (tr ("Delete...") + "\tDel", [this, slot] { askDeleteSlot (slot); });
 
     // FL's Patcherize / Patcherize all (round 165m): the effect (or the whole chain) into a new Patcher, same sound
     menu.addSeparator();
@@ -9210,10 +9210,35 @@ void EffectsPanel::showSlotMenu (int slot)
                                  return false;
                              juce::MessageManager::callAsync ([safe, slot] {
                                  if (safe != nullptr)
-                                     safe->deleteSlot (slot);
+                                     safe->askDeleteSlot (slot);
                              });
                              return true;
                          });
+}
+
+// FL 2026's slot menu "Delete..." (and Del with the menu open) asks first: "Confirm | The selected plugin is about to be
+// deleted." with Ok / Cancel and "Remember my choice" (checked live, round 190rx: shots/fl/fl-slot-delete-confirm.png);
+// a remembered Ok skips it (Settings › General › Manage messages shows it again). LYNX deleted at once.
+void EffectsPanel::askDeleteSlot (int slot)
+{
+    const auto* s = slots();
+    if (s == nullptr || slot < 0 || slot >= (int) s->size())
+        return;
+    if (! messages::shown ("DeletePlugin"))
+    {
+        deleteSlot (slot);
+        return;
+    }
+    FlMessage box { tr ("Confirm"), tr ("The selected plugin is about to be deleted."), { tr ("OK"), tr ("Cancel") }, true };
+    box.icon = juce::MessageBoxIconType::WarningIcon; // (FL's "!")
+    showFlMessage (box,
+                   [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (int button, bool remember) {
+                       if (button != 1 || safe == nullptr)
+                           return;
+                       if (remember)
+                           messages::setShown ("DeletePlugin", false);
+                       safe->deleteSlot (slot);
+                   });
 }
 
 void EffectsPanel::deleteSlot (int slot)
@@ -9749,6 +9774,8 @@ bool MixerComponent::runAction (const std::string& id)
         return strips.runMenuItem (tr ("Open audio editor"));
     else if (id == "mixer.audioEditorRecord")
         return strips.runMenuItem (tr ("Open audio editor and record"));
+    else if (id == "mixer.saveTrackState") // (round 190rx: FL's Ctrl+Shift+S in the Mixer)
+        return strips.runMenuItem (tr ("Save mixer track state as..."));
     else if (id == "mixer.rename") // FL's mixer menu keys (round 167k): the menu's own items
         return strips.runMenuItem (tr ("Rename, color and icon..."));
     else if (id == "mixer.changeIcon") // issue #220 (round 190ng): F3, the icon picker of the selected track(s)

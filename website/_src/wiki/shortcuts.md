@@ -247,6 +247,7 @@ Each key opens the dialog of one note tool in the Piano roll.
 | `Del` | Delete the selected inserts. LYNX SHARE asks first |
 | `Ctrl+E` | Open the audio editor |
 | `Shift+E` | Open the audio editor and record |
+| `Ctrl+Shift+S` | Save the selected insert's state as... (a mixer track state; outside the Mixer it is Save as) |
 | `Alt+R` | Render the armed inserts to wave files |
 | `Shift+Alt+R` | Render the selected inserts to wave files |
 
