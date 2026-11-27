@@ -2231,6 +2231,15 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--pr308probe"))
+        {
+            // LYNX --pr308probe <prefix> <project.flp> [--shot-scale 1.5 --shot-suffix @150] (round 190sf, review of PR #308:
+            // Continuous scrolling, frame by frame): src/Pr308Probe190sf.inc
+            const auto i = args.indexOf ("--pr308probe");
+            runPr308Probe (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--issues190rtshot"))
         {
             // LYNX --issues190rtshot <prefix> <sample.wav> [--shot-scale 1.5 --shot-suffix @150] (round 190rt, issues #309 /
@@ -41720,6 +41729,7 @@ private:
 #include "LoopShot190kf.inc"   // round gaps190kf
 #include "QaRest190lcShot.inc"  // rollup 0.1.30 step 7 (round 190lc)
 #include "LoopInfoShot190kx.inc" // round 190kx
+#include "Pr308Probe190sf.inc" // round 190sf: review of PR #308 (--pr308probe)
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {
