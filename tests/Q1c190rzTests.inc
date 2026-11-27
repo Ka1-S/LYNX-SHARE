@@ -1,6 +1,8 @@
 // Round 190rz (0.1.32 stage Q1 part C: the rows parts A and B left "not exercised"): one test per defect found by driving
 // the app (or by an FL 2026 check) and fixed.
 
+#include "core/Effects.h"
+#include "core/MixerOps.h"
 #include "core/RackFilter.h"
 #include "core/RackOps.h"
 
@@ -72,4 +74,27 @@ TEST (q1c190rz_rack_selection_keeps_the_shown_channels)
     primary = 0;
     rackfilter::keepShown (song, 0, rows, primary);
     CHECK ((rows == std::vector<int> { 0, 2 }) && primary == 0);
+}
+
+// A compressor's sidechain link is an edge of the mixer's processing order (Song::mixerOrder) even when no send carries
+// it (the demo's Bass compressor listens to the Kick with no Kick -> Bass send). Pluck -> Kick as a sidechain closed
+// the loop Kick -> Bass -> Pad -> Pluck: it was accepted (the arrow menu's items were enabled, Remote Control's
+// mixer.route answered OK) and mixerOrder fell back to its "corrupt file" order. Now it is refused like any other loop.
+TEST (q1c190rz_sidechain_link_counts_for_route_loops)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.mixer = Song::defaultMixer (8);
+    auto comp = makeEffectSlot (EffectKind::compressor);
+    comp.sidechain = 1;                 // Bass (5) listens to Kick (1), no send
+    song.mixer[5].effects.push_back (comp);
+    song.setRoute (5, 6, true, 0.0f);   // Bass -> Pad, a sidechain send
+    song.setRoute (6, 7, true, 0.0f);   // Pad -> Pluck
+    CHECK (! song.canRoute (7, 1) && ! song.canRoute (6, 1) && ! song.canRoute (5, 1));
+    CHECK (song.canRoute (7, 2) && song.canRoute (1, 7) && song.canRoute (2, 1));
+    CHECK (mixerops::routeSelectedTo (song, { 7 }, 1, mixerops::RouteKind::sidechain) == 0 && ! song.routes (7, 1));
+    // the processing order stays a real one: Kick before Bass before Pad before Pluck
+    const auto order = song.mixerOrder();
+    const auto at = [&order] (int t) { return std::find (order.begin(), order.end(), t) - order.begin(); };
+    CHECK (at (1) < at (5) && at (5) < at (6) && at (6) < at (7));
 }
