@@ -3353,9 +3353,9 @@ private:
 
     void chooseSample (int deck)
     {
-        chooser = std::make_unique<juce::FileChooser> (tr ("Load sample"), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg;*.wv");
+        chooser = lynx::ui::makeFileChooser (tr ("Load sample"), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg;*.wv"); // (round 190rx: the shared chooser)
         juce::Component::SafePointer<SlicexEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, deck] (const juce::FileChooser& fc) {
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [self, deck] (const juce::FileChooser& fc) {
             if (self != nullptr && fc.getResult().existsAsFile())
                 self->loadSample (deck, fc.getResult().getFullPathName());
         });
@@ -3407,9 +3407,9 @@ private:
     void saveSample (int deck)
     {
         const auto name = nameLabel.getText().isNotEmpty() ? nameLabel.getText() : juce::String ("Slicex");
-        chooser = std::make_unique<juce::FileChooser> (tr ("Save sample as"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name + ".wav"), "*.wav");
+        chooser = lynx::ui::makeFileChooser (tr ("Save sample as"), juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile (name + ".wav"), "*.wav");
         juce::Component::SafePointer<SlicexEditor> self (this);
-        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+        lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
                               [self, deck] (const juce::FileChooser& fc) {
                                   if (self == nullptr || fc.getResult() == juce::File())
                                       return;

@@ -1011,6 +1011,7 @@ const std::vector<Entry>& all()
     // (round 190jv: FL's next record, 0x33, "TrimUnusedMixerTracks" in File/Data — the Trim unused tracks question)
     static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") },
                                               { "TrimUnusedMixerTracks", TR_NOOP ("Trim unused mixer tracks"), TR_NOOP ("File/Data") },
+                                              { "DeletePlugin", TR_NOOP ("Delete plugin"), TR_NOOP ("File/Data") }, // (round 190rx: the slot menu's Delete...)
                                               { "RecAutoSwitchExternalInput", TR_NOOP ("Auto switch to external input only"), TR_NOOP ("Audio") } };
     return entries;
 }

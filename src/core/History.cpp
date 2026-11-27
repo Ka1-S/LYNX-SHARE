@@ -159,6 +159,10 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     // channels
     if (before.channels.size() != after.channels.size())
         return label (after.channels.size() > before.channels.size() ? TR_NOOP ("Add channel") : TR_NOOP ("Delete channel"));
+    // round 190rx: inserts put in or taken out before the last one renumber the inserts the channels play into; the step
+    // is named for the inserts (Mixer › Insert multiple... was "Channel: Hat")
+    if (before.mixer.size() != after.mixer.size())
+        return label (after.mixer.size() > before.mixer.size() ? TR_NOOP ("Add insert") : TR_NOOP ("Remove insert"));
 
     for (std::size_t c = 0; c < after.channels.size(); ++c)
     {

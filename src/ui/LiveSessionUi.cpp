@@ -147,6 +147,13 @@ void join (Context c)
                             const auto name = w->getTextEditorContents ("me").trim();
                             const auto code = w->getTextEditorContents ("code").trim();
                             rememberName (name);
+                            // round 190rx: a code that can't be one is said at once, before the open project is let go
+                            // (the code used to be checked only after "save changes?" had been answered)
+                            if (! livecrypto::parseCode (code.toStdString()))
+                            {
+                                warn (tr ("Join live session"), tr ("That is not a LYNX SHARE invite code."));
+                                return;
+                            }
                             c.confirmDiscard ([c, name, code] {
                                 c.live.join (code, optionsFor (c, name));
                                 auto& live = c.live;

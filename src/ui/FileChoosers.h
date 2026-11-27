@@ -13,7 +13,10 @@
 //    or cancels that fast), uses the built-in chooser for the rest of the session and opens it at once in its place;
 //  - gives zenity / kdialog each filter pattern in upper case too (they match case-sensitively: "*.wav" hid "LOOP.WAV");
 //  - LYNX_FILE_DIALOG=builtin or =native forces one (troubleshooting).
-// Windows and macOS keep their native dialogs. Every chooser of the UI goes through makeFileChooser / launchChooser.
+// Windows and macOS keep their native dialogs, always: the "never showed" fallback below is Linux / BSD only (round
+// 190rx, Discord sidthenugget 11-26: on Windows a native dialog closed within a second (Esc right after Ctrl+O, a
+// double click) was taken for one that never showed, and every later chooser of the session was JUCE's built-in one,
+// opened in LYNX's install folder). Every chooser of the UI goes through makeFileChooser / launchChooser.
 // Message thread only.
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -50,6 +53,13 @@ inline bool& brokenThisSession()
 }
 // a native dialog that ended sooner than this without a file never showed
 constexpr double quickFailMs = 1000.0;
+// Only Linux / BSD's dialogs (zenity, kdialog: a program that may not start) can fail without showing; Windows' and
+// macOS' own dialogs always show, and a quick empty answer there is the user's Cancel (round 190rx)
+#if JUCE_LINUX || JUCE_BSD
+constexpr bool quickFailMeansBroken = true;
+#else
+constexpr bool quickFailMeansBroken = false;
+#endif
 
 #if JUCE_LINUX || JUCE_BSD
 // an executable `name` in one of PATH's folders (what `which` would find, without needing `which`)
@@ -108,9 +118,9 @@ inline bool nativeDialogs()
         return false;
     if (forced == "native")
         return true;
+#if JUCE_LINUX || JUCE_BSD
     if (brokenThisSession())
         return false;
-#if JUCE_LINUX || JUCE_BSD
     static const bool usable = [] {
         const auto program = nativeProgram (onPath ("zenity"), onPath ("kdialog"));
         return program.isNotEmpty() && answers (program);
@@ -166,7 +176,7 @@ std::function<void (const juce::FileChooser&)> watched (const juce::FileChooser*
     if (it != made().end())
         made().erase (it); // (read once: the chooser launches once)
     const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_FILE_DIALOG", {}).trim().equalsIgnoreCase ("native");
-    if (! info.native || forced)
+    if (! info.native || forced || ! quickFailMeansBroken)
         return callback;
     const auto launched = juce::Time::getMillisecondCounterHiRes();
     return [info, flags, callback, replace, launched] (const juce::FileChooser& fc) mutable {

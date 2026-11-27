@@ -30,7 +30,10 @@ juce::String automationPointValueText (const AutomationTarget& target, float val
 // hosted plugin's own text); "" when there is none.
 juce::String targetValueTextAt (AudioEngine& engine, const AutomationTarget& target, float value);
 float& copiedAutomationValue();
-void typeAutomationPointValue (AudioEngine& engine, int automation, int point);
+// `lfoAmplitude` (round 190rx): the point is one of the LFO's amplitude points (the editor's LFO mode edits those, so its
+// point numbers count them), not one of the clip's own points.
+void typeAutomationPointValue (AudioEngine& engine, int automation, int point, bool lfoAmplitude = false);
+
 
 // Round 190bw, FL's per-point curve modes. FL's envelope editor remembers the mode and the tension last used and gives
 // them to the next new point [DECOMP FLEngine 0xcce3b0: new point; 0xcd79f0: "change point curve"; 0xcc9790: tension
