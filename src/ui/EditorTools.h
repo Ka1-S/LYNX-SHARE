@@ -270,10 +270,10 @@ public:
     // Playlist only: the view scrolls smoothly, the playhead fixed near the left edge — instead of jumping a page
     // once the playhead reaches the view's edge. FL's Follow right-click menu, "Continuous scrolling".
     bool isContinuousScroll() const noexcept { return continuousScrollPlaylist; }
-    void setContinuousScroll (bool on)
+    void setContinuousScroll (bool on, bool save = true) // save: call onOptionsChanged (not while the settings are read)
     {
         continuousScrollPlaylist = on;
-        if (onOptionsChanged)
+        if (save && onOptionsChanged)
             onOptionsChanged();
     }
     // Round 190im (R15, owner decision L3; Live's manual 6.2 / 8.7: "Follow will pause if you make an edit or scroll the

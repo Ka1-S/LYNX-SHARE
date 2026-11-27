@@ -4162,7 +4162,7 @@ void MainComponent::loadUiSettings()
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "playlistContinuousScroll")
-            EditorGlobals::get().setContinuousScroll (on);
+            EditorGlobals::get().setContinuousScroll (on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
             EditorGlobals::get().setFollowingView (key == "followChannelRack" ? EditorGlobals::FollowView::channelRack
                                                                                : EditorGlobals::FollowView::audioEditor, on, false);
