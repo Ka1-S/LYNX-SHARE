@@ -1758,6 +1758,22 @@ bool OutputMonitor::update (double nowMs)
         stopOverlay();
         return false;
     }
+    // Round 190sb (the first 15 s after start-up): the oscilloscope and the spectrum stop once the silence has let every
+    // part of their picture fall out of sight (the bars below -60 dB, no hold line, no clip light, the bands under
+    // 1e-4 of their height), not only when the long view's 8.5 s of history has scrolled out too: the start-up sound
+    // kept the toolbar at the display's rate for ~13 s after every start (1-20 % of a core on the message thread,
+    // Windows), the same picture over and over. The long view's history still scrolls at the idle poll's rate, so
+    // switching to it shows what it would have.
+    const auto settled = mode != longView && silentMs > 0.0 && clipMs <= 0.0 && sideClipMs[0] <= 0.0 && sideClipMs[1] <= 0.0
+                         && sideHeld[0] == 0.0f && sideHeld[1] == 0.0f && sidePeak[0] < 1.0e-3f && sidePeak[1] < 1.0e-3f
+                         && std::all_of (bands.begin(), bands.end(), [] (float b) { return b < visible; });
+    if (settled)
+    {
+        peak = held = 0.0f; // (none of these show: the bars start at -60 dB, the bands' height is under 1e-4)
+        sidePeak.fill (0.0f);
+        bands.fill (0.0f);
+        stopOverlay();
+    }
 
     // long view: the level scrolls from right to left, one column per 1/30 s (the loudest frame of it)
     column = juce::jmax (column, now);
@@ -1772,6 +1788,8 @@ bool OutputMonitor::update (double nowMs)
         if (mode == longView)
             frameChanged();
     }
+    if (settled)
+        return false; // (the idle poll goes on stepping it: the display's rate again at the next sound)
 
     if (mode == spectrum)
     {
