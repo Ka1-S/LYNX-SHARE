@@ -1,7 +1,11 @@
 #include "ui/AlsExportDialog.h"
 #include "engine/SafeWrite.h"
 
+#include <cmath>
+#include <cstring>
+#include <limits>
 #include <map>
+#include <vector>
 
 #include "core/AlsExport.h"
 #include "engine/Mp3Format.h"
@@ -126,7 +130,72 @@ bool writeWavForLive (const juce::File& source, const juce::File& target)
 
 bool sampleNeedsWavForOtherApps (const juce::File& file) { return needsWavForLive (file); }
 
-juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& seconds, int& sampleRate, int& channels)
+juce::MemoryBlock losslessFlacOf (const float* const* planes, int channels, juce::int64 frames, double sampleRate, int* bitsUsed)
+{
+    if (channels < 1 || channels > 2 || frames <= 0 || frames > (juce::int64) std::numeric_limits<int>::max() || sampleRate <= 0.0)
+        return {};
+    // the smallest depth whose grid holds every value exactly, under full scale (FLAC has no room for an over)
+    const auto onGrid = [&] (double scale) {
+        for (int c = 0; c < channels; ++c)
+            for (juce::int64 i = 0; i < frames; ++i)
+            {
+                const auto v = (double) planes[c][i] * scale;
+                if (v != std::floor (v) || v < -scale || v >= scale)
+                    return false;
+            }
+        return true;
+    };
+    const auto bits = onGrid (32768.0) ? 16 : onGrid (8388608.0) ? 24 : 0;
+    if (bits == 0)
+        return {};
+    juce::MemoryBlock out;
+    {
+        juce::FlacAudioFormat flac;
+        auto* stream = new juce::MemoryOutputStream (out, false);
+        std::unique_ptr<juce::AudioFormatWriter> writer (flac.createWriterFor (stream, sampleRate, (unsigned int) channels, bits, {}, 0));
+        if (writer == nullptr)
+        {
+            delete stream;
+            return {};
+        }
+        // JUCE's integer write: 32-bit left-justified values (the writer shifts them down to `bits`), exact for these
+        constexpr int block = 65536;
+        std::vector<std::vector<int>> ints ((std::size_t) channels, std::vector<int> (block));
+        for (juce::int64 at = 0; at < frames; at += block)
+        {
+            const auto n = (int) std::min<juce::int64> (block, frames - at);
+            const int* rows[2] {};
+            for (int c = 0; c < channels; ++c)
+            {
+                for (int i = 0; i < n; ++i)
+                    ints[(std::size_t) c][(std::size_t) i] = (int) std::llround ((double) planes[c][at + i] * 2147483648.0);
+                rows[c] = ints[(std::size_t) c].data();
+            }
+            if (! writer->write (rows, n))
+                return {};
+        }
+    }
+    // the proof: decoded back, every sample bit for bit what LYNX plays
+    juce::FlacAudioFormat flac;
+    std::unique_ptr<juce::AudioFormatReader> reader (flac.createReaderFor (new juce::MemoryInputStream (out, false), true));
+    if (reader == nullptr || reader->lengthInSamples != frames || (int) reader->numChannels != channels)
+        return {};
+    juce::AudioBuffer<float> back (channels, 65536);
+    for (juce::int64 at = 0; at < frames; at += back.getNumSamples())
+    {
+        const auto n = (int) std::min<juce::int64> (back.getNumSamples(), frames - at);
+        if (! reader->read (&back, 0, n, at, true, channels > 1))
+            return {};
+        for (int c = 0; c < channels; ++c)
+            if (std::memcmp (back.getReadPointer (c), planes[c] + at, (std::size_t) n * sizeof (float)) != 0)
+                return {};
+    }
+    if (bitsUsed != nullptr)
+        *bitsUsed = bits;
+    return out;
+}
+
+juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& seconds, int& sampleRate, int& channels, bool* flac)
 {
     juce::MemoryBlock out;
     SampleLibrary library;
@@ -136,6 +205,16 @@ juce::MemoryBlock decodedWavForOtherApps (const juce::File& file, double& second
     channels = data->isStereo() ? 2 : 1;
     sampleRate = juce::roundToInt (data->sampleRate);
     seconds = (double) data->frames() / data->sampleRate;
+    if (flac != nullptr)
+    {
+        const float* planes[2] { data->leftData(), channels > 1 ? data->rightData() : nullptr };
+        *flac = false;
+        if (auto lossless = losslessFlacOf (planes, channels, data->frames(), data->sampleRate); lossless.getSize() > 0)
+        {
+            *flac = true;
+            return lossless;
+        }
+    }
     {
         auto* stream = new juce::MemoryOutputStream (out, false);
         juce::WavAudioFormat wav;

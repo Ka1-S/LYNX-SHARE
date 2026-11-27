@@ -89,9 +89,12 @@ bool writeWith (const Song& song, std::function<std::optional<ForeignPlugin> (co
     // as the 32-bit float WAV LYNX plays from it, under "<name>.wav": Bitwig, Studio One and Cubase read PCM / float WAV,
     // AIFF, FLAC, MP3 and Ogg files, not those. Before, it went in as it was, with 0 Hz / 0 channels / 0 s on its Audio
     // element when JUCE's readers could not open it either (401 of Thief's 1,351 clips), and stretched ones unstretched.
+    // Round 190sa (Q6): one that is exactly 16- or 24-bit audio (FL's WavPack samples) goes in as a lossless FLAC,
+    // "<name>.flac", checked bit for bit (Bitwig 6.1 reads FLAC in a DAWproject); FL's Ogg Vorbis samples decode to values
+    // no integer format holds (and often over full scale): they stay 32-bit float WAV.
     struct Decoded
     {
-        bool needs = false;
+        bool needs = false, flac = false;
         juce::MemoryBlock wav;
         double seconds = 0.0;
         int rate = 0, channels = 0;
@@ -105,7 +108,7 @@ bool writeWith (const Song& song, std::function<std::optional<ForeignPlugin> (co
             const juce::File file (fromUtf8 (path));
             d.needs = file.existsAsFile() && sampleNeedsWavForOtherApps (file);
             if (d.needs)
-                d.wav = decodedWavForOtherApps (file, d.seconds, d.rate, d.channels);
+                d.wav = decodedWavForOtherApps (file, d.seconds, d.rate, d.channels, &d.flac);
             it = decoded.emplace (path, std::move (d)).first;
         }
         return it->second;
@@ -129,7 +132,8 @@ bool writeWith (const Song& song, std::function<std::optional<ForeignPlugin> (co
     };
     options.embeddedName = [decodedFor] (const std::string& path) {
         const juce::File file (fromUtf8 (path));
-        return (decodedFor (path).needs ? file.getFileNameWithoutExtension() + ".wav" : file.getFileName()).toStdString();
+        const auto& d = decodedFor (path);
+        return (d.needs ? file.getFileNameWithoutExtension() + (d.flac ? ".flac" : ".wav") : file.getFileName()).toStdString();
     };
     options.sampleFormat = [&formats, &seen, decodedFor] (const std::string& path, double& seconds, int& sampleRate, int& channels) {
         auto it = seen.find (path);
