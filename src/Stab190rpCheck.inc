@@ -55,7 +55,7 @@
             const auto text = mainUi.recoveryBoxForTest (backup, buttons);
             offline.markSaved(); // (nothing to save: the box's choice opens at once, no "save changes?" first)
             mainUi.checkPreviousSessionForTest (juce::Time::getCurrentTime() - juce::RelativeTime::seconds (30));
-            pump (500, [] { return juce::Component::getCurrentlyModalComponent() != nullptr; });
+            pump (5000, [] { return juce::Component::getCurrentlyModalComponent() != nullptr; }); // (rollup 0.1.32 step 6: 500 ms was short for the first window on the macOS CI runner)
             auto* box = dynamic_cast<juce::AlertWindow*> (juce::Component::getCurrentlyModalComponent());
             check ("recovery box shown (" + juce::String (named ? "plugin named" : "no plugin") + ")", box != nullptr);
             if (box != nullptr)

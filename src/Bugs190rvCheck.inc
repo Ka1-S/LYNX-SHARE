@@ -102,7 +102,8 @@
                 const auto off = enabledOf (1);
                 click ({});
                 const auto on = enabledOf (1);
-                click (juce::ModifierKeys (juce::ModifierKeys::ctrlModifier)); // solo: only this effect of the insert on
+                click (juce::ModifierKeys (juce::ModifierKeys::commandModifier)); // solo: only this effect of the insert on (FL's Ctrl: Cmd on macOS,
+                // where JUCE makes Control+click a popup click; rollup 0.1.32 step 6, the macOS self-test)
                 const auto soloed = enabledOf (1) && ! enabledOf (0);
                 if (before && ! off && on && soloed)
                     ++toggled;
