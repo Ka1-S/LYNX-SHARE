@@ -1,4 +1,5 @@
 #include "ui/MidiToolsPanel.h"
+#include "ui/FileChoosers.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1526,8 +1527,8 @@ void MidiToolsPanel::chooseChordBank()
         }
         else if (chosen == 2)
         {
-            safe->bankChooser = std::make_unique<juce::FileChooser> (tr ("Open a .stacks chord bank"), juce::File(), "*.stacks");
-            safe->bankChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+            safe->bankChooser = lynx::ui::makeFileChooser (tr ("Open a .stacks chord bank"), juce::File(), "*.stacks"); // (round 190rx: the shared chooser)
+            lynx::ui::launchChooser (safe->bankChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
                 if (safe == nullptr || fc.getResult() == juce::File())
                     return;
                 std::string error;
