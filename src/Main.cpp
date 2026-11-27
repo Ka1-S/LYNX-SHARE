@@ -1,5 +1,8 @@
 #include <cfenv>
 #include <juce_gui_basics/juce_gui_basics.h>
+#if JUCE_MAC
+ #include <CoreFoundation/CoreFoundation.h> // (rollup 0.1.32 step 6: the message pump of Stab190rpCheck.inc on macOS)
+#endif
 #include "engine/UniqueSamples.h"
 #include "engine/AraHost.h"
 #include "engine/FileSort.h"
