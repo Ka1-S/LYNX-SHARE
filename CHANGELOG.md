@@ -34,6 +34,9 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- Easier to read: text on the red accent sits on a slightly deeper red (4.5:1 contrast), links use the theme's link color, and
+  English uses US spelling and one menu separator (›) throughout. At the toolbar's narrowest width the pattern box shows the
+  pattern's name and Pattern options moves to the overflow menu.
 - A double click on a sample in the Browser previews it, as in FL Studio 2026 (it added a channel); adding it is the new LYNX
   extra *Double-click a sample in the Browser to add it to a new channel*, off by default. The Clip-launch layout always adds (#323).
 - Lighter when idle: the output display's oscilloscope and spectrum stop drawing once silence has settled their picture, and FL
@@ -104,6 +107,8 @@ The short version of each release. The full notes, with measurements, known issu
 - DAWproject export writes a sample other apps can't read as lossless FLAC only when its audio is exactly 16- or 24-bit;
   copying samples for an export is faster and checked as it goes.
 - A looped time selection that runs past the song's end no longer plays the clips at the end again (#324).
+- Hints and tooltips no longer write "Alt++click" or "Ctrl++click"; the Clip-launch layout's Both / Grid / Song buttons and
+  its arrangement box are no longer cut off in Portuguese, Spanish, Italian and Indonesian, or at 125 %.
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
   save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
   third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
