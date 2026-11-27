@@ -1425,7 +1425,10 @@ void PlaylistComponent::refreshArrangementBox()
         arrangementBox.setItemEnabled (removeArrangementAction, names.size() > 1);
     }
 
+    const auto shownBefore = arrangementBox.getText();
     arrangementBox.setSelectedId (song.currentArrangement + 1, juce::dontSendNotification);
+    if (toolbarFitsNarrow && arrangementBox.getText() != shownBefore) // (round 190sc: the box's width follows its name there)
+        resized();
 }
 
 void PlaylistComponent::arrangementChosen()
@@ -1967,32 +1970,48 @@ void PlaylistComponent::resized()
     updateHeaderWidth(); // (round 190ig: the header width follows the layout style)
     updateDropLaneProbe();
     const auto h = toolbarHeight - 6;
-    arrangementBox.setBounds (4 + titleInsetLeft, 3, juce::jmin (150, getWidth() / 5), h);
-    // round 190ig (FM-26): the Pattern layout's toolbar in FL's order — the snap (magnet) before the tools, and the tools'
-    // own FL order and glyphs; the other layouts keep LYNX's order
-    tools.setFlPlaylistLook (flClipLook() && ! simpleHeaders);
-    if (flClipLook() && ! simpleHeaders)
+    const auto layoutToolbar = [this, h] (int boxWidth) {
+        arrangementBox.setBounds (4 + titleInsetLeft, 3, boxWidth, h);
+        // round 190ig (FM-26): the Pattern layout's toolbar in FL's order — the snap (magnet) before the tools, and the tools'
+        // own FL order and glyphs; the other layouts keep LYNX's order
+        tools.setFlPlaylistLook (flClipLook() && ! simpleHeaders);
+        if (flClipLook() && ! simpleHeaders)
+        {
+            snapBox.setBounds (arrangementBox.getRight() + 8, 3, 128, h);
+            tools.setBounds (snapBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
+            followButton.setBounds (tools.getRight() + 6, 3, h, h);
+        }
+        else
+        {
+            tools.setBounds (arrangementBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
+            snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
+            followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
+        }
+        stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
+        pointerButton.setBounds (stretchButton.getRight() + 2, 3, h, h); // round 190jq (issue #191)
+        // beside the clip grid the Playlist is narrow: what would run under the panel's title buttons goes (the inset keeps
+        // 4 px of air before them). Anywhere else the toolbar stays exactly as it was.
+        const auto toolbarEnd = getWidth() - titleInsetRight + 4;
+        if (toolbarFitsNarrow && tools.getRight() > toolbarEnd)
+            tools.setSize (juce::jmax (0, toolbarEnd - tools.getX()), h);
+        for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
+            c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
+        pointerButton.setVisible (pointerclick::buttonShown && ! simpleHeaders && (! toolbarFitsNarrow || pointerButton.getRight() <= toolbarEnd));
+    };
+    auto boxWidth = juce::jmin (150, getWidth() / 5);
+    layoutToolbar (boxWidth);
+    // round 190sc: beside the clip grid (at 125 % the box read "Arrangeme..."), the box takes the width its name needs
+    // from the room left after the last item shown, so nothing that showed goes; anywhere else nothing changes
+    if (toolbarFitsNarrow)
     {
-        snapBox.setBounds (arrangementBox.getRight() + 8, 3, 128, h);
-        tools.setBounds (snapBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
-        followButton.setBounds (tools.getRight() + 6, 3, h, h);
+        auto right = tools.getRight();
+        for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton, &pointerButton })
+            if (c->isVisible())
+                right = juce::jmax (right, c->getRight());
+        const auto need = juce::roundToInt (juce::GlyphArrangement::getStringWidth (getLookAndFeel().getComboBoxFont (arrangementBox), arrangementBox.getText())) + 56;
+        if (const auto grow = juce::jlimit (0, juce::jmax (0, getWidth() - titleInsetRight - right), juce::jmin (150, need) - boxWidth); grow > 0)
+            layoutToolbar (boxWidth + grow);
     }
-    else
-    {
-        tools.setBounds (arrangementBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
-        snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
-        followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
-    }
-    stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
-    pointerButton.setBounds (stretchButton.getRight() + 2, 3, h, h); // round 190jq (issue #191)
-    // beside the clip grid the Playlist is narrow: what would run under the panel's title buttons goes (the inset keeps
-    // 4 px of air before them). Anywhere else the toolbar stays exactly as it was.
-    const auto toolbarEnd = getWidth() - titleInsetRight + 4;
-    if (toolbarFitsNarrow && tools.getRight() > toolbarEnd)
-        tools.setSize (juce::jmax (0, toolbarEnd - tools.getX()), h);
-    for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
-        c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
-    pointerButton.setVisible (pointerclick::buttonShown && ! simpleHeaders && (! toolbarFitsNarrow || pointerButton.getRight() <= toolbarEnd));
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight - overviewGap);
     overviewGapBlock.setBounds (overview.getX(), overview.getBottom(), overview.getWidth(), overviewGap);
     // FL's "+" (21 x 18 at 7 px from the left of the header panel), on the ruler's row; FL's headers only
