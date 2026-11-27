@@ -39,12 +39,12 @@ public:
 };
 
 // Frame times → the numbers a report prints: frames per second, the gaps between frames (p50 / p95 / p99 / max) and
-// how many gaps a user sees as a hitch (> 50 ms).
+// how many gaps a user sees as a hitch (> 50 ms; round 190ry: also > 33 ms, two frames missed at 60 Hz).
 struct FrameStats
 {
     int frames = 0;
     double fps = 0.0, p50 = 0.0, p95 = 0.0, p99 = 0.0, max = 0.0;
-    int hitches = 0;
+    int hitches = 0, hitches33 = 0;
 
     static FrameStats of (const std::vector<double>& times, double spanMs)
     {
@@ -63,6 +63,7 @@ struct FrameStats
         s.p99 = at (0.99);
         s.max = gaps.back();
         s.hitches = (int) std::count_if (gaps.begin(), gaps.end(), [] (double g) { return g > 50.0; });
+        s.hitches33 = (int) std::count_if (gaps.begin(), gaps.end(), [] (double g) { return g > 33.0; });
         return s;
     }
 
@@ -70,7 +71,7 @@ struct FrameStats
     {
         return juce::String (frames) + " frames, " + juce::String (fps, 1) + " fps, gap p50 " + juce::String (p50, 1) + " / p95 "
                + juce::String (p95, 1) + " / p99 " + juce::String (p99, 1) + " / max " + juce::String (max, 1) + " ms, gaps > 50 ms "
-               + juce::String (hitches);
+               + juce::String (hitches) + ", gaps > 33 ms " + juce::String (hitches33);
     }
 };
 } // namespace lynx::ui

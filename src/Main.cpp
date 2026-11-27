@@ -850,6 +850,52 @@ private:
     }
 };
 
+// --uiperf (round 190ry, Q3 fluidity): input -> paint of single events — a click on a note, a knob turned, a clip dragged,
+// a key typed in a search box. `arm` before the event is sent (the place it changes, in the window's coordinates); the
+// first frame the window paints over that place ends the wait. An event that painted nothing there before the next one
+// counts as missed.
+struct UiPerfLatency
+{
+    double armedAt = -1.0;
+    juce::Rectangle<int> watch;
+    std::vector<double> ms;
+    int missed = 0;
+
+    void arm (juce::Rectangle<int> areaInWindow)
+    {
+        if (armedAt >= 0.0)
+            ++missed;
+        watch = areaInWindow;
+        armedAt = juce::Time::getMillisecondCounterHiRes();
+    }
+
+    void framePainted (double now, juce::Rectangle<int> area)
+    {
+        if (armedAt >= 0.0 && area.intersects (watch))
+        {
+            ms.push_back (now - armedAt);
+            armedAt = -1.0;
+        }
+    }
+
+    juce::String take (const juce::String& what)
+    {
+        if (armedAt >= 0.0)
+            ++missed;
+        auto v = ms;
+        std::sort (v.begin(), v.end());
+        const auto at = [&v] (double q) { return v[std::min (v.size() - 1, (std::size_t) (q * (double) v.size()))]; };
+        const auto text = "    input -> paint (" + what + "): " + (v.empty() ? juce::String ("none")
+                                                                               : "p50 " + juce::String (at (0.5), 1) + " / p95 " + juce::String (at (0.95), 1)
+                                                                                     + " / max " + juce::String (v.back(), 1) + " ms")
+                          + ", " + juce::String ((int) v.size()) + " events shown, " + juce::String (missed) + " missed\n";
+        ms.clear();
+        missed = 0;
+        armedAt = -1.0;
+        return text;
+    }
+};
+
 class LynxApplication final : public juce::JUCEApplication
 {
 public:
@@ -17082,7 +17128,10 @@ private:
             std::sort (v.begin(), v.end());
             return v[v.size() / 2];
         };
-        for (const auto& name : lynx::perfprojects::names())
+        auto all = lynx::perfprojects::names();
+        if (wanted.contains ("q3big")) // (round 190ry: only when asked for)
+            all.push_back ("q3big");
+        for (const auto& name : all)
         {
             if (! wanted.isEmpty() && ! wanted.contains (juce::String (name)))
                 continue;
@@ -17825,15 +17874,16 @@ private:
                 std::sort (sorted.begin(), sorted.end());
                 const auto at = [&sorted] (double q) { return sorted.empty() ? 0.0 : sorted[(std::size_t) juce::jlimit (0, (int) sorted.size() - 1, (int) (q * (double) sorted.size()))]; };
                 double sum = 0.0;
-                int over = 0;
+                int over = 0, over33 = 0;
                 for (auto t : sorted)
                 {
                     sum += t;
                     over += t > 16.0 ? 1 : 0;
+                    over33 += t > 33.0 ? 1 : 0; // (round 190ry: two frames missed at 60 Hz)
                 }
                 return juce::String ((int) sorted.size()) + ", mean " + juce::String (sorted.empty() ? 0.0 : sum / (double) sorted.size(), 1)
                        + " ms, p95 " + juce::String (at (0.95), 1) + " ms, max " + juce::String (sorted.empty() ? 0.0 : sorted.back(), 1)
-                       + " ms, >16 ms " + juce::String (over);
+                       + " ms, >16 ms " + juce::String (over) + ", p99 " + juce::String (at (0.99), 1) + " ms, >33 ms " + juce::String (over33);
             }
 
             void finish()
@@ -17869,13 +17919,15 @@ private:
         mainWindow->onFrame = [r = run.get()] (double ms) { if (r->frame >= 0) r->rendered.push_back (ms); };
         // round 173f: every frame the window paints; a fader drag's moves count as shown when a frame covers the fader
         auto drag = std::make_shared<UiPerfDrag>();
-        mainWindow->watchFrames ([r = run.get(), drag] (double now, juce::Rectangle<int> area) {
+        auto latency = std::make_shared<UiPerfLatency>(); // (round 190ry)
+        mainWindow->watchFrames ([r = run.get(), drag, latency] (double now, juce::Rectangle<int> area) {
             if (r->frame >= 0)
             {
                 r->frames.push_back (now);
                 r->paintedPixels += (double) area.getWidth() * (double) area.getHeight();
             }
             drag->framePainted (now, area);
+            latency->framePainted (now, area);
         });
         run->text << "project: " << project.getFullPathName() << "\n"
                    << "LYNX " << getApplicationVersion() << ", " << juce::SystemStats::getOperatingSystemName() << ", "
@@ -18580,9 +18632,292 @@ private:
                                    ui->setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
                                    return juce::String();
                                } });
-        // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
+        // round 190ry (Q3 fluidity, 0.1.32): the Piano roll, the Playlist and the clip grid scrolled and zoomed while
+        // playing; input -> paint of a note click, a knob turned, a mute button, a clip dragged and keys typed in the
+        // Browser's search box; the open time of the main views, the Settings window and its pages, the menus, the command
+        // palette, and 30 effect windows (then the song playing with them open). LYNX_UIPERF_ONLY="q3" runs these alone.
+        {
+            auto paintAll = [] {
+                auto& desktop = juce::Desktop::getInstance();
+                for (int k = 0; k < desktop.getNumComponents(); ++k)
+                    if (auto* c = desktop.getComponent (k); c != nullptr && c->isShowing())
+                        if (auto* p = c->getPeer())
+                            p->performAnyPendingRepaintsNow();
+            };
+            auto mouse = [this] (juce::Component& target, juce::Point<int> p, juce::ModifierKeys mods) {
+                auto* peer = mainWindow->getPeer();
+                if (peer == nullptr)
+                    return;
+                juce::ModifierKeys::currentModifiers = mods;
+                const auto local = peer->globalToLocal (target.localPointToGlobal (p).toFloat());
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, mods, juce::MouseInputSource::defaultPressure,
+                                        juce::MouseInputSource::defaultOrientation, juce::Time::currentTimeMillis());
+            };
+            auto inWindow = [this] (juce::Component& c, juce::Rectangle<int> r) { return mainWindow->getLocalArea (&c, r); };
+            const auto left = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier);
+            const auto ctrl = juce::ModifierKeys (juce::ModifierKeys::ctrlModifier);
+            const auto ctrlLeft = juce::ModifierKeys (juce::ModifierKeys::ctrlModifier | juce::ModifierKeys::leftButtonModifier);
+            auto playSong = [this] (bool song) {
+                engine->getTransport().songMode = song;
+                engine->rewind();
+                engine->play();
+            };
+
+            // --- scroll and zoom while playing ----------------------------------------------------------------------
+            run->steps.push_back ({ "q3 playlist scroll down/up, song playing", [ui, playSong] { ui->selectTabForSnapshot (2); playSong (true); },
+                                     [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
+            run->steps.push_back ({ "q3 playlist scroll sideways, song playing", {},
+                                     [wheelAt, ui, none] (int f) { wheelAt (ui->getPlaylistForSnapshot(), f < 40 ? -0.15f : 0.15f, 0.0f, none); }, 80 });
+            run->steps.push_back ({ "q3 playlist zoom (Ctrl+wheel), song playing", {},
+                                     [wheelAt, ui, ctrl] (int f) {
+                                         if (f % 3 == 0)
+                                             wheelAt (ui->getPlaylistForSnapshot(), 0.0f, (f / 9) % 2 == 0 ? 0.15f : -0.15f, ctrl);
+                                     }, 120 });
+            run->steps.push_back ({ "q3 piano roll scroll down/up, pattern playing", [this, ui, playSong] {
+                                       engine->stop();
+                                       ui->selectTabForSnapshot (1);
+                                       playSong (false);
+                                   },
+                                     [wheelAt, ui, none] (int f) { wheelAt (ui->getPianoRollForSnapshot(), 0.0f, f < 40 ? -0.15f : 0.15f, none); }, 80 });
+            run->steps.push_back ({ "q3 piano roll scroll sideways, pattern playing", {},
+                                     [wheelAt, ui, none] (int f) { wheelAt (ui->getPianoRollForSnapshot(), f < 40 ? -0.15f : 0.15f, 0.0f, none); }, 80 });
+            run->steps.push_back ({ "q3 piano roll zoom (Ctrl+wheel), pattern playing", {},
+                                     [wheelAt, ui, ctrl] (int f) {
+                                         if (f % 3 == 0)
+                                             wheelAt (ui->getPianoRollForSnapshot(), 0.0f, (f / 9) % 2 == 0 ? 0.15f : -0.15f, ctrl);
+                                     }, 120 });
+            run->steps.push_back ({ "q3 mixer scroll sideways, song playing", [this, ui, playSong] {
+                                       engine->stop();
+                                       ui->selectTabForSnapshot (3);
+                                       playSong (true);
+                                   },
+                                     [wheelAt, ui, none] (int f) { wheelAt (ui->getMixerForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+
+            // --- input -> paint --------------------------------------------------------------------------------------
+            // Ctrl+click on a note (every tool: the note joins / leaves the selection), two notes in turn so no click
+            // makes a double-click
+            run->steps.push_back ({ "q3 latency: Ctrl+click on a note (piano roll)", [this, ui] {
+                                       engine->stop();
+                                       ui->selectTabForSnapshot (1);
+                                   },
+                                     [ui, mouse, inWindow, latency, ctrl, ctrlLeft] (int f) {
+                                         if (f % 8 != 4)
+                                             return;
+                                         auto& pr = ui->getPianoRollForSnapshot();
+                                         const auto a = pr.firstVisibleNoteForSnapshot();
+                                         if (a.index < 0)
+                                             return;
+                                         const auto b = pr.firstVisibleNoteForSnapshot (a.index, { pr.getWidth(), pr.getHeight() });
+                                         const auto& n = (f / 8) % 2 == 0 || b.index < 0 ? a : b;
+                                         mouse (pr, n.bounds.getCentre(), ctrl); // (over the note first, as a real mouse)
+                                         latency->arm (inWindow (pr, n.bounds));
+                                         mouse (pr, n.bounds.getCentre(), ctrlLeft);
+                                         mouse (pr, n.bounds.getCentre(), ctrl);
+                                         juce::ModifierKeys::currentModifiers = {};
+                                     }, 192, [latency] { return latency->take ("a note's selection"); } });
+            // a knob: the pan knob of insert 1's strip dragged up 3 px a move (one move every 6 frames), then released
+            run->steps.push_back ({ "q3 latency: mixer pan knob drag", [this, ui, mouse, left] {
+                                       ui->selectTabForSnapshot (3);
+                                       auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                       const auto pan = strips.panAreaForSnapshot (1);
+                                       mouse (strips, pan.getCentre(), {});
+                                       mouse (strips, pan.getCentre(), left);
+                                       juce::ignoreUnused (this);
+                                   },
+                                     [ui, mouse, inWindow, latency, left] (int f) {
+                                         if (f % 6 != 3)
+                                             return;
+                                         auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                         const auto pan = strips.panAreaForSnapshot (1);
+                                         latency->arm (inWindow (strips, pan.expanded (4)));
+                                         mouse (strips, pan.getCentre().translated (0, -3 * (1 + (f / 6) % 12)), left);
+                                     }, 150, [this, ui, mouse, latency] {
+                                         auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                         mouse (strips, strips.panAreaForSnapshot (1).getCentre(), {});
+                                         juce::ModifierKeys::currentModifiers = {};
+                                         const auto pan = engine->getSong().mixer.size() > 1 ? engine->getSong().mixer[1].pan : 0.0f;
+                                         engine->undo();
+                                         return latency->take ("the knob") + "    pan of insert 1 at the release " + juce::String (pan, 3) + "\n";
+                                     } });
+            // a button: insert 1's mute, clicked every 30 frames (no double-click), an even number of times
+            run->steps.push_back ({ "q3 latency: mixer mute click", {},
+                                     [ui, mouse, inWindow, latency, left] (int f) {
+                                         if (f % 30 != 15)
+                                             return;
+                                         auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
+                                         const auto m = strips.muteAreaForSnapshot (1);
+                                         mouse (strips, m.getCentre(), {});
+                                         latency->arm (inWindow (strips, m));
+                                         mouse (strips, m.getCentre(), left);
+                                         mouse (strips, m.getCentre(), {});
+                                         juce::ModifierKeys::currentModifiers = {};
+                                     }, 240, [this, latency] {
+                                         return latency->take ("the mute button") + "    insert 1 muted at the end: "
+                                                + (engine->getSong().mixer.size() > 1 && engine->getSong().mixer[1].muted ? "yes" : "no") + "\n";
+                                     } });
+            // a clip dragged sideways in the Playlist, 24 px a move (one every 6 frames), then dropped and undone
+            auto clipPress = std::make_shared<juce::Point<int>>();
+            run->steps.push_back ({ "q3 latency: playlist clip drag", [this, ui, mouse, left, clipPress] {
+                                       ui->selectTabForSnapshot (2);
+                                       auto& pl = ui->getPlaylistForSnapshot();
+                                       pl.setViewForSnapshot (64.0, 0, 0);
+                                       const auto grid = pl.gridAreaForSnapshot();
+                                       *clipPress = {};
+                                       for (int i = 0; i < (int) engine->getSong().playlist.size(); ++i)
+                                           if (const auto b = pl.clipBoundsForSnapshot (i); b.getWidth() >= 24 && grid.contains (b) && b.getHeight() >= 12
+                                                                                            && b.getRight() < grid.getCentreX())
+                                           {
+                                               *clipPress = { b.getX() + 12, b.getBottom() - 4 };
+                                               break;
+                                           }
+                                       mouse (pl, *clipPress, {});
+                                       mouse (pl, *clipPress, left);
+                                   },
+                                     [ui, mouse, inWindow, latency, left, clipPress] (int f) {
+                                         if (f % 6 != 3 || clipPress->isOrigin())
+                                             return;
+                                         auto& pl = ui->getPlaylistForSnapshot();
+                                         const auto grid = pl.gridAreaForSnapshot();
+                                         latency->arm (inWindow (pl, grid.withY (clipPress->y - 20).withHeight (40)));
+                                         mouse (pl, clipPress->translated (24 * (1 + (f / 6) % 10), 0), left);
+                                     }, 120, [this, ui, mouse, latency, clipPress] {
+                                         auto& pl = ui->getPlaylistForSnapshot();
+                                         mouse (pl, *clipPress, {});
+                                         juce::ModifierKeys::currentModifiers = {};
+                                         engine->undo();
+                                         const auto moved = engine->getPublishCount();
+                                         return latency->take ("the dragged clip") + "    (pressed at " + clipPress->toString() + ", song published "
+                                                + juce::String ((juce::int64) moved) + " times)\n";
+                                     } });
+            // keys typed in the Browser's search box (one every 6 frames), then taken back with Backspace
+            auto typed = std::make_shared<int> (0);
+            run->steps.push_back ({ "q3 latency: typing in the Browser's search box", [ui, typed] {
+                                       ui->showDesktopForSnapshot (false);
+                                       ui->runActionForSnapshot ("browser.search");
+                                       *typed = 0;
+                                   },
+                                     [this, ui, inWindow, latency, typed] (int f) {
+                                         static const juce::String text ("kick drum loop");
+                                         if (f % 6 != 3 || *typed >= text.length())
+                                             return;
+                                         auto& browser = ui->getBrowserForSnapshot();
+                                         std::function<juce::TextEditor* (juce::Component&)> findBox = [&findBox] (juce::Component& c) -> juce::TextEditor* {
+                                             for (auto* child : c.getChildren())
+                                                 if (auto* t = dynamic_cast<juce::TextEditor*> (child); t != nullptr && t->isShowing())
+                                                     return t;
+                                                 else if (auto* deeper = findBox (*child))
+                                                     return deeper;
+                                             return nullptr;
+                                         };
+                                         if (auto* box = browser.isShowing() ? findBox (browser) : nullptr)
+                                         {
+                                             latency->arm (inWindow (browser, browser.getLocalBounds()));
+                                             const auto c = text[*typed];
+                                             box->keyPressed (juce::KeyPress ((int) c, {}, c));
+                                             ++*typed;
+                                         }
+                                     }, 96, [this, ui, latency, typed] {
+                                         auto text = latency->take ("a key in the search box") + "    search box: \"" + ui->getBrowserForSnapshot().searchTextForSnapshot() + "\"\n";
+                                         ui->getBrowserForSnapshot().setSearchForSnapshot ({});
+                                         return text;
+                                     } });
+
+            // --- open times ------------------------------------------------------------------------------------------
+            const char* views[] { "channel rack", "piano roll", "playlist", "mixer" };
+            for (int tab : { 3, 1, 0, 2 })
+                run->steps.push_back ({ juce::String ("q3 open: ") + views[tab] + " maximised", [this, ui, tab, paintAll] {
+                                           engine->stop();
+                                           ui->selectTabForSnapshot (tab);
+                                           paintAll();
+                                       }, {}, 600 });
+            run->steps.push_back ({ "q3 open: Settings window (General)", [this, paintAll] {
+                                       lynx::closeSettings();
+                                       lynx::showSettings (*engine, lynx::SettingsPage::general);
+                                       paintAll();
+                                   }, {}, 1500 });
+            const char* pages[] { "Project", "Info", "Files", "General", "Audio", "MIDI", "Theme", "LYNX extras", "Link" };
+            for (int page = 0; page <= (int) lynx::SettingsPage::link; ++page)
+                run->steps.push_back ({ juce::String ("q3 open: Settings page ") + pages[page], [page, paintAll] {
+                                           lynx::switchSettingsPage ((lynx::SettingsPage) page);
+                                           paintAll();
+                                       }, {}, 600 });
+            run->steps.push_back ({ "q3 open: Settings closed", [paintAll] { lynx::closeSettings(); paintAll(); }, {}, 400 });
+            const auto menuNames = ui->getMenuNamesForSnapshot();
+            for (int m = 0; m < menuNames.size(); ++m)
+                run->steps.push_back ({ "q3 open: menu " + menuNames[m], [ui, m, paintAll] {
+                                           auto menu = ui->getMenuForSnapshot (m);
+                                           menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (ui->getScreenBounds().withSize (40, 20).translated (40 * m, 0)));
+                                           paintAll();
+                                       }, {}, 500, [] { juce::PopupMenu::dismissAllActiveMenus(); return juce::String(); } });
+            run->steps.push_back ({ "q3 open: command palette", [ui, paintAll] {
+                                       ui->runActionForSnapshot ("view.commandPalette");
+                                       paintAll();
+                                   }, {}, 600, [ui] {
+                                       const auto ms = ui->paletteOpenMsForSnapshot();
+                                       ui->closeActionSearchForSnapshot();
+                                       return "    palette's own open time " + juce::String (ms, 1) + " ms\n";
+                                   } });
+            // 30 effect windows (the first effects that have a LYNX editor), then the song playing with them open
+            auto opened = std::make_shared<int> (0);
+            run->steps.push_back ({ "q3 open: 30 effect windows", [this, opened, paintAll] {
+                                       engine->stop();
+                                       *opened = 0;
+                                       const auto& mixer = engine->getSong().mixer;
+                                       for (int t = 0; t < (int) mixer.size() && *opened < 30; ++t)
+                                           for (int s = 0; s < (int) mixer[(std::size_t) t].effects.size() && *opened < 30; ++s)
+                                               if (lynx::NativeEffectWindows::canOpen (mixer[(std::size_t) t].effects[(std::size_t) s]))
+                                               {
+                                                   lynx::NativeEffectWindows::open (*engine, t, s);
+                                                   ++*opened;
+                                               }
+                                       paintAll();
+                                   }, {}, 1500, [opened] { return "    effect windows opened: " + juce::String (*opened) + "\n"; } });
+            run->steps.push_back ({ "q3 30 effect windows open, song playing", [ui, playSong] { ui->selectTabForSnapshot (2); playSong (true); }, {}, 4000 });
+            run->steps.push_back ({ "q3 effect windows closed", [this, paintAll] {
+                                       engine->stop();
+                                       lynx::NativeEffectWindows::closeAll();
+                                       paintAll();
+                                   }, {}, 500 });
+
+            // --- the clip grid (last: the Clip-launch layout stays until the step ends) -------------------------------
+            run->steps.push_back ({ "q3 open: Clip-launch layout", [ui, paintAll] {
+                                       ui->selectTabForSnapshot (2);
+                                       ui->setClipLaunchWorkflow (true);
+                                       ui->setClipGridView (lynx::PlaylistArea::GridView::grid);
+                                       paintAll();
+                                   }, {}, 1500 });
+            run->steps.push_back ({ "q3 clip grid scroll down/up, clips launched", [this] {
+                                       engine->getTransport().songMode = true;
+                                       if (const auto& grid = engine->getSong().clipGrid)
+                                           for (int scene = 0; scene < juce::jmin (8, (int) grid->scenes.size()); ++scene)
+                                               engine->launcherCommand ({ lynx::launcher::Command::Type::launchScene, 0, scene });
+                                   },
+                                     [wheelAt, ui, none] (int f) {
+                                         if (auto* grid = ui->getClipGridForSnapshot())
+                                             wheelAt (*grid, 0.0f, f < 40 ? -0.15f : 0.15f, none);
+                                     }, 80 });
+            run->steps.push_back ({ "q3 clip grid scroll sideways, clips launched", {},
+                                     [wheelAt, ui, none] (int f) {
+                                         if (auto* grid = ui->getClipGridForSnapshot())
+                                             wheelAt (*grid, f < 40 ? -0.15f : 0.15f, 0.0f, none);
+                                     }, 80, [this, ui] {
+                                         engine->launcherCommand ({ lynx::launcher::Command::Type::stopAll });
+                                         engine->stop();
+                                         return juce::String();
+                                     } });
+            run->steps.push_back ({ "q3 open: Pattern layout again", [ui, paintAll] { ui->setClipLaunchWorkflow (false); paintAll(); }, {}, 800 });
+        }
+        // LYNX_UIPERF_ONLY=text: only the steps whose name has that text (round 190ry: "a|b|c", any of them)
         if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
-            run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());
+        {
+            const auto any = juce::StringArray::fromTokens (only, "|", "");
+            run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&any] (const auto& s) {
+                                  for (const auto& t : any)
+                                      if (t.isNotEmpty() && juce::String (s.name).contains (t))
+                                          return false;
+                                  return true;
+                              }), run->steps.end());
+        }
         // let the window draw the project first
         perf = std::move (run);
         juce::Timer::callAfterDelay (1500, [this] { if (perf != nullptr) perf->startTimer (16); });

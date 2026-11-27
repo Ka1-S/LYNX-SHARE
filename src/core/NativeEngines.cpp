@@ -242,6 +242,38 @@ std::string defaultPresetPath (const std::string& presetFolder, bool generator, 
     return c.empty() ? std::string() : c.front();
 }
 
+// Round 190ry (Q3 fluidity): "is there a preset to start from" = ! presetCandidates (...).empty(), with the cheap checks
+// first. presetCandidates lists FL's whole Plugin database\Generators tree and the engine's preset folder to rank the
+// candidates; asking only whether one exists needs no listing when a Default preset is there (as it is for nearly every
+// engine). available() runs for every native engine whenever the plugin picker (F8), the Browser's Plugin database, an
+// Add menu or a layout switch lists them: with FL's data on a slow disk (WSL's /mnt/c) those listings froze the window
+// for 15-20 s each time.
+bool hasPresetCandidate (const std::string& presetFolder, bool generator, const FlAccess& access)
+{
+    if (presetFolder.empty() || access.roots.data.empty())
+        return false;
+    const auto folder = std::string ("%FLStudioData%\\Patches\\Plugin presets\\") + (generator ? "Generators\\" : "Effects\\") + presetFolder;
+    if (access.fileExists)
+        for (const auto* name : { "Default.fst", "Default.tbio", "Default\\Default.tbio" })
+            if (const auto path = resolveFlPath (folder + "\\" + name, access.roots); ! path.empty() && access.fileExists (path))
+                return true;
+    if (generator && access.listPresets)
+    {
+        const auto wanted = lower (presetFolder + ".fst");
+        for (const auto& path : access.listPresets (resolveFlPath ("%FLStudioData%\\Patches\\Plugin database\\Generators", access.roots)))
+        {
+            const auto cut = path.find_last_of ("\\/");
+            if (lower (cut == std::string::npos ? path : path.substr (cut + 1)) == wanted)
+                return true;
+        }
+    }
+    if (access.listPresets)
+        for (const auto& path : access.listPresets (resolveFlPath (folder, access.roots)))
+            if (endsWith (path, ".fst") || endsWith (path, ".tbio") || endsWith (path, ".gmsynth") || endsWith (path, ".mrp"))
+                return true;
+    return false;
+}
+
 namespace
 {
 // BooBass has no preset folder: a new one is its three knobs at FL's Plugin database values (32767) over the
@@ -368,17 +400,42 @@ std::optional<ChannelDef> withPreset (const ChannelDef& current, const std::stri
     return out;
 }
 
+namespace
+{
+// (round 190ry) the access's memo, if it keeps one: the answer for (kind of engine, kind), else `look`'s, kept
+template <typename Look>
+bool remembered (const FlAccess& access, int group, int kind, Look&& look)
+{
+    auto* memo = access.availability.get();
+    if (memo == nullptr)
+        return look();
+    {
+        const std::scoped_lock l (memo->lock);
+        if (const auto it = memo->known.find ({ group, kind }); it != memo->known.end())
+            return it->second;
+    }
+    const auto answer = look(); // (outside the lock: two threads may both look, and agree)
+    const std::scoped_lock l (memo->lock);
+    memo->known[{ group, kind }] = answer;
+    return answer;
+}
+} // namespace
+
 bool available (const InstrumentEngine& e, const FlAccess& access)
 {
-    if (e.kind == InstrumentKind::boobass)
-        return ! booBassDll (access).empty();
     // an engine with a LYNX preset bank starts from it without FL (round 168n)
-    return e.needs == Needs::nothing || banks::hasBank (e.kind) || ! defaultPresetPath (e.presetFolder, true, access).empty();
+    if (e.kind != InstrumentKind::boobass && (e.needs == Needs::nothing || banks::hasBank (e.kind)))
+        return true;
+    return remembered (access, 0, (int) e.kind, [&] {
+        if (e.kind == InstrumentKind::boobass)
+            return ! booBassDll (access).empty();
+        return hasPresetCandidate (e.presetFolder, true, access);
+    });
 }
 
 bool available (const EffectEngine& e, const FlAccess& access)
 {
-    return e.needs == Needs::nothing || ! defaultPresetPath (e.presetFolder, false, access).empty();
+    return e.needs == Needs::nothing || remembered (access, 1, (int) e.kind, [&] { return hasPresetCandidate (e.presetFolder, false, access); });
 }
 
 std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& access)

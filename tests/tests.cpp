@@ -18157,3 +18157,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Q1a190rwTests.inc" // round 190rw (0.1.32 stage Q1 part A: Playlist, Piano roll, Channel rack): the defects it found and fixed
 #include "Q1c190rzTests.inc" // round 190rz (0.1.32 Q1 part C): the rows parts A and B left not exercised
 #include "Q1b190rxTests.inc" // round 190rx (0.1.32 Q1 part B): the defects the feature audit found and fixed
+#include "Q3190ryTests.inc" // round 190ry (0.1.32 stage Q3, fluidity): native engines offered without listing FL's folders; the big UI project
