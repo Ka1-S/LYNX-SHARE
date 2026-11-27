@@ -4924,18 +4924,30 @@ public:
     {
         (view == PlaylistArea::GridView::beside ? both : view == PlaylistArea::GridView::grid ? grid : song).setToggleState (true, juce::dontSendNotification);
     }
+    // round 190sc: the width Both | Grid | Song need in this language (132 px, three equal buttons, when their texts fit:
+    // pt-BR "Ambos", es "Cuadrícula", it "Entrambi" were cut to "Amb...")
+    int neededCompactWidth()
+    {
+        return juce::jmax ((int) compactWidth, textRoom (both) + textRoom (grid) + textRoom (song));
+    }
     void resized() override
     {
         auto r = getLocalBounds().reduced (0, 4);
-        const auto withSwitches = r.getWidth() >= width;
+        const auto withSwitches = r.getWidth() >= neededCompactWidth() + (width - compactWidth);
         for (juce::Component* c : { (juce::Component*) &draw, (juce::Component*) &key, (juce::Component*) &midi })
             c->setVisible (withSwitches);
         auto switches = withSwitches ? r.removeFromRight (26 + 4 + 40 + 4 + 44) : juce::Rectangle<int>();
         if (withSwitches)
             r.removeFromRight (8);
-        const auto w = r.getWidth() / 3;
-        both.setBounds (r.removeFromLeft (w));
-        grid.setBounds (r.removeFromLeft (w));
+        // equal thirds when every text fits in one (as before); else each button its text's room and an equal share of the rest
+        const int need[] { textRoom (both), textRoom (grid), textRoom (song) };
+        const auto total = r.getWidth();
+        int w[] { total / 3, total / 3, total / 3 };
+        if (const auto sum = need[0] + need[1] + need[2]; juce::jmax (need[0], need[1], need[2]) > total / 3)
+            for (int i = 0; i < 3; ++i)
+                w[i] = sum <= total ? need[i] + (total - sum) / 3 : total * need[i] / juce::jmax (1, sum);
+        both.setBounds (r.removeFromLeft (w[0]));
+        grid.setBounds (r.removeFromLeft (w[1]));
         song.setBounds (r);
         draw.setBounds (switches.removeFromLeft (26));
         switches.removeFromLeft (4);
@@ -4945,6 +4957,10 @@ public:
     }
 
 private:
+    int textRoom (juce::TextButton& b)
+    {
+        return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getLookAndFeel().getTextButtonFont (b, 22), b.getButtonText())) + 18;
+    }
     juce::TextButton both, grid, song;
     IconButton draw { "drawMode", Icon::draw };
     juce::TextButton key, midi;
@@ -5332,9 +5348,10 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             detailView->setVisible (clipLaunch && DetailView::shownSetting);
         playlistArea.setDetailView (clipLaunch ? detailView.get() : nullptr,
                                     [this] (int available) { return detailView != nullptr ? detailView->heightFor (available) : 0; });
-        if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get());
+        if (flip != nullptr)
             flip->show (PlaylistArea::GridView::beside);
-        workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::compactWidth : 0); // (round 190iv)
+        workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch && flip != nullptr ? flip->neededCompactWidth() : 0); // (round 190iv; 190sc: its texts' width)
     }
     // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
     playlist.setSimpleHeaders (style == Style::simple);
