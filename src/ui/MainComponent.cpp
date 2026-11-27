@@ -2454,6 +2454,14 @@ bool MainComponent::shouldDropFilesWhenDraggedExternally (const juce::DragAndDro
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    // round 190rx: Esc ends "Link to MIDI controller (move a knob...)" when no controller moved (with none connected it
+    // waited for ever, the hint bar held on its message); first, so no other Esc (focus give-back, close the panel)
+    // takes it
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && engine.isLearningMidi())
+    {
+        engine.learnMidiController ({}); // (an empty target: learning ends, nothing is linked)
+        return true;
+    }
     // issue #247, reopened (round 190ri): letters typed while a text field just lost the keyboard go back into it
     if (ui::keyfocus::typeIntoFieldJustLeft (key))
         return true;
@@ -2521,14 +2529,6 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && browser.isHotSwapping())
     {
         browser.endHotSwap();
-        return true;
-    }
-
-    // round 190rx: Esc ends "Link to MIDI controller (move a knob...)" when no controller moved (with none connected it
-    // waited for ever, the hint bar held on its message)
-    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && engine.isLearningMidi())
-    {
-        engine.learnMidiController ({}); // (an empty target: learning ends, nothing is linked)
         return true;
     }
 
