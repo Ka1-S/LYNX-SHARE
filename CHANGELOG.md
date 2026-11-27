@@ -66,6 +66,17 @@ The short version of each release. The full notes, with measurements, known issu
   LYNX writes for you now goes through one checked writer (projects, exports, settings, and the samples, takes and state
   files it saves: Slicer, Newtone, ADR, Auto Sampler, stems, recordings, Gross Beat's .fnv): if anything fails, the old file
   is left as it was and LYNX says why ("Not saved: the disk is full. Your project file was not changed.").
+- **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
+  save (on Windows an assert or std::terminate ended LYNX with nothing written); the recovery box can open the backup without
+  third-party plugins (the default when a plugin's window was open); a half-written save is never the backup offered; with
+  several LYNX windows, each one's crash is found at the next start.
+- An audio driver that never answers (some ASIO drivers) no longer freezes LYNX: the open gives up after 10 s, LYNX uses the
+  default device and says which driver did not answer (Try again / Choose another...); a device whose open hung or crashed the
+  last start is skipped at the next one. An audio device lost while recording stops the recording, keeps the take and reopens
+  when the device is back.
+- A Harmless or Harmor channel's freeze plays as the channel did (it rendered without the channel's volume and pan, which
+  these two use inside their voices); a cancelled freeze no longer stops LYNX ten seconds later; closing some plugins' windows
+  (Cakewalk's SI instruments) no longer crashes LYNX.
 - Export for other apps no longer deletes the exported folder after a zip that could not be written completely; Auto Sampler
   takes and extracted stems no longer append to an older file of the same name.
 - Export to FL Studio: a one-step note on a LYNX Sampler whose ADSR is on keeps its length (FL played it to the end of the
