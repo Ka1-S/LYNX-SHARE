@@ -939,7 +939,7 @@ int removeChannels (Song& song, std::vector<int> channels)
     return removed;
 }
 
-bool isInsertFree (const Song& song, int track) noexcept
+bool isInsertFree (const Song& song, int track)
 {
     if (track <= 0 || track >= (int) song.mixer.size() || song.mixer[(std::size_t) track].current) // (round 190mv: FL's Current track)
         return false;
@@ -954,7 +954,10 @@ bool isInsertFree (const Song& song, int track) noexcept
         if (t != track && song.routes (t, track))
             return false;
 
-    return true;
+    // round 190rz (FL 2026, checked live: Ctrl+L skipped the empty inserts renamed "Bar" and "Foo" and took Insert 7):
+    // an insert the user has named, or given an input, a Playlist track or anything else Song::insertInUse counts, is
+    // not free either
+    return ! song.insertInUse (track);
 }
 
 std::vector<int> sendChannelsToFreeInserts (Song& song, const std::vector<int>& channels)
@@ -973,6 +976,14 @@ std::vector<int> sendChannelsToFreeInserts (Song& song, const std::vector<int>& 
         }
 
         int track = 0;
+
+        // round 190rz (FL 2026, checked live): a channel that is the only one on its insert keeps it (Ctrl+L on 808 Kick,
+        // alone on Insert 1, renamed Insert 1 "808 Kick"; 808 Clap, sharing Insert 1, moved to a free insert)
+        if (const auto own = song.channels[(std::size_t) channel].mixerTrack; own > 0 && own < (int) song.mixer.size()
+            && std::none_of (song.channels.begin(), song.channels.end(), [own, channel, &song] (const ChannelDef& c) {
+                   return c.mixerTrack == own && &c != &song.channels[(std::size_t) channel];
+               }))
+            track = own;
 
         for (int t = 1; t < (int) song.mixer.size() && track == 0; ++t)
             if (isInsertFree (song, t))

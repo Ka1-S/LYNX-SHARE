@@ -1,4 +1,5 @@
 #include "ui/SlotWatch.h"
+#include "core/KeyMap.h"
 #include "engine/SafeWrite.h"
 #include "ui/WindowPlaces.h"
 #include "ui/FileChoosers.h"
@@ -398,7 +399,8 @@ public:
     bool keyPressed (const juce::KeyPress& key) override
     {
         const auto cmd = key.getModifiers().isCommandDown();
-        if (cmd && key.getKeyCode() == 'Z')
+        const auto letter = keys::letterOfKeyCode (key.getKeyCode()); // (round 190rz: X11 sends 'z' for Ctrl+Z)
+        if (cmd && letter == 'Z')
         {
             if (key.getModifiers().isShiftDown())
                 engine.redo();
@@ -406,7 +408,7 @@ public:
                 engine.undo();
             return true;
         }
-        if (cmd && key.getKeyCode() == 'Y')
+        if (cmd && letter == 'Y')
         {
             engine.redo();
             return true;
@@ -415,7 +417,7 @@ public:
             return true;
         if (warpMode() || sample == nullptr)
             return false;
-        if (cmd && key.getKeyCode() == 'A')
+        if (cmd && letter == 'A')
         {
             selected.clear();
             for (int k = 0; k < (int) notes.pitches.size(); ++k)

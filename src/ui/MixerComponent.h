@@ -636,6 +636,7 @@ public:
     // or `notches` wheel notches; true while the right-drag paints the curve orange (between press and release)
     bool eqGestureForSnapshot (int band, int dy, int notches);
     void deleteSlot (int slot); // removes the slot's effect (its menu's Delete, the Delete key)
+    void savePluginPresetAs (int slot); // a hosted plugin's "Save preset as..." from the slot menu (round 190rz)
     void askDeleteSlot (int slot); // the slot menu's Delete... (and Del in it): FL's confirm first (round 190rx)
     void groupIntoRack (int slot, bool all); // round 183c: Live's Group, the slot (or the chain) into an Audio Effect Rack
     void selectSlot (int slot)

@@ -11062,9 +11062,11 @@ void MainComponent::showMissingFiles (bool afterOpening)
                     if (std::find (it->usedBy.begin(), it->usedBy.end(), user) == it->usedBy.end())
                         it->usedBy.push_back (user);
                 }
-        // installed, but failed to load: they play silence / are bypassed
+        // installed, but failed to load: they play silence / are bypassed. Round 190rz: the host's line is "<name>: <why>",
+        // and a plugin that is not installed fails to load too ("<name>: plugin not installed or not scanned"): it is
+        // listed once, by its name above, not again as "installed but did not load"
         for (const auto& line : host.getLoadFailures())
-            if (std::none_of (info.plugins.begin(), info.plugins.end(), [&] (const MissingPlugin& p) { return p.name == line.toStdString(); }))
+            if (! listsFailure (info.plugins, line.toStdString()))
                 info.plugins.push_back ({ line.toStdString(), {}, "Silence: the plugin is installed but did not load" });
         if (currentFile.existsAsFile())
             info.searchFolders.add (currentFile.getParentDirectory().getFullPathName());

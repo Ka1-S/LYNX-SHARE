@@ -55,6 +55,10 @@
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginEditors.h"
 #include "ui/PluginWindow.h"
+#include "ui/PluginPresetMenu.h"
+#include "ui/WrapperMenu.h"
+#include "ui/ChannelSettings.h"
+#include "core/PluginHelp.h"
 #include "ui/HintBar.h"
 #include "core/StandIns.h"
 #include "ui/I18n.h"
@@ -9023,8 +9027,21 @@ void EffectsPanel::showSlotMenu (int slot)
         }
         menu.addSubMenu (tr ("Presets"), presets, presets.getNumItems() > 0);
     }
-    menu.addItem (tr ("Browse presets"), false, false, [] {});
-    menu.addItem (tr ("Save preset as..."), false, false, [] {});
+    // round 190rz (Q1 part C, FL parity: FL's slot menu has them working): a hosted plugin's Browse presets / Save preset
+    // as... as its window's wrapper menu does (ui/PluginWindow.cpp: the plugin's folder of user presets, in the Browser;
+    // the "Save preset" name box). A built-in effect keeps them greyed here (its editor's preset bar has them).
+    if (isPlugin && livePlugin != nullptr && locateInBrowserHandler())
+        menu.addItem (tr ("Browse presets"), [folder = pluginpresetui::folderFor (livePlugin->getInstance().getName())] {
+            folder.createDirectory();
+            if (locateInBrowserHandler())
+                locateInBrowserHandler() (folder);
+        });
+    else
+        menu.addItem (tr ("Browse presets"), false, false, [] {});
+    if (isPlugin && livePlugin != nullptr)
+        menu.addItem (tr ("Save preset as..."), [this, slot] { savePluginPresetAs (slot); });
+    else
+        menu.addItem (tr ("Save preset as..."), false, false, [] {});
     if (isPlugin)
     {
         // FL's "Add to plugin database (flag as favorite)": LYNX's favourites (the picker's stars), as the wrapper menu
@@ -9062,7 +9079,12 @@ void EffectsPanel::showSlotMenu (int slot)
             targets = allPluginParameterTargets (livePlugin->getInstance(), { AutomationTargetKind::effectParam, track, slot, 0 });
         menu.addItem (tr ("Link all parameters..."), ! targets.empty(), false, [this, targets] { openRemoteControlSettings (engine, targets, false); });
     }
-    menu.addItem (tr ("Browse parameters"), false, false, [] {});
+    // round 190rz: FL's Browse parameters, as the plugin window's (round 190oa): the Browser's Current project › Effects
+    // entry of this slot, open on its parameters
+    menu.addItem (tr ("Browse parameters"), wrappermenu::browseParametersHandler() != nullptr, false, [t = track, slot] {
+        if (wrappermenu::browseParametersHandler())
+            wrappermenu::browseParametersHandler() (true, t, slot);
+    });
 
     // FL's slot menu "CPU" section (REA round 139): Allow threaded processing (plugins), Smart disable
     menu.addSectionHeader (tr ("CPU"));
@@ -9102,7 +9124,14 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addItem (tr ("Change icon..."), false, false, [] {});
     menu.addSeparator();
     menu.addSubMenu (tr ("Scaling"), juce::PopupMenu(), false);
-    menu.addItem (tr ("Help"), false, false, [] {});
+    // round 190rz: FL's Help opens the plugin's manual page: a built-in effect's page of LYNX's wiki (as a channel window's
+    // wrapper menu, round 190oa); a hosted plugin has none of LYNX's
+    if (! isPlugin)
+        menu.addItem (tr ("Help"), [url = pluginhelp::pageFor (effectInfo (fx.kind).name, false)] {
+            juce::URL (juce::String::fromUTF8 (url.c_str())).launchInDefaultBrowser();
+        });
+    else
+        menu.addItem (tr ("Help"), false, false, [] {});
 
     // LYNX's own items
     menu.addSeparator();
@@ -9261,6 +9290,34 @@ void EffectsPanel::askDeleteSlot (int slot)
                            messages::setShown ("DeletePlugin", false);
                        safe->deleteSlot (slot);
                    });
+}
+
+// round 190rz: the slot menu's "Save preset as..." for a hosted plugin — the plugin window's own (PresetBar::saveAs in
+// ui/PluginPresetMenu.cpp): a name, then <settings>/Presets/Plugins/<plugin>/<name>.lynxpreset
+void EffectsPanel::savePluginPresetAs (int slot)
+{
+    auto* effect = dynamic_cast<PluginEffect*> (engine.getEffect (track, slot).get());
+    if (effect == nullptr)
+        return;
+    auto* window = new juce::AlertWindow (tr ("Save preset"), tr ("Name of the preset:"), juce::MessageBoxIconType::NoIcon, this);
+    window->addTextEditor ("name", tr ("My preset"));
+    window->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    juce::Component::SafePointer<EffectsPanel> safe (this);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window, t = track, slot] (int result) {
+        const auto name = window->getTextEditorContents ("name").trim();
+        if (result != 1 || name.isEmpty() || safe == nullptr)
+            return;
+        // (looked up again: the slot may have changed while the box was open)
+        auto* fx = dynamic_cast<PluginEffect*> (safe->engine.getEffect (t, slot).get());
+        if (fx == nullptr)
+            return;
+        auto& plugin = fx->getInstance();
+        const auto file = pluginpresetui::folderFor (plugin.getName()).getChildFile (juce::File::createLegalFileName (name) + pluginpresets::extension);
+        juce::String error;
+        if (! pluginpresetui::save (plugin, file, name, error))
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset"), error);
+    }), true);
 }
 
 void EffectsPanel::deleteSlot (int slot)

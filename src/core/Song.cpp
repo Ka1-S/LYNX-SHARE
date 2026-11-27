@@ -819,6 +819,17 @@ bool Song::canRoute (int from, int to) const
             for (int o = 0; o < maxSlotSends; ++o)
                 if (const auto target = slotSendTarget (fx, o); target > 0 && target < n)
                     stack.push_back (target);
+        // round 190rz: an effect listening to `t` as its sidechain needs `t` first (mixerOrder's edge), even without a
+        // send — a project's compressor linked to the Kick (the demo's Bass) had none, so Pluck -> Kick closed the loop
+        // Kick -> Bass -> Pad -> Pluck and mixerOrder fell back to its "corrupt file" order
+        for (int u = 1; u < n; ++u)
+            if (u != t && ! seen[(std::size_t) u])
+                for (const auto& fx : mixer[(std::size_t) u].effects)
+                    if (fx.sidechain == t || fx.sidechain2 == t)
+                    {
+                        stack.push_back (u);
+                        break;
+                    }
     }
 
     return true;

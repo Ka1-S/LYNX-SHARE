@@ -281,12 +281,13 @@ int newChannelInsert (Song& song, layoutstyle::Style style);
 // Removes several channels (any order). Returns how many were removed.
 int removeChannels (Song& song, std::vector<int> channels);
 
-// An insert nobody uses yet: no channel routes to it, it has no effects and no insert sends into it.
-bool isInsertFree (const Song& song, int track) noexcept;
+// An insert nobody uses yet: no channel routes to it, it has no effects and no insert sends into it, and nothing else
+// Song::insertInUse counts (a name of its own, an input, a Playlist track...; round 190rz, FL 2026).
+bool isInsertFree (const Song& song, int track);
 
 // Routes each channel to its own free insert (adding inserts at the end if needed, up to
 // maxMixerTracks), named and coloured after the channel. Returns the insert of each channel
-// (0 = could not get one).
+// (0 = could not get one). A channel that already is the only one on its insert keeps it (FL 2026, round 190rz).
 std::vector<int> sendChannelsToFreeInserts (Song& song, const std::vector<int>& channels);
 
 // --- Channel settings "Misc" tab (REA round 143b; FL's channel window: Levels, Polyphony, Time, Group, Arpeggiator) --

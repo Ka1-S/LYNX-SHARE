@@ -312,6 +312,8 @@ void ChannelRackComponent::setFilterGroup (int group)
         return;
 
     filterGroup = group;
+    // round 190rz (FL 2026, checked live): switching to a group leaves the channels it hides unselected
+    selectRows (engine.getSelectedChannels(), engine.getSelectedChannel());
     updateSize();
     repaint();
 
@@ -2251,6 +2253,10 @@ void ChannelRackComponent::selectRows (std::vector<int> rows, int primary)
     if (! keepAutoSelection)
         autoSelected.clear();
     autoOnly = false;
+    // round 190rz (FL 2026, checked live): with a group filter on, the rack selects only the channels it shows — select
+    // all, a Shift range, a drag over the selectors and Up / Down never reach a hidden channel, so Alt+Del, Ctrl+L or a
+    // fill can't act on channels the user can't see
+    rackfilter::keepShown (engine.getSong(), filterGroup, rows, primary);
     engine.setChannelSelection (std::move (rows), primary);
     repaint();
 }
@@ -2375,7 +2381,12 @@ void ChannelRackComponent::selectRelative (int delta, bool extend)
     if (count == 0)
         return;
 
-    const auto row = juce::jlimit (0, count - 1, engine.getSelectedChannel() + delta);
+    auto row = juce::jlimit (0, count - 1, engine.getSelectedChannel() + delta);
+    // round 190rz: Up / Down step over the channels a group filter hides (FL: the rack moves between the shown rows)
+    while (! isShown (row) && row + (delta < 0 ? -1 : 1) >= 0 && row + (delta < 0 ? -1 : 1) < count)
+        row += delta < 0 ? -1 : 1;
+    if (! isShown (row))
+        return;
 
     if (extend)
     {

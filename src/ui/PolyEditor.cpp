@@ -1,4 +1,5 @@
 #include "ui/PolyEditor.h"
+#include "core/KeyMap.h"
 
 #include <algorithm>
 #include <cmath>
@@ -716,12 +717,13 @@ public:
             commit();
             return true;
         }
-        if (bufferMode() && key.getModifiers().isCommandDown() && (key.getKeyCode() == 'Z' || key.getKeyCode() == 'Y'))
+        const auto letter = keys::letterOfKeyCode (key.getKeyCode()); // (round 190rz: X11 sends 'z' for Ctrl+Z)
+        if (bufferMode() && key.getModifiers().isCommandDown() && (letter == 'Z' || letter == 'Y'))
         {
-            bufferStep (key.getKeyCode() == 'Z' && ! key.getModifiers().isShiftDown() ? -1 : 1);
+            bufferStep (letter == 'Z' && ! key.getModifiers().isShiftDown() ? -1 : 1);
             return true;
         }
-        if (key.getModifiers().isCommandDown() && key.getKeyCode() == 'A')
+        if (key.getModifiers().isCommandDown() && letter == 'A')
         {
             selected.clear();
             for (int k = 0; k < (int) model.notes.size(); ++k)
