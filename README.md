@@ -70,7 +70,7 @@ AGPL-3.0, and is still an **alpha**.
 - like to launch clips and scenes the way Ableton Live does, and want that next to patterns in the same program;
 - move projects between FL Studio, FL Studio Mobile, Ableton Live and other DAWs, or collaborate with people who use them;
 - are making your first song, maybe coming from BandLab, FL Studio Mobile or GarageBand, and want one simple window to start in;
-- have a modest computer (or a Raspberry Pi) and want a DAW that stays light.
+- want a light DAW (it also runs on a Raspberry Pi 4 or 5 with a 64-bit OS).
 
 ## Why LYNX SHARE
 
@@ -80,7 +80,7 @@ AGPL-3.0, and is still an **alpha**.
 | 📂 **Your projects come with you** | Opens `.flp` (also zipped), `.als` (Live 11 and 12), `.flm`, `.dawproject`, GarageBand `.band`, BandLab `.blx` and tracker modules (`.mod`, `.xm`, `.s3m`, `.it`); exports `.flp`, `.als`, `.dawproject` and `.flm`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
 | 🎛️ **Three layouts, one program** | The Pattern layout by default, a Clip-launch layout in the style of Ableton Live, and a Simple layout that mixes BandLab's one-window style with FL Studio Mobile's. The first start asks where you are coming from and picks one; switch any time in *View › Layout style*. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
-| ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, while FL's *Thief* demo plays LYNX SHARE 0.1.31 uses 34.4 % of one CPU core and 564 MB of memory (FL Studio 2026: 905 MB), and opens it in 4.3 s (FL Studio: 7.1 s) ([0.1.31 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.31-alpha)). |
+| ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, while FL's *Thief* demo plays LYNX SHARE 0.1.32 uses 33.9 % of one CPU core and 562 MB of memory (FL Studio 2026: 82.8 % and 899 MB), and opens it in 4.7 s (FL Studio: 6.8 s); [more numbers below](#performance). |
 | 🔒 **Free, private, clean-room** | No price, no account, no subscription, no telemetry, and nothing goes online before you say so. Every behavior was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
 
 ## Features
@@ -383,8 +383,30 @@ for guests who don't have the host's plugins. The host can let a guest only list
   parts you are not playing live are rendered a little ahead, and long audio streams from disk.
 - *Safe overloads* (on by default, as in FL Studio) keeps the interface responsive when the CPU runs out; deactivating
   the tracks and channels you are not using frees their CPU and memory.
-- Every release is measured against FL Studio on the same PC, and the automated tests check the engine's and the
-  interface's cost on every change. The latest numbers are in the [table above](#why-lynx-share).
+- Every release is measured against FL Studio and Ableton Live on the same PC, and the automated tests check the
+  engine's and the interface's cost on every change. The 0.1.32 numbers:
+
+| Project (measured on one PC) | | LYNX SHARE 0.1.32 | FL Studio 2026 | Ableton Live 12 |
+|---|---|---|---|---|
+| Empty project | window shown after the start | **0.9 s** | 1.5 s | |
+| | memory | **144 MB** | 308 MB | |
+| FL's demo *Thief* | opening | **4.7 s** | 6.8 s | |
+| | CPU playing / stopped | **33.9 % / 3.8 %** | 82.8 % / 18.1 % | |
+| | memory | **562 MB** | 899 MB | |
+| FL's demo *Exoplanet* | CPU playing / stopped | **46.8 % / 13.5 %** | 80.7 % / 41.5 % | |
+| | memory | **382 MB** | 906 MB | |
+| Live's demo *Patience* (Live's audio device) | opening | **3.2 s** | | about 15 s |
+| | CPU playing / stopped | **69.0 % / 28.6 %** | | 125.6 % / 44.1 % |
+| | memory | **436 MB** | | 1,762 MB |
+| 8 x Surge XT (VST3), the same .flp | CPU playing / stopped | **34.3 % / 5.9 %** | 76.5 % / 42.5 % | |
+| | memory | 382 MB | **355 MB** | |
+
+Windows 11, Ryzen 5 3600; FL Studio 2026 (26.1.7) and LYNX SHARE on FL Studio ASIO, 44.1 kHz, 256 samples; Live 12.4
+(trial) on its own MME / DirectX device, and LYNX SHARE on the same device for *Patience*. CPU is the process's CPU in %
+of one core (100 % = one core), memory the private working set; medians of 2-6 runs, with nothing else running. With
+many instances of a hosted plugin LYNX SHARE is not lighter on memory yet (the Surge XT row). After a profile's first
+start, the first 15 s of an empty start use about 5 % of one core. Your results will differ; the method and the raw
+ranges are in the [0.1.32 release notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.32-alpha).
 
 ### Platforms
 
@@ -424,6 +446,9 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **Tracker modules** `.mod` `.xm` `.s3m` `.it` (ProTracker, FastTracker 2, Scream Tracker 3, Impulse Tracker) | ✅ partial | — | Instruments as Sampler channels with their samples, patterns, the order list as the Playlist, speed and tempo, note volume, pan, delay and cut. Volume and pan changes become the channel's events (MOD and XM), and slides, vibrato, arpeggios and pitch envelopes become the notes' pitch curves; what is left out is counted in the report. The built-in Tracker (*View › Tracker*) edits the notes the tracker way. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. *File › Save a copy for an older LYNX...* writes a copy that 0.1.31, 0.1.30, 0.1.28 or 0.1.27 can open, and lists what that release loses. |
+
+**Coming from Bitwig Studio?** LYNX SHARE does not open Bitwig's own `.bwproject` files: export a DAWproject from
+Bitwig and open that, and send your song back with *File › Export › DAWproject (.dawproject)...*.
 
 Instruments and samples of other samplers open too: DirectWave programs and banks (`.dwp`, `.dwb`), GigaStudio `.gig`
 instruments (as DirectWave channels) and Kontakt's `.ncw` samples. Kontakt `.nki` instruments need Kontakt itself as a
@@ -648,6 +673,7 @@ LYNX.exe --render project.flp out.wav 20       render 20 s of the current patter
 LYNX.exe --export-flp project.lynx out.flp     export an FL Studio project (.zip: with the samples)
 LYNX.exe --export-flm project.lynx out.flm     export an FL Studio Mobile project (samples in <name> Samples)
 LYNX.exe --export-als project.flp folder [--live11]  export an Ableton Live set (<name> Project/<name>.als)
+LYNX.exe --export-dawproject project.flp out.dawproject  export a DAWproject (Bitwig, Studio One, Cubase...)
 LYNX.exe --selftest report.txt [demo.lynx]     self-test without an audio device
 LYNX.exe --snapshot prefix project.flp         draw the UI (and its windows) to PNG
 LYNX.exe --showcase out.lynx [pattern]         generate the demo project used in these screenshots
@@ -668,7 +694,7 @@ LYNX.AppImage --menu-entry on|off              Linux AppImage: add to / remove f
 
 Contributed by @guike8 (PRs #71 and #76), in LYNX SHARE since 0.1.28.
 
-Enable **Settings > General > Remote control** to let authenticated local clients read and edit the open project. It is off by default. An active indicator appears under the toolbar; switching the setting off closes the listener and removes its discovery file. Automatic update checks keep their normal behavior.
+Enable **Settings › General › Let other apps on this PC control LYNX (Remote API)** to let authenticated local clients read and edit the open project. It is off by default. An active indicator appears under the toolbar; switching the setting off closes the listener and removes its discovery file. Automatic update checks keep their normal behavior.
 
 The vendor-neutral `lynx-control/1` API provides bounded project and device reads, complete paged native-project snapshots, atomic document edits, transport, revision/change tracking and guarded native undo. It uses an owner-private discovery file and mutual authentication on loopback. Windows, macOS and Linux use the same protocol.
 

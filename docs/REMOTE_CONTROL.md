@@ -5,7 +5,7 @@ It is independent of any particular client. It uses authenticated IPv4 loopback
 TCP and newline-delimited UTF-8 JSON. It does not expose scripting or a network
 listener on other interfaces.
 
-Enable **Settings → General → Remote control**. It is off by default, and the
+Enable **Settings › General › Let other apps on this PC control LYNX (Remote API)**. It is off by default, and the
 application displays its active status. Disabling it stops the listener and
 removes its discovery record. Automated launches can explicitly set
 `LYNX_CONTROL_ENABLED=1`; setting a discovery path alone does not enable access.
