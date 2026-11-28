@@ -551,9 +551,12 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
         local obj="$1" source="$2"; shift 2
         cached_pp "$obj" -- $ZIG c++ $COMMON_STR -Isrc -DLYNX_EXPORT_VERSION="\"$VERSION\"" -DJUCE_MODULE_AVAILABLE_juce_audio_plugin_client=1 "$@" -c "$source" -o "$obj"
     }
-    plugin_link() { # <output> <objects...>
+    # (round 190sh: the plugin's own entry object goes last, so the shared engine before it is laid out the same way in the CLAP and
+    # in every VST3, and the .7z's solid stream finds more of each VST3 in the files before it: 21.5 -> 20.2 MB locally. The zip
+    # cannot use that: it packs every file alone)
+    plugin_link() { # <output> <entry objects...>
         local output="$1"; shift
-        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT"/ysfx/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT"/libxmp/*.o "$OUT"/ysfx/*.o "$OUT/plugin/LynxPlugin.res" "$@" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
         rm -f "$(dirname "$output")"/*.lib "$(dirname "$output")"/*.pdb # (the linker's import library: not part of a plugin)
     }
     ( cd resources && "$ZIG" rc /fo "$OUT_ABS/plugin/LynxPlugin.res" LynxPlugin.rc )
