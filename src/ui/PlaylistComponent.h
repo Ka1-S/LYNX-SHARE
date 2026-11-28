@@ -860,6 +860,7 @@ private:
     void askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels);
     void showClipMenu (int clip);
     void showRulerMenu (int x, int y = -1);
+    void showFollowMenu();                                // right-click on Follow: "Continuous scrolling"
     juce::PopupMenu markerMenu (int index, int x); // FL's marker menu (round 190ri)
     void deleteTracksAsked (std::vector<int> tracks); // (round 190ri: FL's question for more than one)
     void moveTracksBy (std::vector<int> tracks, int direction);

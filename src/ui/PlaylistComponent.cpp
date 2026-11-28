@@ -1326,9 +1326,15 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     followButton.setFlat (true);
     followButton.setClickingTogglesState (false);
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
-    followButton.setTooltip (tr ("Follow: the Playlist scrolls along with the playhead while the song plays; off, you can look around freely"));
+    // PR #308: the right-click's menu in the hint bar (FL's mouse glyph there; LYNX's [RMB] markup + the menu marker), the
+    // tooltip the same words in plain text
+    const auto followHint = tr ("Follow: the Playlist scrolls along with the playhead while the song plays; off, you can look around freely")
+                            + "  [RMB] " + tr ("Continuous scrolling");
+    ui::setHint (followButton, followHint, true);
+    followButton.setTooltip (ui::plainHint (followHint));
     ui::setQuickTip (followButton, tr ("Follow the playhead"));
     followButton.onClick = [this] { runAction ("playlist.follow"); };
+    followButton.onRightClick = [this] { showFollowMenu(); };
     followButton.setWantsKeyboardFocus (false);
     followButton.setMouseClickGrabsKeyboardFocus (false);
     addAndMakeVisible (followButton);
@@ -12170,6 +12176,15 @@ juce::PopupMenu PlaylistComponent::rulerMenu (int x, int y)
     return menu;
 }
 
+void PlaylistComponent::showFollowMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (tr("Continuous scrolling"), true, EditorGlobals::get().isContinuousScroll(), [] {
+        EditorGlobals::get().setContinuousScroll (! EditorGlobals::get().isContinuousScroll());
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&followButton));
+}
+
 void PlaylistComponent::showRulerMenu (int x, int y)
 {
     if (const auto marker = y >= 0 ? markerTagAt (x, y) : -1; marker >= 0)
@@ -16697,6 +16712,16 @@ bool PlaylistComponent::playheadTrailOn() const
     return ui::motion::enabled() && engine.getTransport().playing.load (std::memory_order_relaxed) && playheadTick >= 0.0;
 }
 
+// The screen's pixels per component pixel (the window's DPI scale x the desktop scale x any transform): the scale the cached
+// picture is drawn at. (getApproximateScaleFactorForComponent alone leaves out the peer's DPI scale and divides the global
+// scale back out: 1 at Windows' 150 % and at LYNX_UIPERF_SCALE=150.)
+static double screenPixelScale (const juce::Component& c)
+{
+    const auto* peer = c.getPeer();
+    return (double) juce::Component::getApproximateScaleFactorForComponent (&c) * (double) juce::Desktop::getInstance().getGlobalScaleFactor()
+           * (peer != nullptr ? peer->getPlatformScaleFactor() : 1.0);
+}
+
 bool PlaylistComponent::liveFrame (double nowMs)
 {
     const auto feel = feelFrame (nowMs); // round 190qe: the edge scroll of a drag, the zoom glide
@@ -16755,15 +16780,24 @@ bool PlaylistComponent::liveFrame (double nowMs)
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
         const auto grid = gridArea();
-        const auto newStart = transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
-                                                              20.0 / pixelsPerTick);
+        // PR #308, FL's Continuous scrolling: the playhead held at a third of the grid. Only with a playhead (Pattern mode
+        // has none here: the view stays put, as with the option off), and in whole steps of the screen's pixels (2 px at
+        // 150 %), so the cached picture is shifted and only the uncovered strip is painted (repaintScrolled)
+        const auto continuous = EditorGlobals::get().isContinuousScroll() && tick >= 0.0;
+        const auto quantum = continuous ? (double) edgescroll::wholeQuantum (screenPixelScale (*this)) : 1.0;
+        const auto newStart = continuous ? transportedit::followViewStartContinuous (tick, grid.getWidth() / 3.0 / pixelsPerTick, pixelsPerTick / quantum)
+                                         : transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
+                                                                           20.0 / pixelsPerTick);
 
         if (EditorGlobals::get().followsNow (EditorGlobals::FollowView::playlist) && playing && newStart != scrollTicks)
         {
             scrollTicks = newStart;
             followSeenScroll = scrollTicks; // (round 190im: not a scroll by hand)
             updateScrollBars();
-            repaint();
+            if (continuous)
+                repaintScrolled();
+            else
+                repaint();
             if (gpuPlayhead.isShowing())
                 gpuPlayhead.show (playheadMark()); // (at its place in the new page)
         }

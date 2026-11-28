@@ -3,6 +3,7 @@
 
 #include "core/MeterBallistics.h"
 #include "core/TransportEdit.h"
+#include "core/EditorFeel.h" // (review 190sf: wholeQuantum, the Continuous scrolling steps)
 
 TEST (transport162_quantize_tick_strength)
 {
@@ -147,6 +148,19 @@ TEST (transport162_follow_and_stop)
     CHECK (followViewStart (1000.0, 4000.0, 500.0, 100.0) == 400.0);
     CHECK (followViewStart (1000.0, 4000.0, 50.0, 100.0) == 0.0);
     CHECK (followViewStart (1000.0, 4000.0, -1.0, 100.0) == 1000.0); // no playhead
+
+    // FL's Continuous scrolling: the view holds at 0 until the playhead reaches leadTicks, then tracks it exactly
+    // (rounded to whole pixels at the given pixelsPerTick); a seek back to the start moves the view back with it.
+    using lynx::transportedit::followViewStartContinuous;
+    CHECK (followViewStartContinuous (500.0, 1000.0, 2.0) == 0.0);
+    CHECK (followViewStartContinuous (1500.0, 1000.0, 2.0) == 500.0);
+    CHECK (followViewStartContinuous (3000.0, 1000.0, 2.0) == 2000.0);
+    CHECK (followViewStartContinuous (-1.0, 1000.0, 2.0) == 0.0); // no playhead
+    CHECK (followViewStartContinuous (0.0, 1000.0, 2.0) == 0.0);  // a loop back to the start moves the view back
+    // (review 190sf) whole pixels: 500.3 ticks at 2 px a tick = 1000.6 px -> 1001 px; in 2-px steps (150 %: pixelsPerTick / 2) -> 1000 px
+    CHECK (followViewStartContinuous (1500.3, 1000.0, 2.0) == 500.5);
+    CHECK (followViewStartContinuous (1500.3, 1000.0, 1.0) == 500.0);
+    CHECK (lynx::edgescroll::wholeQuantum (1.5) == 2 && lynx::edgescroll::wholeQuantum (1.0) == 1);
 
     // feedback 190bm: inside a loop (the Piano Roll in Pattern mode) the view holds still at the loop's end
     {
