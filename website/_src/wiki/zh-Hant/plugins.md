@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: 3975a954ae
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 

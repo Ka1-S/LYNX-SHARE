@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: 3975a954ae
 ---
 ![La parte inferior del Gestor de plugins, con su nota de que cada archivo de plugin se examina en un proceso aparte](/assets/img/wiki/plugin-manager-scan.webp)
 

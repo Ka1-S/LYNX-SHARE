@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: 3975a954ae
 ---
 ![プラグインマネージャーの下部。各プラグインファイルは別プロセスで調べるという注記がある](/assets/img/wiki/plugin-manager-scan.webp)
 

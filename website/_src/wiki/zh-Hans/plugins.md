@@ -1,5 +1,5 @@
 ---
-source: cc14fa4fea
+source: 3975a954ae
 ---
 ![插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查](/assets/img/wiki/plugin-manager-scan.webp)
 
