@@ -36,6 +36,8 @@ The short version of each release. The full notes, with measurements, known issu
   instrument icon opens the instrument (Discord).
 
 **Changed**
+- A sample dropped on an audio clip in the Playlist replaces that clip's sound, as in FL Studio 2026: its audio clip channel
+  loads the new file, so every clip of that channel plays it, on the same mixer track and effects (#325).
 - Easier to read: text on the red accent sits on a slightly deeper red (4.5:1 contrast), links use the theme's link color, and
   English uses US spelling and one menu separator (›) throughout. At the toolbar's narrowest width the pattern box shows the
   pattern's name and Pattern options moves to the overflow menu.
