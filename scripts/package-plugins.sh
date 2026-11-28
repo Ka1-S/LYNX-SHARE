@@ -95,11 +95,14 @@ rm -f "${dist:?}/$archive"
 case "$os" in
     # (a zip compresses every file alone, so its 12 binaries, which share nearly all their bytes, cost 12 times as much; the
     # .7z next to it is one solid LZMA2 stream (128 MiB dictionary, about 1.5 GB to pack, 128 MB to unpack), the same trick as the tar.xz
-    # below: 195 MB -> 20 MB in round 190pu. The zip stays for Explorer and every older unpacker)
+    # below: 195 MB -> 20 MB in round 190pu. The zip stays for Explorer and every older unpacker.
+    # Round 190sh: the zip is written by 7-Zip's Deflate encoder (258-byte matches, 5 passes): plain Deflate as before, which
+    # every unzip reads, 3.3 % smaller than Info-ZIP's zip -9 (-mpass=15 gains 0.03 % more for 4x the time; Deflate64 would be
+    # 5 % but not every unpacker reads it))
     windows)
-        ( cd "$work" && zip -q -r -9 -X "$dist/$archive" "$top" )
         sevenz="$(command -v 7zz || command -v 7z || command -v 7za || true)"
-        [[ -n "$sevenz" ]] || { echo "no 7zz / 7z: needed for the .7z next to the zip (apt install 7zip)" >&2; exit 1; }
+        [[ -n "$sevenz" ]] || { echo "no 7zz / 7z: needed for the zip and the .7z (apt install 7zip)" >&2; exit 1; }
+        ( cd "$work" && "$sevenz" a -tzip -mx=9 -mm=Deflate -mfb=258 -mpass=5 -mmt="${PACK_THREADS:-$(nproc)}" -bso0 -bsp0 "$dist/$archive" "$top" )
         archive7="${archive%.zip}.7z"
         rm -f "${dist:?}/$archive7"
         ( cd "$work" && "$sevenz" a -t7z -mx=9 -m0=lzma2 -md=128m -mfb=273 -ms=on -mmt=1 -bso0 -bsp0 "$dist/$archive7" "$top" )
