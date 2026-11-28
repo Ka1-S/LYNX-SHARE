@@ -3,9 +3,50 @@
 The short version of each release. The full notes, with measurements, known issues and downloads, are on the
 [GitHub releases page](https://github.com/Ka1-S/LYNX-SHARE/releases).
 
-## 0.1.32 alpha (unreleased: the release round writes the rest of these notes)
+## 0.1.32 alpha
+
+The quality release: no new big features, but the fixes, checks and details promised for 0.1.32, the issues reported
+on GitHub and Discord, and the work of three contributors.
+
+**Please read before you update**
+- **Online sessions: everyone in a session should update to 0.1.32.** A 0.1.31.x guest keeps its own tempo and project
+  settings instead of the host's; the host is now told when a guest's LYNX SHARE is too old to follow.
+- **Re-export `.flp` files made with 0.1.31, 0.1.31.1 or 0.1.31.2.** Their song-start values of some plugins were written
+  on the wrong range, so FL Studio could play the project as loud DC from the first sample (LYNX's export of FL's demo
+  Thief did). Turn the volume down before you open such a file in FL Studio, and export it again from your project with
+  0.1.32.
+- **CLAP plugins now get the song's transport**, so tempo-synced CLAP plugins (delays, LFOs, arpeggiators) follow the
+  song's tempo and position (before, they never got it). A project that uses one can sound different from 0.1.31: it
+  now plays in time.
+
+**Safety fixes**
+- **Saving on a full disk no longer destroys the project** (since 0.1.30). Projects, exports, settings and the files LYNX
+  saves for you go through one checked writer: if anything fails, the old file stays as it was and LYNX says why.
+- **`.flp` exports no longer play as DC in FL Studio** (since 0.1.31; see above).
+- **Export to Ableton Live no longer crashes Live** when the project has a sampled drum kit (Live 12.4 crashed on a drum
+  pad's Simpler).
+- **PipeWire (Linux): channels in the right order.** A device whose ports were announced out of order could swap left and
+  right, or mix up a multi-channel interface's inputs; LYNX now uses the device's port order (0.1.31.x and earlier).
+- **Undo while dragging no longer crashes LYNX**, and after a crash LYNX saves your work and can open the backup
+  without third-party plugins.
+
+**Measured** (one PC: Windows 11, Ryzen 5 3600; FL Studio 2026 on FL Studio ASIO, 44.1 kHz, 256 samples; Ableton Live 12.4
+on its own MME / DirectX device; CPU in % of one core, memory = private working set; medians of 2-6 runs; full table in the
+GitHub notes)
+- FL's demo **Thief**: LYNX 33.9 % playing (FL Studio 82.8 %), 3.8 % stopped (18.1 %), 562 MB (899 MB), opens in 4.7 s
+  (6.8 s). FL's demo **Exoplanet**: 46.8 % (80.7 %), 382 MB (906 MB). Live's demo **Patience** on Live's device: 69.0 %
+  (Live 125.6 %), 436 MB (1,762 MB), opens in 3.2 s (about 15 s).
+- An empty start shows the window in 0.9 s (FL Studio 1.5 s) with 144 MB (308 MB); after a profile's first start, the first
+  15 s use about 5 % of one core. Eight Surge XT instances: 34 % (FL Studio 77 %), but 382 MB
+  against FL Studio's 355 MB: with many hosted plugins LYNX is not lighter on memory yet.
+- Against 0.1.31 the playing CPU of the same projects is unchanged within the runs' spread; Patience uses 115 MB less.
 
 **From contributors**
+- Eight commits by @DERALKERAL (PRs #262, #263, #264, #266, #268): the Empty template is FL Studio's one-Sampler project;
+  a new project's name is filled in for you and never clashes, and a folder name ending in a space is kept; MIDI files
+  dropped on a Channel rack channel, with a drop indicator; the Playlist shades every 4 bars, as FL's grid; a switched-off
+  track (its LED dark) goes dark, and with a track selected the other tracks step back (*Dim unselected tracks*, off by
+  default for now); the Piano roll's scale box opens its menu again after the first click.
 - Continuous scrolling, as in FL Studio (right-click the Playlist's Follow button): the view scrolls smoothly with the
   playhead held near its left edge, instead of jumping a page at the edge. Off by default. PR #308 by @FKHR26.
 - A Mixer insert can hold up to 25 effect slots, as in FL Studio 2026.2: the slot list keeps its ten rows and scrolls, a
@@ -32,6 +73,12 @@ The short version of each release. The full notes, with measurements, known issu
   right (with a button such as *Plugin manager...* or *Show in folder*) instead of a box to click away.
 - Soft look (*Options › Theme › Appearance*): flat steps and buttons, muted colors and slimmer plates, close to 0.1.29's look.
 - *Playlist › Edit › Cut clips at the song position* (#285) and *File › Open the project's folder* (#286).
+- Hosted effect windows show FL Studio's **ON** and **MIX LEVEL** at the right end of their strip (#321); the power LED of
+  LYNX's own effect windows mutes the effect, Ctrl+click solos it (#317).
+- *Help* has links to the Tutorials, the Manual (wiki), the FAQ and What's new.
+- Routing hints (a LYNX extra, on): an unassigned Playlist track's header says where its clips are heard.
+- Clip-launch layout: Live's track keys in the clip grid (Ctrl+D / Del on a selected track title, Ctrl+Shift+T, Ctrl+Alt+T)
+  and Live's track header menu; the Simple layout's *Finish* can save M4A where the system encodes AAC.
 - Track-only mode and the Simple layout: the Piano roll shows the other tracks' notes as ghosts; a click on a Simple track's
   instrument icon opens the instrument (Discord).
 
@@ -47,6 +94,8 @@ The short version of each release. The full notes, with measurements, known issu
   Studio's plugin database is kept between starts (only changed files are read again): a later empty start uses about a
   quarter of the CPU it did.
 - The Simple layout: a sound dragged onto the timeline becomes a track there, as in BandLab.
+- Pattern layout: a channel added to the Channel rack plays into the Master, as in FL Studio 2026 (*Ctrl+L* routes it to a
+  free insert).
 - **Faster with FL Studio's data and big projects:** F8, the Add menu, layout switches and opening a project no longer walk
   FL Studio's plugin database folders to know which FL engines LYNX has (F8 took 30.8 s with FL's data on a slow drive, now
   19 ms; a layout switch 15-39 s, now under 0.5 s); an edit while a 1,728-bar song plays no longer pauses for 1.6 s (65 ms):
@@ -111,6 +160,9 @@ The short version of each release. The full notes, with measurements, known issu
 - DAWproject export writes a sample other apps can't read as lossless FLAC only when its audio is exactly 16- or 24-bit;
   copying samples for an export is faster and checked as it goes.
 - A looped time selection that runs past the song's end no longer plays the clips at the end again (#324).
+- The plugin window's pin (*Always on top*) no longer leaves a plugin's editor blank on Linux (#319); the empty Playlist's
+  "Your song is built here" card no longer ghosts while you zoom or resize (#313); with every window closed, the workspace's
+  card lists the window keys (F5, F6, F7, F9, Alt+F8) readably on any background (#305).
 - Hints and tooltips no longer write "Alt++click" or "Ctrl++click"; the Clip-launch layout's Both / Grid / Song buttons and
   its arrangement box are no longer cut off in Portuguese, Spanish, Italian and Indonesian, or at 125 %.
 - **After a crash, LYNX saves your work and opens it safely.** Every abort that is not a broken heap now writes an emergency
