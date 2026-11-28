@@ -32,8 +32,9 @@
         // the hint of a sound in the Loops panel / Plugin database
         {
             const auto simple = BrowserComponent::generatorRowHint (true), pattern = BrowserComponent::generatorRowHint (false);
-            check ("Simple hint names the timeline, not the Channel Rack", simple.contains ("timeline") && ! simple.contains ("Channel Rack"), simple);
-            check ("Pattern hint keeps the Channel Rack", pattern.contains ("Channel Rack"), pattern);
+            // (round 190sc writes the window name "Channel rack"; either case counts)
+            check ("Simple hint names the timeline, not the Channel Rack", simple.contains ("timeline") && ! simple.containsIgnoreCase ("Channel Rack"), simple);
+            check ("Pattern hint keeps the Channel Rack", pattern.containsIgnoreCase ("Channel Rack"), pattern);
         }
 
         // Q6: a sample other apps can't read goes into a DAWproject as a lossless FLAC when its audio is exactly 16- or
