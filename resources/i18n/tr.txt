@@ -13166,3 +13166,5 @@ countries: tr
 "Delete plugin" = "Eklentiyi sil"
 "Save the selected mixer track's state as..." = "Seçili mikser kanalının durumunu farklı kaydet..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[çift tık] yeni enstrüman parçası olarak ekle veya zaman çizelgesine sürükle"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "{0} örneğini {1} ile değiştirir: klipleri, insert ve efektler kalır  [Shift] yeni klip"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Bir pattern klibine bırakılan örnek hiçbir şey yapmaz, FL Studio'daki gibi  [Shift] yeni klip"

@@ -13166,3 +13166,5 @@ countries: kr
 "Delete plugin" = "플러그인 삭제"
 "Save the selected mixer track's state as..." = "선택한 믹서 트랙 상태를 다른 이름으로 저장..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[더블 클릭] 새 악기 트랙으로 추가 또는 타임라인으로 드래그"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "{0}의 샘플을 {1}(으)로 교체: 클립, 인서트, 이펙트는 유지  [Shift] 새 클립"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "패턴 클립에 놓은 샘플은 아무 동작도 하지 않습니다(FL Studio와 동일)  [Shift] 새 클립"

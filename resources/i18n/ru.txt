@@ -13166,3 +13166,5 @@ countries: ru by kz
 "Delete plugin" = "Удалить плагин"
 "Save the selected mixer track's state as..." = "Сохранить состояние выбранной дорожки микшера как..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[двойной клик] добавить новой дорожкой инструмента или перетащить на шкалу времени"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "Заменяет сэмпл {0} на {1}: клипы, инсерт и эффекты остаются  [Shift] новый клип"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Сэмпл, брошенный на клип паттерна, ничего не делает, как в FL Studio  [Shift] новый клип"

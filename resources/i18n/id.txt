@@ -13166,3 +13166,5 @@ countries: id
 "Delete plugin" = "Hapus plugin"
 "Save the selected mixer track's state as..." = "Simpan status trek mixer yang dipilih sebagai..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[klik ganda] tambahkan sebagai trek instrumen baru, atau seret ke timeline"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "Mengganti sampel {0} dengan {1}: klip, insert, dan efeknya tetap  [Shift] klip baru"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Sampel yang dijatuhkan pada klip pola tidak melakukan apa-apa, seperti di FL Studio  [Shift] klip baru"

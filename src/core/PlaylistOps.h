@@ -452,6 +452,17 @@ int repairChannels (Song& song);
 // `autoName`: FL's General › "Auto name channels" (on by default; round 190bx, core/FlSettings.h): off = the
 // channel keeps the name it has (a channel without one still takes the file's).
 void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name, bool autoName = true);
+// Issue #325 (round 190sg; FL 2026 checked live + FLEngine FUN_00e73950, undo "replace audio clip sample"): ONE sample
+// file dropped on an audio clip of the Playlist (Pattern layout, no Shift) loads into that clip's audio clip channel
+// instead of making a new clip. The channel stays (its index, mixer track and so its effects, levels, colour), so every
+// clip of it plays the new file. What described the old file goes with it: slices, loop points, warp markers and the
+// channel's time stretch (FL played a kick dropped on a stretched loop's clips at its own speed); the channel takes the
+// file's name (`autoName`, FL's "Auto name channels"). A clip that showed the whole old file (no offset, its length the
+// file's `oldTicks` times its own stretch) shows the whole new one (`newTicks`); other clips keep their place, offset
+// and length; fades stay, shortened to a clip that became shorter. Ticks <= 0: unknown, no length changes. False
+// (nothing changed) when `clip` is no audio clip of an audio clip channel.
+bool replaceClipSample (Song& song, int clip, const std::string& path, const std::string& name, std::int64_t oldTicks,
+                        std::int64_t newTicks, bool autoName = true);
 } // namespace lynx::audioclips
 
 // FL's "Create automation clip" placement (REA round 177b: FUN_01191a50 places it, FUN_00e50b50 picks the track).

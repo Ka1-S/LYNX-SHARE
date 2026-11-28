@@ -13166,3 +13166,5 @@ countries: nl be
 "Delete plugin" = "Plug-in verwijderen"
 "Save the selected mixer track's state as..." = "Status van het geselecteerde mixerkanaal opslaan als..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[dubbelklik] toevoegen als nieuw instrumentspoor, of naar de tijdlijn slepen"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "Vervangt de sample van {0} door {1}: clips, insert en effecten blijven  [Shift] nieuwe clip"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Een sample op een patroonclip losgelaten doet niets, zoals in FL Studio  [Shift] nieuwe clip"

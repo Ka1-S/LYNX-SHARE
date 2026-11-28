@@ -5,6 +5,7 @@
 #include "core/QuickRender.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <limits>
 
@@ -1107,6 +1108,43 @@ void loadSampleInto (ChannelDef& channel, const std::string& path, const std::st
     // FL's General › "Auto name channels" (round 190bx): off = a channel that has a name keeps it
     if (autoName || channel.name.empty())
         channel.name = name;
+}
+
+bool replaceClipSample (Song& song, int clip, const std::string& path, const std::string& name, std::int64_t oldTicks,
+                        std::int64_t newTicks, bool autoName)
+{
+    if (clip < 0 || clip >= (int) song.playlist.size() || path.empty())
+        return false;
+    const auto index = song.playlist[(std::size_t) clip].channel;
+    if (song.playlist[(std::size_t) clip].kind != ClipKind::audio || index < 0 || index >= (int) song.channels.size())
+        return false;
+    auto& channel = song.channels[(std::size_t) index];
+    if (channel.instrument != InstrumentKind::audioClip)
+        return false;
+    loadSampleInto (channel, path, name, autoName);
+    channel.zones.clear();
+    channel.sampler.slices.clear();
+    channel.sampler.loopStart = channel.sampler.loopEnd = -1;
+    channel.sampler.warp.clear();
+    channel.sampler.stretchBeats = 0.0f;
+    channel.sampler.stretchMul = 0;
+    if (oldTicks <= 0 || newTicks <= 0)
+        return true;
+    song.forEachClipList ([&] (std::vector<Clip>& clips) {
+        for (auto& c : clips)
+        {
+            if (c.kind != ClipKind::audio || c.channel != index || c.offset != 0 || std::abs (c.offsetFraction) > 1.0e-3f)
+                continue;
+            const auto stretch = c.stretch > 0.0 ? c.stretch : 1.0;
+            const auto whole = (double) oldTicks * stretch;
+            if (std::abs ((double) c.length - whole) > std::max (1.0, whole * 0.002)) // (a trimmed clip keeps its length)
+                continue;
+            c.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) newTicks * stretch));
+            c.fadeIn = std::min (c.fadeIn, c.length);
+            c.fadeOut = std::min (c.fadeOut, c.length - c.fadeIn);
+        }
+    });
+    return true;
 }
 } // namespace lynx::audioclips
 

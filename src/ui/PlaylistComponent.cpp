@@ -16246,6 +16246,20 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
             return;
     }
 
+    // issue #325 (round 190sg, FL 2026 checked live): one sample dropped on an audio clip replaces its channel's sample
+    // (every clip of that channel plays it; the channel, its insert and effects stay); on a pattern clip nothing happens
+    if (files.size() == 1)
+    {
+        auto nothing = false;
+        if (const auto target = sampleDropTarget ({ x, y }, juce::File (files[0]), nothing); target >= 0)
+        {
+            replaceSampleOnDrop (target, juce::File (files[0]));
+            return;
+        }
+        if (nothing)
+            return;
+    }
+
     for (const auto& f : files)
         if (videotracks::isVideoFile (juce::File (f)))
             // a video dropped on the clip tracks: a video clip on a video track, where it was dropped (round 174d)
@@ -16270,6 +16284,86 @@ void PlaylistComponent::addAudioClipAtPlayhead (const juce::File& file)
             break;
     }
     addAudioClip (engine, file, start, track, true);
+}
+
+int PlaylistComponent::sampleDropTarget (juce::Point<int> p, const juce::File& file, bool& nothing) const
+{
+    nothing = false;
+    // FL's Pattern layout only (Live and BandLab place a new clip where it is dropped: Clip-launch and Simple keep that);
+    // Shift adds a clip there as FL does; a file FL's Playlist takes as a sample, not a video
+    if (simpleHeaders || layoutstyle::current() != layoutstyle::Style::pattern || p.x < headerWidth || p.y < tracksTop()
+        || p.y >= gridArea().getBottom() || p.x >= gridArea().getRight() || ! SampleLibrary::isSampleFile (file)
+        || videotracks::isVideoFile (file) || shiftDropForCheck || juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown())
+        return -1;
+    bool right = false;
+    const auto index = clipAt (p.x, p.y, right);
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return -1;
+    const auto& clip = song.playlist[(std::size_t) index];
+    if (clip.kind == ClipKind::pattern)
+    {
+        nothing = true; // (FL: the drop finds no channel behind a pattern clip and stops, FLEngine FUN_00e73950)
+        return -1;
+    }
+    const auto channel = clip.channel;
+    if (clip.kind != ClipKind::audio || channel < 0 || channel >= (int) song.channels.size()
+        || song.channels[(std::size_t) channel].instrument != InstrumentKind::audioClip)
+        return -1;
+    return index;
+}
+
+bool PlaylistComponent::replaceSampleOnDrop (int clip, const juce::File& file)
+{
+    const auto& song = engine.getSong();
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return false;
+    const auto data = engine.getSampleLibrary().load (file.getFullPathName());
+    if (data == nullptr)
+    {
+        ui::postNotice ({ tr ("Could not read {0}", { file.getFileName() }), {} });
+        return false;
+    }
+    // the clip lengths the old and the new file give (as a drop makes them: at the song's tempo, the channel's stretch)
+    const auto ticksOf = [&song] (double seconds) { return juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * song.bpm / 60.0 * ppq)); };
+    const auto& channel = song.channels[(std::size_t) song.playlist[(std::size_t) clip].channel];
+    std::int64_t oldTicks = 0;
+    if (channel.sampler.stretchBeats > 0.0f)
+        oldTicks = (std::int64_t) std::llround ((double) channel.sampler.stretchBeats * ppq);
+    else if (auto old = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str())); old != nullptr && old->sampleRate > 0)
+        oldTicks = ticksOf ((double) old->frames() / old->sampleRate);
+    const auto newTicks = data->sampleRate > 0 ? ticksOf ((double) data->frames() / data->sampleRate) : (std::int64_t) 0;
+    auto done = false;
+    engine.editSong ([&] (Song& s) {
+        done = audioclips::replaceClipSample (s, clip, file.getFullPathName().toStdString(), file.getFileNameWithoutExtension().toStdString(),
+                                              oldTicks, newTicks, flsettings::options().autoNameChannels.load());
+    });
+    repaint();
+    return done;
+}
+
+bool PlaylistComponent::sampleDropGhost (juce::Point<int> p, const juce::File& file, std::vector<Clip>& ghost)
+{
+    auto nothing = false;
+    const auto target = sampleDropTarget (p, file, nothing);
+    const auto& song = engine.getSong();
+    if (target >= 0)
+    {
+        // the ghost marks every clip of the channel (they all change), not the place of a new clip
+        const auto channel = song.playlist[(std::size_t) target].channel;
+        for (const auto& c : song.playlist)
+            if (c.kind == ClipKind::audio && c.channel == channel)
+                ghost.push_back (c);
+        ui::postHint ({ tr ("Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip",
+                            { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()), file.getFileNameWithoutExtension() }), {} });
+        return true;
+    }
+    if (nothing)
+    {
+        ui::postHint ({ tr ("A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip"), {} });
+        return true;
+    }
+    return false;
 }
 
 void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
@@ -17462,7 +17556,8 @@ void PlaylistComponent::updateDropGhost (const SourceDetails& details)
         }
         else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile() && p.x >= headerWidth)
         {
-            add (ClipKind::audio, -1, track, snapped, dropGhostAudioTicks (file));
+            if (! sampleDropGhost (p, file, ghost)) // (issue #325: over an audio clip the clips that change)
+                add (ClipKind::audio, -1, track, snapped, dropGhostAudioTicks (file));
             name = file.getFileNameWithoutExtension();
         }
         else if (simpleHeaders && BrowserComponent::isGeneratorDrag (details)) // (round 190sa: a sound makes a new track)
@@ -17509,7 +17604,8 @@ void PlaylistComponent::updateDropGhostForFiles (const juce::StringArray& files,
     {
         const juce::File file (files[0]);
         name = file.getFileNameWithoutExtension();
-        if (file.existsAsFile() && ! file.hasFileExtension ("mid;midi") && ! videotracks::isVideoFile (file))
+        const auto onClip = files.size() == 1 && sampleDropGhost (p, file, ghost); // (issue #325)
+        if (! onClip && file.existsAsFile() && ! file.hasFileExtension ("mid;midi") && ! videotracks::isVideoFile (file))
             if (const auto length = dropGhostAudioTicks (file); length > 0)
             {
                 Clip c;

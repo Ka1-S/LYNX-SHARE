@@ -13166,3 +13166,5 @@ countries: pl
 "Delete plugin" = "Usuń wtyczkę"
 "Save the selected mixer track's state as..." = "Zapisz stan zaznaczonej ścieżki miksera jako..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[dwuklik] dodaj jako nową ścieżkę instrumentu lub przeciągnij na oś czasu"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "Zastępuje sampel {0} plikiem {1}: klipy, insert i efekty zostają  [Shift] nowy klip"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Sampel upuszczony na klip patternu nic nie robi, jak w FL Studio  [Shift] nowy klip"

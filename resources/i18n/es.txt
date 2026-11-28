@@ -13166,3 +13166,5 @@ countries: es mx ar co cl pe ve
 "Delete plugin" = "Eliminar plugin"
 "Save the selected mixer track's state as..." = "Guardar el estado de la pista del mezclador seleccionada como..."
 "[double-click] add it as a new instrument track, or drag it onto the timeline" = "[doble clic] añadirlo como pista de instrumento nueva, o arrastrarlo a la línea de tiempo"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "Sustituye el sample de {0} por {1}: sus clips, el insert y los efectos se mantienen  [Shift] clip nuevo"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "Un sample soltado sobre un clip de patrón no hace nada, como en FL Studio  [Shift] clip nuevo"
