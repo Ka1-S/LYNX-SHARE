@@ -7476,20 +7476,34 @@ public:
     {
         const auto r = getLocalBounds().toFloat();
         const auto cx = r.getCentreX(), cy = r.getCentreY();
-        constexpr float bodyR = 4.5f, holeR = 1.8f, toothlen = 2.2f, toothHalfW = 1.0f;
-        juce::Path p;
-        p.addEllipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR * 2.0f);
-        for (int i = 0; i < 8; i++)
+
+        constexpr int   numTeeth        = 6;
+        constexpr float bodyR           = 4.5f; // radius of the gear's core disc
+        constexpr float holeR           = 2.9f; // radius of the centre hole
+        constexpr float toothHalfW      = 1.6f; // half-width -> ~39° tooth / ~21° gap
+        constexpr float toothLen        = 1.5f; // short protrusion - reference teeth only poke out ~33% past bodyR
+        constexpr float toothOverLap    = 1.0f; // just enough root overlap to blend into the body with no seam
+
+        juce::Path p; // non-zero winding (the default): body + teeth union together, however much they overlap
+
+        p.addEllipse (cx - bodyR, cy - bodyR, bodyR * 2.0f, bodyR * 2.0f); 
+
+        for (int i = 0; i < numTeeth; i++)
         {
             juce::Path tooth;
-            tooth.addRectangle (-toothHalfW, -(bodyR + toothlen), toothHalfW * 2.0f, toothlen + 1.0f);
-            tooth.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::twoPi * (float) i / 8.0f)
+            tooth.addRoundedRectangle (-toothHalfW, -(bodyR + toothLen), toothHalfW * 2.0f,
+                                        toothLen + toothOverLap, toothHalfW); // fully rounded ends -> soft, petal-like lobe
+            tooth.applyTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::twoPi * (float) i / (float) numTeeth)
                                         .translated (cx, cy));
             p.addPath (tooth);
         }
+
+        // Centre hole: a mirrored copy of a plain circle. Mirroring reverses its winding direction
+        // without changing its shape, so it subtracts from the union above instead of adding to it.
         juce::Path hole;
-        hole.addEllipse (cx - holeR, cy - holeR, holeR * 2.0f, holeR * 2.0f);
-        p.setUsingNonZeroWinding (false); // even-odd fill: the hole subtracts from the body instead of adding to it
+        hole.addEllipse (-holeR, -holeR, holeR * 2.0f, holeR * 2.0f);
+        hole.applyTransform (juce::AffineTransform::scale (-1.0f, 1.0f).translated (cx, cy));
+
         p.addPath (hole);
         g.setColour (getToggleState() || over ? theme::colour::accent : theme::colour::textSecondary);
         g.fillPath (p);
