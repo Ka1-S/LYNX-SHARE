@@ -112,6 +112,8 @@
                 for (int k = 0; k < 3; ++k)
                     offline.dispatchPendingMessages();
             };
+            offline.getSampleLibrary().load (oldFile.getFullPathName()); // (the clips' waveforms, as in a project that plays)
+            offline.getSampleLibrary().load (newFile.getFullPathName());
             offline.setSong (makeSong());
             settle();
             ui.selectTabForSnapshot (2);
@@ -138,6 +140,10 @@
                        hint ? hint->text : juce::String ("none"));
                 if (shots.isNotEmpty())
                 {
+                    // (the clips' waveforms are read on a worker when first painted: one paint, then the pictures)
+                    ui.createComponentSnapshot (ui.getLocalBounds());
+                    ui::WaveformCache::getInstance()->waitUntilIdle (5000);
+                    settle();
                     if (hint)
                         ui.setHintForSnapshot (*hint);
                     savePng (ui.createComponentSnapshot (ui.getLocalBounds()), shots + "-drag-over-clip.png");
