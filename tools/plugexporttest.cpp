@@ -74,6 +74,21 @@ struct Audio
                 return (long) i;
         return -1;
     }
+    // round 190sh: FNV-1a over the samples' bits, so two builds of the plugins can be compared render for render (the
+    // report's "fingerprint" lines: the same plugin file renders the same bytes run after run)
+    juce::String fingerprint() const
+    {
+        std::uint64_t h = 1469598103934665603ull;
+        for (const auto* channel : { &l, &r })
+            for (const auto v : *channel)
+            {
+                std::uint32_t bits;
+                std::memcpy (&bits, &v, sizeof bits);
+                for (int b = 0; b < 4; ++b)
+                    h = (h ^ ((bits >> (8 * b)) & 0xffu)) * 1099511628211ull;
+            }
+        return juce::String::toHexString ((juce::int64) h).paddedLeft ('0', 16);
+    }
     double difference (const Audio& o) const
     {
         double p = l.size() == o.l.size() ? 0.0 : 1e9;
@@ -482,6 +497,7 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     const auto sound = render (*instance, entry->instrument, &seconds);
     report << "  " << blocks << " blocks of " << block << ": " << juce::String (100.0 * seconds / (blocks * block / rate), 2) << " % of real time\n";
     check (sound.peak() > 1.0e-3, "makes sound, peak " + juce::String (sound.peak(), 4));
+    report << "  fingerprint defaults " << sound.fingerprint() << "\n";
 
     auto direct = entry->instrument ? directInstrument (*entry) : directEffect (entry->effect, makeEffectSlot (entry->effect).params);
     const auto nulled = sound.difference (direct);
@@ -529,6 +545,7 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
             }
         check (found == juce::jmin (named, parameters.size()), "the host lists the engine's parameters: " + juce::String (found) + " of " + juce::String (named));
         const auto wet = render (*instance, false);
+        report << "  fingerprint moved " << wet.fingerprint() << "\n";
         const auto d = wet.difference (direct = directEffect (entry->effect, params));
         check (d < 1.0e-5, "null test with " + juce::String (named) + " parameters moved by the host: peak difference " + juce::String (d, 8)
                                + (d < 1.0e-5 ? juce::String() : ", first at sample " + juce::String (wet.firstDifference (direct))));
@@ -551,6 +568,7 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
             moved->setValue (was < 0.5f ? was + 0.3f : was - 0.3f);
             report << "  moved '" << moved->getName (64) << "' " << was << " -> " << moved->getValue() << "\n";
             const auto changed = render (*instance, true);
+            report << "  fingerprint moved " << changed.fingerprint() << "\n";
             check (changed.difference (sound) > 1.0e-3, "the moved parameter changes the sound, difference " + juce::String (changed.difference (sound), 5));
         }
     }
@@ -565,6 +583,7 @@ void testPlugin (juce::AudioPluginFormat& format, const juce::PluginDescription&
     {
         second->setStateInformation (state.getData(), (int) state.getSize());
         const auto first = render (*instance, entry->instrument), restored = render (*second, entry->instrument);
+        report << "  fingerprint restored " << restored.fingerprint() << "\n";
         const auto d = restored.difference (first);
         check (d < 1.0e-3, "state restores the sound: peak difference " + juce::String (d, 8)
                                + (d < 1.0e-3 ? juce::String() : ", first at sample " + juce::String (restored.firstDifference (first, 1.0e-3))));
