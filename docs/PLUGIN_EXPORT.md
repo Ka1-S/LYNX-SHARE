@@ -310,6 +310,18 @@ Windows 11 Explorer or 7-Zip). Tried and not taken: ICF (zig's linker driver rej
 classes in one VST3 (option B above: it needs a patch of JUCE's VST3 wrapper, whose class ids, bus layout and MIDI mode are
 compile-time macros; the owner chose C in round 188b).
 
+Round 190sh (size audit per object, lynx-work/plugpack_190sh/HANDOFF.md): a plugin binary is the whole LYNX app minus
+`Main.cpp`, because the plugin's editor is the app's plugin window and its processor the app's AudioEngine. Of the Windows
+CLAP's 36.7 MB of sections: src/core 15.1 MB, src/ui 10.5, JUCE 5.4, src/engine 2.3, C libraries 1.9 (pocketpy 0.8),
+libc++ / CRT 0.8. lld-link already drops unreferenced code and folds identical functions (no `/DEBUG`, so `/OPT:REF,ICF` is
+its default: an explicit `-OPT:REF -OPT:ICF` gives the same bytes), and the translation tables are not in the plugins
+(nothing there calls `i18n::initialise`). What changed: the zip is written by 7-Zip's Deflate encoder (plain Deflate,
+-3.3 %), and every binary links its own entry object last (scripts/build-windows-zig.sh; cmake/LynxPlugins.cmake with
+plugin/LinkAnchor.cpp first), so the engine has the same layout in each binary and the solid archives share more: Windows
+zip 197.8 -> 191.2 MB, .7z 20.4 -> 19.2 MB (local build, the same binaries packed by both scripts). plugexporttest prints
+render fingerprints; 150 renders through the old and the new binaries: 0 differ. The zip stays about 12 x 16 MB until the
+VST3s share one engine (option B; about 35 MB).
+
 Per instance, measured in plugexporttest:
 
 - memory: 1.2 to 2.2 MB more per extra instance;

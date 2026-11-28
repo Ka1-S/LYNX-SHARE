@@ -111,7 +111,7 @@ Os efeitos e instrumentos do próprio LYNX SHARE, como Facet EQ, Apex Limiter, L
 
 - Todos os plugins estão num só arquivo CLAP, `LYNX Plugins.clap`. Uma lista curta vem também como VST3 e, no Linux, como LV2.
 - Instrumentos do pacote: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil e LYNX Duoloom.
-- No Windows, baixe `LYNX-Plugins-<version>-win-x64.7z` (cerca de 20 MB). O `.zip` (cerca de 195 MB) tem os mesmos arquivos.
+- No Windows, baixe `LYNX-Plugins-<version>-win-x64.7z` (cerca de 20 MB). O `.zip` (cerca de 190 MB) tem os mesmos arquivos.
 - Rode o script de instalação do arquivo (`install.cmd` no Windows, `install.sh` no macOS e no Linux) e examine os plugins de novo na sua DAW.
 - Um plugin abre o mesmo editor que dentro do LYNX SHARE, e o estado dele abre no LYNX SHARE como projeto.
 

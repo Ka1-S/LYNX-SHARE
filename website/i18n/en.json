@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE is an alpha. It opens, plays and exports whole projects, but it has bugs. Save often, and keep a copy of anything you import from another program.",
 "dlp.know2": "Installed versions offer new releases through an Update bar under the toolbar. The Microsoft Store version updates through the Store, and the AppImage through AppImageUpdate or Gear Lever.",
 "dlp.know3": "Plugin formats differ per system: VST3 and CLAP everywhere, Audio Units on macOS, LV2 on Linux, VST2 on Windows and Linux. ASIO and the 32-bit plugin bridge are Windows-only.",
-"dlp.know4": "The LYNX plugin pack, LYNX SHARE's own effects and instruments as plugins for other DAWs, is a separate, optional download (LYNX-Plugins) on the <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">releases page</a>. LYNX SHARE itself does not need it. On Windows, take the .7z (about 20 MB): the .zip (about 195 MB) has the same files.",
+"dlp.know4": "The LYNX plugin pack, LYNX SHARE's own effects and instruments as plugins for other DAWs, is a separate, optional download (LYNX-Plugins) on the <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">releases page</a>. LYNX SHARE itself does not need it. On Windows, take the .7z (about 20 MB): the .zip (about 190 MB) has the same files.",
 "dlp.know5": "The first start asks where you are coming from and picks a layout, and connects nowhere until you have answered.",
 "dlp.next": "Getting started: first run and first sound",
 "dlp.trouble": "Troubleshooting: SmartScreen, Gatekeeper, no sound",

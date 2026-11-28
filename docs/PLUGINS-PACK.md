@@ -4,7 +4,7 @@ LYNX SHARE's own engines also come as plugins for other hosts (Ableton Live, Bit
 One...). This is a separate, optional download next to each release: `LYNX-Plugins-<version>-<system>`. LYNX SHARE
 itself doesn't need it. How it is built and tested: [PLUGIN_EXPORT.md](PLUGIN_EXPORT.md).
 
-On Windows the pack comes twice: `LYNX-Plugins-<version>-win-x64.zip` (about 195 MB: a zip packs every file on its own, and
+On Windows the pack comes twice: `LYNX-Plugins-<version>-win-x64.zip` (about 190 MB: a zip packs every file on its own, and
 the 12 plugin files share nearly all their bytes) and `LYNX-Plugins-<version>-win-x64.7z` (about 20 MB, the same files; Windows 11
 opens it in Explorer, older Windows needs 7-Zip). Take the `.7z` if you can.
 

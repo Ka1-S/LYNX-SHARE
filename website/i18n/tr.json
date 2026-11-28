@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE bir alpha. Tüm projeleri açar, çalar ve dışa aktarır, ama hataları var. Sık kaydedin ve başka bir programdan içe aktardığınız her şeyin bir kopyasını saklayın.",
 "dlp.know2": "Kurulu sürümler yeni sürümleri araç çubuğunun altındaki bir Güncelleme çubuğuyla sunar. Microsoft Store sürümü Store üzerinden, AppImage ise AppImageUpdate veya Gear Lever ile güncellenir.",
 "dlp.know3": "Plugin formatları sisteme göre değişir: her yerde VST3 ve CLAP, macOS'ta Audio Units, Linux'ta LV2, Windows ve Linux'ta VST2. ASIO ve 32 bit plugin köprüsü yalnızca Windows'ta.",
-"dlp.know4": "LYNX plugin paketi, yani LYNX SHARE'in kendi efektleri ve enstrümanlarının diğer DAW'lar için plugin olarak sunulan hali, <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">sürümler sayfasında</a> ayrı, isteğe bağlı bir indirmedir (LYNX-Plugins). LYNX SHARE'in kendisi buna ihtiyaç duymaz. Windows'ta .7z dosyasını alın (yaklaşık 20 MB): .zip (yaklaşık 195 MB) aynı dosyaları içerir.",
+"dlp.know4": "LYNX plugin paketi, yani LYNX SHARE'in kendi efektleri ve enstrümanlarının diğer DAW'lar için plugin olarak sunulan hali, <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">sürümler sayfasında</a> ayrı, isteğe bağlı bir indirmedir (LYNX-Plugins). LYNX SHARE'in kendisi buna ihtiyaç duymaz. Windows'ta .7z dosyasını alın (yaklaşık 20 MB): .zip (yaklaşık 190 MB) aynı dosyaları içerir.",
 "dlp.know5": "İlk açılış nereden geldiğinizi sorar ve bir yerleşim seçer; siz yanıtlayana kadar hiçbir yere bağlanmaz.",
 "dlp.next": "Başlarken: ilk açılış ve ilk ses",
 "dlp.trouble": "Sorun giderme: SmartScreen, Gatekeeper, ses yok",

@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE 是 alpha 版。它可以打开、播放和导出完整的工程，但存在错误。请经常保存，并为从其他程序导入的内容保留一份副本。",
 "dlp.know2": "已安装的版本会通过工具栏下方的更新栏提示新版本。Microsoft Store 版本通过 Store 更新，AppImage 通过 AppImageUpdate 或 Gear Lever 更新。",
 "dlp.know3": "各系统的插件格式不同：所有系统都支持 VST3 和 CLAP，macOS 上有 Audio Units，Linux 上有 LV2，Windows 和 Linux 上有 VST2。ASIO 和 32 位插件桥接仅限 Windows。",
-"dlp.know4": "LYNX 插件包，即 LYNX SHARE 自己的效果器和乐器，以插件形式供其他 DAW 使用，是<a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">发布页面</a>上单独、可选的下载（LYNX-Plugins）。LYNX SHARE 本身不需要它。在 Windows 上请选 .7z（约 20 MB）：.zip（约 195 MB）里的文件完全相同。",
+"dlp.know4": "LYNX 插件包，即 LYNX SHARE 自己的效果器和乐器，以插件形式供其他 DAW 使用，是<a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">发布页面</a>上单独、可选的下载（LYNX-Plugins）。LYNX SHARE 本身不需要它。在 Windows 上请选 .7z（约 20 MB）：.zip（约 190 MB）里的文件完全相同。",
 "dlp.know5": "首次启动会询问你来自哪里并选择一种布局，在你回答之前不会连接任何地方。",
 "dlp.next": "入门：首次运行和第一个声音",
 "dlp.trouble": "故障排除：SmartScreen、Gatekeeper、没有声音",

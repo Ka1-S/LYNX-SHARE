@@ -111,7 +111,7 @@ LYNX SHARE 自己的效果器和乐器，例如 Facet EQ、Apex Limiter、LYNX T
 
 - 所有插件都在一个 CLAP 文件 `LYNX Plugins.clap` 里。其中一小部分也提供 VST3 版本，在 Linux 上还提供 LV2 版本。
 - 包中的乐器：LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil 和 LYNX Duoloom。
-- 在 Windows 上，请选 `LYNX-Plugins-<version>-win-x64.7z`（约 20 MB）。`.zip`（约 195 MB）里的文件完全相同。
+- 在 Windows 上，请选 `LYNX-Plugins-<version>-win-x64.7z`（约 20 MB）。`.zip`（约 190 MB）里的文件完全相同。
 - 运行压缩包里的安装脚本（Windows 用 `install.cmd`，macOS 和 Linux 用 `install.sh`），然后在你的 DAW 里重新扫描插件。
 - 插件打开的编辑器和 LYNX SHARE 里的一样，它的状态可以在 LYNX SHARE 中作为工程打开。
 

@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHAREはアルファ版です。プロジェクト全体を開き、再生し、エクスポートできますが、不具合があります。こまめに保存し、ほかのプログラムから読み込んだものは、元のコピーを残しておいてください。",
 "dlp.know2": "インストール版では、ツールバーの下のアップデートバーで新しいリリースを案内します。Microsoft Store版はStoreから、AppImageはAppImageUpdateまたはGear Leverでアップデートします。",
 "dlp.know3": "プラグイン形式はシステムごとに異なります。VST3とCLAPはどこでも、Audio UnitsはmacOS、LV2はLinux、VST2はWindowsとLinuxです。ASIOと32ビットプラグインのブリッジはWindowsのみです。",
-"dlp.know4": "LYNXプラグインパックは、LYNX SHARE独自のエフェクトとインストゥルメントをほかのDAW向けのプラグインにしたもので、<a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">リリースページ</a>にある別の任意ダウンロード (LYNX-Plugins) です。LYNX SHARE本体には必要ありません。 Windowsでは.7z (約20 MB) をお使いください。.zip (約195 MB) にも同じファイルが入っています。",
+"dlp.know4": "LYNXプラグインパックは、LYNX SHARE独自のエフェクトとインストゥルメントをほかのDAW向けのプラグインにしたもので、<a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">リリースページ</a>にある別の任意ダウンロード (LYNX-Plugins) です。LYNX SHARE本体には必要ありません。 Windowsでは.7z (約20 MB) をお使いください。.zip (約190 MB) にも同じファイルが入っています。",
 "dlp.know5": "最初の起動で、どこから来たかを尋ねてワークフローを選びます。答えるまでどこにも接続しません。",
 "dlp.next": "はじめに: 初回起動と最初の音",
 "dlp.trouble": "トラブルシューティング: SmartScreen、Gatekeeper、音が出ない",

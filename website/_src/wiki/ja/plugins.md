@@ -111,7 +111,7 @@ Facet EQ、Apex Limiter、LYNX Tune、LYNX ModelなどLYNX SHARE独自のエフ�
 
 - すべてのプラグインが1つのCLAPファイル`LYNX Plugins.clap`に入っています。一部はVST3としても、LinuxではLV2としても提供されます。
 - パックの音源: LYNX FM10、LYNX Model、LYNX Fourfold、LYNX Wavecoil、LYNX Duoloom。
-- Windowsでは`LYNX-Plugins-<version>-win-x64.7z`（約20 MB）をダウンロードしてください。`.zip`（約195 MB）にも同じファイルが入っています。
+- Windowsでは`LYNX-Plugins-<version>-win-x64.7z`（約20 MB）をダウンロードしてください。`.zip`（約190 MB）にも同じファイルが入っています。
 - アーカイブ内のインストールスクリプト（Windowsは`install.cmd`、macOSとLinuxは`install.sh`）を実行し、DAWでプラグインを再スキャンしてください。
 - プラグインはLYNX SHARE内と同じエディターを開き、その状態はLYNX SHAREでプロジェクトとして開けます。
 

@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE는 알파 버전입니다. 프로젝트 전체를 열고, 재생하고, 내보낼 수 있지만 버그가 있습니다. 자주 저장하고, 다른 프로그램에서 가져온 파일은 사본을 보관하세요.",
 "dlp.know2": "설치한 버전은 툴바 아래의 업데이트 바로 새 릴리스를 알려 줍니다. Microsoft Store 버전은 Store를 통해, AppImage는 AppImageUpdate 또는 Gear Lever로 업데이트합니다.",
 "dlp.know3": "플러그인 형식은 시스템마다 다릅니다. VST3와 CLAP은 어디서나, Audio Units는 macOS, LV2는 Linux, VST2는 Windows와 Linux에서 쓸 수 있습니다. ASIO와 32비트 플러그인 브리지는 Windows 전용입니다.",
-"dlp.know4": "LYNX 플러그인 팩, 즉 LYNX SHARE 자체의 이펙트와 악기를 다른 DAW용 플러그인으로 만든 것은 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">릴리스 페이지</a>에서 받는 선택 사항인 별도 다운로드(LYNX-Plugins)입니다. LYNX SHARE 자체에는 필요하지 않습니다. Windows에서는 .7z(약 20 MB)를 받으세요. .zip(약 195 MB)에도 같은 파일이 들어 있습니다.",
+"dlp.know4": "LYNX 플러그인 팩, 즉 LYNX SHARE 자체의 이펙트와 악기를 다른 DAW용 플러그인으로 만든 것은 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">릴리스 페이지</a>에서 받는 선택 사항인 별도 다운로드(LYNX-Plugins)입니다. LYNX SHARE 자체에는 필요하지 않습니다. Windows에서는 .7z(약 20 MB)를 받으세요. .zip(약 190 MB)에도 같은 파일이 들어 있습니다.",
 "dlp.know5": "처음 시작하면 어디서 오셨는지 묻고 레이아웃을 골라 주며, 답하기 전에는 어디에도 연결하지 않습니다.",
 "dlp.next": "시작하기: 첫 실행과 첫 소리",
 "dlp.trouble": "문제 해결: SmartScreen, Gatekeeper, 소리가 나지 않을 때",

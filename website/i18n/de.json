@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE ist eine Alpha. Sie öffnet, spielt und exportiert ganze Projekte, hat aber Fehler. Speichere oft und behalte eine Kopie von allem, was du aus einem anderen Programm importierst.",
 "dlp.know2": "Installierte Versionen bieten neue Releases über eine Update-Leiste unter der Toolbar an. Die Version aus dem Microsoft Store aktualisiert sich über den Store, das AppImage über AppImageUpdate oder Gear Lever.",
 "dlp.know3": "Die Plugin-Formate unterscheiden sich je nach System: VST3 und CLAP überall, Audio Units auf macOS, LV2 unter Linux, VST2 unter Windows und Linux. ASIO und die Bridge für 32-Bit-Plugins gibt es nur unter Windows.",
-"dlp.know4": "Das LYNX-Plugin-Paket, die eigenen Effekte und Instrumente von LYNX SHARE als Plugins für andere DAWs, ist ein separater, optionaler Download (LYNX-Plugins) auf der <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">Release-Seite</a>. LYNX SHARE selbst braucht es nicht. Nimm unter Windows die .7z (etwa 20 MB): Die .zip (etwa 195 MB) enthält dieselben Dateien.",
+"dlp.know4": "Das LYNX-Plugin-Paket, die eigenen Effekte und Instrumente von LYNX SHARE als Plugins für andere DAWs, ist ein separater, optionaler Download (LYNX-Plugins) auf der <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">Release-Seite</a>. LYNX SHARE selbst braucht es nicht. Nimm unter Windows die .7z (etwa 20 MB): Die .zip (etwa 190 MB) enthält dieselben Dateien.",
 "dlp.know5": "Der erste Start fragt, woher du kommst, und wählt ein Layout, und er verbindet sich nirgends, bis du geantwortet hast.",
 "dlp.next": "Erste Schritte: erster Start und erster Sound",
 "dlp.trouble": "Fehlerbehebung: SmartScreen, Gatekeeper, kein Ton",

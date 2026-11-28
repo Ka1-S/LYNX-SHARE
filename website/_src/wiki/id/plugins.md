@@ -111,7 +111,7 @@ Efek dan instrumen milik LYNX SHARE sendiri, seperti Facet EQ, Apex Limiter, LYN
 
 - Semua plugin ada dalam satu file CLAP, `LYNX Plugins.clap`. Daftar pendek juga tersedia sebagai VST3 dan, di Linux, sebagai LV2.
 - Instrumen dalam paket: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil, dan LYNX Duoloom.
-- Di Windows, pilih `LYNX-Plugins-<version>-win-x64.7z` (sekitar 20 MB). `.zip` (sekitar 195 MB) berisi file yang sama.
+- Di Windows, pilih `LYNX-Plugins-<version>-win-x64.7z` (sekitar 20 MB). `.zip` (sekitar 190 MB) berisi file yang sama.
 - Jalankan skrip instalasi di dalam arsip (`install.cmd` di Windows, `install.sh` di macOS dan Linux), lalu pindai ulang plugin di DAW Anda.
 - Plugin membuka editor yang sama seperti di dalam LYNX SHARE, dan state-nya bisa dibuka di LYNX SHARE sebagai proyek.
 

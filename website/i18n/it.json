@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE è in alpha. Apre, riproduce ed esporta progetti interi, ma ha dei bug. Salva spesso e tieni una copia di tutto ciò che importi da un altro programma.",
 "dlp.know2": "Le versioni installate propongono le nuove versioni con una barra di aggiornamento sotto la barra degli strumenti. La versione del Microsoft Store si aggiorna tramite lo Store, e l'AppImage con AppImageUpdate o Gear Lever.",
 "dlp.know3": "I formati di plugin cambiano da sistema a sistema: VST3 e CLAP ovunque, Audio Units su macOS, LV2 su Linux, VST2 su Windows e Linux. ASIO e il bridge per i plugin a 32 bit sono solo per Windows.",
-"dlp.know4": "Il pacchetto di plugin LYNX, gli effetti e gli strumenti propri di LYNX SHARE come plugin per altre DAW, è un download separato e facoltativo (LYNX-Plugins) nella <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">pagina delle versioni</a>. LYNX SHARE stesso non ne ha bisogno. Su Windows, scegli il .7z (circa 20 MB): lo .zip (circa 195 MB) contiene gli stessi file.",
+"dlp.know4": "Il pacchetto di plugin LYNX, gli effetti e gli strumenti propri di LYNX SHARE come plugin per altre DAW, è un download separato e facoltativo (LYNX-Plugins) nella <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">pagina delle versioni</a>. LYNX SHARE stesso non ne ha bisogno. Su Windows, scegli il .7z (circa 20 MB): lo .zip (circa 190 MB) contiene gli stessi file.",
 "dlp.know5": "Il primo avvio chiede da dove vieni e sceglie un flusso, e non si connette da nessuna parte finché non hai risposto.",
 "dlp.next": "Primi passi: il primo avvio e il primo suono",
 "dlp.trouble": "Risoluzione dei problemi: SmartScreen, Gatekeeper, nessun suono",

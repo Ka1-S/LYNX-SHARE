@@ -680,7 +680,7 @@
 "dlp.know1": "LYNX SHARE masih alpha. Aplikasi ini membuka, memutar, dan mengekspor proyek utuh, tapi masih ada bug. Simpan sesering mungkin, dan simpan salinan apa pun yang kamu impor dari program lain.",
 "dlp.know2": "Versi yang terpasang menawarkan rilis baru lewat bar Perbarui di bawah toolbar. Versi Microsoft Store diperbarui lewat Store, dan AppImage lewat AppImageUpdate atau Gear Lever.",
 "dlp.know3": "Format plugin berbeda di tiap sistem: VST3 dan CLAP di mana-mana, Audio Units di macOS, LV2 di Linux, VST2 di Windows dan Linux. ASIO dan bridge plugin 32-bit hanya untuk Windows.",
-"dlp.know4": "Paket plugin LYNX, efek dan instrumen LYNX SHARE sendiri sebagai plugin untuk DAW lain, adalah unduhan terpisah dan opsional (LYNX-Plugins) di <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">halaman rilis</a>. LYNX SHARE sendiri tidak membutuhkannya. Di Windows, pilih .7z (sekitar 20 MB): .zip (sekitar 195 MB) berisi file yang sama.",
+"dlp.know4": "Paket plugin LYNX, efek dan instrumen LYNX SHARE sendiri sebagai plugin untuk DAW lain, adalah unduhan terpisah dan opsional (LYNX-Plugins) di <a href=\"https://github.com/Ka1-S/LYNX-SHARE/releases\">halaman rilis</a>. LYNX SHARE sendiri tidak membutuhkannya. Di Windows, pilih .7z (sekitar 20 MB): .zip (sekitar 190 MB) berisi file yang sama.",
 "dlp.know5": "Saat pertama dijalankan, ditanyakan dari mana kamu berasal dan sebuah tata letak dipilih, dan tidak terhubung ke mana pun sampai kamu menjawab.",
 "dlp.next": "Memulai: pertama kali dijalankan dan suara pertama",
 "dlp.trouble": "Pemecahan masalah: SmartScreen, Gatekeeper, tidak ada suara",

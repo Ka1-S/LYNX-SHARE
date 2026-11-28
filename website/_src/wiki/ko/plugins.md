@@ -111,7 +111,7 @@ Facet EQ, Apex Limiter, LYNX Tune, LYNX Model 같은 LYNX SHARE 자체 이펙트
 
 - 모든 플러그인이 CLAP 파일 하나, `LYNX Plugins.clap`에 들어 있습니다. 일부는 VST3로도, Linux에서는 LV2로도 제공됩니다.
 - 팩에 든 악기: LYNX FM10, LYNX Model, LYNX Fourfold, LYNX Wavecoil, LYNX Duoloom.
-- Windows에서는 `LYNX-Plugins-<version>-win-x64.7z`(약 20 MB)를 받으세요. `.zip`(약 195 MB)에도 같은 파일이 들어 있습니다.
+- Windows에서는 `LYNX-Plugins-<version>-win-x64.7z`(약 20 MB)를 받으세요. `.zip`(약 190 MB)에도 같은 파일이 들어 있습니다.
 - 압축 파일 안의 설치 스크립트(Windows는 `install.cmd`, macOS와 Linux는 `install.sh`)를 실행한 다음 DAW에서 플러그인을 다시 스캔하세요.
 - 플러그인은 LYNX SHARE 안에서와 같은 에디터를 열고, 그 상태는 LYNX SHARE에서 프로젝트로 열립니다.
 
