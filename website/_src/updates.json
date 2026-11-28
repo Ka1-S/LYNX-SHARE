@@ -1,5 +1,34 @@
 [
   {
+    "version": "0.1.32-alpha",
+    "tag": "v0.1.32-alpha",
+    "date": "2026-11-28",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.32-alpha",
+    "title": "The quality release: safer saves and exports, the promised fixes, three contributors",
+    "summary": "LYNX SHARE 0.1.32 is a quality release: saving on a full disk no longer destroys the project, exported .flp files no longer play as DC in FL Studio, .als exports no longer crash Live, PipeWire channels are in the right order, CLAP plugins follow the song's tempo, and it brings the fixes promised on GitHub and Discord, FL Studio's Plugin options tab for four stock synths, continuous scrolling and the work of three contributors.",
+    "new": [
+      "**Please update everyone in an Online session** to 0.1.32: a 0.1.31.x guest keeps its own tempo and project settings, and the host is now told so.",
+      "**Re-export .flp files made with 0.1.31.x**: some plugin values at the song's start were written on the wrong range, so FL Studio could play the project as loud DC. Turn the volume down before opening such a file in FL Studio and export it again with 0.1.32.",
+      "**CLAP plugins get the song's transport**: tempo-synced CLAP plugins now follow the song's tempo and position, so a project that uses one can sound different from 0.1.31.",
+      "**FL Studio's Plugin options tab** for 3x Osc, DX10, Granulizer and BeepMap (#311), Link to controller lists the project's automation clips (#310), and hosted effect windows show ON and MIX LEVEL (#321).",
+      "**Easier options**: Reset this page on every Settings page, the ? palette finds every option, a How to use this... guide in every window's menu, and links to the Tutorials, Manual and FAQ in the Help menu."
+    ],
+    "better": [
+      "**Measured on one PC** (Windows 11, Ryzen 5 3600, FL Studio 2026 on FL Studio ASIO 44.1 kHz / 256): FL's demo Thief plays with 33.9 % of one core (FL Studio 82.8 %) and 562 MB (899 MB) and opens in 4.7 s (6.8 s); Live's demo Patience plays with 69 % (Live 12: 126 %) and 436 MB (1,762 MB). After the first start, the first 15 s use about 5 % of one core.",
+      "**From contributors**: the Empty template as FL's one-Sampler project, new project names filled in, MIDI dropped on a channel, 4-bar shading and darkened switched-off tracks by DERALKERAL (PRs #262-#268); up to 25 mixer slots and a full Reset track to default by codewithamoako (PRs #260, #284); continuous scrolling by FKHR26 (PR #308).",
+      "**As in FL Studio 2026**: Ctrl+N saves a new version in the Pattern layout, a new channel plays into the Master, a sample dropped on an audio clip replaces its sound (#325), and a double click in the Browser previews a sample (#323)."
+    ],
+    "fixed": [
+      "**Saving on a full disk no longer destroys the project** (since 0.1.30): every file LYNX writes goes through one checked writer, and if anything fails the old file stays as it was.",
+      "**Export to Ableton Live no longer crashes Live** with a sampled drum kit; **PipeWire** channels follow the device's port order (left and right could be swapped); an audio driver that never answers no longer freezes LYNX.",
+      "**Crashes**: undo while dragging, closing Cakewalk's SI instruments, and more found by crash reports and stress tests; after a crash LYNX saves your work and can open the backup without third-party plugins.",
+      "GitHub issues #247, #270, #271, #272, #296, #299, #301, #303, #305, #309, #313, #317, #319, #323, #324 and #325, and the Discord reports on missing SoundFonts, marker skips and track grouping."
+    ],
+    "known": [
+      "#199, #223, #253, #255 and #258 could not be reproduced here and wait for the reporters' files. With many instances of a hosted plugin LYNX can use a little more memory than FL Studio (8 Surge XT: 382 vs 355 MB). A profile's very first start still reads FL Studio's plugin database once."
+    ]
+  },
+  {
     "version": "0.1.31.2-alpha",
     "tag": "v0.1.31.2-alpha",
     "date": "2026-11-25",
