@@ -8,11 +8,11 @@
 #include <string>
 #include <unordered_map>
 
-#include "core/Inflate.h"
 #include "engine/PluginHost.h"
 #include "ui/I18nData.h"
 #include "ui/I18nEnglish.h"
 #include "ui/I18nLocale.h"
+#include "ui/I18nTables.h"
 
 namespace lynx
 {
@@ -218,8 +218,8 @@ juce::String tableText (const juce::String& id)
 {
     for (const auto& t : data::tables)
         if (id == t.id)
-            if (const auto text = inflateZlib (t.zlib, t.zlibSize, false, t.textSize + 16); text && text->size() == t.textSize)
-                return juce::String::fromUTF8 ((const char*) text->data(), (int) text->size());
+            if (const auto text = unpackTable (t))
+                return juce::String::fromUTF8 (text->data(), (int) text->size());
     return {};
 }
 

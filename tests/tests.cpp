@@ -200,6 +200,7 @@
 #include "core/Templates.h"
 #include "flp/Flp.h"
 #include "ui/I18nData.h"
+#include "ui/I18nTables.h"
 #include "ui/I18nEnglish.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
@@ -6908,7 +6909,8 @@ TEST (translations_embedded_table_is_up_to_date)
                 std::printf ("  %s.txt is not embedded: run python3 tools/make_i18n.py\n", id.c_str());
                 continue;
             }
-            const auto unpacked = lynx::inflateZlib (found->zlib, found->zlibSize, false, found->textSize + 16);
+            // (round 190sh: the keys are stored once, ui/I18nTables.h; the table must still come back byte for byte)
+            const auto unpacked = lynx::i18n::unpackTable (*found);
             const bool same = unpacked && unpacked->size() == text.size() && found->textSize == text.size()
                               && std::memcmp (unpacked->data(), text.data(), text.size()) == 0;
             CHECK (same);
