@@ -13173,3 +13173,5 @@ countries: cn sg
 "A double click on an audio file in the Browser makes a new Sampler channel with it. Off, as in FL Studio: a double click only previews the sample, Enter loads it into the selected channel and the right-click menu's \"Open in a new channel\" adds it. Always on in the Clip-launch layout, as in Live. Its only switch is here." = "在浏览器中双击音频文件会用它新建一个 Sampler 通道。关闭（与 FL Studio 相同）：双击只预览采样，Enter 将其载入所选通道，右键菜单的“在新通道中打开”可添加它。在 Clip-launch 布局中始终开启，与 Live 相同。唯一的开关在这里。"
 "Sample: [LMB] preview  drag to the Channel Rack or the Playlist  [Enter] into the selected channel  [RMB] Open in a new channel  [Shift][Up] / [Shift][Down] swap through the files" = "采样：[LMB] 预览  拖到通道机架或播放列表  [Enter] 载入所选通道  [RMB] 在新通道中打开  [Shift][Up] / [Shift][Down] 依次切换文件"
 "Continuous scrolling" = "连续滚动"
+"Replaces the sample of {0} with {1}: its clips, insert and effects stay  [Shift] new clip" = "将 {0} 的采样替换为 {1}：其片段、插入轨和效果保留  [Shift] 新片段"
+"A sample dropped on a pattern clip does nothing, as in FL Studio  [Shift] new clip" = "拖到模式片段上的采样不起作用，与 FL Studio 相同  [Shift] 新片段"

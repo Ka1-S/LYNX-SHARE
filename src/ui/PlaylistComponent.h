@@ -281,6 +281,10 @@ public:
     void dragOverForSnapshot (const juce::var& description, juce::Point<int> at);
     void dropForSnapshot (const juce::var& description, juce::Point<int> at) { itemDropped (SourceDetails (description, nullptr, at)); } // (round 190jj)
     juce::String dropGhostReasonForCheck() const { return dropGhostReason; }
+    // round 190sg (issue #325): the drop's Shift for the checks (a test can't hold the key), and the drop target there
+    static inline bool shiftDropForCheck = false;
+    int sampleDropTargetForCheck (juce::Point<int> p, const juce::File& file) const { bool nothing = false; return sampleDropTarget (p, file, nothing); }
+    const std::vector<Clip>& dropGhostForCheck() const noexcept { return dropGhost; }
     bool dropGhostTagOnlyForCheck() const noexcept { return dropGhostTagOnly; }
     juce::Rectangle<int> dropGhostAreaForCheck() const { return dropGhostArea; }
     bool isClipSelectedForCheck (int clip) const { return isSelected (clip); }
@@ -436,6 +440,13 @@ public:
     // Simple: why a track refuses what is dropped on it (empty: it takes it); BandLab's "Region not supported by this
     // track" for audio on a track of notes (instrument, drums, sampler, pads)
     juce::String simpleDropRefusal (int track, ClipKind kind) const;
+    // Issue #325 (round 190sg, FL 2026 checked live): in the Pattern layout ONE sample file dropped (no Shift) on an audio
+    // clip loads into that clip's channel, so all its clips play it (core audioclips::replaceClipSample); on a pattern
+    // clip FL does nothing. The clip index to replace, or -1; `nothing`: the drop does nothing there (a pattern clip).
+    int sampleDropTarget (juce::Point<int> p, const juce::File& file, bool& nothing) const;
+    bool replaceSampleOnDrop (int clip, const juce::File& file); // (one undo step; false: the file can't be read)
+    // the ghost and the hint bar while such a drag is over a clip: true when it is (the ghost then marks the clips that change)
+    bool sampleDropGhost (juce::Point<int> p, const juce::File& file, std::vector<Clip>& ghost);
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)

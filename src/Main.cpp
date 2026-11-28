@@ -2371,6 +2371,18 @@ public:
            #endif
             std::_Exit (2); // (not reached when the display part ran)
         }
+        if (args.contains ("--issue325test"))
+        {
+            // LYNX --issue325test report.txt [shot prefix] (round 190sg, issue #325; also in --selftest): src/Issue325Check190sg.inc
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            juce::String log;
+            const auto i = args.indexOf ("--issue325test");
+            const auto result = issue325Check (log, i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            juce::File (args[i + 1].unquoted()).replaceWithText (log + "issue325=" + result + "\n");
+            setApplicationReturnValue (result == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--q6190satest"))
         {
             // LYNX --q6190satest report.txt [shot prefix] (round 190sa, 0.1.32 Q6 + the Simple layout's sound drop; also in
@@ -10611,6 +10623,9 @@ private:
         // round 190sa (0.1.32 Q6): a sound dropped on the Simple timeline is a new track, the hint names the timeline (src/Q6Check190sa.inc)
         juce::String q6190saLog;
         const auto q6190saResult = q6190saCheck (q6190saLog);
+        // round 190sg (issue #325): a sample dropped on an audio clip replaces its channel's sample, as FL (src/Issue325Check190sg.inc)
+        juce::String issue325Log;
+        const auto issue325Result = issue325Check (issue325Log);
         // round 190rp (0.1.32 Q4, stability): src/Stab190rpCheck.inc
         juce::String stab190rpLog;
         const auto stab190rpResult = stab190rpCheck (stab190rpLog);
@@ -12035,7 +12050,7 @@ private:
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && trackclips190neResult == "OK" && tracker190nwResult == "OK" && tracker190obResult == "OK" && rackauto190ooResult == "OK" && tracker190omResult == "OK" && rackauto190owResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK" && rollup031Result == "OK" && rollup031s2Result == "OK"
                         && keys190nuResult == "OK" && rollup031s3Result == "OK"
-                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && q1a190rwResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && perf190sbResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && q6190saResult == "OK" && stab190rpResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
+                        && helix4khs190ocResult == "OK" && rollup031s4Result == "OK" && sections190olResult == "OK" && rollup031s5Result == "OK" && simpleDuck190otResult == "OK" && tracks190peResult == "OK" && issue258Result == "OK" && issues190qrResult == "OK" && backlog190rcResult == "OK" && community190riResult == "OK" && q1a190rwResult == "OK" && iox190rmResult == "OK" && issues190rtResult == "OK" && perf190rnResult == "OK" && perf190sbResult == "OK" && qa190rbResult == "OK" && bugs190rvResult == "OK" && q6190saResult == "OK" && issue325Result == "OK" && stab190rpResult == "OK" && repeats190pmResult == "OK" && mixerqol190qhResult == "OK" && autolive190qpResult == "OK" && issue282Result == "OK" && feel190qeResult == "OK" && toolbar190qgResult == "OK" && extras190qkResult == "OK" && extras190roResult == "OK" && discord190quResult == "OK" && trialmark190qtResult == "OK" && optionsux190qxResult == "OK" && chordlane190pfResult == "OK" && autolinks190ovResult == "OK"
                         && trackstates190opResult == "OK" && rollup031s6Result == "OK" // (round 190op's item, reported but not counted in its branch: rollup 0.1.31 step 6)
                         && rollup031s7Result == "OK" && rollup031s8Result == "OK" && rollup032Result == "OK" && headerGearResult == "OK" && perTab259Result == "OK" && slots260Result == "OK" && hotfixPlacesResult == "OK" && startPageScrollResult.startsWith ("OK") // (round 190qf: slots260) (rollup 0.1.31 step 7, round 190pw; and the three rounds' items its branches reported but did not count:)
                         && slides190piResult == "OK" && automodes190paResult == "OK" && heldSteps190ozResult == "OK"
@@ -12170,6 +12185,7 @@ private:
                << "qa190rb=" << qa190rbResult << "\n"
                << "bugs190rv=" << bugs190rvResult << (bugs190rvResult == "OK" ? juce::String() : " | " + bugs190rvLog.replace ("\n", "; ")) << "\n"
                << "q6190sa=" << q6190saResult << (q6190saResult == "OK" ? juce::String() : " | " + q6190saLog.replace ("\n", "; ")) << "\n"
+               << "issue325=" << issue325Result << (issue325Result == "OK" ? juce::String() : " | " + issue325Log.replace ("\n", "; ")) << "\n"
                << "stab190rp=" << stab190rpResult << (stab190rpResult == "OK" ? juce::String() : " | " + stab190rpLog.replace ("\n", "; ")) << "\n"
                << "repeats190pm=" << repeats190pmResult << "\n"
                << "mixerqol190qh=" << mixerqol190qhResult << "\n"
@@ -22602,6 +22618,7 @@ private:
 #include "Backlog190rcCheck.inc" // round 190rc: #288 native presets, #287 MIDI drop, #283 #285 #286, PR #284, Discord 11-24
 #include "Bugs190rvCheck.inc" // round 190rv: 0.1.32 open bug issues (#317 header LED, #319 pin)
 #include "Q6Check190sa.inc" // round 190sa: 0.1.32 Q6 (files) + the Simple layout's sound drop
+#include "Issue325Check190sg.inc" // round 190sg: issue #325, a sample dropped on an audio clip replaces its channel's sample (FL)
 #include "Qa190rbCheck.inc" // round 190rb: the 0.1.32 quality round's crash / memory fixes, checked
 #include "Stab190rpCheck.inc" // round 190rp: 0.1.32 Q4 stability (recovery box, device lost, recovery round trip, sample 0)
 #include "Iox190rmCheck.inc" // round 190rm: the 0.1.32 import / export sweep (--convert190rm)
